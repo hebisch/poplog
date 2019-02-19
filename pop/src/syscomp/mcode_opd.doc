@@ -1,0 +1,68 @@
+MCODE_OPD.DOC                                           Simon Nichols  Nov 1986
+
+           REPRESENTATION OF ADDRESSING MODES IN M-CODE INSTRUCTIONS
+
+
+M-code operand type     Addressing mode
+-------------------     ---------------
+
+WORD                    register
+"Rn"                        VAX, 68K and GEC assemblers:    Rn
+
+INTEGER                 immediate
+n                           VAX/VMS and 68K  assemblers:    #n
+                            VAX/BSD assembler:              $n
+                            GEC assembler:                  r0!n
+                                where:  1) it is the operand of an immediate
+                                           instruction (e.g. ldwi)
+                                        2) -32768 <= n <= 32767
+
+REF                     immediate
+<ref 'label'>           The contents of the REF is a STRING, which is a label.
+                            VAX/VMS and 68K assemblers:     #label
+                            VAX/BSD                         $label
+
+STRING                  absolute
+'label'                 The string is an address label. In branch and compare
+                        instructions it will be a local label, i.e. the
+                        destination of a branch in the current procedure.
+                            VAX and 68K assemblers:         label
+                            GEC assembler:                  r7!label-pdr_label
+                                where:  1) r7 is the procedure base register
+                                        2) -pdr_label- labels the start of the
+                                           procedure
+VECTOR
+{^reg 0}                register indirect (deferred)
+                            VAX assemblers:     (reg)
+                            68K/Sun assembler:  reg@
+                            GEC assembler:      reg!0
+{^reg ^dis}             based (displacement)
+                            VAX assemblers:     dis(reg)
+                            68K/Sun assembler:  reg@(dis)       (a0-a7)
+                                                a2@(dis, reg:l) (d0-d7)
+                                where a2 always contains 0
+                            GEC assembler:      reg!dis
+{^reg ^false}           autodecrement
+                            VAX assemblers:     -(reg)
+                            68K/Sun assembler:  reg@-
+                            GEC assembler:      (-4)reg
+{^reg ^true}            autoincrement
+                            VAX assemblers:     (reg)+
+                            68K/Sun assembler:  reg@+
+                            GEC assembler:      reg(+4)
+{^reg ^dis ^reg'}       based indexed with displacement
+                            68K assembler:      reg@(dis, reg':l)
+                            GEC assembler:      reg!dis[reg']
+
+CONSPAIR                "double indirect" (VAX only), i.e. autoincrement
+[operand'|dis]          deferred or displacement deferred.
+                        The front of the operand will itself be an operand of
+                        type other than CONSPAIR. The back is a displacement:
+                        this is always zero on the VAX.
+                            VAX/VMS assembler:  @operand'
+                            VAX/BSD assembler:  *operand'
+
+
+Although not an addressing mode, it is worth mentioning for completeness that
+an operand of M-code compare instructions will be a condition, i.e. one of:
+    EQ, NEQ, LT, LEQ, GT, GEQ, ULT, ULEQ, UGT, UGEQ, NEG, POS, OVF, NOVF
