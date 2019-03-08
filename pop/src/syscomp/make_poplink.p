@@ -23,11 +23,11 @@ sys_unlock_heap();
 true -> pop_record_writeable;
 
 load lib.p
-load sysdefs.p
+compile(pop_architecture >< '/sysdefs.p');
 load mcdata.p
 load files.p
 load wordflags.p
-load asmout.p
+compile(pop_architecture >< '/asmout.p');
 load os_comms.p
 load w_util.p
 load w_module.p

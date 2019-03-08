@@ -28,18 +28,18 @@ constant macro POPC = true;
 
 
 load lib.p
-load sysdefs.p
+compile(pop_architecture >< '/sysdefs.p');
 load mcdata.p
 load files.p
 load wordflags.p
-load asmout.p
+compile(pop_architecture >< '/asmout.p');
 load os_comms.p
 load sysint.p
 load syspop.p
 load ident_labs.p
 load genfloat.p
 load genstruct.p
-load genproc.p
+compile(pop_architecture >< '/genproc.p');
 load pas_optimise.p
 load m_optimise.p
 load m_trans.p
