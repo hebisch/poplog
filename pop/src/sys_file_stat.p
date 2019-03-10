@@ -123,7 +123,7 @@ endsection;     /* $-Sys */
 --- John Williams, Aug  7 1992
         Got _stat and _lstat the wrong way round
 --- John Williams, Aug  7 1992
-        Optional extra boolean argument _______________follow_symlinks added
+        Optional extra boolean argument follow_symlinks added
 --- John Gibson, Sep 14 1991
         Removed N*ull_end
 --- John Williams, Mar 18 1991

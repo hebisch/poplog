@@ -1381,7 +1381,7 @@ define syntax define;
     endif;
 
 
-    ;;; check for define ____name = ...
+    ;;; check for define name = ...
     proglist -> savepl;
     Try_with(props, false) -> (props, nargs);
     if nextreaditem() == "=" then readitem() -> pdr_val endif;
@@ -1391,7 +1391,7 @@ define syntax define;
                     and (Sys$-Vm$-Passign_ident(assign_name) -> (,,));
 
     if pdr_val then
-        ;;; define ____name = ...
+        ;;; define name = ...
 
         define lconstant comp_expr();
             if pop11_comp_expr_to([enddefine ;]) == ";" then

@@ -27,10 +27,10 @@ lconstant
     tmpstring = writeable inits(1),
     ;
 
-    ;;; Determine if there is word in the dictionary that matches ____item
-    ;;; (if it's a word) or that has string ____item (if it's a string)
-    ;;; if not, add ____item if it's a word, or construct and add one with
-    ;;; string ____item.
+    ;;; Determine if there is word in the dictionary that matches item
+    ;;; (if it's a word) or that has string item (if it's a string)
+    ;;; if not, add item if it's a word, or construct and add one with
+    ;;; string item.
     ;;; Return word and true if word was in dictionary, false if not
 define Cons_word(item, _garbage_string) -> word;
     lvars   word, key, item, string, _wstring, _len, _offs, _saddr, _cell,

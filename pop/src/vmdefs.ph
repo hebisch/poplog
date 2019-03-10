@@ -71,7 +71,7 @@ lconstant macro (
     ;;; See Np_literal_offset in vm_conspdr.p
     _NONPOP_LIT             = _2:1e28,
 
-    ;;; Values for ____type arg to sysCONSTRUCT
+    ;;; Values for type arg to sysCONSTRUCT
     SCON_LIST               = 1,
     SCON_VECONS             = 2,
     SCON_VECTOR             = 3,

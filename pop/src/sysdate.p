@@ -46,7 +46,7 @@ struct TM
     long    TM_GMTOFF;
 #_ELSEIF DEF USE_TM_ZONE
     long    TM_GMTOFF;
-    <byte>  TM_ZONE;        ;;; <____type> means pointer field of C size
+    <byte>  TM_ZONE;        ;;; <type> means pointer field of C size
 #_ENDIF
   };
 
@@ -137,7 +137,7 @@ endsection;     /* $-Sys */
 --- John Gibson, Aug 15 1996
         Added :data after tzname
 --- John Gibson, Jun 30 1995
-        Changed to use lstackmem for ______secs.
+        Changed to use lstackmem for _secs.
 --- Robert John Duncan, Mar  3 1995
         Removed reference to RIS*COS
 --- John Gibson, Mar  2 1995

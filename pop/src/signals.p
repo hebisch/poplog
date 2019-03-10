@@ -67,7 +67,7 @@ lvars
 struct
   { int     PSC_SIG,
             PSC_CODE;
-    <code>  PSC_PC;             ;;; <____type> means pointer field of C size
+    <code>  PSC_PC;             ;;; <type> means pointer field of C size
     <byte>  PSC_ADDR;
     { long  PSC_SIGARRAY[];     ;;; VMS
     | long  PSC_RW_FLAG;        ;;; WIN32
@@ -398,7 +398,7 @@ define lconstant Raise_astp(p, lptr);
     pair -> ast_executing_list;
 
     ;;; apply procedure -- this must not change the stack
-    ;;; set cucharout to standard value in case _p does any printing
+    ;;; set cucharout to standard value in case p does any printing
     ;;; and cucharout is set to something special (like identfn)
     charout -> cucharout;
     _stklength() -> _slen;
@@ -446,7 +446,7 @@ define lconstant Raise_sig(sig, lptr);
     if flag == true then sig -> flag endif;     ;;; block self only
     ;;; run handler with appropriate signals blocked -- must not change the
     ;;; stack.
-    ;;; set cucharout to standard value in case _______handler does any printing
+    ;;; set cucharout to standard value in case handler does any printing
     ;;; and cucharout is set to something special (like identfn)
     procedure();
         dlocal cucharout = charout, % Sig_flag(flag, true) % = false;
@@ -459,10 +459,10 @@ define lconstant Raise_sig(sig, lptr);
     true
 enddefine;
 
-    /*  Process ast queue -- ____lptr points to preceding pair
+    /*  Process ast queue -- lptr points to preceding pair
         in queue (used for removing entries from the queue)
         initially it points to the dummy pair at the head of the
-        queue. ___ptr points to the current pair in the queue
+        queue. ptr points to the current pair in the queue
     */
 define lconstant Do_ast_queue(_async);
     lvars ptr, ast, lptr = Sys_ast_queue, _async;
@@ -687,7 +687,7 @@ endsection;     ;;; $-Sys
         Added dedicated handling code for SIG_CHILD in Async_raise_signal
 --- John Gibson, Apr 13 1994
         Various changes to allow AST procedure args to be a pair of the form
-        conspair(_p, _____flags) where bits in _____flags specify block conditions etc.
+        conspair(p, flags) where bits in flags specify block conditions etc.
 --- John Gibson, Jan 31 1994
         Reorganised ast code, and added Ast_Dont_Queue for use by syssleep
 --- John Gibson, Aug 19 1992

@@ -479,7 +479,7 @@ FIXED_ADDR:
             goto scan_propent_both
         endif;
         ;;; set DLINK to point to (new) self (only needed if put on
-        ;;; destroy_prop_chain, but UNTRACED overwrites ___old).
+        ;;; destroy_prop_chain, but UNTRACED overwrites _old).
         _old!FIRST -> _new!DPTE_DLINK;
         if not(_doing_saveincr) and UNTRACED(PTE_ARG) then
             ;;; clear VSCANNED and KEYSAV

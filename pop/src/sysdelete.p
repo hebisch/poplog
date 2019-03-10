@@ -82,7 +82,7 @@ endsection;     /* $-Sys$-Io */
 
 /* --- Revision History ---------------------------------------------------
 --- John Williams, Aug  7 1992
-        Added optional extra boolean argument _______________follow_symlinks to -sysdelete-
+        Added optional extra boolean argument follow_symlinks to -sysdelete-
 --- John Gibson, Mar 28 1988
         Moved out of sysio.p
  */

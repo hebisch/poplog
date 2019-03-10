@@ -232,10 +232,10 @@ define lconstant typed_move_instr(x, y, upd, acctype);
                     [^T_SGN_BYTE    {^M_MOVEsb    ^M_UPDb} ]
                     [^T_SHORT       {^M_MOVEs     ^M_UPDs} ]
                     [^T_SGN_SHORT   {^M_MOVEss    ^M_UPDs} ]
-                                        [^T_INT                 {^M_MOVEi  ^M_UPDi}]
-                                        [^T_SGN_INT             {^M_MOVEsi  ^M_UPDi}]
+                    [^T_INT         {^M_MOVEi     ^M_UPDi} ]
+                    [^T_SGN_INT     {^M_MOVEsi    ^M_UPDi} ]
                     [^T_WORD        {^M_MOVE      ^M_MOVE} ]
-                                        [^T_INT_DOUBLE          {^M_MOVE          ^M_MOVE} ]
+                    [^T_INT_DOUBLE  {^M_MOVE      ^M_MOVE} ]
                     ]);
 ;;;        printf(acctype, 'typed_move_instr: acctype = %p\n');
     type_m_opcode(acctype) -> op;

@@ -92,8 +92,8 @@ lvars
 
 ;;; --- APP- PROCEDURES -------------------------------------------------
 
-    /*  Apply the procedure _____app_p to the range of addresses
-        from ______addr to but (not including) ______addr@{______size}
+    /*  Apply the procedure app_p to the range of addresses
+        from _addr to but (not including) _addr@{_size}
     */
 define App_range(_addr, _size, app_p);
     lvars procedure app_p, _addr, _size;
@@ -104,7 +104,7 @@ define App_range(_addr, _size, app_p);
     endwhile
 enddefine;
 
-    /*  Apply _____app_p to an area of userstack in safe mode, i.e. check that
+    /*  Apply app_p to an area of userstack in safe mode, i.e. check that
         items encountered look like proper pop structures
     */
 define App_userstack_range(_addr, _size, app_p);
@@ -181,17 +181,17 @@ enddefine;
 
     /*  Apply app_p to a call stack, either the actual stack
         or saved in a process record.
-        ________sframe
+        _sframe
             points to the first frame
-        _______limit
+        _limit
             is the limit address for frames.
-        _____________retaddr_ptr
+        _retaddr_ptr
             points to the location containing the return address
-            into the owner procedure of ________sframe
+            into the owner procedure of _sframe
             (_NULL for processes, where return addresses are relativised)
-        _____app_p
+        app_p
             procedure to apply to address of full items
-        ___________app_owner_p
+        app_owner_p
             applied to the owner address and returns the
             actual address of the procedure record.
     */
@@ -260,15 +260,15 @@ define App_calls(_sframe, _limit, _retaddr_ptr, app_p, app_owner_p);
     endwhile
 enddefine;
 
-    /*  Clear the entries in a tmpclr property (________oldtab and ________newtab are the
+    /*  Clear the entries in a tmpclr property (_oldtab and _newtab are the
         same in a non-copying collection)
     */
 define Clear_proptab(prop, _oldtab, _newtab);
     lvars   prop, _oldtab, _newtab, _lim, _entry, _n,
-            _len = _newtab!V_LENGTH;    ;;; must get V_LENGTH from ________newtab
+            _len = _newtab!V_LENGTH;    ;;; must get V_LENGTH from _newtab
 
     if prop!PT_EXPAND then
-        ;;; adjust PT_COUNT (must use ________oldtab for counting the entries)
+        ;;; adjust PT_COUNT (must use _oldtab for counting the entries)
         _0 -> _n;
         _oldtab@V_WORDS[_len] -> _lim;
         _oldtab@V_WORDS -> _oldtab;
@@ -282,7 +282,7 @@ define Clear_proptab(prop, _oldtab, _newtab);
         prop!PT_COUNT fi_+ _pint(_n) -> prop!PT_COUNT
     endif;
 
-    ;;; clear all entries in ________newtab
+    ;;; clear all entries in _newtab
     _newtab@V_WORDS[_len] -> _lim;
     _newtab@V_WORDS -> _newtab;
     while _newtab <@(w) _lim do 0 -> _newtab!(w)++ -> _newtab endwhile
@@ -309,7 +309,7 @@ define App_roots(app_p, app_clrproptab_p, app_owner_p, scan_deferred_p,
             _allow_objmod_pad;
 
         define :inline lconstant APP(field=item);
-            ;;; test compound and garbageable first before calling _____app_p,
+            ;;; test compound and garbageable first before calling app_p,
             ;;; on the assumption that most won't be (the >=@(w) garblow test
             ;;; is done first since it's more likely to fail).
             if (_rec!field ->> work) >=@(w) garblow and iscompound(work) then
@@ -877,7 +877,7 @@ define Setup(_open_seg_reloc, need_copy);
     ;;; add open seg to seg table
     Tab_open_seg();
 
-    ;;; see if can do a copying gc (_________need_copy is an integer if doing
+    ;;; see if can do a copying gc (need_copy is an integer if doing
     ;;; sys_lock_system).
     unless (_open_seg_reloc _sgr _0 or need_copy or pop_gc_copy)
     and Setup_copy_gc(_open_seg_reloc, isinteger(need_copy)) then

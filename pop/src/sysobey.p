@@ -88,7 +88,7 @@ endsection;     /* $-Sys */
 
 /* --- Revision History ---------------------------------------------------
 --- John Gibson, May 27 1994
-        Locally set interrupt to identfn in parent if __________________may_do_term_output
+        Locally set interrupt to identfn in parent if may_do_term_output
         is true.
 --- John Gibson, Apr 19 1994
         Uses new sys_vfork/sys_wait

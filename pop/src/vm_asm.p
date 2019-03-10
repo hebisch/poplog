@@ -552,7 +552,7 @@ define rI_MOVEQ_LEX(instr);
 
     if _need_clos then
         ;;; need variable to store closure to avoid multiple creation
-        ;;; code sequence is  '__id or (_____________creat-closure ->> __id)'
+        ;;; code sequence is  'id or (creat-closure ->> id)'
         Lookup_home(pcr!PCR_CLOS_LVAR) -> id;
         Newlab([]) -> label;
         if vm_pas_mode then
@@ -600,7 +600,7 @@ define rI_MOVEI_LEX(instr);
     ;;; code to initialise clos lvar to closure if necessary
     if Push_lex_pdr(pcr) -> push_code then
         ;;; need variable to store closure to avoid multiple creation
-        ;;; code sequence is 'unless __id then (_____________creat-closure -> __id) endunless'
+        ;;; code sequence is 'unless id then (creat-closure -> id) endunless'
         Lookup_home(pcr!PCR_CLOS_LVAR) ->> id -> instr!INST_ARGS[_0];
         Newlab([]) -> label;
         if vm_pas_mode then
@@ -1252,7 +1252,7 @@ define Assemble_pdr(_nargs, props, d_list, l_list, nlgoto_var, rtid_args,
 
     ;;; produce procedure
     endcode -> fast_back(pcr!PCR_CODE_END);
-    ;;; add a label at the end of ________initcode so code optimisation can't
+    ;;; add a label at the end of initcode so code optimisation can't
     ;;; mix up it up with the user code
     Cons_procedure( initcode nc_<> Newlab_ref1(fast_back(pcr!PCR_CODE_LIST)),
                     d_list, _nargs, props, l_list, nonpop_l_list, plab_list,

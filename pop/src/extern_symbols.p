@@ -87,7 +87,7 @@ define Shlib_open(name, add_extn) -> handle;
         ;;; archive -- use module name shr.o
         name <> '(shr.o)' -> name
     endif;
-    ;;; if ____name ends with ')', assume it's libfoo.a(modname)
+    ;;; if name ends with ')', assume it's libfoo.a(modname)
     lvars _handle = _extern dlopen(Encode_sys(name,_nbuf),
                                 if isendstring(')', name) then _:DLOPEN_MFLAGS
                                 else _:DLOPEN_FLAGS
@@ -127,7 +127,7 @@ define Shlib_close(handle);
 enddefine;
 
     /* get the value of a symbol and assign it to the external pointer
-       _____value
+       value
     */
 define Shlib_findsym(handles, try_previous_p, symbol, value) -> success;
     lvars handles, try_previous_p, symbol, value, msg, success = false;

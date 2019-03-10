@@ -958,7 +958,7 @@ define make_package(names, used, size) -> pkg;
     Newpackage(names, size) -> pkg;
 
     unless endp(used) do
-        /* First package used cannot cause name conflicts when ___pkg is new */
+        /* First package used cannot cause name conflicts when pkg is new */
         Checkr_package(used!P_FRONT) -> u;
         [^u] -> pkg!PKG_USES;
         conspair(pkg, u!PKG_USERS) -> u!PKG_USERS;
@@ -1794,7 +1794,7 @@ lconstant macro CHECKR_VECTOR_INDEX =
     ];
 
 
-define fast_vector_access(i, vec);              /* N.B. _i is 0-origin */
+define fast_vector_access(i, vec);              /* N.B. i is 0-origin */
     lvars key;
     vec!KEY -> key;
     CHECKR_VECTOR_INDEX -> i;
@@ -1806,7 +1806,7 @@ enddefine;
 
 
 define updaterof fast_vector_access(i, vec) with_nargs 3;
-                                                /* N.B. _i is 0-origin */
+                                                /* N.B. i is 0-origin */
     lvars key;
     vec!KEY -> key;
     CHECKR_VECTOR_INDEX -> i;
@@ -1840,15 +1840,15 @@ endsection;     /* $-lisp */
 --- John Williams, Aug  7 1995
         Removed redundant lvar declarations.
 --- John Gibson, May 27 1995
-        Dlocal_frame_offset now takes a 3rd ___________nonactive argument
+        Dlocal_frame_offset now takes a 3rd _nonactive argument
 --- John Williams, May 16 1995
-        Fixed bug in call to type_error in _______________Checkr_sym_name.
+        Fixed bug in call to type_error in Checkr_sym_name.
 --- John Gibson, Apr  7 1995
         Revised key layout
 --- John Williams, Mar 15 1995
         Added name_error.
 --- John Williams, Mar 14 1995
-        ___________________Check_pkg_externals uses fast_subscrv instead of pointer arithmetic.
+        Check_pkg_externals uses fast_subscrv instead of pointer arithmetic.
 --- John Williams, Mar 14 1995
         Added `early' versions of type_error, control_error & package_error.
 --- John Williams, Dec  6 1994
@@ -1883,7 +1883,7 @@ endsection;     /* $-lisp */
 --- John Williams, Dec  9 1993
         Gen_package_iterator now always returns 4 values.
 --- John Williams, Dec  8 1993
-        Modified Gen_package_iterator's handling of _______uselist.
+        Modified Gen_package_iterator's handling of uselist.
 --- John Williams, Dec  7 1993
         Added Gen_package_iterator.
 --- John Williams, Nov  2 1993

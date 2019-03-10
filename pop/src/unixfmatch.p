@@ -123,7 +123,7 @@ define :inline lconstant MATCH_AT(T, MATCHP, S8_CMP, S16_CMP);
             "return";               ;;; make it return if it succeeds
             returnif(MATCHP(_cptr, fast_front(patt))) (false);
             () -> ;                 ;;; remove the "return" continuation
-            ;;; carry on with the continuation, skipping ______item chars
+            ;;; carry on with the continuation, skipping _item chars
             fast_back(patt) -> patt;
             goto m_NCHARS;
 
@@ -186,12 +186,12 @@ define sys_match_filename(name, patt) -> _result;
 enddefine;
 
 
-    /*  Match entries in directory ___dir against ____patt, returning a
-        list of entries according to the ____mode argument.
-        Returns <false> if ___dir doesn't exist/isn't a directory.
+    /*  Match entries in directory dir against patt, returning a
+        list of entries according to the mode argument.
+        Returns <false> if dir doesn't exist/isn't a directory.
     */
 
-    ;;; Bits in ____mode argument
+    ;;; Bits in mode argument
 lconstant macro (
     SUBDIR      = 2:1e0,    ;;; return sub-directories that match
     ORDFILE     = 2:1e1,    ;;; return ordinary files that match

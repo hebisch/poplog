@@ -29,7 +29,7 @@ endsection;
 
 section $-Sys => ident_declare;
 
-    ;;; Return ID_IDENTPROPS flags and ID_NUM_ATTRIBUTE value from _______idprops
+    ;;; Return ID_IDENTPROPS flags and ID_NUM_ATTRIBUTE value from idprops
 define Idprops_flags(token, idprops, _const);
     lvars idprops, prec, token, _num = _0, _active = _0, _const;
 

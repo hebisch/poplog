@@ -1055,7 +1055,7 @@ protected
 define vars sysGO_ON(/*lablist,*/ elselab);
     lvars lab, lablist, elselab, go_instr, base, _ichk;
     if isprocedure(elselab) then
-        ;;; code-planting procedure which will return (_______lablist, _______elselab, ____base)
+        ;;; code-planting procedure which will return (lablist, elselab, base)
         if pop_syntax_only then
             fast_apply(elselab) -> (, , );
             return
@@ -1136,8 +1136,8 @@ define vars sysLOCAL(token);
         enddefine;
 
         ;;; entry in dlexpr list is a 3- or 4-element vector
-        ;;;     { __________save-lvars ___________access-code ___________update-code _____actid }
-        ;;; where _____actid is present only for an active variable
+        ;;;     { save-lvars access-code update-code actid }
+        ;;; where actid is present only for an active variable
 
         initv(if actid then 4 else 3 endif) -> entry;
         [% repeat nvars times New_save_lvar(actid) endrepeat %]

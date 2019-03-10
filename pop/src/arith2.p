@@ -256,7 +256,7 @@ define Arith_2(x, y, _opsub);
         ;;; drop thru to CMPLX_REAL
 
     CMPLX_REAL:
-        ;;; ______type contains 0 of the appropriate type for imag part
+        ;;; _type contains 0 of the appropriate type for imag part
         chain(x, y, _type, fast_subscrv(_opsub, CXWEAK Complex_ops),
                                             CXWEAK Complex_op_cmplx_real);
 

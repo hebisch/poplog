@@ -128,7 +128,7 @@ enddefine;
 
 #_INCLUDE 'item_tables.ph'
 
-    /*  Default lex type for Unicode char ____uc in the range 0100 - FFFF
+    /*  Default lex type for Unicode char _uc in the range 0100 - FFFF
     */
 define lconstant unichar_lextype(_uc);
     lvars _t, _uc = _int(_uc), _xc = _uc _sub _16:100, _hi = _shift(_xc, _-8);
@@ -297,7 +297,7 @@ define lconstant Lex_put(putspace);
     endif
 enddefine;
 
-    /*  Set ____char to be the current character with type ____type
+    /*  Set char to be the current character with type type
     */
 define :inline lconstant LEX_RESTORE(char, type);
     char, 1 -> lexN, type -> lextype
@@ -1053,7 +1053,7 @@ enddefine;
 
 ;;; --- CHARACTER CONSTANT/STRING OPENER ------------------------------------
 
-    ;;; ___________closer_type is the closing type
+    ;;; closer_type is the closing type
 define lconstant read_strcon(closer_type);
     lvars   n, charcount = 0, c, curr_attr = 0, nextchar_attr = false,
             has_attr = false, closer_type, char_read = false, tmp;

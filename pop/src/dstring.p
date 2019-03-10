@@ -453,7 +453,7 @@ define updaterof subdstring(subdstr, _ssub, _len, dstring);
             _bfill(_0, @@(b)[_len], _aptr)
         endif
     elseif (subdstr!KEY!K_FLAGS ->> _flags) _bitst _:M_K_DSTRING then
-        ;;; check attributes in _______subdstr are zero
+        ;;; check attributes in subdstr are zero
         if _flags _bitst _:M_K_STRING16 then
             _DSTRING16_ATTR_PTR(subdstr, _0) -> _saptr
         else

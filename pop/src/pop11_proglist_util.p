@@ -60,7 +60,7 @@ define Next_is_equal(nxtitem, choices);
         returnunless(isvector(choices) and subscrv(1,choices) == nxtitem)
                                     (false)
     endif;
-    ;;; only if _______nxtitem is syntax
+    ;;; only if nxtitem is syntax
     returnunless(isword(nxtitem)) (false);
     if testdef sys_current_ident then
         weakref sys_current_ident(nxtitem)

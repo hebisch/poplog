@@ -229,7 +229,7 @@ define Copy_vedstring(string) -> new;
 enddefine;
 
 
-    /*  ____char is false if substring is being shifted out
+    /*  _char is false if substring is being shifted out
     */
 define Set_subvedstring(_char, _col, string, _ncols);
     lvars   string, dvec, data, _ptr, _lim, _i, _col, _ncols, _lcol, _n,

@@ -101,7 +101,7 @@ define lconstant Get_ratio(num, den) -> ratio;
     endif
 enddefine;
 
-    /*  reduce integers _u and _v to their lowest common terms, with _v +ve
+    /*  reduce integers u and v to their lowest common terms, with v +ve
     */
 define lconstant Rat_reduce(u, v);
     lvars g, u, v;
@@ -109,8 +109,8 @@ define lconstant Rat_reduce(u, v);
         return(0, 1)
     elseif pop_reduce_ratios then
         Intgr_gcd(u, v) -> g;       ;;; v /== 0 (see intarith.p)
-        ;;; _g is now the gcd -- make sure sign(_g) = sign(_v) so that the
-        ;;; denominator _v/_g is positive
+        ;;; g is now the gcd -- make sure sign(g) = sign(v) so that the
+        ;;; denominator v/g is positive
         if Intgr_neg(v) /== Intgr_neg(g) then
             Intgr_negate(g) -> g
         endif;

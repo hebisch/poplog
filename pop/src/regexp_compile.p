@@ -302,7 +302,7 @@ define regexp_compile(inputstr) -> regexp_p -> err;
                 return(Error_map(13) -> err); ;;; ERROR
             endif;
             if i /== CBACK then
-                ;;; because the last character is repeated ____zero or more times,
+                ;;; because the last character is repeated zero or more times,
                 ;;; we must discount it from minlength
                 minlength - 1 -> minlength
             endif;
@@ -509,7 +509,7 @@ define regexp_compile(inputstr) -> regexp_p -> err;
                 nextloop;
 
             elseif c >= `1` and c <= `9` then
-                ;;; @_n where n is a digit refers back to a sub-expression
+                ;;; @n where n is a digit refers back to a sub-expression
                 if (c - `0` ->> c) > closed then
                     return(Error_map(11) -> err); ;;; ERROR
                 endif;

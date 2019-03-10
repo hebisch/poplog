@@ -853,7 +853,7 @@ define copy_fixed(item);
     endif;
 enddefine;
 
-    /*  N.B. The ____hold arg for this must be true if supplied (since
+    /*  N.B. The hold arg for this must be true if supplied (since
         false is interpreted as no encoding)
     */
 define sys_encode_string_fixed(string);

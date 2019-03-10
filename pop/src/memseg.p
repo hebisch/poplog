@@ -96,7 +96,7 @@ define Is_updateable(item);
                     or item <@(w) _seg!SEG_BASE_PTR) (true)
     enduntil;
 
-    ;;; ____item is in ___seg
+    ;;; item is in seg
     not(_seg!SEG_FLAGS _bitst _M_SEG_CONSTANT)
 enddefine;
 

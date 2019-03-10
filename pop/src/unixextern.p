@@ -968,9 +968,9 @@ enddefine;
 define lconstant Convert_symbols(symbol_list, fprintf);
     lvars spec, symname, lang, symbol_list, fprintf;
     fast_for spec in symbol_list do
-        ;;; ____spec is a vector where ____spec(1) is the symbol name as a word or
-        ;;; string, and ____spec(2) is a language name string (or a pair
-        ;;; conspair(_________lang-name, ____type), where ____type is used only by Popc).
+        ;;; spec is a vector where spec(1) is the symbol name as a word or
+        ;;; string, and spec(2) is a language name string (or a pair
+        ;;; conspair(lang-name, type), where type is used only by Popc).
         ;;; If symbol name is a string, take it as is, otherwise do standard
         ;;; O/S conversion on it, taking language name into account.
         Name_translate(spec(1),
@@ -1083,7 +1083,7 @@ define lconstant shlib_searchlist() -> (extras, searchlist);
 enddefine;
 
     /*  convert linker arguments to a list of shared libraries to be
-        loaded and add these to the _________link_item; the _____dummy argument is
+        loaded and add these to the link_item; the dummy argument is
         for compatibility with the other interface defined below
     */
 define lconstant process_link_args(args, dummy, link_item);
@@ -1111,7 +1111,7 @@ define lconstant process_link_args(args, dummy, link_item);
         lvars arg, b;
 #_IF DEF AIX
         if (locchar(`(`, 1, arg) ->> b) and isendstring(')', arg) then
-            ;;; assume ___arg ends with module name (...)
+            ;;; assume arg ends with module name (...)
             b fi_- 1 -> b;
             return( substring(1, b, arg), allbutfirst(b, arg) )
         endif;
@@ -1233,7 +1233,7 @@ define lconstant get_symbols(handles, names, values) -> success;
     endfor;
 enddefine;
 
-    /* open the shared libraries and load the symbols for a _________link_item
+    /* open the shared libraries and load the symbols for a link_item
     */
 define lconstant Link_load(link_item);
     lvars link_item;
@@ -1645,7 +1645,7 @@ endsection;     /* $-Sys$-Extern */
 --- Robert Duncan, Sep  6 1996
         Fixed NCR version of shlib_open to include GLOBAL mode flag
 --- John Gibson, Aug 16 1996
-        Changed Convert_symbols to allow for ____spec(2) being a pair with the
+        Changed Convert_symbols to allow for spec(2) being a pair with the
         symbol type in the back.
         Removed Do_p*opc_load.
 --- Robert Duncan, Aug  9 1996
@@ -1675,7 +1675,7 @@ endsection;     /* $-Sys$-Extern */
 --- Robert John Duncan, May 27 1994
         Enabled use of shared libraries for IRIX 5
 --- Robert John Duncan, May 23 1994
-        Changed library search under Solaris to look in the image ______before
+        Changed library search under Solaris to look in the image before
         any dynamically-loaded shared objects.
 --- John Gibson, Apr  8 1994
         Changed Temp_name to use $TMPDIR if defined

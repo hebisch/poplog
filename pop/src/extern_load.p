@@ -170,8 +170,8 @@ define external_do_load(mark, objfiles, symbol_list);
 
     if vm_pas_mode == "popc" then
         ;;; Just return null external pointers with symbol names of the form
-        ;;;         [_________lang-name/]______symbol[:____type]
-        ;;; (where _________lang-name = ASM means no conversion).
+        ;;;         [lang-name/]symbol[:type]
+        ;;; (where lang-name = ASM means no conversion).
         fast_for spec in symbol_list do
             Get_symbol_ptr(spec) -> exptr;
             false -> type;

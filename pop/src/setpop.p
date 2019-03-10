@@ -150,7 +150,7 @@ vars
 define lconstant Get_arg_list(_address);
     lvars _address, _arg, _char;
     [%  until _zero(_address!(<b>)++ -> _address ->> _arg) do
-            ;;; _____arg is the address of a null terminated string
+            ;;; _arg is the address of a null terminated string
             Consstring_bptr(_arg, _-1, CSB_FIXED)
         enduntil
     %]          ;;; return list of arg strings

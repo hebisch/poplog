@@ -226,7 +226,7 @@ define System_error(_sig, _fault_code, _pc, _fault_addr);
     if _sig == _:SIG_SEGV then
         ;;; segmentation violation
 #_IF DEF SUNOS or DEF MIPS or DEF OSF1 or DEF NCR or DEF AIX or DEF DGUX or DEF LINUX
-        ;;; ____________fault_addr is reliable
+        ;;; _fault_addr is reliable
         'serr: MEMORY ACCESS VIOLATION (see above)' -> ms;
         if
   #_IF DEF AIX      ;;; stupid AIX doesn't have etext
@@ -786,13 +786,13 @@ define sys_raise_exception(count, message, severity);
     dlocal  raise_exception_idstring, _handler_sframe, _handler_sflim;
 
     if isinteger(count) then
-        ;;; _____count, ____mess
+        ;;; count, mess
         nullstring -> raise_exception_idstring
     elseif isstring(message) then
-        ;;; _____count, ____mess, _________________idstring_or_false
+        ;;; count, mess, idstring_or_false
         ((), count, message) -> (count, message, raise_exception_idstring)
     else
-        ;;; ____mess, ________itemlist
+        ;;; mess, itemlist
         destlist(message), count -> (count, message);
         nullstring -> raise_exception_idstring
     endif;

@@ -76,7 +76,7 @@ enddefine;
         Changed pdtolist to use Ensure_writeable rather than writeable (latter
         sets writeable_ignored true)
 --- John Williams, Jun 29 1993
-        Reversed order of arguments to ____eq_p in fast_ncdelete (cf. BR ianr.42)
+        Reversed order of arguments to eq_p in fast_ncdelete (cf. BR ianr.42)
 --- John Gibson, Oct 12 1991
         Made -fast_ncdelete- take optional eq_p and number-to-delete args
 --- John Gibson, Apr  9 1988

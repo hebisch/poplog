@@ -482,7 +482,7 @@ define cons_access(want_p_spec, spec, checking, exptr);
     endif
 enddefine;
 
-    /*  Return the base type bitsize of ____spec and its value spec (or
+    /*  Return the base type bitsize of spec and its value spec (or
         false if there are access/conversion procedures)
     */
 define field_spec_info(spec) -> (spec, n);

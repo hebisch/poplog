@@ -1045,7 +1045,7 @@ define vars sysEXECUTE();
     ;;; NOTE that a sys_lock_system could have happened ...
 enddefine;
 
-    /*  Compile_code with _________compile_p, and then execute.
+    /*  Compile_code with compile_p, and then execute.
     */
 protected
 define vars sysEXEC_COMPILE(compile_p, flags);
@@ -1203,7 +1203,7 @@ enddefine;
 
     /*  Run compile procedure with the option of executing
         code planted on return from procedure.
-        If _________compile_p returns true, code is detached from current
+        If compile_p returns true, code is detached from current
         procedure and executed.
     */
 protected

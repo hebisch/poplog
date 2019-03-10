@@ -99,7 +99,7 @@ endsection;     /* $-Sys */
 --- John Gibson, Jun 20 1996
         Made it cancel all timers before doing the exec.
 --- John Gibson, Apr 29 1996
-        Allowed ________execfile to be given in a ref to say use execvp instead
+        Allowed execfile to be given in a ref to say use execvp instead
         of execve.
 --- John Gibson, Mar 16 1995
         Rewritten to use a rawstruct to pass the args/envvars (so it works

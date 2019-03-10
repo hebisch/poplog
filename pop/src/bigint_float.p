@@ -15,7 +15,7 @@
 
 section $-Sys;
 
-    /*  Return double float operand ____df as a bigint
+    /*  Return double float operand _df as a bigint
     */
 define Dfloat_->_bigint(_df);
     lvars   result, _Raddr, _df, _nbits, _ms, _nslices, _Rstart, _Rlim,
@@ -35,7 +35,7 @@ define Dfloat_->_bigint(_df);
     _nbits -> _pf_expof(_df) -> ;       ;;; nbits of integer
     _pf_intof(_df) -> -> _ms;
     if _neg(_ms) then
-        ;;; negative -- add 2**_____nbits
+        ;;; negative -- add 2**nbits
         _nbits _add _1 -> _pf_expof(_df_1) -> ;
         _pfadd(_df, _df_1) -> ;
         (_pf_intof(_df) ->) _add _shift(_-1, _nbits) -> _ms;
@@ -71,9 +71,9 @@ enddefine;
 
 ;;; --- BIGINT -> FLOAT --------------------------------------------------
 
-    /*  Float ____bint into double float operand ____df, with ____________adjust_exp added
+    /*  Float bint into double float operand _df, with _adjust_exp added
         to exponent. Return true/false for no overflow/overflow if
-        _____________want_result is true, else mishap on overflow
+        _want_result is true, else mishap on overflow
     */
 define Bigint_->_dfloat(bint, _df, _adjust_exp, _want_result);
     lvars nbits, bint, _addr, _df, _len, _adjust_exp, _want_result;

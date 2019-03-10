@@ -70,7 +70,7 @@ endsection;     /* $-Sys */
 
 /* --- Revision History ---------------------------------------------------
 --- John Gibson, Mar 14 1997
-        When given _______sepchar, made it call _p on nullstring for empty fields
+        When given sepchar, made it call p on nullstring for empty fields
         (otherwise you can't parse e.g. a line of comma-separated fields
         correctly).
 --- John Gibson, Apr 17 1996

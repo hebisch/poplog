@@ -172,7 +172,7 @@ enddefine;
     */
 define sys_vfork(/*will_do_wait*/) with_nargs 1;
     unless _vfork_child then
-        ;;; leave the args on the stack but check ____astp
+        ;;; leave the args on the stack but check astp
         if isboolean(dup()) then false else Check_astp_arg(dup()) endif;
         ;;; make sure there's plenty of free heap space before doing the
         ;;; FIRST vfork -- if it isn't enough, things will go wrong ...

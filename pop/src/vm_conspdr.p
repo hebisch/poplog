@@ -232,7 +232,7 @@ enddefine;
 ;;; --- OPTIMISED INSTRUCTIONS INSIDE Cons_procedure ------------------------
 
 
-    /*  Replace the current instruction with ____code
+    /*  Replace the current instruction with code
     */
 define lconstant Replace_instr(code);
     lvars code, clist = asm_clist, next;
@@ -370,7 +370,7 @@ CHANGE_LAB:
         _pint(_test _sub _:M_LAB_REF1) -> fast_front(list)
     endif;
 
-    ;;; increment ref count for new label _____clist
+    ;;; increment ref count for new label clist
     clist -> source!INST_ARGS[_0];      ;;; insert new label
     _int(fast_front(clist)) -> _test;
     if _neg(_test) and not(_test _bitst _:M_LAB_REFMAX) then
@@ -437,7 +437,7 @@ define I_NBOOL_opt();
             instr %], Replace_instr)
 enddefine;
 
-    /*  {I_CMP _________routine ________operand1 ________operand2}
+    /*  {I_CMP _routine operand1 operand2}
         call compare subroutine or optimise in-line with a following I_IF
     */
 define I_CMP();
@@ -476,9 +476,9 @@ define I_CMP();
     chain((), Replace_instr)
 enddefine;
 
-    /*  {I_TAG_TEST _________routine _______operand}
+    /*  {I_TAG_TEST _routine operand}
         call tag-test subroutine or optimise in-line with a following I_IF
-        (where _________routine is _iscompound, _issimple or _isinteger)
+        (where _routine is _iscompound, _issimple or _isinteger)
     */
 define I_TAG_TEST();
     lvars instr, ifinstr, opnd;

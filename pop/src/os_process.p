@@ -59,7 +59,7 @@ define Get_os_process_trap();
                 flags fi_|| OSPROCF_DEAD -> fast_subscrv(OSPROC_FLAGS,proc);
                 unless flags &&/=_0 OSPROCF_WILL_WAIT then
                     ;;; will not do a sys_wait for this process, so can
-                    ;;; remove ____proc entry now
+                    ;;; remove proc entry now
                     fast_back(pair) -> if lpair then fast_back(lpair)
                                        else os_process_list
                                        endif

@@ -146,7 +146,7 @@ lconstant
 
 define lconstant Set_channel(fname);
     lvars fname;
-    ;;; set _sr_channel to be channel for _____fname opened in user mode -- this
+    ;;; set _sr_channel to be channel for fname opened in user mode -- this
     ;;; will be used to map the heap onto the file
     fname@V_BYTES -> _work_ufofab!FAB$L_FNA;        ;;; filename addr
     fname!V_LENGTH -> _work_ufofab!FAB$B_FNS;   ;;; filename length
@@ -251,8 +251,8 @@ define lconstant Update_nonpop_seg_used(saving);
 enddefine;
 
 
-    /*  Map or read the pages offset-size _______poffs at page address _______paddr,
-        starting at (page aligned) __________fileoffs on the restore file
+    /*  Map or read the pages offset-size _poffs at page address _paddr,
+        starting at (page aligned) _fileoffs on the restore file
         (channel/file descriptor in _sr_channel).
     */
 define lconstant Map_or_read(_paddr, _poffs, _fileoffs, _const, _share);
@@ -848,7 +848,7 @@ define Restore_cs_ptrs(id_vec);
                 endprocedure)
 enddefine;
 
-    /*  The ____file argument may be a boolean, in which case the file is
+    /*  The file argument may be a boolean, in which case the file is
         next on the stack.
     */
 define lconstant Do_Restore(file, _layering, _sframe, _retaddr_ptr);
@@ -890,7 +890,7 @@ define lconstant Do_Restore(file, _layering, _sframe, _retaddr_ptr);
         mishap(0, 'RESTORE PROHIBITED BY EXTERNAL LOAD/MEMORY FACTORS')
     endif;
 
-    ;;; Open the save file (the ____file argument may be a boolean or an ident,
+    ;;; Open the save file (the file argument may be a boolean or an ident,
     ;;; in which case the file is next on the stack).
     if Open(file, '.psv', #_< [^PSVP_MAGIC ^PSVS_MAGIC] >_#) ->> fname then
         -> (_sysend, _magicnum)
@@ -1111,7 +1111,7 @@ enddefine;
 ;;; --- RESTORING SAVED IMAGES ON STARTUP --------------------------------
 
     /*  Try to restore saved images from poparglist args, using
-        ________dir_list as the directories to look in, and ____________default_extn
+        dir_list as the directories to look in, and default_extn
         for args that don't have one.
     */
 define Init_restore(dir_list, default_extn);

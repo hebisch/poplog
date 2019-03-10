@@ -119,7 +119,7 @@ endsection;
 --- John Gibson, Dec  4 1995
         Uses lmember_= instead of mem*ber
 --- Robert John Duncan, Aug 11 1995
-        Changed _________remainder value in encrypt to 89 for Version 15
+        Changed remainder value in encrypt to 89 for Version 15
 --- John Gibson, Jul 29 1995
         Made Poplog_Main assign "pop11" to subsystem if false
 --- Robert John Duncan, May 23 1995
@@ -131,7 +131,7 @@ endsection;
         displayed with the password prompt to save users having to type
         obscure shell commands to get hold of it.
 --- John Gibson, Jan 28 1995
-        Changed _________remainder value in encrypt to 97 for normal system.
+        Changed remainder value in encrypt to 97 for normal system.
 --- John Gibson, Dec 12 1994
         Changed CPU check dates to 1998.
 --- John Gibson, Jun 17 1993

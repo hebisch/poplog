@@ -69,19 +69,19 @@ define Coalesce_heap_segs();
                 ;;; not contiguous, or insufficient free space for a string
                 _seg -> _last_seg
             else
-                ;;; can coalesce _seg with __________last_seg, filling any unused
-                ;;; space in __________last_seg with a string
+                ;;; can coalesce _seg with _last_seg, filling any unused
+                ;;; space in _last_seg with a string
                 unless _zero(_free) then
                     ;;; fill space (with a string)
                     Make_filler_struct(_last_seg!SEG_FREE_PTR, _free)
                 endunless;
                 _seg!SEG_FREE_PTR -> _last_seg!SEG_FREE_PTR;
                 _seg!SEG_SIZE _add _last_seg!SEG_SIZE -> _last_seg!SEG_SIZE;
-                ;;; remove _____seg entry by shifting down rest
+                ;;; remove _seg entry by shifting down rest
                 _seg@(struct SEG)++ -> _ptr;
                 _moveq(@@(w){_seg_table_next_free, _ptr}, _ptr, _seg)
                                     -> _seg_table_next_free;
-                nextloop        ;;; leave _____seg alone for next loop
+                nextloop        ;;; leave _seg alone for next loop
             endif
         endif;
         _seg@(struct SEG)++ -> _seg

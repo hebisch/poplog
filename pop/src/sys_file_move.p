@@ -78,7 +78,7 @@ define sys_file_move(from_name, to_name);
     Symlink_target(from_name, _flags _bitst _2:01) -> from_name;
     Symlink_target(to_name, _flags _bitst _2:10) -> to_name;
 
-    ;;; check _________from_name can be deleted
+    ;;; check from_name can be deleted
     unless (File_nlinks(Fname_path(from_name, true), false) ->) then
         ;;; no write access in directory
         Syserr_mishap(from_name, 1, errms)
@@ -105,7 +105,7 @@ define sys_file_move(from_name, to_name);
         returnif(_nonneg(_res)) (sysunlink(from_name) ->);
 
         if _ERRNO == _:EEXIST then
-            ;;; _______to_name exists already
+            ;;; to_name exists already
             if isinteger((File_nlinks(to_name, false) ->) ->> nlinks) then
                 if nlinks fi_<= 1 then
                     Move_file_back(to_name, true) -> (,);
@@ -138,7 +138,7 @@ endsection;     /* $-Sys$-Io */
         Added Encode_sys calls as appropriate
 --- John Gibson, Jun  6 1995
         Fixed it to cope with case where _:EEXIST is returned rather than
-        _:EXDEV when _______to_name exists and is on a different device.
+        _:EXDEV when to_name exists and is on a different device.
 --- John Gibson, Jun  2 1995
         Made sys_file_move take optional integer arg where 2:01 = deref
         source symlinks, 2:10 = deref target symlinks, or boolean true = 1,

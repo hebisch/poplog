@@ -70,7 +70,7 @@ lvars
 
 ;;; --- TTY PARAMETER MANIPULATION ---------------------------------------
 
-    /*  Set a terminal's parameters corresponding to ____arg3
+    /*  Set a terminal's parameters corresponding to arg3
     */
 define lconstant Tty_param_init(ttyparams, arg3);
     lvars ttyparams, arg3;
@@ -376,7 +376,7 @@ define lconstant Do_read(/*_bindx, buff, _nbytes,*/ dev, timclos)
         lvars   buff, prompt, promptstring, _flags = dev!D_FLAGS,
                 _count, _read_lives = _3, _bindx, _nbytes, _save_termio_done;
 
-        ;;; If async input is enabled for ____fd, turn checking off
+        ;;; If async input is enabled for _fd, turn checking off
         ;;; during the read
         dlocal 0 %  if dlocal_context fi_<= 2 then
                         _extern _pop_set_async_check(_0, _fd, _:RD_SET) ->
@@ -476,7 +476,7 @@ define lconstant Do_read(/*_bindx, buff, _nbytes,*/ dev, timclos)
 enddefine;      /* Do_read */
 
     /*  Read record orientated file type device (disk, tape, etc)
-        i.e. supply ________nchars if possible
+        i.e. supply _nchars if possible
     */
 define lconstant File_read(dev, _csub, userbuf, _nchars);
     lvars   buf = dev!D_IN_BUFFER, dev, userbuf, _count, _take,
@@ -788,7 +788,7 @@ define lconstant Do_write(/* _bindx, buf, _nbytes, */ dev);
     define lconstant Blocking(_bindx, buf, _nbytes);
         lvars   buf, _bindx, _nbytes, _nwrit, _write_lives = _4;
 
-        ;;; If async output is enabled for ____fd, turn checking off
+        ;;; If async output is enabled for _fd, turn checking off
         ;;; during the write
         dlocal 0 %  if dlocal_context fi_<= 2 then
                         _extern _pop_set_async_check(_0, _fd, _:WR_SET) ->
@@ -1362,7 +1362,7 @@ define Sys_fd_open_check(_result, _close_on_exec, _retry) /* -> _retry */;
     endif
 enddefine;
 
-    /*  ______mode is the permissions when ________oflags specifies create
+    /*  _mode is the permissions when _oflags specifies create
     */
 define Opencreate(file, fullname, _oflags, _mode) -> _fd;
     lvars   fullname, file, _oflags = _int(_oflags), _mode = _int(_mode),
@@ -1451,8 +1451,8 @@ endsection;     /* $-Sys$-Io */
         Added disabling of LNEXT control character for USE_TERMIOS raw mode
         in Tty_param_init
 --- John Gibson, Jan 29 1994
-        Changed Opencreate to use _extern open with modern ________oflags and
-        ______mode args.
+        Changed Opencreate to use _extern open with modern _oflags and
+        _mode args.
 --- John Gibson, Sep 28 1993
         Added Sync_or_close
 --- Robert John Duncan, Feb  9 1993

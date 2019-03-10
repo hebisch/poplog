@@ -538,7 +538,7 @@ enddefine;
 
 
     /*  Do a garbage collection that shifts the open seg to make
-        a gap of word offset size _________gapsize below it (_________gapsize
+        a gap of word offset size _gapsize below it (_gapsize
         representing an exact number of pages). Any unused space
         in a fixed-address segment below is absorbed into the gap.
     */
@@ -846,7 +846,7 @@ define Sysgarbage(_do_mem_adjust, why);
         weight_val(_fxd_creat,  _Wtd_fxd_creat) -> _Wtd_fxd_creat;
         weight_val(_all_creat,  _Wtd_all_creat) -> _Wtd_all_creat;
 
-        ;;; ensure ___all >= _____fixed (so (___all<<7)/_____fixed computed below
+        ;;; ensure all >= fixed (so (all<<7)/fixed computed below
         ;;; can't be zero)
         if _Wtd_fxd_creat _sgr _Wtd_all_creat then
             _Wtd_fxd_creat -> _Wtd_all_creat
@@ -934,7 +934,7 @@ define Sysgarbage(_do_mem_adjust, why);
         @@(vpage){_open_seg_base_ptr, Open_seg_shift_gap_base()}
                                             ->> _actual_gap -> _gapsize;
         if _do_mem_adjust == true and testdef free_block_key then
-            ;;; if ___________gapsize_arg then arg is neg -- called from Alloc_store.
+            ;;; if gapsize_arg then arg is neg -- called from Alloc_store.
             ;;; Decrement gap by given amount if over popmemlim
             if gapsize_arg
             and _int(max_mem_lim) _slt _Ms_total _sub ##(w){_int(gapsize_arg)}
@@ -1410,7 +1410,7 @@ define Get_record(key) -> rec;
     key -> rec!KEY
 enddefine;
 
-    /*  Init a rawstruct for ________nwords words of space
+    /*  Init a rawstruct for _nwords words of space
     */
 define Init_rawstruct(_nwords) -> _rs;
     lvars _nwords, _rs, _wsize = @@V_WORDS[_nwords] _sub @@POPBASE;

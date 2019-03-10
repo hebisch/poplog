@@ -35,7 +35,7 @@ define property_equal(prop1, prop2);
     dlvars val_eq_p = false, prop2;
 
     unless isproperty(prop2) do
-        /* Assume user supplied ________val_eq_p */
+        /* Assume user supplied val_eq_p */
         Check_procedure(prop2);
         prop2 -> val_eq_p;
         prop1 -> prop2;

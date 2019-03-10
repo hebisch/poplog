@@ -40,7 +40,7 @@ define issubstring_lim(substr, _index, _start_lim, _end_lim, string);
         _len -> _start_lim
     endif;
 
-    ;;; set the actual limit of significant characters of ______string to _________end_lim
+    ;;; set the actual limit of significant characters of string to _end_lim
     if _end_lim then
         Check_integer(_end_lim, 1);
         _int(_end_lim) -> _end_lim;
@@ -49,7 +49,7 @@ define issubstring_lim(substr, _index, _start_lim, _end_lim, string);
         _len -> _end_lim
     endif;
 
-    ;;; set limit defined by ___________start_lim and length of substring
+    ;;; set limit defined by _start_lim and length of substring
     substr!V_LENGTH -> _sublen;
     _start_lim _add _sublen -> _start_lim;
     if _start_lim _lt _end_lim then _start_lim -> _end_lim endif;

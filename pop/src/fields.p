@@ -90,7 +90,7 @@ lconstant
 
 lconstant pop_invalid = 'INVALID FIELD SPEC FOR RECORDCLASS/VECTORCLASS';
 
-    /*  Round ______offset to a multiple of ____mult bits
+    /*  Round offset to a multiple of mult bits
     */
 define lconstant round_mult(offset, mult);
     lvars offset, mult;
@@ -511,8 +511,8 @@ enddefine;      /* Convert_rec_speclist */
 
     /*  Function spec is a 2-element vector.
             spec(1) is the number of args or false, or a pair containing
-            that in the front and the _________fltsingle arg in the back.
-            The _________fltsingle arg is (big)integer in which bit N set
+            that in the front and the fltsingle arg in the back.
+            The fltsingle arg is (big)integer in which bit N set
             specifies that a (d)decimal passed for the (N+1)th arg
             should be passed as sfloat rather than (the default) dfloat.
 
@@ -535,11 +535,11 @@ define Convert_func_spec(spec, exptr) -> fdesc;
         if ispair(nargs) then
             destpair(nargs)
         else
-            nargs, 0    ;;; default _________fltsingle to 0
+            nargs, 0    ;;; default fltsingle to 0
         endif -> (nargs, fltsingle);
         if not(nargs) or (isinteger(nargs) and nargs fi_>= 0) then
             true -> spec_ok;
-            ;;; check _________fltsingle within range of signed machine word and then
+            ;;; check fltsingle within range of signed machine word and then
             ;;; convert back to unsigned popint
             Uint_->_pint(Pint_->_sint(fltsingle, _MOST_POSITIVE_SIGNED(w)))
                                         -> fltsingle
@@ -910,7 +910,7 @@ endsection;     /* $-Sys$-Fld */
             FLWEAK Float_val_s_C -> fsv(FD_VAL_SPEC,fdesc)
 
 --- John Gibson, Nov  4 1996
-        Changed Field_instrs to take extra _________subs_opnd argument, and generate
+        Changed Field_instrs to take extra subs_opnd argument, and generate
         new-style I_PUSH/POP_FIELD(_ADDR) instructions when
         DEF OLD_FIELD_INSTRUCTIONS is false.
 --- John Gibson, Jun  3 1996

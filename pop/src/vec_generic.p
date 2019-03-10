@@ -19,7 +19,7 @@ section $-Sys => sysanyvecons;
 
 ;;; --- HASHING PROCEDURES --------------------------------------------
 
-    /*  Hash a sequence of _____len chars. These procedures are used (amongst other
+    /*  Hash a sequence of _len chars. These procedures are used (amongst other
         things) for getting the bucket of a string in the dictionary.
         If the size of the dictionary or the hashing algorithm is changed,
         the corresponding procedure word_dict_cell in src/syscomp/w_util.p

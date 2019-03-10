@@ -104,7 +104,7 @@ enddefine;
     /*  Return a bigint result, first truncating unwanted sign-extension
         slices, then returning an integer if possible.
         Also returns the new end address of the structure.
-        (N.B. ____bint can be a constant nonwriteable bigint, so musn't be
+        (N.B. bint can be a constant nonwriteable bigint, so musn't be
         changed unless it is truncatable (which a constant won't be).)
     */
 define Bigint_return(bint);
@@ -132,7 +132,7 @@ define Bigint_return(bint);
         endwhile
     endif;
 
-    ;;; _____len is now the correct length -- see if can return an integer
+    ;;; _len is now the correct length -- see if can return an integer
     if _len _lteq _:POPINT_SLICES then
 #_IF POPINT_SLICES == 2
         if _len == _1 then

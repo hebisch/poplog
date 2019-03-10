@@ -81,7 +81,7 @@ define sysflush(dev);
     endif
 enddefine;
 
-    /*  Make all terminal devices in ________dev_list referencing the same
+    /*  Make all terminal devices in dev_list referencing the same
         actual terminal have the same D_CTRL_BLK structure
     */
 define sys_link_tty_params(dev_list);

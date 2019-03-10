@@ -130,7 +130,7 @@ define Move_file_back(file, remove) -> (_nlinks, _mode);
 
     _pint(_fmode _bimask _8:7777) -> _mode;
     if pop_file_versions fi_<= 1 then
-        ;;; must remove name if ______remove true
+        ;;; must remove name if remove true
         if remove then sysunlink(file, true) -> endif;
         return
     endif;
@@ -185,7 +185,7 @@ endsection;     /* $-Sys$-Io */
 --- John Gibson, Mar  8 1997
         Added calls of Encode_sys etc.
 --- John Gibson, Jun  2 1995
-        Added extra _______________follow_symlinks arg to File_nlinks
+        Added extra follow_symlinks arg to File_nlinks
 --- John Gibson, Jun 23 1994
         Fixed bug in Move_file_back caused by last change
 --- John Gibson, Jun 13 1994

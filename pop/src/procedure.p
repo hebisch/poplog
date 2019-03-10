@@ -114,14 +114,14 @@ define updaterof fast_frozval();
 enddefine;
 
 
-    /*  Search the dlocals of a procedure _p to find if identifier
-        ____id is a dlocal, and if so return offset of saved value
-        in _p's stack frame (or zero otherwise).
+    /*  Search the dlocals of a procedure p to find if identifier
+        _id is a dlocal, and if so return offset of saved value
+        in p's stack frame (or zero otherwise).
 
-        If ____id is an active var and ________nonactiv is false, the offset
+        If _id is an active var and nonactiv is false, the offset
         returned is for the first saved value of the active var.
 
-        N.B. ________nonactiv MUST be true if ____id is a nonpop ident
+        N.B. nonactiv MUST be true if _id is a nonpop ident
         (otherwise the '_id!ID_IDENTPROPS' test will access junk)
     */
 define Dlocal_frame_offset(_id, p, nonactiv);
@@ -150,7 +150,7 @@ define Dlocal_frame_offset(_id, p, nonactiv);
             _index_data _bimask _2:111 -> _n;   ;;; lo 3 bits is index count
             _shift(_index_data, _-3) -> _index_data;
             repeat
-                ;;; lo byte of ____________index_data is index into stack frame of
+                ;;; lo byte of _index_data is index into stack frame of
                 ;;; first save lvar
                 returnif((_ptr!(w)++ -> _ptr) == _id)
                                         (@@(csword)[_index_data _bimask _16:FF]);
@@ -353,7 +353,7 @@ endsection;     /* $-Sys */
 --- Robert John Duncan, Mar 21 1994
         Added Procedure_copy
 --- John Williams, Dec 16 1993
-        Fixed bug in ________Pdr_hash.
+        Fixed bug in Pdr_hash.
 --- Robert John Duncan, Feb 11 1991
         Added -Flush_procedure-
 --- John Gibson, Mar 14 1990

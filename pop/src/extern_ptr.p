@@ -330,7 +330,7 @@ define Xt$-X_apply(/* _nargs, _routine */);
 
     _1 -> _in_X_call;       ;;; nonzero = true
 
-    _call_external(_-1);    ;;; -1 for _________fltsingle arg = pass singles
+    _call_external(_-1);    ;;; -1 for fltsingle arg = pass singles
     Extern$-result_struct!EXRES_WORD;
 
     CALL_AFTER
@@ -345,7 +345,7 @@ define Xt$-X_cb_apply(/* _nargs, _routine */);
     _:PEF_ASYNC_CALLBACK _biset _:PEF_ASYNC_RETURN_ABEXIT -> _external_flags;
     _1 -> _in_X_call;           ;;; nonzero = true
 
-    _call_external(_0);         ;;; 0 for _________fltsingle arg
+    _call_external(_0);         ;;; 0 for fltsingle arg
     Extern$-result_struct!EXRES_WORD;
 
     CALL_AFTER
@@ -356,7 +356,7 @@ enddefine;
         _call_external (these check for NULL external pointers).
     */
 
-    ;;; Fixed _______nargs
+    ;;; Fixed _nargs
 define Call_extern(_exptr, _nargs, _fltsingle);
     lvars _exptr, _nargs, _fltsingle;       ;;; no pop lvars -- see above
     CALL_DECLARE;
@@ -499,7 +499,7 @@ endexload;
 --- John Gibson, Aug 19 1992
         Changed the names of the Xpt- things
 --- John Gibson, Aug  6 1992
-        Changed external call procedure to take _________fltsingle arg
+        Changed external call procedure to take fltsingle arg
 --- John Gibson, May 24 1992
         Exported external_ptr_key
 --- John Gibson, Jul 13 1991

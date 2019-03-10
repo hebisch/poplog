@@ -170,7 +170,7 @@ define null(item);
             if fast_front(item) then      ;;; not (yet) dead
                 _stklength() -> _savelen;
                 ;;; N.B. Applying this procedure can recursively call null
-                ;;; or hd etc on ____item, causing the list to be expanded
+                ;;; or hd etc on item, causing the list to be expanded
                 ;;; when it returns. (This is awful, but we have to allow for
                 ;;; it since XVed can be called inside sysread etc.)
                 fast_apply(work);
@@ -386,7 +386,7 @@ define :inline lconstant HAS_SEQ_MATCH_HD(l);
 enddefine;
 
 
-    /*  Come here when _____list1 is a list pair or [] and _____list2 is a list pair
+    /*  Come here when list1 is a list pair or [] and list2 is a list pair
         whose hd is a sequence matchvar
     */
 define lconstant Match_seq(list1, list2);
@@ -444,7 +444,7 @@ define lconstant Match_seq(list1, list2);
                 endunless
             else
                 ;;; check that if there's an atom following the matchvar, it
-                ;;; occurs in _____list1 too
+                ;;; occurs in list1 too
                 fast_front(list2) -> val;
                 quitif((isnumber(val) or isstring(val) or isword(val))
                         and not(lmember_=(val,list1)));
@@ -468,7 +468,7 @@ define lconstant Match_seq(list1, list2);
 
             ;;; deal with restriction
             if isident(restr) then idval(restr) -> restr endif;
-            ;;; if there's nothing else in _____list2, rest of _____list1 must be right
+            ;;; if there's nothing else in list2, rest of list1 must be right
             if list2 == [] then
                 if isinteger(restr) then
                     quitunless(listlength(list1) == restr)
@@ -571,7 +571,7 @@ define Eq__Pair(item, pair);
                     nextloop
                 endunless
             elseif isprocedure(ibk) and isboolean(item!P_FRONT) then
-                ;;; ____item is dynamic
+                ;;; item is dynamic
                 if isprocedure(pbk) and isboolean(pair!P_FRONT) then
                     ;;; both dynamic
                     returnif(null(pair)) (null(item));
@@ -582,7 +582,7 @@ define Eq__Pair(item, pair);
                         nextloop
                     endunless
                 else
-                    ;;; ____item is dynamic, ____pair not
+                    ;;; item is dynamic, pair not
                     returnunless(pbk == [] or ispair(pbk)) (false);
                     unless HAS_SEQ_MATCH_HD(pair) then
                         returnif(null(item)) (false);
@@ -596,7 +596,7 @@ define Eq__Pair(item, pair);
                     endunless
                 endif
             elseif isprocedure(pbk) and isboolean(pair!P_FRONT) then
-                ;;; ____pair is dynamic, ____item not
+                ;;; pair is dynamic, item not
                 returnunless((ibk == [] or ispair(ibk))) (false);
                 returnif(null(pair)) (false);
                 returnunless(dup(EQ(item!P_FRONT, pair!P_FRONT)));
@@ -619,7 +619,7 @@ define Eq__Pair(item, pair);
 
     elseif item == [] then
         if isprocedure(pair!P_BACK) and isboolean(pair!P_FRONT) then
-            ;;; ____pair is dynamic
+            ;;; pair is dynamic
             returnif(null(pair)) (true);
             returnunless(HAS_SEQ_MATCH_HD(pair)) (false)
         else

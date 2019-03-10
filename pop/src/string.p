@@ -426,7 +426,7 @@ define Str_allbutfirst(_n, string);
 enddefine;
 
 
-    /*  Return chars of ______string from ______ssub to end as a (radix 10) system
+    /*  Return chars of string from _ssub to end as a (radix 10) system
         integer, or false if contains non-digits.
         (Avoids using strnumber, which brings in the whole of the itemiser).
     */
@@ -486,7 +486,7 @@ define Consstring_bptr(_bptr, _len, _ptrmode) -> string;
             Get_string16(_len);
             _sp()@(csword->csbyte){_bptr} -> _bptr
         elseif _ptrmode == CSB_POP_STRING then
-            ;;; ______bptr is a pop string
+            ;;; _bptr is a pop string
             _bptr -> tmp;
             Get_string16(_len);
             tmp -> _bptr
@@ -526,7 +526,7 @@ define Consstring_bptr(_bptr, _len, _ptrmode) -> string;
             Get_string16 -> get16_p;
             SUBSTR16(_sbuf, string)
         else
-            ;;; assume s_stackbuff length is not enough (but assume _____len is)
+            ;;; assume s_stackbuff length is not enough (but assume _len is)
             chain(_bptr, _len, _ptrmode, _decode, long_output)
         endif
     else
@@ -636,7 +636,7 @@ define sys_encode_string(string) -> string;
     if encode then
         string!V_LENGTH -> _len;
         if _len _lteq _:BLEN then
-            ;;; ensure any padding bytes after _____len will be zero in ______wbuf,
+            ;;; ensure any padding bytes after _len will be zero in _wbuf,
             ;;; so the word _cmp below can work
             _0 -> _wbuf!(w){_BYTEVEC_DATA_SIZE(_len) _sub @@(w)++}
         endif;

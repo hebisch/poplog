@@ -83,9 +83,9 @@ endsection;     /* $-Sys */
 
 /* --- Revision History ---------------------------------------------------
 --- John Gibson, May 26 1994
-        Changed both procedures to allow _____struc arg(s) to be external pointers
+        Changed both procedures to allow struc arg(s) to be external pointers
 --- John Gibson, Nov  5 1992
-        Fixed Check_byterange to check ________nbytes arg against vector length
+        Fixed Check_byterange to check _nbytes arg against vector length
         instead of total structure size
 --- John Gibson, Mar 21 1988
         Moved out of data.p

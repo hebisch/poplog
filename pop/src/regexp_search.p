@@ -245,7 +245,7 @@ define regexp_search(strp, str, strsize, backward,
             strp, regexp,           ;;; index pointers into string/regexp.
             savestrp,               ;;; used to store start of * expressions.
             neg,                    ;;; true for negative expressions.
-            bbeg, bnchars, bstr,    ;;; used for @_n back references.
+            bbeg, bnchars, bstr,    ;;; used for @n back references.
             low, size,              ;;; holds range for character classes.
             c, tmp,
           ;

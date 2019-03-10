@@ -59,7 +59,7 @@ define lconstant Random(n, want_0);
                 mishap(n, 1, 'RANDOM NUMBER GENERATION REQUIRES BIGINTEGERS (not loaded)')
             endif
         else
-            ;;; return the overflow of seed * ___n from RANSEED_BITS
+            ;;; return the overflow of seed * _n from RANSEED_BITS
             _posword_emul(Random_genseed(), _n) -> _n -> ;
             _pint(_n)
         endif

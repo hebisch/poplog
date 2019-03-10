@@ -64,7 +64,7 @@ constant
 --- John Gibson, Feb 25 1995
         Added _MATH1/2 macros to replace _m*ath1/2 subroutines
 --- John Gibson, Oct 14 1994
-        Revised definitions of _f_____name functions to accomodate VMS ALPHA
+        Revised definitions of _f_name functions to accomodate VMS ALPHA
         use of 'g' floats rather than 'd'.
 --- Robert John Duncan, Apr 11 1994
         Unix-style maths functions are available from any ANSI C compiler

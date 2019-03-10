@@ -46,7 +46,7 @@ define Callback(_argptr, _break_diff);
         mystackmark = struct STACKMARK =>> {% _0, stackmark_key %},
         ;
 
-    ;;; _______context can only be 1 or 2, since suspension of processes
+    ;;; _context can only be 1 or 2, since suspension of processes
     ;;; etc across external calls is not allowed
 
     define lconstant Barrier(_context, _abexit_ret);

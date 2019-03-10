@@ -286,7 +286,7 @@ endsection;     /* $-Sys */
 --- John Gibson, Jul  7 1994
         Uses lstackmem
 --- John Gibson, Apr 13 1994
-        Allowed ______trap_p to sys_timer to be an AST handler arg (pair
+        Allowed trap_p to sys_timer to be an AST handler arg (pair
         or procedure); changed syssleep to use the ASTP_BLOCK_NEVER flag.
 --- John Gibson, Apr  8 1992
         -sys_timer- now allows a repeating timer.

@@ -56,7 +56,7 @@ vars procedure
 
     /*  Normal value of pop_setpop_compiler, called by setpop_reset
         after a setpop. (Note that vedsetpop dlocally redefines it
-        with a different ______ss_err procedure.)
+        with a different ss_err procedure.)
     */
 
 define Subsystem_setpop_compiler(ss_err);
@@ -108,7 +108,7 @@ enddefine;
 
 define lconstant Get_ss(mode);
     lvars mode;
-    /* ____mode should be a valid value for veddocsubsystem */
+    /* mode should be a valid value for veddocsubsystem */
 
     if isstring(mode) then
         Find_extn_ss(if mode = nullstring then
@@ -158,7 +158,7 @@ define updaterof subsystem_searchlist(list, docname, mode);
     unless (Get_ss(mode) ->> ss) do
         mishap(mode, 1, 'CANNOT IDENTIFY SUBSYSTEM')
     endunless;
-    ss(SS_SEARCH_LISTS) -> search_lists;    /* MISHAP if __ss not long enough */
+    ss(SS_SEARCH_LISTS) -> search_lists;    /* MISHAP if ss not long enough */
     lblock;
         lvars SL = search_lists;
         until SL == [] do

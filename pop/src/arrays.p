@@ -106,7 +106,7 @@ define Hash(p, array);
     endif
 enddefine;
 
-    ;;; _p is the outer procedure, _____array the inner array
+    ;;; p is the outer procedure, array the inner array
     ;;; (may be the same)
 define Print(p, array);
     lvars procedure (p, array);
@@ -196,7 +196,7 @@ define Get(bounds, offset, by_row) -> _arrayp;
     until rev_blst == [] do
         fast_destpair(fast_destpair(rev_blst)) -> (_hi, _lo, rev_blst);
         ;;; length in this dimension represented so that
-        ;;;     _0 _lteq (_________subscript _sub ____lo) _lt ________length
+        ;;;     _0 _lteq (subscript _sub _lo) _lt _length
         (_hi fi_+ 1) _sub _lo -> _WORD;
         ;;; lower bound as popint
         _lo                   -> _WORD;
@@ -211,7 +211,7 @@ define Get(bounds, offset, by_row) -> _arrayp;
 
     ;;; next value appearing in the word before PD_EXECUTE tells GC that
     ;;; previous word contains a word offset size to ignore at the end
-    ;;; of PD_TABLE (i.e. _________tabsize)
+    ;;; of PD_TABLE (i.e. _tabsize)
     $-Sys$-Gc$-pd_table_noscan_region -> _WORD;
 
     sys_grbg_list(save1);
@@ -233,7 +233,7 @@ define Copy(old) -> new;
         old!PD_ARRAY_MAX_SUBSCR -> new!PD_ARRAY_MAX_SUBSCR;
         old!PD_ARRAY_BY_ROW     -> new!PD_ARRAY_BY_ROW;
 
-        ;;; create updater (___new not yet marked as array)
+        ;;; create updater (new not yet marked as array)
         copy(new) -> new!PD_UPDATER;
         old!PD_UPDATER!PD_ARRAY_SUBSCR_PDR -> new!PD_UPDATER!PD_ARRAY_SUBSCR_PDR;
         ;;; mark as array again

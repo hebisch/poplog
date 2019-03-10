@@ -48,7 +48,7 @@ lconstant macro _SHRIM_START = [ _extern __pop_shrim_start@(b.r->vpage) ];
 
 ;;; ----------------------------------------------------------------------
 
-    /*  Seek to word offset ______woff in the save file
+    /*  Seek to word offset _woff in the save file
     */
 define Seek(_woff);
     lvars _woff;
@@ -58,7 +58,7 @@ enddefine;
 
 ;;; --- SAVING -------------------------------------------------------------
 
-    /*  Write out word offset length ______woff from address _______waddr
+    /*  Write out word offset length _woff from address _waddr
     */
 define Write(_waddr, _woff);
     lvars _waddr, _woff;
@@ -66,7 +66,7 @@ define Write(_waddr, _woff);
                                                         _sr_device!D_WRITE)
 enddefine;
 
-    /*  Write out a single word from address _______waddr
+    /*  Write out a single word from address _waddr
     */
 define Write_word(/* _waddr */) with_nargs 1;
     chain((), @@(w)[_1], Write)
@@ -136,14 +136,14 @@ define lconstant Do_read(_waddr, _woff, _nbytes);
     endunless
 enddefine;
 
-    /*  Read word offset size ______woff into address _______waddr
+    /*  Read word offset size _woff into address _waddr
     */
 define Read(_waddr, _woff);
     lvars _waddr, _woff;
     chain(_waddr, _0, ##(b){_woff|w}, Do_read)
 enddefine;
 
-    /*  Read a single word into address _______waddr
+    /*  Read a single word into address _waddr
     */
 define Read_word(/* _waddr */) with_nargs 1;
     chain((), _0, ##(b)[_1|w], Do_read)

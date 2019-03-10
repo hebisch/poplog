@@ -267,7 +267,7 @@ endsection;     /* $-Sys */
 --- John Gibson, Feb  5 1997
         String16 changes.
 --- Robert Duncan, May 30 1996
-        Fixed %M case in Char_printf to reset ____spec flag
+        Fixed %M case in Char_printf to reset spec flag
 --- John Gibson, May 13 1996
         Message_printf -> exported sys_message_printf
 --- John Gibson, Apr 12 1996

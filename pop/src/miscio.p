@@ -48,12 +48,12 @@ vars
     procedure pop_timeout   = identfn,
     procedure pop_file_write_error = erase,
 
-    ;;; Default encoding for devices with ___org argument /= true
+    ;;; Default encoding for devices with org argument /= true
     default_device_encoding = false,    ;;; N.B. not restored
     ;
 
 constant
-    ;;; Ident of this used for devs with ___org argument = true
+    ;;; Ident of this used for devs with org argument = true
     no_device_encoding  = false,
     ;
 
@@ -99,7 +99,7 @@ define Add_file_tab_entry(dev);
     dev -> _file_tab_next_free!(w)++ -> _file_tab_next_free
 enddefine;
 
-    /*  Close files in the file table -- if _____all is true close all files,
+    /*  Close files in the file table -- if _all is true close all files,
         otherwise close only those in the close table
     */
 define Close_filetab_files(_all);
@@ -118,7 +118,7 @@ define Close_filetab_files(_all);
     endwhile
 enddefine;
 
-    /*  Apply _____app_p to all open devices
+    /*  Apply app_p to all open devices
     */
 define App_open_devs(app_p);
     lvars _entry;

@@ -127,7 +127,7 @@ define set_subvector(item, _subs, vec, _len);
     returnif(_zero(_len));
 
     vec!KEY -> key;
-    ;;; check ____item valid by assigning it into the first component
+    ;;; check item valid by assigning it into the first component
     fast_apply(item, _subs, vec, key!K_FAST_SUBSCR_V!PD_UPDATER);
 
     ;;; then replicate the field value in the other positions
