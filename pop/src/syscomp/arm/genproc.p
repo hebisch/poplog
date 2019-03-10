@@ -521,14 +521,13 @@ define lconstant gen_reg_store(src, dst, tmp);
     asm_emit(opcode, src, dst1, 3);
 enddefine;
 
-define lconstant asmPUSH(opd);
+define lconstant push_operand(opd);
     lvars opd;
-    ;;; printf(opd, 'asmPUSH(%p)\n');
     load_to_reg(opd, R1) -> opd;
     asm_emit("str", opd, '[sp, #-4]!', 3);
 enddefine;
 
-define lconstant asmPOP(opd);
+define lconstant pop_operand(opd);
     lvars opd, reg;
     if isreg(opd) then opd else R1 endif -> reg;
     asm_emit("ldr", reg, '[sp], #4', 3);
@@ -656,6 +655,14 @@ define get_operands(src1, src2);
     get_operand2(src2);
 enddefine;
 
+;;; Like get_operands, but user is supposed to switch order
+;;; of operand (we need to perform loads in source order,
+;;; to preserve order of side effects).
+define get_operands_r(src1, src2);
+    lvars src1, src2;
+    get_operand2(src1);
+    load_to_reg(src2, R1);
+enddefine;
 
 ;;; gen_op_2:
 ;;;     plants code for a unary operation 'opcode' of the form:
@@ -682,7 +689,7 @@ enddefine;
 
 define lconstant gen_op_3(src1, src2, dst, opcode);
     lvars src1, src2, dst, opcode, op1, op2, dreg;
-    get_operands(src1, src2) -> (op1, op2);
+    get_operands_r(src1, src2) -> (op2, op1);
     if isreg(dst) then
         dst -> dreg;
         false -> dst;
@@ -701,7 +708,7 @@ enddefine;
 
 define lconstant gen_op_commute(src1, src2, dst, opcode);
     lvars src1, src2, dst, opcode;
-    if is_int_opd(src1) then
+    if is_int_opd(src2) then
         (src1, src2) -> (src2, src1)
     endif;
     gen_op_3(src1, src2, dst, opcode);
@@ -709,8 +716,7 @@ enddefine;
 
 ;;; m_op_*: 
 ;;;     translate 2- and 3-operand M-code arithmetic/logical instructions
-;;;     on machine integers; changes arguments to correct order
-;;;     and calls corresponding gen_... operation.
+;;;     on machine integers;  calls corresponding gen_... operation.
 
 define lconstant m_op_2(opcode);
     lvars opcode, (, src, dst) = explode(m_instr);
@@ -720,13 +726,13 @@ enddefine;
 define lconstant m_op_commute(opcode);
     lvars opcode,
           (, src1, src2, dst) = explode(m_instr);
-    gen_op_commute(src2, src1, dst, opcode);
+    gen_op_commute(src1, src2, dst, opcode);
 enddefine;
 
 define lconstant m_op_3(opcode);
     lvars opcode,
           (, src1, src2, dst) = explode(m_instr);
-    gen_op_3(src2, src1, dst, opcode);
+    gen_op_3(src1, src2, dst, opcode);
 enddefine;
 
 ;;; m_parith, m_parith_test:
@@ -745,7 +751,7 @@ define lconstant m_parith(opcode);
         asm_emit("sub", R5, src1, 3, 4);
         R5 -> src1;
     endif;
-    gen_op_3(src2, src1, dst, opcode);
+    gen_op_3(src1, src2, dst, opcode);
 enddefine;
 
 define lconstant m_parith_test(opcode);
@@ -757,7 +763,7 @@ define lconstant m_parith_test(opcode);
         asm_emit("sub", R5, src1, 3, 4);
         R5 -> src1;
     endif;
-    gen_op_3(src2, src1, -_USP, opcode);
+    gen_op_3(src1, src2, -_USP, opcode);
     gen_branch('b' >< testop(test), lab);
 enddefine;
 
@@ -768,12 +774,12 @@ enddefine;
 
 define lconstant m_ptr_op_3(opcode);
     lvars gen_p, (, /*type*/, offs, ptr, dst) = explode(m_instr);
-    gen_op_3(ptr, offs, dst, opcode);
+    gen_op_3(offs, ptr, dst, opcode);
 enddefine;
 
 define lconstant m_ptr_op_commute(opcode);
     lvars gen_p, (, /*type*/, offs, ptr, dst) = explode(m_instr);
-    gen_op_commute(ptr, offs, dst, opcode);
+    gen_op_commute(offs, ptr, dst, opcode);
 enddefine;
 
 define M_ADD    = m_op_commute(% "add"  %) enddefine;
@@ -810,7 +816,7 @@ enddefine;
 
 define M_NEG();
     lvars (, src, dst) = explode(m_instr);
-    gen_op_3(src, 0, dst, "rsb");
+    gen_op_3(0, src, dst, "rsb");
 enddefine;
 
 /*
@@ -858,7 +864,6 @@ define M_PTR_SUB      = m_ptr_op_3(% "sub" %) enddefine;
 define M_ASH();
     lvars (, src1, src2, dst) = explode(m_instr),
           dreg;
-    load_to_reg(src2, R1) -> src2;
     if isreg(dst) then
         dst -> dreg;
         false -> dst;
@@ -866,6 +871,7 @@ define M_ASH();
         R1 -> dreg;
     endif;
     if isintegral(src1) then
+        load_to_reg(src2, R1) -> src2;
         if src1 < -31 then -31 -> src1 endif;
         if src1 > 31 then
             asm_emit("mov", dreg, '#0', 3);
@@ -878,6 +884,7 @@ define M_ASH();
         endif;
     else
         load_to_reg(src1, R5) -> src1;
+        load_to_reg(src2, R1) -> src2;
         asm_emit("cmp", src1, '#0', 3);
         asm_emit("movge", dreg, src2, 'asl ' >< src1, 4);
         asm_emit("rsb", R5, src1, '#0', 4);
@@ -1211,7 +1218,7 @@ define M_CREATE_SF();
 
     ;;; printf(dlocal_labs, 'M_CREATE_SF: Push dynamic locals %p\n');
     ;;; Push dynamic locals
-    applist(dlocal_labs, asmPUSH);
+    applist(dlocal_labs, push_operand);
     ;;; printf('Pushed dynamic locals\n');
     ;;; Clear POP registers and allocate POP variables
     false -> tmp;
@@ -1235,14 +1242,14 @@ define M_CREATE_SF();
         reglabel(0) -> tmp;
         gen_move(popint_zero, reglabel(0));
     endif;
-    repeat Npopstkvars times asmPUSH(tmp) endrepeat;
+    repeat Npopstkvars times push_operand(tmp) endrepeat;
     ;;; Allocate non-POP on-stack lvars (uninitialised)
     if Nstkvars /== Npopstkvars then
-        gen_op_3(SP, (Nstkvars - Npopstkvars) * 4, SP, "sub");
+        gen_op_3((Nstkvars - Npopstkvars) * 4, SP, SP, "sub");
     endif;
     ;;; Push the owner address
     ;;; printf('Push the owner address\n');
-    asmPUSH(PB);
+    push_operand(PB);
 enddefine;
 
 ;;; {M_UNWIND_SF}
@@ -1250,9 +1257,9 @@ enddefine;
 
 define M_UNWIND_SF();
     ;;; Remove owner address and on-stack vars (POP and non-POP)
-    gen_op_3(SP, (Nstkvars + 1) * 4, SP, "add");
+    gen_op_3((Nstkvars + 1) * 4, SP, SP, "add");
     ;;; Pop dynamic locals
-    applist(rev(dlocal_labs), asmPOP);
+    applist(rev(dlocal_labs), pop_operand);
         
     ;;; restore registers
     asm_emit("ldmfd", 'sp!', reg_spec, 3);
