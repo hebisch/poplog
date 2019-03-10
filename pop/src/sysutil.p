@@ -99,7 +99,7 @@ vars _unix_usrstack = _NULL;    ;;; must be vars so it's not restored
     */
 define Abs_callstack_lim();
 
-#_IF DEF SUNOS or DEF NCR or DEF DGUX or DEF HPUX or DEF X86_LINUX
+#_IF DEF SUNOS or DEF NCR or DEF DGUX or DEF HPUX or DEF LINUX
     ;;; They have several different USRSTACK values (and they're liable
     ;;; to change with a new release, etc). The following code finds the
     ;;; highest arg or env string address, and then takes that rounded up

@@ -82,7 +82,7 @@ define sys_fork(will_do_wait);
 
     _extern pop_fork() -> _child_id;
 
-    if (_child_id) _gr _2147483647 then
+    if (_child_id) _eq _-1 then
         Syserr_mishap(0, 'UNABLE TO FORK')
     elseif _zero(_child_id) then
         ;;; the child
@@ -188,7 +188,7 @@ define sys_vfork(/*will_do_wait*/) with_nargs 1;
     ##(csword){_call_stack_hi, _vf_tmp}
                 -> _vf_stk@(struct VFRET)[_vf_n]!CSTKLEN;
 
-    if (_do_vfork()) _gr _2147483647 then
+    if _do_vfork() _eq _-1 then
         unless _vfork_child then _extern _pop_sigmask(_0) -> endunless;
         Syserr_mishap(0, 'UNABLE TO VFORK')
     endif;

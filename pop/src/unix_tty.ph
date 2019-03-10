@@ -72,7 +72,7 @@ struct TERMIOS
                 TMIO_CFLAG,     ;;; control modes
                 TMIO_LFLAG;     ;;; local modes
 
-  #_IF DEFV SUNOS < 5.0 or DEF IRIX or DEF X86_LINUX
+  #_IF DEFV SUNOS < 5.0 or DEF IRIX or DEF LINUX
     byte        TMIO_LINE;      ;;; line discipline
   #_ELSEIF DEF HPUX
     long        TMIO_RESERVED;  ;;; reserved for future use

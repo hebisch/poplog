@@ -10,6 +10,7 @@
 
 section $-Popas;
 
+constant macro CLOSURE_HDR_LEN = 6;
 
 define global popint(n); lvars n; (n << 2) || 3; enddefine;
 

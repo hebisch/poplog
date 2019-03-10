@@ -191,7 +191,8 @@ define lconstant gen_closure(lab_list, props, nargs, flags, b_pdpt, u_pdpt,
 
     define lconstant gen_clos(lab_list, nargs, upd, pdpt, frozl);
         lvars   f, lab_list, nargs, upd, len_lab, pdpt, frozl,
-                nfroz = listlength(frozl), len = 5+nfroz;
+                nfroz = listlength(frozl),
+                len = CLOSURE_HDR_LEN + nfroz;
 
         asm_outword(props,                      ;;; PD_PROPS
                     asm_symlabel('procedure_key'),  ;;; KEY

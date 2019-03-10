@@ -460,6 +460,7 @@ weak constant
     ;;; subroutine/inline procedures
 weak constant
         _negate,        ;;; negate
+        _rshift,        ;;; right shift, optional
         _shift,         ;;; shift integer
         _logcom,        ;;; logical complement i.e. 1's complement
         _int,           ;;; pop integer to integer

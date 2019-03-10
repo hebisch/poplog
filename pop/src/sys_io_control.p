@@ -51,8 +51,8 @@ define sys_io_control(dev, _mode) -> _res;
         endif;
     endif;
 
-    (_extern[NI] ioctl(dev!D_FILE_DESC, _mode, _argbptr))
-          _lteq _2147483647 -> _res;
+    (_extern[NI, SE] ioctl(dev!D_FILE_DESC, _mode, _argbptr))
+          _sgreq _0 -> _res;
 
     if devparams and _res then
         Get_tty_params(dev, devparams);
