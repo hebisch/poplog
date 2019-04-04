@@ -57,7 +57,7 @@ deftype
     uid_t   = int,
     gid_t   = uid_t;
 
-#_ELSEIF DEF X86_LINUX      /* must come before BERKELEY */
+#_ELSEIF DEF LINUX      /* must come before BERKELEY */
 
 deftype
     dev_t   = short,
@@ -171,16 +171,16 @@ struct STATB
     int     ST_GEN;
   };
 
-#_ELSEIF DEF X86_LINUX      /* must come before BERKELEY */
+#_ELSEIF DEF LINUX      /* must come before BERKELEY */
 
 struct STATB
   { dev_t   ST_DEV;
     ino_t   ST_INO;
     nlink_t ST_NLINK;
-        mode_t  ST_MODE;
+    mode_t  ST_MODE;
     uid_t   ST_UID;
     gid_t   ST_GID;
-        int     ST_PAD2;
+    int     ST_PAD2;
     dev_t   ST_RDEV;
     off_t   ST_SIZE;
     long    ST_BLKSIZE;
@@ -428,7 +428,7 @@ lconstant macro (
         _F_SETLK        = _8,
         _F_SETLKW       = _9,
         );
-#_ELSEIF DEF X86_LINUX
+#_ELSEIF DEF LINUX
 lconstant macro (
     _F_GETLK    = _5,
     _F_SETLK    = _6,
@@ -450,7 +450,7 @@ lconstant macro (
     O_ACCESS    = 3,        ;;; mask for read/write
     );
 
-#_IF DEF X86_LINUX
+#_IF DEF LINUX
 lconstant macro (
     O_NDELAY    = 8:4000,
     O_APPEND    = 8:2000,
@@ -471,7 +471,7 @@ lconstant macro (
     O_EXCL      = 16:400,
 );
 
-#_ELSEIF DEF X86_LINUX
+#_ELSEIF DEF LINUX
 
 lconstant macro (
     O_CREAT     = 8:0100,

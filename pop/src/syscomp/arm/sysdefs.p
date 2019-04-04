@@ -25,11 +25,11 @@ global constant macro (
 
     WORD_BITS       = 32,
 
-    POPINT_BITS     = 30,
+    POPINT_BITS     = 29,
 
-    SHORT_ALIGN_BITS = 8,       ;;; alignment in bits for short access
-    INT_ALIGN_BITS   = 8,       ;;; alignment in bits for int access
-    DOUBLE_ALIGN_BITS = 8,      ;;; alignment in bits for double access
+    SHORT_ALIGN_BITS = 16,       ;;; alignment in bits for short access
+    INT_ALIGN_BITS   = 32,       ;;; alignment in bits for int access
+    DOUBLE_ALIGN_BITS = 64,      ;;; alignment in bits for double access
 
     STRUCT_SHORT_ALIGN_BITS = 16,   ;;; bit alignment for short
     STRUCT_INT_ALIGN_BITS   = 32,   ;;; bit alignment for int

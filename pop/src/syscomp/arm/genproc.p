@@ -448,7 +448,7 @@ define lconstant get_addressable_op(opd, tmp);
         endif;            
         mishap(opd, 1, 'Unhandled operand in get_addressable_op');
     endif;
-    if isinteger(opd) then
+    if isinteger(opd) or isbiginteger(opd) then
         mishap(opd, 1, 'Want address of literal');
         ;;; load_literal_addr(opd, tmp);
         ;;; return('[' >< tmp >< ']');
@@ -470,7 +470,7 @@ enddefine;
 define lconstant load_to_reg(opd, tmp);
     lvars opd, tmp, opd1, opcode, type, n;
     returnif(isreg(opd))(opd);
-    if isinteger(opd) then
+    if isinteger(opd) or isbiginteger(opd) then
         if is_small_disp(opd) then
             asm_emit("mov", tmp, '#' >< opd, 3);
             return(tmp);
@@ -594,7 +594,15 @@ define gen_move(src, dst);
         asm_emit("mov", dst, src, 3);
         ;;; printf('gen_move returning');
     else
-        load_to_reg(src, R1) -> src;
+        ;;; FIXME: Do it in general
+        ;;; Special case to support
+        ;;;   M_MOVE r10 {r10 <false>}
+        if src == USP and dst == -_USP then
+            asm_emit("mov", R1, src, 3);
+            R1 -> src;
+        else
+            load_to_reg(src, R1) -> src;
+        endif;
         ;;; NOTE: I_SWAP assumes that WK_REG = R0 will survive
         ;;; M_MOVE with arguments on user stack.  This is OK, since
         ;;; gen_reg_store does not need temporary when
