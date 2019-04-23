@@ -8,9 +8,20 @@
 
 #_TERMIN_IF DEF IO_INCLUDED
 
+#_IF WORD_BITS == 64
+
+deftype file_desc_t = int;
+
+#_ELSE
+
+deftype file_desc_t = short;
+
+#_ENDIF
+
 struct DEVICE
-  { short   D_FLAGS;
-    int     D_FILE_DESC;
+  {
+    short   D_FLAGS;
+    file_desc_t     D_FILE_DESC;
     full    KEY,
 >->         D_CTRL_BLK,
             D_UNIT_N,
