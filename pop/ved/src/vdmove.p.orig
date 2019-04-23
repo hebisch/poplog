@@ -1,0 +1,507 @@
+/* --- Copyright University of Sussex 1997. All rights reserved. ----------
+ > File:            C.all/ved/src/vdmove.p
+ > Purpose:         Cursor movement in Ved
+ > Author:          Aaron Sloman & John Gibson (see revisions)
+ > Documentation:   HELP * VEDCOMMS, HELP * VEDPROCS, HELP * VEDVARS
+ */
+
+;;; -------------------- CURSOR MOVEMENTS --------------------------------
+
+#_INCLUDE 'vddeclare.ph'
+
+global constant
+		procedure (vedmarkfind, vedendrange)
+	;
+
+
+;;; ----------------------------------------------------------------------
+
+section $-Sys$-Ved =>
+					vedcharleft, vedcharleftlots, vedcharmiddle,
+					vedcharright, vedcharrightlots, vedcharup, vedcharuplots,
+					vedchardown, vedchardownlots, vedchardownleft,
+					vedchardownright, vedchardownleftlots,
+					vedchardownrightlots, vedcharupleft, vedcharupright,
+					vedcharupleftlots, vedcharuprightlots, vedtabright,
+					vednextline, vedpositionpush, vedpushkey, vedpositionpop,
+					vedpopkey, vedexchangeposition, vedscreenleft,
+					vedscreenmiddle, vedscreenright, vedtextleft,
+					vedtextright, vedscreendown, vedscreenup, vedwordleft,
+					vedwordright, vedtopfile, vedendfile, ved_moveto
+				;
+
+lconstant
+	tof_mess = '\{b}top of file',
+	eof_mess = '\{b}end of file',
+;
+
+define vedcharleft();
+	if vedcolumn == 1 then
+		vedcharup(); vedtextright();
+	else
+		vedcolumn fi_- 1 -> vedcolumn;
+	endif;
+enddefine;
+
+define vedcharleftlots();
+	if vedcolumn == 1 then
+		vedcharleft()
+	else
+		max(1,vedcolumn fi_- (vedscreenwidth div 4)) -> vedcolumn;
+	endif
+enddefine;
+
+define vedcharmiddle();
+	(vvedlinesize fi_// 2) fi_+ 1 -> vedcolumn ->
+enddefine;
+
+define vedcharright();
+	vedcolumn fi_+ 1 -> vedcolumn;
+enddefine;
+
+define vedcharrightlots();
+	vedcolumn fi_+ (vedscreenwidth div 4) -> vedcolumn;
+enddefine;
+
+define vedcharup();
+	if vedline == 1 then
+		vederror(tof_mess);
+	else
+		vedtrimline();
+		vedline fi_- 1 -> vedline;
+		vedsetlinesize();
+	endif;
+enddefine;
+
+define vedcharuplots();
+	lvars line, topline;
+	if vedline == 1 then
+		vederror(tof_mess);
+	else
+		fi_max(1, vedline fi_- (vedwindowlength div 3)) -> line;
+		vedlineoffset fi_+ 1 -> topline;
+		if vedline fi_> topline then
+			fi_max(line, topline) -> line;
+		endif;
+		vedtrimline();
+		line -> vedline;
+		vedsetlinesize();
+	endif;
+enddefine;
+
+define lconstant Max_line() -> maxline;
+	lvars maxline;
+	if vedonstatus then
+		vvedbuffersize fi_+ 1
+	else
+		fi_max(vvedbuffersize fi_+ vedwindowlength fi_- 2, Bottom_of_window())
+	endif -> maxline;
+	if vedediting and vedline fi_>= maxline then
+		vederror(eof_mess)
+	endif
+enddefine;
+
+define vedchardown();
+	Max_line() -> ;
+	vedtrimline();
+	vedline fi_+ 1 -> vedline;
+	vedsetlinesize()
+enddefine;
+
+define vedchardownlots();
+	lvars line, bottline, maxline = Max_line();
+	fi_min(maxline, vedline fi_+ (vedwindowlength div 3)) -> line;
+	Bottom_of_window() -> bottline;
+	if vedline fi_< bottline then
+		fi_min(line, bottline) -> line;
+	endif;
+	vedtrimline();
+	line -> vedline;
+	vedsetlinesize();
+enddefine;
+
+define vedchardownleft();
+	vedchardown(); vedcharleft()
+enddefine;
+
+define vedchardownright();
+	vedchardown(); vedcharright();
+enddefine;
+
+define vedchardownleftlots();
+	vedchardownlots(); vedcharleftlots();
+enddefine;
+
+define vedchardownrightlots();
+	vedchardownlots(); vedcharrightlots();
+enddefine;
+
+define vedcharupleft();
+	vedcharup(); vedcharleft();
+enddefine;
+
+define vedcharupright();
+	vedcharup(); vedcharright();
+enddefine;
+
+define vedcharupleftlots();
+	vedcharuplots(); vedcharleftlots();
+enddefine;
+
+define vedcharuprightlots();
+	vedcharuplots(); vedcharrightlots();
+enddefine;
+
+define vedtabright();
+	Tab_size_at(vedcolumn) fi_+ vedcolumn -> vedcolumn;
+enddefine;
+
+define vednextline();
+	vedchardown(); vedscreenleft();
+enddefine;
+
+define vedpositionpush();
+	;;; save line, column, and position in current window
+	{%	vedline,
+		vedcolumn,
+		vedline fi_- vedlineoffset,
+		vedcolumnoffset
+	%} :: vedpositionstack -> vedpositionstack
+enddefine;
+
+define vedpushkey();
+	lvars len;
+	listlength(vedpositionstack) -> len;
+	if len fi_> 4 then
+		allbutlast(len fi_- 4, vedpositionstack) -> vedpositionstack
+	endif;
+	vedpositionpush();
+	vedputmessage('\{b}current position stacked')
+enddefine;
+
+
+	/*	If _____cycle is true then cycle position back to end
+		If ______________restore_window is true then ensure position in window is restored
+	*/
+define lconstant Reset_position(cycle, restore_window);
+	lvars	pos, line, col, newloffs, newcoffs, vn, hn, cycle, restore_window,
+			postk = vedpositionstack;
+	if postk == [] then vederror('\{b}no stacked positions') endif;
+
+	fast_destpair(postk) -> (pos, vedpositionstack);
+	if cycle then
+		if vedpositionstack /== [] then
+			if listlength(vedpositionstack) fi_< 5 then
+				vedpositionstack <> [^pos] -> vedpositionstack
+			endif
+		else
+			postk -> vedpositionstack
+		endif
+	endif;
+
+	vedtrimline();
+	fi_max(1,fast_subscrv(1,pos)) -> line;
+	fi_min(vvedbuffersize fi_+ vedwindowlength, line) ->> line
+							->> fast_subscrv(1,pos) -> vedline;
+	fast_subscrv(2,pos) ->> col -> vedcolumn;
+	vedsetlinesize();
+
+	;;; if not in current window, then make sure window location restored
+	returnunless(restore_window and vedediting);
+	returnif(vedonstatus);
+
+	fi_max(0, line fi_- fast_subscrv(3,pos)) -> newloffs;
+	newloffs fi_- vedlineoffset -> vn;
+	if vn /== 0
+	and not(terminal_can_scroll and abs(vn) fi_<= (vedwindowlength >> 2)) then
+		false -> vn
+	endif;
+
+	fast_subscrv(4,pos) -> newcoffs;
+	newcoffs fi_- vedcolumnoffset -> hn;
+	if hn /== 0
+	and (vednocharinsert or vednomoveinsert
+		or abs(hn) fi_> (vedwlinewidth >> 2))
+	then
+		false -> hn
+	endif;
+
+	if vn and hn then
+		if vn /== 0 then vedscrollvert(vn) endif;
+		if hn /== 0 then vedscrollhorz(hn) endif
+	else
+		newloffs -> vedlineoffset;
+		newcoffs -> vedcolumnoffset;
+		vedrefreshwindow(true)
+	endif
+enddefine;
+
+define vedpositionpop();
+	Reset_position(false, false)
+enddefine;
+
+define vedpopkey();
+	Reset_position(true, true)
+enddefine;
+
+	;;; vedexchangeposition moves to the most recently pushed position
+	;;; and stacks the current position in its place.
+define vedexchangeposition();
+	lvars pos, oldline, oldcol, oldloffs, oldcoffs, postk = vedpositionstack;
+	;;; set new position
+	if postk == [] then
+		vedpushkey()
+	else
+		;;; note current position
+		vedline -> oldline;
+		vedcolumn -> oldcol;
+		oldline fi_- vedlineoffset -> oldloffs;
+		vedcolumnoffset -> oldcoffs;
+		Reset_position(false, true);
+
+		;;; then update stored position
+		postk -> vedpositionstack;
+		fast_front(postk) -> pos;
+		oldline		-> fast_subscrv(1, pos);
+		oldcol		-> fast_subscrv(2, pos);
+		oldloffs	-> fast_subscrv(3, pos);
+		oldcoffs	-> fast_subscrv(4, pos);
+	endif
+enddefine;
+
+define vedscreenleft();
+	Get_left_margin() fi_+ 1 -> vedcolumn;
+enddefine;
+
+define vedscreenmiddle();
+	vedscreenwidth >> 1 -> vedcolumn
+enddefine;
+
+define vedscreenright();
+	vedscreenwidth fi_- 1 -> vedcolumn;
+enddefine;
+
+define vedtextleft();
+	lvars col;
+	vedsetlinesize();
+	if vvedlinesize fi_> 0 then
+		if Skipwhite(1, vedthisline()) ->> col then
+			col
+		else
+			vvedlinesize fi_+ 1
+		endif;
+	else 1
+	endif -> vedcolumn
+enddefine;
+
+define vedtextright();
+	vedsetlinesize();
+	vvedlinesize fi_+ 1 -> vedcolumn;
+enddefine;
+
+define vedscreendown();
+	if vedline fi_>= Bottom_of_window() then
+		if vedline fi_> vvedbuffersize then
+			vederror(eof_mess);
+		endif;
+		vedline fi_+ vedwindowlength fi_- 2 -> vedline;
+		if vedline fi_> vvedbuffersize fi_+ 1 then
+			vvedbuffersize fi_+ 1 -> vedline
+		else
+			unless vedscrollscreen then
+				Bottom_of_window() fi_- 1 -> vedlineoffset;
+				if vedinputwaiting() then
+					Set_refresh_needed(2)
+				else
+					vedrefreshwindow(true)
+				endif
+			endunless
+		endif;
+	else
+		Bottom_of_window() -> vedline;
+	endif;
+	vedsetlinesize();
+enddefine;
+
+define vedscreenup();
+	if vedline fi_<= vedlineoffset fi_+ 1 then
+		if vedline == 1 then vederror(tof_mess) endif;
+		if vedwindowlength >> 1 fi_> vedline then
+			1 -> vedline;       ;;; make sure it scrolls if very near top
+		else
+			fi_max(1,vedline fi_- vedwindowlength fi_+ 2) -> vedline;
+			unless vedscrollscreen then
+				vedline fi_- 1 -> vedlineoffset;
+				if vedinputwaiting() then
+					Set_refresh_needed(2)
+				else
+					vedrefreshwindow(true)
+				endif
+			endunless
+		endif;
+	else
+		vedlineoffset fi_+ 1 -> vedline;
+	endif;
+	vedsetlinesize();
+enddefine;
+
+
+	;;; return type of character to left of cursor, allowing for newlines etc
+define lconstant Char_type();
+	if vedcolumn fi_- 1 fi_> vvedlinesize then
+		`\s`
+	elseif vedcolumn == 1 then
+		`\n`
+	else
+		vedchartype(fast_subscrs(vedcolumn fi_- 1, Buffer_line(vedline)))
+	endif
+enddefine;
+
+define vars vedwordleft();
+	lvars x;
+	if vedcolumn == 1 then
+		vedcharup();
+		while vedline fi_> 1 and vvedlinesize == 0 do
+			vedcharup()
+		endwhile;
+		vedtextright()
+	elseif vedcolumn fi_> vvedlinesize fi_+ 1 then
+		vvedlinesize fi_+ 1 -> vedcolumn;
+		if vedcolumn == 1 and vedline fi_> 1 then vedwordleft() endif
+	else
+		vedcharleft();
+		until vedatitemstart(vedcolumn,vedthisline(),vvedlinesize fi_+ 1) do
+			vedcharleft()
+		enduntil;
+		vedchartype(`\s`) -> x;
+		while Char_type() == x do
+			vedcharleft();
+		endwhile;
+	endif;
+enddefine;
+
+define vars vedwordright();
+	lvars x;
+	if vedcolumn fi_> vvedlinesize then
+		vednextline();
+		while vvedlinesize == 0 and vvedbuffersize fi_>= vedline do
+			vedchardown()
+		endwhile
+	else
+		until vedatitemend(vedcolumn,vedthisline(),vvedlinesize) do
+			vedcharright()
+		enduntil;
+		vedcharright();
+		;;; traverse spaces on right
+		vedcharright();
+		vedchartype(`\s`) -> x;
+		while Char_type() == x and vedcolumn _lteq vvedlinesize do
+			vedcharright();
+		endwhile;
+		vedcharleft()
+	endif;
+enddefine;
+
+
+define vedjumpto(col);
+	;;; accept a two element datastructure or two numbers - line and column
+	lvars col, line;
+	if isinteger(col) then
+		-> line
+	else
+		col(1) -> line, col(2) -> col
+	endif;
+	if isinteger(line) and isinteger(col) and line fi_> 0 and col fi_> 0 then
+		unless line == vedline then
+			vedtrimline();
+			line -> vedline;
+			vedsetlinesize()
+		endunless;
+		col -> vedcolumn
+	else
+		mishap(line, col, 2, 'vedjumpto: POSITIVE INTEGERS NEEDED')
+	endif
+enddefine;
+
+define vedtopfile();
+	vedjumpto(1,1)
+enddefine;
+
+define vedendfile();
+	vedjumpto(max(vvedmarkhi,vedusedsize(vedbuffer) fi_+ 1),1)
+enddefine;
+
+define vars ved_moveto();
+	;;; move to location defined by the argument
+	lvars line, char, found;
+	lconstant message = '\{b}no such line';
+	;;; get rid of leading spaces in vedargument
+	if skipchar(`\s`, 1, vedargument) ->> char then
+		allbutfirst(char fi_- 1, vedargument) -> vedargument
+	endif;
+	if vedargument = nullstring then
+		vederror('\{b}move to where?')
+	elseif vedargument = 'a' then
+		vedtopfile()
+	elseif vedargument = 'z' then
+		vedendfile()
+	elseif vedargument = 'm' then
+		vedmarkfind()
+	elseif vedargument = 'e' then
+		vedendrange()
+	elseif (vedargument(1) ->> char) == `+` or char == `-` then
+		if strnumber(allbutfirst(1,vedargument)) ->> line then
+			if char == `+` then vedline fi_+ line
+			else vedline fi_- line
+			endif -> line;
+			if line < 1 then
+				vederror(message)
+			else
+				vedjumpto(line, 1)
+			endif
+		else
+			vederror('\{b}number required after @+ or @-')
+		endif
+	else
+		if (strnumber(vedargument) ->> line)
+		and line fi_> 0 and line fi_<= datalength(vedbuffer) then
+			vedjumpto(line, vedcolumn)
+		else
+			vederror(message)
+		endif
+	endif
+enddefine;
+
+endsection;     /* $-Sys$-Ved */
+
+
+/* --- Revision History ---------------------------------------------------
+--- John Gibson, Sep 30 1997
+		Changed element 4 of vedpositionstack entry to be value of
+		vedcolumnoffset.
+--- John Gibson, Aug  4 1994
+		Changed position stack stuff so that (1) column offset is saved
+		and (2) vedpopkey and vedexchangeposition always restore the window
+		position (i.e. even if cursor is in window).
+--- John Williams, Jan  8 1993
+		ved_moveto now calls vedendrange (defined in ved/src/vdmark.p)
+--- John Gibson, Mar 31 1992
+		Sectionised
+--- John Gibson, Feb  9 1992
+		Made vedjumpto constant -- shouldn't be redefinable
+--- James Goodlet, Feb 19 1991 - fixed -vedwordright- bug where occasional
+		space would appear between cursor and end of text on a line.  This
+		was caused by adding 1 to -vvedlinesize- in the -vedatitemend- test.
+--- Rob Duncan, Nov  7 1989
+		Added new variable -terminal_can_scroll- to indicate ved's scrolling
+		ability instead of relying on -vednolinedelete-
+--- Aaron Sloman, Aug 29 1988
+		Extended ved_moveto, and therefore <ENTER>@ with several new options
+		described in HELP *NEWS
+--- John Gibson, Feb 14 1988
+		Replaced -vednullstring- with -nullstring-
+--- Aled Morris, Nov 24 1987
+		removed spurious space from error message ' NO STACKED POSITIONS'
+												   ^here
+;;; 27-11-86 -- AS -- added vedjumpto, and called it in various places
+ */
