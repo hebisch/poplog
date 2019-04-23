@@ -187,7 +187,7 @@ define lconstant Get_print_key(item) -> key;
     printf( if item == _NULL then
                 '<NULL>'
             else
-                item, '<SYSTEM_OBJECT %x>'
+                '<SYSTEM_OBJECT %x>', conspair(item, [])
             endif )
 enddefine;
 
