@@ -1221,10 +1221,10 @@ endsection;     /* $-Popas$-M_trans */
 --- John Gibson, Nov  3 1994
         Improvements to get_moves
 --- John Gibson, Oct  7 1994
-        # Added generation of new typed mem access operands for short/byte
+        # Added generation of new typed mem access operands for short/byte
           (instead of M_MOVEx instructions, etc), dependent on
           USE_NEW_M_OPERANDS being set true by genproc.p.
-        # Added support for constants in _special_var_block, dependent on
+        # Added support for constants in _special_var_block, dependent on
           GEN_SVB_CONSTANTS  being set true
 --- John Gibson, Jul 21 1992
         Version 14.21 changes

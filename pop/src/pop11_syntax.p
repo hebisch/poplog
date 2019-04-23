@@ -1768,12 +1768,12 @@ enddefine;
         Changed list/vector constructors to use new sysCONSTRUCT (rather
         than sysEX*EC_OPTION_COMPILE)
 --- John Gibson, May 23 1995
-        # If POP11_OLD_VARS is clear in pop_pop11_flags, then
+        # If POP11_OLD_VARS is clear in pop_pop11_flags, then
             (1) procedure formals now default to lvars;
             (2) nested defines now default to lconstant;
             (3) vars inside procedures produces a warning (although still a
                 mishap if POP11_VARS_CHECK is set);
-        # active is no longer required for updaterof of an active variable.
+        # active is no longer required for updaterof of an active variable.
 --- John Gibson, Aug 16 1993
         Test for Popc now pop_pas_mode == "popc"
 --- John Gibson, Jun 18 1993

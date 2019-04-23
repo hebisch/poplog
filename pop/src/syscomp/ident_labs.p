@@ -841,9 +841,9 @@ endsection;     /* $-Popas */
 --- John Gibson, Jan 13 1996
         Excluded "_" as a nonpop ident
 --- John Gibson, Oct  7 1994
-        # Made get_svb_offset construct a newmapping property from
+        # Made get_svb_offset construct a newmapping property from
           special_var_block to speed up search
-        # Made perm_const_lab use get_svb_offset on constants when requested
+        # Made perm_const_lab use get_svb_offset on constants when requested
 --- John Gibson, Oct 16 1992
         14.22 changes
 --- John Gibson, Jul 21 1992

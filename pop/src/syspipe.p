@@ -50,8 +50,8 @@ endsection;     /* $-Sys$-Io */
 --- John Gibson, Jun  1 1994
         Changed to use new lstackmem construct
 --- John Gibson, May 24 1994
-        # Changed syspipe to use Sys_fd_open_check
-        # Moved sockets stuff to library
+        # Changed syspipe to use Sys_fd_open_check
+        # Moved sockets stuff to library
 --- Robert John Duncan, Jun  2 1993
         Sockets enabled for SVR4; added a dummy exload to ensure that the
         required library is pulled in

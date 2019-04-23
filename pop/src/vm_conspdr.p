@@ -1245,9 +1245,9 @@ endsection;     /* $-Sys$-Vm */
         leaving <true> on the stack. The fix involves the variable
         _no_nots.
 --- John Gibson, Oct 17 1996
-        # New I_GO_ON includes base integer and uses whichever of I_SWITCH
+        # New I_GO_ON includes base integer and uses whichever of I_SWITCH
           or I_SWITCH_base is present.
-        # I_FAST_+- uses I_FAST_+-_any if present instead of I_FAST_+-_2/3.
+        # I_FAST_+- uses I_FAST_+-_any if present instead of I_FAST_+-_2/3.
 --- John Gibson, Sep 27 1996
         Added I_TAG_TEST, and improved optimising of conditions by
         using new label reference count to remove redundant labels.

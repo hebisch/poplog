@@ -191,8 +191,8 @@ enddefine;
 
 /* --- Revision History ---------------------------------------------------
 --- John Gibson, Dec 14 1995
-        # Uses fast_lmember instead of lmember on popmatchvars.
-        # Uses nc_<> to add elements to the end of a matched segment instead
+        # Uses fast_lmember instead of lmember on popmatchvars.
+        # Uses nc_<> to add elements to the end of a matched segment instead
           of <>
 --- John Gibson, Dec  4 1995
         Uses lmember_= instead of mem*ber
