@@ -909,10 +909,13 @@ define constant Drop_pfx(opcodes, _rm);
         endif;
         Drop_b(_code);
     enduntil;
+    _int(/* prefix */) -> _code;
+    if _code _bitst _NO_REX_W then
+        _rex _biclear _16:8 -> _rex;
+    endif;
     if _rex /== _0 then
         Drop_b(_rex);
     endif;
-    _int(/* prefix */) -> _code;
     (_code _biset _NO_REX_W, _rm _bimask _7)
 enddefine;
 
