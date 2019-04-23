@@ -82,7 +82,7 @@ Ldata_start:
 ;;;       %rax   --  work register, external type of compound arguments
 ;;;                  number of floating point arguments in registers
 ;;;                  at call
-;;;       %rbp   --  frame pointer
+;;;       %rbp   --  points to work variables on the machine stack
 ;;;       %r10   --  work register2, external type of compound arguments
 ;;;                  during conversion
 ;;;                  routne at call
@@ -93,10 +93,11 @@ Ldata_start:
 ;;;       %r15   --  displacement on Poplog (user) stack
 ;;;
 ;;;    Work variables on the machine stack:
-;;;       -16(%rbp)  -- saved rountine
-;;;       -24(%rbp)  -- work variable for memory conversion
-;;;       -32(%rbp)  -- number of floating point arguments in registers
+;;;       (%rbp)     -- saved rountine
+;;;       -8(%rbp)   -- work variable for memory conversion
+;;;       -16(%rbp)  -- number of floating point arguments in registers
 ;;;                     during conversion
+;;;       -24(%rbp)  -- stored size of arguments on user stack
 
   .text
 
@@ -118,21 +119,21 @@ define lconstant macro gen_storesf;
     while cf < 6 do
         cf + 1 -> cfn;
         'float_arg', >< cf, >< ':\n';
-        '\incl   -32(%rbp)\n';
+        '\incl   -16(%rbp)\n';
         '\tmovq  $float_arg', >< cfn, ',%r11\n';
         '\ttestl   $1, %r12d\n';
         '\tjnz single_', >< cf >< '\n';
 
 ;;; just load the value
 
-        '\tmovlpd  -24(%rbp), %xmm' >< cf >< '\n';
+        '\tmovlpd  -8(%rbp), %xmm' >< cf >< '\n';
         '\tsarl $1, %r12d\n';
         '\tjmp next_arg\n\n';
 
 ;;; convert to single
 
     'single_', >< cf >< ':\n';
-        '\tcvtsd2ss   -24(%rbp), %xmm' >< cf >< '\n';
+        '\tcvtsd2ss   -8(%rbp), %xmm' >< cf >< '\n';
         '\tsarl $1, %r12d\n';
         '\tjmp next_arg\n\n';
         cfn -> cf;
@@ -155,16 +156,16 @@ int_arg6:
     jmp next_arg
 
 float_arg6:
-    incl   -32(%rbp)
     testl   $1, %r12d
     jnz single_6
+    movq -8(%rbp), %rax
     movq %rax, (%rsp, %r14)
     addq    $8, %r14
     sarl $1, %r12d
     jmp next_arg
 
 single_6:
-    cvtsd2ss  -24(%rbp), %xmm7
+    cvtsd2ss  -8(%rbp), %xmm7
     movss   %xmm7, (%rsp, %r14)
     addq    $8, %r14
     sarl $1, %r12d
@@ -201,7 +202,7 @@ DEF_C_LAB (_call_external)
     movq    (%USP), %r12    ;;; fltsingle
     movq    8(%USP), %r10   ;;; routine
     movq    16(%USP), %r15  ;;; nargs
-    shlq    $3, %r15        ;;; convert ot byte offset;
+    shlq    $3, %r15        ;;; convert to byte offset;
     leaq    24(%USP), %USP  ;;; adjust user stack
     xorl    %eax,%eax
     testq   %r15, %r15
@@ -212,14 +213,14 @@ DEF_C_LAB (_call_external)
 ;;;     fits into a register this gives 3+nargs, push allocate 1
 ;;;     so we put another two into alignment code
 
-    subq    $56, %rbp
     push    %r10
+    movq    %rsp, %rbp
     xorq    %r14, %r14
     subq    %r15, %rsp       ;;; allocate space for arguments
     subq    $0x16, %rsp        ;;; 
-    andq    $-0xf0, %rsp       ;;; align the stack
-    movl    $0, -32(%rbp)
-    movq   %r15, -40(%rbp)
+    andq    $-0x10, %rsp       ;;; align the stack
+    movl    $0, -16(%rbp)
+    movq   %r15, -24(%rbp)
 
     movq   $int_arg0,   %r13
     movq   $float_arg0, %r11  
@@ -247,7 +248,7 @@ L1.1:
     ;;; float and push
 
     subq    $1, %rax
-    movq    %rax, -24(%rbp)
+    movq    %rax, -8(%rbp)
     ;;;  call conversion & store
     jmp     *%r11        
 
@@ -278,27 +279,25 @@ L4.1:   cmpl    $_:EXTERN_TYPE_DDEC, %r10d
     ;;; Ddecimal: call double store routine
 
     movq    _DD_1(%rax), %r10
-    movq    %r10, -24(%rbp)
+    movq    %r10, -8(%rbp)
     jmp     *%r11
 
-    ;;; If the sign bit of ltsingle is set, convert to single float
-
 L5.1:
-    ;;; Must be biginteger: load first slice to ESI
+    ;;; Must be biginteger
 
-    ;;; If there's more than one slice, pull in the high bits first
+    ;;; If there's more than two slices, pull in the high bits first
 
     cmpl    $3, _BGI_LENGTH(%rax)
     jb      L5.2
     movl    _BGI_SLICES+8(%rax), %r10d
     shl     $62, %r10
     ;;; spill to the stack
-    movq    %r10, -24(%rbp)
+    movq    %r10, -8(%rbp)
     movl    _BGI_SLICES+4(%rax),%r10d
     shlq    $31, %r10
     movl    _BGI_SLICES(%rax), %eax
     orq     %r10, %rax
-    orq     -24(%rbp), %rax
+    orq     -8(%rbp), %rax
     jmp     *%r13
 
     ;;; At most two slices, pull in the lowest part first
@@ -306,25 +305,24 @@ L5.2:
     movl    _BGI_SLICES(%rax), %r10d
     cmpl    $1, _BGI_LENGTH(%rax)
     je  L6.1
-    movl    _BGI_SLICES+4(%rax), %eax
+
+    movslq  _BGI_SLICES+4(%rax), %rax
     shrq    $1, %rax
     orq     %r10, %rax
     jmp     *%r13
 
 L6.1:   ;;; Push the result
-
-    movq    %r10, %rax
+    movslq  %r10d, %rax
     jmp     *%r13
 
 next_arg:
     subq    $8, %r15
     jnz     argloop
 
-    addq    -40(%rbp), %USP
-    movq    -16(%rbp), %r10
+    addq    -24(%rbp), %USP
+    movq    (%rbp), %r10
+    movb    -16(%rbp), %al
 
-do_call:
-    movb    -32(%rbp), %al
 do_call1:
     cld             ;;; clear direction flag
     movq    %USP, SAVED_USP ;;; save USP for callback
@@ -336,26 +334,12 @@ do_call1:
     movq    SAVED_USP, %USP ;;; restore USP
 
     ;;; Copy possible results into result_struct:
-    ;;; double result from ST(0) first, then word result from EAX
+    ;;; double result first, then word result from RAX
 
     leaq    C_LAB(Sys$-Extern$-result_struct), %rcx
 
     movq    %rax, 8(%rcx)       ;;; word result
-    movq    %xmm0, (%rcx)           ;;; double result
-#_IF false
-    ;;; See if there's a double result (i.e something in ST(0)):
-    ;;; use FXAM, and copy the resulting status word to EAX.
-    ;;; Mask out everything except bits C0 and C3; if these are both
-    ;;; set, then the register was empty and there's no result
-
-    fxam
-    fstsw   %ax
-    andw    $0x4100, %ax
-    cmpw    $0x4100, %ax
-    je  L7.1
-
-    fstpl   (%ecx)          ;;; double result
-#_ENDIF
+    movq    %xmm0, (%rcx)       ;;; double result
 
 L7.1:   ;;; Reset stack pointer
 
