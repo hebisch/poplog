@@ -483,7 +483,7 @@ define lconstant List_delete_if(test, key, list, lo, hi, count, from_end) -> res
                 n + 1 -> n
             enduntil
         endif;
-        until n == 0 or count == 0 do
+        until n == 1 or count == 0 do
             -> list;
             if Apply_seq_test(front(list), key, test) then
                 count - 1 -> count;
