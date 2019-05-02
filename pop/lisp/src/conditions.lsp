@@ -392,9 +392,9 @@
                 (loop
                     (unless (consp bindings) (return))
                     (setq list (car bindings) bindings (cdr bindings))
-                    (dolist (b list)
-                        (if (typep cond (car b))
-                            (let ((sys:*handler-bindings* bindings))
+                    (let ((sys:*handler-bindings* bindings))
+                        (dolist (b list)
+                            (if (typep cond (car b))
                                 (funcall (cdr b) cond))))))))
     nil)
 
