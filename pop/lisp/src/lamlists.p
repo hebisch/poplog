@@ -18,7 +18,7 @@ constant
     lambda_list_keywords    =   [^@&BODY ^@&WHOLE ^@&ENVIRONMENT
                                  ^@&OPTIONAL ^@&KEY ^@&REST ^@&AUX
                                  ^@&ALLOW-OTHER-KEYS],
-    lambda_parameters_limit =   pop_max_int + 1,
+    lambda_parameters_limit =   pop_max_int,
     ;
 
 
@@ -181,7 +181,7 @@ define bad_key_args(fkeys, args);
         back(args) -> args
     enduntil;
     unless badkeys == [] do
-        control_cerror(false, 'Unknown keywords passed to ~S',
+        program_cerror(false, 'Unknown keywords passed to ~S',
                         [^(f_name(caller(1))) ^^(ncrev(badkeys))])
     endunless
 enddefine;
@@ -190,7 +190,7 @@ enddefine;
 define conskeylist(n) -> n;
     if testbit(n, 0) then
         conslist(n) -> n;
-        control_error('Odd number of keyword arguments', [^n])
+        program_error('Odd number of keyword arguments', [^n])
     else
         conslist(n)
     endif

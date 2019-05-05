@@ -108,7 +108,7 @@
 
 (define-condition SIMPLE-CONDITION (condition)
     ((:string :initarg :format-string :initform nil
-        :accessor simple-condition-format-string)
+        :accessor simple-condition-format-control)
      (:args :initarg :format-arguments :initform ()
         :accessor simple-condition-format-arguments))
     (:report
@@ -149,6 +149,7 @@
 
 (define-condition SIMPLE-ERROR (simple-condition error))
 
+(define-condition PARSE-ERROR (error))
 
 (define-condition ARITHMETIC-ERROR (error)
     ((:operation :initarg :operation :accessor arithmetic-error-operation)
@@ -177,6 +178,10 @@
 
 (define-condition FLOATING-POINT-UNDERFLOW (arithmetic-error))
 
+(define-condition FLOATING-POINT-INEXACT (arithmetic-error))
+
+(define-condition FLOATING-POINT-INVALID-OPERATION (arithmetic-error))
+
 
 (define-condition CELL-ERROR (error)
     ((:name :initarg :name :accessor cell-error-name)
@@ -202,8 +207,11 @@
     ((:description :initform "undefined function" :allocation :class)
      (:object :initform nil :allocation :class)))
 
+(define-condition POPLOG:APPLYING-SPECIAL-FORM (undefined-function)
+    ((:description :initform "special form")))
 
-(define-condition POPLOG:UNBOUND-SLOT (cell-error)
+
+(define-condition UNBOUND-SLOT (cell-error)
     ((:description :initform "unbound slot" :allocation :class)
      (:object :initarg :object)))
 
@@ -234,6 +242,9 @@
     #.sys:mishap-slots
     (:report sys:mishap-reporter))
 
+(define-condition PRINT-NOT-READABLE (error)
+    #.sys:mishap-slots
+    (:report sys:mishap-reporter))
 
 (define-condition FILE-ERROR (error)
     #.`((pathname :initarg :pathname :accessor file-error-pathname)
@@ -254,6 +265,8 @@
     #.`((stream :initarg :stream :accessor stream-error-stream)
         ,@sys:mishap-slots)
     (:report sys:mishap-reporter))
+
+(define-condition READER-ERROR (parse-error stream-error))
 
 
 (define-condition END-OF-FILE (stream-error)
@@ -326,6 +339,7 @@
 
 (define-condition WARNING (condition))
 
+(define-condition STYLE-WARNING (warning))
 
 (define-condition POPLOG:WARNING-WITH-INVOLVING (warning)
     #.sys:mishap-slots
@@ -384,7 +398,7 @@
 
 
 (defun SIGNAL (datum &rest args)
-    (let ((cond (sys:checkr-condition 'simple-error datum args)))
+    (let ((cond (sys:checkr-condition 'simple-condition datum args)))
         (if (and *break-on-signals* (typep cond *break-on-signals*))
             (break cond))
         (let ((bindings sys:*handler-bindings*))

@@ -53,7 +53,7 @@ constant procedure (checkr_fp, elt, listp, nth);
 constant
     array_rank_limit        =  256,
     array_dimension_limit   =  (2 ** 24),           /* Taken from ACL */
-    array_total_size_limit  =  pop_max_int + 1,
+    array_total_size_limit  =  pop_max_int,
     ;
 
 

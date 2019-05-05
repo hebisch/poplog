@@ -28,7 +28,8 @@ global vars                         /* global 'cos used in format_print */
 
 define print_not_readable(item);
     dlocal print_readably = nil, read_eval = true;
-    lisp_error('Print not readable', [^item])
+    lisp_error(@PRINT-NOT-READABLE,
+               {^@:MESSAGE ^('Print not readable') ^@:INVOLVING ^item})
 enddefine;
 
 

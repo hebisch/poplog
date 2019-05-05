@@ -273,13 +273,6 @@ define checkr_vector_index(i, vec);
 enddefine;
 
 
-define check_positive(item) -> item;
-    unless isinteger(item) and item fi_>= 0 do
-        mishap(item, 1, 'Integer >= 0 needed')
-    endunless
-enddefine;
-
-
 define on_stack(thing);
     lvars n = 1, item;
     repeat
@@ -553,6 +546,11 @@ define simple_type_error(message, got, expecting);
         lisp_error)
 enddefine;
 
+define check_positive(item) -> item;
+    unless isinteger(item) and item fi_>= 0 do
+        simple_type_error('Integer >= 0 needed', item, @UNSIGNED-BYTE);
+    endunless
+enddefine;
 
 define name_error(item, kind);
     fast_chain(
@@ -590,11 +588,10 @@ define control_error(message, involving);
         lisp_error)
 enddefine;
 
-
-define control_cerror(cstring, message, involving);
+define program_cerror(cstring, message, involving);
     fast_chain(
         cstring or 'Carry on regardless',
-        @CONTROL-ERROR,
+        @PROGRAM-ERROR,
         {^@:MESSAGE ^message ^@:INVOLVING ^involving},
         lisp_cerror)
 enddefine;

@@ -957,7 +957,7 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
               (throw 'duplicatable-code-p nil)))
              ((eq fn 'multiple-value-setq) (f (length (second x)) (cddr x)))
              ((eq fn 'return-from) (1+ (estimate-code-size-1 (third x) env)))
-             ((or (#-Poplog special-operator-p #+Poplog special-form-p fn)
+             ((or (special-operator-p fn)
                   (member fn *estimate-code-size-punt*))
               (throw 'estimate-code-size nil))
              (t (multiple-value-bind (new-form expanded-p) (macroexpand-1 x env)

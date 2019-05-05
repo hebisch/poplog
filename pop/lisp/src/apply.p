@@ -54,7 +54,10 @@ enddefine;
 
 
 define exec_special_form(sym);
-    control_error('Applying special form ~S', [^sym])
+    fast_chain(
+              @POPLOG:APPLYING-SPECIAL-FORM,
+              {^@:NAME ^sym ^@:OPERATION ^('apply')},
+              lisp_error);
 enddefine;
 
 
@@ -92,7 +95,7 @@ enddefine;
 define lconstant Nargs_cerror(pdr);
     dlocal trace_args;
     cons_arglist() -> trace_args;
-    Check_nargs(function_info(pdr), LISP_N_ARGS, control_cerror, true);
+    Check_nargs(function_info(pdr), LISP_N_ARGS, program_cerror, true);
     dest_arglist(trace_args)
 enddefine;
 

@@ -314,7 +314,7 @@
 (defgeneric SLOT-UNBOUND (class instance slot-name)
     (:method
         ((class T) instance slot-name)
-            (error 'poplog:unbound-slot :name slot-name :object instance)))
+            (error 'unbound-slot :name slot-name :object instance)))
 
 
 (defgeneric ALLOCATE-INSTANCE (class &rest initargs)

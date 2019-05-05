@@ -37,7 +37,7 @@
             (if (and (boundp sym) (not (keywordp sym)))
                 (format t " (value: a ~S)" (type-of (symbol-value sym))))
             (if (fboundp sym)
-                (if (special-form-p sym)
+                (if (special-operator-p sym)
                     (princ " (special-form)")
                     (if (macro-function sym)
                         (princ " (macro)")
