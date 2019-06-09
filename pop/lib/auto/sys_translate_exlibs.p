@@ -84,7 +84,6 @@ define sys_translate_exlibs(varname) /* -> (type, version, libs) */;
             cons_p = identfn;
     lconstant cache = newmapping([], 4, false, false);
 
-        ;;; printf(varname, 'sys_translate_exlibs(%p)\n');
 
     if cache(varname) ->> trans then
         returnunless(trans == true) (explode(trans));
