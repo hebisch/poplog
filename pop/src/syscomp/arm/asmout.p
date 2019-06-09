@@ -313,15 +313,16 @@ enddefine;
  *  Exfunc closure code -- jump to subroutine _exfunc_clos_action (aextern.s)
  *  with exfunc_closure record address in a reg, etc. This procedure is
  *  passed the label of _exfunc_clos_action. The code generated must be
- *  padded to exactly 4 words.
+ *  padded to exactly 4 words.  It must preserve argument registers
+ *  and call-preserved registers.  On ARM that means we can only use
+ *  r12...
  */
 
 define asm_gen_exfunc_clos_code(action_lab);
     lvars action_lab, l = nextlab();
-    ;;; mishap(action_lab, 1, 'asm_gen_exfunc_clos_code unimplemented');
-    asmf_printf(l, '\tldr r0, %p\n');
-    asmf_printf('\tmov r1, pc\n');
-    asmf_printf('\tbx r0\n');
+    asmf_printf('\tsub r12, pc, #8\n');
+    asmf_printf(l, '\tldr pc, %p\n');
+    asmf_printf('\tnop\n');
     asm_outlab(l);
     asm_outword(action_lab, 1);
 enddefine;
