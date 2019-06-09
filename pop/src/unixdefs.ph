@@ -175,13 +175,28 @@ struct STATB
 
 struct STATB
   { dev_t   ST_DEV;
+#_IF DEF ARM_LINUX
+    int     ST_PAD1;
+#_ENDIF
     ino_t   ST_INO;
+#_IF DEF ARM_LINUX
+    mode_t  ST_MODE;
+    nlink_t ST_NLINK;
+#_ELSEIF DEF X86_LINUX
     nlink_t ST_NLINK;
     mode_t  ST_MODE;
+#_ELSE
+    need to define !
+#_ENDIF
     uid_t   ST_UID;
     gid_t   ST_GID;
+#_IF DEF X86_LINUX
     int     ST_PAD2;
+#_ENDIF
     dev_t   ST_RDEV;
+#_IF DEF ARM_LINUX
+    int     ST_PAD3;
+#_ENDIF
     off_t   ST_SIZE;
     long    ST_BLKSIZE;
     blkcnt_t ST_BLOCKS;

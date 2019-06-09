@@ -97,13 +97,13 @@ THREE:
 
 TWO:
     ;;; last modified time
-;;; Sint_->_pint(_stbuf!ST_MTIME)   -> fast_subscrv(2,statbuff);
-        _pint(_stbuf!ST_MTIME)   -> fast_subscrv(2,statbuff);
+    Sint_->_pint(_stbuf!ST_MTIME)   -> fast_subscrv(2,statbuff);
+;;;        _pint(_stbuf!ST_MTIME)   -> fast_subscrv(2,statbuff);
 ;;;        printf(_pint(_stbuf!ST_MTIME), '_pint(_stbuf!ST_MTIME) = %p\n');
 ;;;        printf(fast_subscrv(2,statbuff), 'fast_subscrv(2,statbuff) = %p\n');
 ONE:
     ;;; file size
-    _pint(_stbuf!ST_SIZE)           -> fast_subscrv(1,statbuff);
+    Sint_->_pint(_stbuf!ST_SIZE)    -> fast_subscrv(1,statbuff);
 ;;;        printf(statbuff, 'statbuff = %p\n');
 enddefine;
 

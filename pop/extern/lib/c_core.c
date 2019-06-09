@@ -2131,7 +2131,7 @@ int personality (unsigned long);
 void
 linux_setper(int argc, char * * argv, char * * envp)
 {
-#if defined(__i386__) || defined(__x86_64__)
+#if defined(__i386__) || defined(__x86_64__) || defined(__arm__)
     struct utsname name;
     int major_version = 2;
     int minor_version = 6;
