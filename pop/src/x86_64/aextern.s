@@ -378,20 +378,7 @@ L0.1:   ret
 ;;; called from the code in an exfunc_closure (see asmout.p), with
 ;;; the top of stack pointing to (exfunc_clos address)+10
 
-    .data
-mess2:
-    .string "untested _exfunc_clos_action called\\nlook in aextern.s to enable\\n"
-    .text
-_exfunc_clos_action_message:
-    ;;; Load address of external closure record to eax
-    movq    $mess2, %rdi
-    movl    $0, %eax
-    call    printf
-    movl    $1, %edi
-    call    exit
-
 DEF_C_LAB(Sys$- _exfunc_clos_action)
-;;;        jmp _exfunc_clos_action_message
     movq    (%rsp), %r11
     leaq    -11(%r11), %r11
 
@@ -406,6 +393,7 @@ DEF_C_LAB(Sys$- _exfunc_clos_action)
     popq    %r11
     movq    _EFC_FUNC-11(%r11), %r11
     jmp *(%r11)
+
     .align  16
 
 
@@ -418,21 +406,6 @@ DEF_C_LAB(Sys$- _exfunc_clos_action)
 ;;; Arguments:
 ;;; argp[0] is the function code for -Callback-
 
-    .data
-mess3:
-    .string "untested _pop_external_callback called\\nlook in aextern.s to enable\\n"
-    .text
-_pop_external_callback_message:
-    ;;; Load address of external closure record to eax
-    movq    $mess3, %rdi
-    movl    $0, %eax
-    call    printf
-    movl    $1, %edi
-    call    exit
-    ;;; safety loop
-sloop1:
-    jmp sloop1        
-
 ;;; .globl  EXTERN_NAME(debug_pop)
 
 
@@ -440,7 +413,6 @@ sloop1:
 EXTERN_NAME(_pop_external_callback):
     ;;; for indirect weak reference
 DEF_C_LAB(Sys$- _external_callback_func)
-;;;        jmp _pop_external_callback_message
     ;;; Save call-preserved C registers      
     pushq   %rbx
     pushq   %rbp
@@ -616,7 +588,7 @@ Ldata_end:
     Moved pop_ex*func_arg to c_core.c (otherwise it's undefined if this
     file is not extracted)
 --- Robert John Duncan, Aug 26 1992
-    Changed _call_external to take _________fltsingle arg whose Nth bit
+    Changed _call_external to take fltsingle arg whose Nth bit
     specifies the treatment of (d)decimals for the (N+1)'th arg.
     Also made more compatible with the Sun386/System V version by using
     EXTERN_NAME, changing some instructions etc.

@@ -17,13 +17,13 @@ global constant
 section $-Sys;
 
 
-    /*  Construct a raw array procedure. _________tabsize is the word offset size
+    /*  Construct a raw array procedure. _tabsize is the word offset size
         of the array params starting at PD_ARRAY_TABLE.
     */
 define Array$-Cons(_tabsize) -> _arrayp;
     lvars _tabsize, _arrayp, _drop_ptr, _size;
 
-    ;;; Macros for dropping code at __________drop_ptr
+    ;;; Macros for dropping code at _drop_ptr
     lconstant macro (
                 QUAD    = [_drop_ptr!(l)++ -> _drop_ptr],
         LONG    = [_drop_ptr!(i)++ -> _drop_ptr],

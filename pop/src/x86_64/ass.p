@@ -1508,8 +1508,8 @@ define I_IF_CMP();
     Drop_if(_cc, _cc _bixor _cc_NOT, asm_instr!INST_ARGS[_3]);
 enddefine;
 
-;;; {I_IF_TAG _________routine _______operand ______________I_IF_opt-instr}
-;;;     where _________routine is _issimple or _isinteger
+;;; {I_IF_TAG _routine operand I_IF_opt-instr}
+;;;     where _routine is _issimple or _isinteger
 
 define I_IF_TAG();
     lvars _mod, _rm, _disp;
@@ -1996,7 +1996,7 @@ endsection;     /* $-Sys$-Vm */
         Added I_IF_TAG for issimple/isinteger tests
 --- Robert John Duncan, Dec 15 1994
         Corrections to Do_field and Drop_vecsub_mult for accessing compound
-        data (i.e. ____size /== 1)
+        data (i.e. size /== 1)
 --- Simon Nichols, Sep  6 1990
         -size- argument to field instructions now in units of type size;
         changed -Do_field- to detect size/==1 case for subscripting

@@ -1015,17 +1015,6 @@ DEF_C_LAB (_checkinterrupt)
 
     .align  16
 
-    .data
-mess33:
-    .string "sp = 0x%lx\\n"
-
-    .text
-EXTERN_NAME(pop_print_sp):
-    movq    $mess33, %rdi
-    movq    %rsp, %rsi
-    movl    $0, %eax
-    call    printf
-    ret
 
 /*
 EXTERN_NAME(pop_print):
