@@ -56,10 +56,8 @@ struct BIGINT
 
 
 lconstant macro (
-    SLICE_BITS      = _pint(##(1)[_1|SL]) - 1,
-    SIGN_MASK       = -1<<SLICE_BITS,
-    SIGN_BIT        = 1<<SLICE_BITS,
-    SLICE_MASK      = SIGN_BIT - 1,
+    SLICE_BITS      = _pint(##(1)[_1|SL]), ;;; - 1,
+    SLICE_MASK      = - 1,
 
     ;;; for random number generation
     RANSEED_BITS    = _pint(##(1)[_1|int]) - 1,

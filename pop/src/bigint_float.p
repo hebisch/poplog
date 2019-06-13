@@ -9,7 +9,9 @@
 #_INCLUDE 'declare.ph'
 #_INCLUDE 'numbers.ph'
 
-
+global constant
+    _pf_dfloat_uint, _pf_uintof,
+;
 
 ;;; --- FLOAT -> BIGINT ---------------------------------------------------
 
@@ -25,21 +27,40 @@ define Dfloat_->_bigint(_df);
 
     _pf_expof(_df) -> _nbits;
     _nbits _div _:SLICE_BITS -> _nslices -> _nbits;
-    if _zero(_nbits) then
-        _:SLICE_BITS -> _nbits
-    else
-        _nslices _add _1 -> _nslices
-    endif;
+    _nslices _add _1 -> _nslices;
 
-    ;;; get value for ms (sign) slice
-    _nbits -> _pf_expof(_df) -> ;       ;;; nbits of integer
-    _pf_intof(_df) -> -> _ms;
-    if _neg(_ms) then
-        ;;; negative -- add 2**nbits
+    _nbits -> _pf_expof(_df) -> ;
+
+    ;;; Change to two-complement form
+    if _pfneg(_df) then
         _nbits _add _1 -> _pf_expof(_df_1) -> ;
         _pfadd(_df, _df_1) -> ;
-        (_pf_intof(_df) ->) _add _shift(_-1, _nbits) -> _ms;
-        if _ms == _-1 then _nslices _sub _1 -> _nslices endif
+        _-1;
+    else
+        _0;
+    endif -> _s0;
+
+    if _zero(_nbits) then
+        if _s0 == _-1 then
+            ;;; mishap(0, 'Uniimplemented');
+            _pf_expof(_df) _add _:SLICE_BITS -> _pf_expof(_df) -> ;
+            _pf_uintof(_df) -> -> _ms;
+            if _ms == _-1 then
+                _nslices _sub _1 -> _nslices;
+            else
+                _-1 -> _ms;
+                _pf_expof(_df) _sub _:SLICE_BITS -> _pf_expof(_df) ->
+            endif;
+        else
+            _0 -> _ms;
+        endif;
+    else
+        _pf_uintof(_df) -> -> _ms;
+        _pf_dfloat_uint(_ms, _df_work);
+        _pfsub(_df, _df_work) -> ;
+        if _s0 == _-1 then
+            _ms _add _shift(_-1, _nbits) -> _ms;
+        endif;
     endif;
 
     _df!(w)[_0] -> _s0;  _df!(w)[_1] -> _s1;    ;;; save _df
@@ -49,22 +70,17 @@ define Dfloat_->_bigint(_df);
     result@BGI_SLICES -> _Rstart;
     _Rstart@(SL)[_nslices] ->> _Raddr -> _Rlim;
 
-    if _ms /== _-1 then _ms -> _Raddr--!(SL) -> _Raddr endif;
+    _ms -> _Raddr--!(SL) -> _Raddr;
 
     while _Raddr >@(SL) _Rstart do
-        _pfmodf(_df_work, _df);     ;;; frac into work
-        _pfcopy(_df, _df_work);     ;;; frac back into _df
         quitif(_pfzero(_df));       ;;; done if no more left
         _pf_expof(_df) _add _:SLICE_BITS -> _pf_expof(_df) -> ; ;;; shift left
-        _pf_intof(_df) -> -> _Raddr--!(SL) -> _Raddr
+        _pf_uintof(_df) -> ->> _ms -> _Raddr--!(SL) -> _Raddr;
+        _pf_dfloat_uint(_ms, _df_work);
+        _pfsub(_df, _df_work) -> ;
     endwhile;
 
     while _Raddr >@(SL) _Rstart do _0 -> _Raddr--!(SL) -> _Raddr endwhile;
-    if _ms == _-1 then
-        ;;; set sign bit on ms slice
-        (_Rlim--!(SL) -> _Rlim) _biset _:SIGN_MASK -> _Rlim!(SL)
-    endif;
-
     result
 enddefine;
 
@@ -88,7 +104,7 @@ define Bigint_->_dfloat(bint, _df, _adjust_exp, _want_result);
 
     until _zero(_len) do
         nbits _add _:SLICE_BITS -> _pf_expof(_df) -> ;
-        _pf_dfloat_int(_addr--!(SL) -> _addr, _df_work);
+        _pf_dfloat_uint(_addr--!(SL) -> _addr, _df_work);
         _pfadd(_df, _df_work) -> ;
         _pf_expof(_df) -> nbits;        ;;; re-get in case rounding occurred
         _len _sub _1 -> _len;

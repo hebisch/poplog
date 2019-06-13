@@ -12,7 +12,7 @@
 
 global constant
         procedure (sys_real_time, Sys$-Float_random, Sys$-Bigint_random),
-        _posword_emul
+        _posword_mul_high,
     ;
 
 ;;; -----------------------------------------------------------------------
@@ -60,7 +60,7 @@ define lconstant Random(n, want_0);
             endif
         else
             ;;; return the overflow of seed * _n from RANSEED_BITS
-            _posword_emul(Random_genseed(), _n) -> _n -> ;
+            _posword_mul_high(Random_genseed(), _n) -> _n ;
             _pint(_n)
         endif
         ;;; goto RETURN_INT

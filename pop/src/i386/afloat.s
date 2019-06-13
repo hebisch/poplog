@@ -18,6 +18,7 @@ lconstant macro (
     ;;; User stack pointer
 
     USP = "ebx",
+    SP  = "esp",
 
     ;;; Pop ddecimal structure fields:
     ;;; _DD_1 = MS part, _DD_2 = LS part
@@ -133,6 +134,20 @@ DEF_C_LAB (_pf_dfloat_int)
 
     movl    (%USP), %edi
     fildl   4(%USP)
+    addl    $8, %USP
+    fstpl   (%edi)
+    wait
+    ret
+
+    .align  4
+
+DEF_C_LAB (_pf_dfloat_uint)
+    movl    (%USP), %edi
+    movl    4(%USP), %eax
+    pushl   $0
+    pushl   %eax
+    fildq   (%SP)
+    addl    $8, %SP
     addl    $8, %USP
     fstpl   (%edi)
     wait
@@ -485,6 +500,50 @@ pf_intof_exception:
     call    fpu_init
     movl    $C_LAB(false), (%USP)
     ret
+
+    .align  4
+
+DEF_C_LAB (_pf_uintof)
+    movl    (%USP), %esi
+    fldl    (%esi)
+    fldz
+    fxch    %st(1)
+    fucom   %st(1)
+    fnstsw  %ax
+    fstp    %st(1)
+    sahf
+    jb      L.out_of_range
+    flds    .LC1
+    fxch    %st(1)
+    fucom
+    fnstsw  %ax
+    fstp    %st(1)
+    sahf
+    jnb      L.out_of_range
+    subl     $8, %SP
+    fstcw    (%SP)
+    movw     (%SP), %ax
+    movw     %ax, %si
+    orw      $0x0c00, %si
+    movw     %si, (%SP)
+    fldcw    (%SP)
+    fistpq   (%SP)
+    movl     (%SP), %esi
+    movw     %ax, (%SP)
+    fldcw    (%SP)
+    movl     %esi, (%USP)
+    subl     $4, %USP
+    addl     $8, %SP
+    movl     $C_LAB(true), (%USP)
+    ret
+L.out_of_range:
+    fstp    %st(0)
+    movl    $C_LAB(false), (%USP)
+    ret
+
+    ;;; 2^32 as single float
+.LC1:
+    .long   1333788672
 
     .align  4
 

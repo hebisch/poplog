@@ -20,11 +20,10 @@ section $-Sys$-Fld;
 
 lconstant macro (
     W1REM_BITS  = WORD_BITS - SLICE_BITS,
-    W1REM_MASK  = 2**W1REM_BITS - 1,
+    W1REM_MASK  = 0,
     W2_BITS     = SLICE_BITS - W1REM_BITS,
     W2REM_BITS  = WORD_BITS - W2_BITS,
-    W2REM_MASK  = 2**W2REM_BITS - 1,
-    W2REM_SADD  = 2**(W2REM_BITS-1),
+    W2REM_MASK = 0,
 );
 
     /*  Check the value to go into an "exval" field -- identical translation
@@ -57,7 +56,9 @@ define Exval_val(item) /* -> _item */;
         ;;; biginteger -- return modulo wordsize
         lvars _val = item!BGI_SLICES[_0];
         if item!BGI_LENGTH /== _1 then
+             _val _bimask _:SLICE_MASK -> _val;
             _shift(item!BGI_SLICES[_1], _:SLICE_BITS) _add _val -> _val;
+           ;;; FIXME: looks bogus
 #_IF WORD_BITS==DOUBLE_BITS
             if item!BGI_LENGTH /== _2 then
                 _shift(item!BGI_SLICES[_2], _:SLICE_BITS _add _:SLICE_BITS)
@@ -116,9 +117,9 @@ define :inline lconstant DOUB_VAL(_addr, lo_only_test, unsigned_mask_expr);
         mishap(0, 'OVERFLOW CONVERTING TO POP INTEGER (bigintegers not loaded)')
     endunless;
     BGWEAK Get_bigint(_3) -> bint;
-    _lo _bimask _:SLICE_MASK -> bint!BGI_SLICES[_0];
+    _lo -> bint!BGI_SLICES[_0];
     _shift(_lo, _:-SLICE_BITS) _bimask _:W1REM_MASK -> _lo;
-    (_shift(_hi, _:W1REM_BITS) _add _lo) _bimask _:SLICE_MASK
+    (_shift(_hi, _:W1REM_BITS) _add _lo)
                                     -> bint!BGI_SLICES[_1];
     _shift(_hi, _:-W2_BITS) unsigned_mask_expr -> bint!BGI_SLICES[_2];
 
@@ -142,10 +143,7 @@ define :inline lconstant DOUB_UPD(val, _addr, signed, sign_extn,
             if val!BGI_LENGTH == _2 then
                 if _neg(_hi) and not(signed) then Bgi_err(val, signed) endif
             else
-                if val!BGI_SLICES[_2] signed_add_expr _gr _:W2REM_MASK then
-                    Bgi_err(val, signed)
-                endif;
-                _shift(val!BGI_SLICES[_2], _:W2_BITS) _add _hi -> _hi
+                Bgi_err(val, signed)
             endif
         endif
     else
@@ -170,8 +168,7 @@ enddefine;
 ;;;
 define updaterof Double_val_s(val, _addr);
     lvars val, _addr;
-    DOUB_UPD(val, _addr, true, if _neg(_lo) then _-1 else _0 endif,
-                                            _add _:W2REM_SADD)
+    DOUB_UPD(val, _addr, true, if _neg(_lo) then _-1 else _0 endif, 0);
 enddefine;
 
     /*  Access/update an unsigned double(word) field (pdprops is the value spec)

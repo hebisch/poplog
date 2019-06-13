@@ -139,6 +139,27 @@ DEF_C_LAB (_pf_dfloat_int)
 
     .align  16
 
+DEF_C_LAB (_pf_dfloat_uint)
+    movq   (%USP), %rsi    
+    movq    8(%USP), %rdi
+    addq    $16, %USP
+    testq   %rdi, %rdi
+    js      L.high_bit
+    pxor    %xmm0, %xmm0
+    cvtsi2sdq  %rdi, %xmm0
+    jmp     L.store1
+L.high_bit:
+    movq    %rdi, %rax
+    shrq    %rax
+    andl    $1, %edi
+    orq     %rdi, %rax
+    pxor    %xmm0, %xmm0
+    cvtsi2sdq       %rax, %xmm0
+    addsd   %xmm0, %xmm0
+L.store1:
+    movsd   %xmm0, (%rsi)
+    ret
+
 ;;; _PF_DFLOAT_DEC:
 ;;; Double float a pop decimal.
 
@@ -502,6 +523,48 @@ pf_intof_exception:
     call    fpu_init
     movq    $C_LAB(false), (%USP)
     ret
+
+    .align  16
+
+DEF_C_LAB (_pf_uintof)
+    movq    (%USP), %rsi
+    movsd   (%rsi), %xmm0
+    ucomisd .LC0(%rip), %xmm0
+    jb      L.out_of_range
+    ucomisd .LC1(%rip), %xmm0
+    jnb     L.out_of_range
+    ucomisd .LC2(%rip), %xmm0
+    jnb     L.big_case
+    cvttsd2siq      %xmm0, %rax
+    movq    %rax, (%USP)
+    subq    $8, %USP
+    movq    $C_LAB(true), (%USP)
+    ret
+L.big_case:
+    subsd   .LC2(%rip), %xmm0
+    cvttsd2siq      %xmm0, %rax
+    movabsq $-9223372036854775808, %rsi
+    xorq    %rsi, %rax
+    movq    %rax, (%USP)
+    subq    $8, %USP
+    movq    $C_LAB(true), (%USP)
+    ret
+L.out_of_range:
+    movq    $C_LAB(false), (%USP)
+    ret
+
+    .align 8
+.LC0:
+    .long   0
+    .long   0
+    .align 8
+.LC1:
+    .long   0
+    .long   1139802112
+    .align 8
+.LC2:
+    .long   0
+    .long   1138753536
 
     .align  16
 

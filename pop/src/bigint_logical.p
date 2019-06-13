@@ -46,24 +46,18 @@ define Bigint_logical(_op, x, y);
     repeat
         _op(
             if _Xaddr <@(SL) _Xlim then
-                (_Xaddr!(SL)++ -> _Xaddr) _biclear _:SIGN_MASK
+                (_Xaddr!(SL)++ -> _Xaddr)
             else
                 x
             endif,
             if _Yaddr <@(SL) _Ylim then
-                (_Yaddr!(SL)++ -> _Yaddr) _biclear _:SIGN_MASK
+                (_Yaddr!(SL)++ -> _Yaddr)
             else
                 y
             endif,
             ) -> _Raddr!(SL)++ -> _Raddr;
         quitunless(_Raddr <@(SL) _Rlim)
     endrepeat;
-
-    ;;; get correct sign
-    if _nonzero(_op(x, y)) then
-        ;;; negative - set sign bit on ms slice
-        (_Raddr--!(SL) -> _Raddr) _biset _:SIGN_MASK -> _Raddr!(SL)
-    endif;
 
     Bigint_return(result) -> Get_store()
 enddefine;

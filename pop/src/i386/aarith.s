@@ -15,7 +15,8 @@ constant
 
 lconstant macro (
 
-    USP             = "ebx",
+    USP         = "ebx",
+    SP          = "esp",
     PB          = "ebp",
 
     _PD_EXECUTE         = @@PD_EXECUTE,
@@ -412,326 +413,220 @@ L2.1:   ;;; Overflow -- pop the stack and return <false>
 
 ;;; === BIGINTEGER ARITHMETIC =========================================
 
-;;; _EMUL:
-;;; _POSWORD_EMUL:
-;;; Multiply two biginteger slices to get a double length result.
-;;; A "slice" is a full word, but only the lower 31 bits are used;
-;;; the top bit is always 0.
-
-;;; Call:
-;;; _emul(_MULTIPLICAND, _MULTIPLIER) -> _HIPART -> _LOPART
-
-DEF_C_LAB (_emul)
-DEF_C_LAB (_posword_emul)
-
-    ;;; Copy argument slices to EAX, EDX
-
+;;; Helper for random number generator
+DEF_C_LAB (_posword_mul_high)
     movl    (%USP), %eax
     movl    4(%USP), %edx
-
-    ;;; Multiply EAX by EDX, leaving double length result in EDX:EAX
-
+    addl    $4, %USP
     imull   %edx
-
-    ;;; Shift the top bit of the low half (EAX) into the bottom bit of
-    ;;; the high half (EDX), then clear the top bit in EAX
-
-    shldl   $1, %eax, %edx
-    andl    $0x7FFFFFFF, %eax
-
-    ;;; Return the low part, then the high part
-
-    movl    %eax, 4(%USP)
     movl    %edx, (%USP)
     ret
 
     .align  4
 
-;;; _EDIV:
-;;; Divide a two-slice dividend by a single divisor.
-
-;;; Call:
-;;; _ediv(_HIPART, _LOPART, _DIVISOR) -> _QUOT -> _REM
-
-DEF_C_LAB (_ediv)
-
-    ;;; Pop divisor into ECX, then move lopart/hipart into EAX/EDX
-
-    movl    (%USP), %ecx
-    addl    $4, %USP
+;;; Bignum routines
+DEF_C_LAB (_bgi_add)
+    movl    16(%USP), %eax
+    pushl   %eax
+    movl    12(%USP), %eax
+    pushl   %eax
+    movl    8(%USP), %eax
+    pushl   %eax
+    movl    4(%USP), %eax
+    pushl   %eax
     movl    (%USP), %eax
-    movl    4(%USP), %edx
+    pushl   %eax
+    addl    $20, %USP
+    call    do_bgi_add
+    addl    $20, %SP
+    ret
 
-    ;;; Combine the two slices by shifting EDX right 1, and transferring
-    ;;; its bottom bit into the top bit of EAX.
+    .align  4
 
-    sall    $1, %eax
-    shrdl   $1, %edx, %eax
-    sarl    $1, %edx
+DEF_C_LAB (_bgi_sub)
+    movl    16(%USP), %eax
+    pushl   %eax
+    movl    12(%USP), %eax
+    pushl   %eax
+    movl    8(%USP), %eax
+    pushl   %eax
+    movl    4(%USP), %eax
+    pushl   %eax
+    movl    (%USP), %eax
+    pushl   %eax
+    addl    $20, %USP
+    call    do_bgi_sub
+    addl    $20, %SP
+    ret
 
-    ;;; Divide EDX:EAX by ECX
+    .align  4
 
-    idivl   %ecx
+DEF_C_LAB (_bgi_negate)
+    movl    8(%USP), %eax
+    pushl   %eax
+    movl    4(%USP), %eax
+    pushl   %eax
+    movl    (%USP), %eax
+    pushl   %eax
+    addl    $12, %USP
+    call    do_bgi_negate
+    addl    $12, %SP
+    ret
 
-    ;;; Return the remainder, then the quotient
+    .align  4
+DEF_C_LAB (_bgi_negate_no_ov)
+    movl    8(%USP), %eax
+    pushl   %eax
+    movl    4(%USP), %eax
+    pushl   %eax
+    movl    (%USP), %eax
+    pushl   %eax
+    addl    $12, %USP
+    call    do_bgi_negate_no_ov
+    addl    $12, %SP
+    ret
 
-    movl    %edx, 4(%USP)
+    .align  4
+
+;;; left shift
+;;; Arguments:
+;;;   destination is on top of the user stack
+;;;   next is shift amount
+;;;   next is lenght of biginit argument
+;;;   next is biginit argument
+DEF_C_LAB (_bgi_lshift)
+    movl    12(%USP), %eax
+    pushl   %eax
+    movl    8(%USP), %eax
+    pushl   %eax
+    movl    4(%USP), %eax
+    pushl   %eax
+    movl    (%USP), %eax
+    pushl   %eax
+    addl    $12, %USP
+    call    do_bgi_lshift
+    addl    $16, %SP
+    movl    %eax, (%USP)
+    ret
+
+;;; logical right shift
+DEF_C_LAB (_bgi_rshiftl)
+    movl    12(%USP), %eax
+    pushl   %eax
+    movl    8(%USP), %eax
+    pushl   %eax
+    movl    4(%USP), %eax
+    pushl   %eax
+    movl    (%USP), %eax
+    pushl   %eax
+    addl    $16, %USP
+    call    do_bgi_rshiftl
+    addl    $16, %SP
+    ret
+
+    .align  4
+
+;;; Multiply unsigned biginit by unsigned machine integer (slice)
+;;; Arguments:
+;;;   destination is on top of the user stack
+;;;   next is length of biginit argument
+;;;   next is biginit argument
+;;;   next is machine integer
+DEF_C_LAB (_bgi_mult)
+    movl    12(%USP), %eax
+    pushl   %eax
+    movl    8(%USP), %eax
+    pushl   %eax
+    movl    4(%USP), %eax
+    pushl   %eax
+    movl    (%USP), %eax
+    pushl   %eax
+    addl    $16, %USP
+    call    do_bgi_mult
+    addl    $16, %SP
+    ret
+
+    .align  4
+
+DEF_C_LAB (_bgi_mult_add)
+    movl    12(%USP), %eax
+    pushl   %eax
+    movl    8(%USP), %eax
+    pushl   %eax
+    movl    4(%USP), %eax
+    pushl   %eax
+    movl    (%USP), %eax
+    pushl   %eax
+    addl    $16, %USP
+    call    do_bgi_mult_add
+    addl    $16, %SP
+    ret
+
+    .align  4
+
+;;; Subtruct product from destination
+DEF_C_LAB (_bgi_sub_mult)
+    movl    12(%USP), %eax
+    pushl   %eax
+    movl    8(%USP), %eax
+    pushl   %eax
+    movl    4(%USP), %eax
+    pushl   %eax
+    movl    (%USP), %eax
+    pushl   %eax
+    addl    $16, %USP
+    call    do_bgi_sub_mult
+    addl    $16, %SP
+    ret
+
+    .align  4
+
+DEF_C_LAB (_bgi_div)
+    movl    12(%USP), %eax
+    pushl   %eax
+    movl    8(%USP), %eax
+    pushl   %eax
+    movl    4(%USP), %eax
+    pushl   %eax
+    movl    (%USP), %eax
+    pushl   %eax
+    addl    $12, %USP
+    call    do_bgi_div
+    addl    $16, %SP
     movl    %eax, (%USP)
     ret
 
     .align  4
 
-;;; _BGI_MULT:
-;;; Multiply a biginteger by a signed machine integer and store the
-;;; result in a destination bigint. Return a pointer to the next free
-;;; slice in the destination and the last carry slice.
-
-;;; Call:
-;;;     _bgi_mult(_MULTIPLIER, _SRCADDR, _SRCLIM, _DSTADDR) -> _NEXT_DSTADDR
-;;;                             -> _CARRY
-
-;;; Register usage:
-;;; ESI source pointer
-;;; EDI destination pointer
-;;; EAX working slice; the low half of multiplications
-;;; EDX the high half of multiplications
-;;; ECX the carry slice
-
-;;; Memory usage:
-;;; 4(%USP) the multiplier, left on the user stack
-;;; SRCLIM  the source limit -- points one beyond the end of the source
-
-DEF_C_LAB (_bgi_mult)
-
-    ;;; Load arguments to registers
-
-    movl    (%USP), %edi    ;;; destination start
-    movl    4(%USP), %eax   ;;; source limit
-    movl    8(%USP), %esi   ;;; source start
+DEF_C_LAB (_quotient_estimate_init)
+    movl    8(%USP), %eax
+    pushl   %eax
+    movl    4(%USP), %eax
+    pushl   %eax
+    movl    (%USP), %eax
+    pushl   %eax
     addl    $8, %USP
-
-    ;;; Save the source limit
-
-    movl    %eax, SRCLIM
-
-    ;;; Initialise the carry slice to zero
-
-    movl    $0, %ecx
-
-    ;;; Clear the direction flag: ESI/EDI are to be incremented after
-    ;;; each slice is loaded/stored
-
-    cld
-
-L1.5:   ;;; Top of loop:
-    ;;; load the next slice into EAX and multiply into EDX:EAX
-
-    slodl
-    imull   4(%USP)
-
-    ;;; Add the previous carry slice to the double-length result.
-
-    addl    %ecx, %eax  ;;; Add to the low half
-    adcl    $0, %edx    ;;; and carry into the high half.
-    sarl    $31, %ecx   ;;; Shift the sign of the carry into ECX
-    addl    %ecx, %edx  ;;; and add it into the high half
-
-    ;;; Shift the top bit of EAX into the bottom bit of EDX and zero
-    ;;; the top bit of EAX
-
-    shldl   $1, %eax, %edx
-    andl    $0x7FFFFFFF, %eax
-
-    ;;; Store EAX into the next destination slice, and make EDX the
-    ;;; next carry slice
-
-    sstol
-    movl    %edx, %ecx
-
-    ;;; Compare the source pointer (ESI) with the source limit;
-    ;;; loop if ESI < SRCLIM.
-
-    cmpl    %esi, SRCLIM
-    ja  L1.5
-
-    ;;; Finished -- return the carry slice, then the next destination
-    ;;; pointer
-
-    movl    %ecx, 4(%USP)
-    movl    %edi, (%USP)
+    call    do_quotient_estimate_init
+    addl    $12, %SP
+    movl    %eax, (%USP)
     ret
 
     .align  4
 
-;;; _BGI_MULT_ADD:
-;;; Multiply a biginteger by a signed machine integer and add it into
-;;; a destination bigint. Returns pointer to the next free slice in the
-;;; destination, and the last carry slice.
-
-;;; Call:
-;;;     _bgi_mult_add(_MULTIPLIER, _SRCADDR, _SRCLIM, _DSTADDR)
-;;;                     -> _NEXT_DSTADDR -> _CARRY
-
-;;; Register usage:
-;;; ESI source pointer
-;;; EDI destination pointer
-;;; EAX working slice; the low half of multiplications
-;;; EDX the high half of multiplications
-;;; ECX the carry slice and the destination slice for the addition
-
-;;; Memory usage:
-;;; 4(%USP) the multiplier, left on the user stack
-;;; SRCLIM  the source limit -- points one beyond the end of the source
-;;;     (declared above)
-
-DEF_C_LAB (_bgi_mult_add)
-
-    ;;; Load arguments to registers
-
-    movl    (%USP), %edi    ;;; destination start
-    movl    4(%USP), %eax   ;;; source limit
-    movl    8(%USP), %esi   ;;; source start
+DEF_C_LAB (_quotient_estimate)
+    movl    8(%USP), %eax
+    pushl   %eax
+    movl    4(%USP), %eax
+    pushl   %eax
+    movl    (%USP), %eax
+    pushl   %eax
     addl    $8, %USP
-
-    ;;; Save the source limit
-
-    movl    %eax, SRCLIM
-
-    ;;; Set the initial carry slice to zero
-
-    movl    $0, %ecx
-
-    ;;; Clear the direction flag: ESI/EDI are to be incremented after
-    ;;; each slice is loaded/stored
-
-    cld
-
-L1.6:   ;;; Top of loop:
-    ;;; load the next slice into EAX and multiply into EDX:EAX
-
-    slodl
-    imull   4(%USP)
-
-    ;;; Add the previous carry slice to the double-length result.
-
-    addl    %ecx, %eax
-    adcl    $0, %edx
-    sarl    $31, %ecx
-    addl    %ecx, %edx
-
-    ;;; Load the next destination slice into ECX and add it into
-    ;;; EDX:EAX (just like the carry slice)
-
-    movl    (%edi), %ecx
-    addl    %ecx, %eax
-    adcl    $0, %edx
-    sarl    $31, %ecx
-    addl    %ecx, %edx
-
-    ;;; Shift the top bit of EAX into the bottom bit of EDX and zero
-    ;;; the top bit of EAX
-
-    shldl   $1, %eax, %edx
-    andl    $0x7FFFFFFF, %eax
-
-    ;;; Store EAX into the next destination slice, and make EDX the
-    ;;; next carry slice
-
-    sstol
-    movl    %edx, %ecx
-
-    ;;; Compare the source pointer (ESI) with the source limit;
-    ;;; loop if ESI < SRCLIM
-
-    cmpl    %esi, SRCLIM
-    ja  L1.6
-
-    ;;; Finished -- return carry slice, then the next destination
-    ;;; pointer
-
-    movl    %ecx, 4(%USP)
-    movl    %edi, (%USP)
+    call    do_quotient_estimate
+    addl    $12, %SP
+    movl    %eax, (%USP)
     ret
 
     .align  4
-
-;;; _BGI_DIV:
-;;; Divide a biginteger by a signed machine integer into a destination
-;;;     bigint and return the last remainder.
-
-;;; Call:
-;;; _bgi_div(_DIVISOR, _SRCADDR, _SRCLIM, _DSTLIM) -> _REM
-
-;;; Register usage:
-;;; ESI source pointer
-;;; EDI destination pointer
-;;; EAX working slice; low half of the dividend; quotient
-;;; EDX high half of the dividend; remainder
-;;; ECX start of the source bigint
-
-;;; Memory usage:
-;;; (%USP)  the divisor, left on the user stack
-
-DEF_C_LAB (_bgi_div)
-
-    ;;; Load arguments to registers
-
-    movl    (%USP), %edi    ;;; destination end
-    movl    4(%USP), %esi   ;;; source end
-    movl    8(%USP), %ecx   ;;; source start
-    addl    $12, %USP
-
-    ;;; Set the direction flag:
-    ;;; division works from the last slice back to the first slice,
-    ;;; so ESI/EDI must be decremented after each load/store.
-
-    std
-
-    ;;; ESI and EDI point one beyond the last source and destination
-    ;;; slices, so do an initial adjustment
-
-    subl    $4, %esi
-    subl    $4, %edi
-
-    ;;; Load the top source slice (which carries the sign bit) into EAX;
-    ;;; sign-extend into EDX:EAX then branch to do the first division
-
-    slodl
-    cltd
-    jmp L2.2
-
-L1.7:   ;;; Top of loop: load the next source slice into EAX
-
-    slodl
-
-    ;;; Combine it with the remainder from the previous division
-    ;;; (i.e. shift the bottom bit of EDX into the top of EAX)
-
-    sall    $1, %eax
-    shrdl   $1, %edx, %eax
-    sarl    $1, %edx
-
-L2.2:   ;;; Divide EDX:EAX by (%USP); remainder goes to EDX, quotient to EAX
-
-    idivl   (%USP)
-
-    ;;; Store the quotient at the destination
-
-    sstol
-
-    ;;; Compare the source pointer (ESI) with the source start (ECX);
-    ;;; loop if ESI >= ECX
-
-    cmpl    %esi, %ecx
-    jbe L1.7
-
-    ;;; Finished -- return the last remainder
-
-    movl    %edx, (%USP)
-    ret
-
-    .align  4
-
 
 ;;; === COMPUTE ARRAY SUBSCRIPTS ======================================
 

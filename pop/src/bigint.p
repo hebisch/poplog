@@ -11,7 +11,8 @@
 #_INCLUDE 'gctypes.ph'
 
 global constant
-        _bgi_mult, _bgi_mult_add, _bgi_div, _scmp
+      _bgi_add, _bgi_sub, _bgi_negate, _bgi_negate_no_ov,
+      _bgi_mult, _bgi_mult_add, _bgi_div, _scmp
     ;
 
 section $-Sys;
@@ -82,11 +83,13 @@ define Pint_to_bigint(_i, work_bigint) -> work_bigint;
 #_IF POPINT_SLICES == 2
     lvars _j;
     _shift(_i, _:-SLICE_BITS) -> _j;
-    if _zero(_j) or _j == _-1 then
+    _i _bimask _:SLICE_MASK -> _i;
+    lvars _ii = _shift(_i, _:SLICE_BITS);
+    if _zero(_j) and not(_neg(_ii))
+       or _j == _-1 and _neg(_ii) then
         _1 -> work_bigint!BGI_LENGTH
     else
         ;;; need two slices
-        _i _bimask _:SLICE_MASK -> _i;
         _j -> work_bigint!BGI_SLICES[_1];
         _2 -> work_bigint!BGI_LENGTH;
     endif;
@@ -116,20 +119,22 @@ define Bigint_return(bint);
     _lim@(SL)[_len] -> _addr;
     if _neg(_addr--!(-SL) -> _addr ->> _x) then
         ;;; negative
-        if _x == _-1 and _addr >@(SL) _lim then
-            repeat
-                _len _sub _1 -> _len;
-                (_addr--!(SL) -> _addr) _biset _:SIGN_MASK -> _x;
-                quitunless(_x == _-1 and _addr >@(SL) _lim)
-            endrepeat;
-            _x -> _addr!(-SL)       ;;; ensure neg sign bit set
-        endif
+        while _x == _-1 and _addr >@(SL) _lim do
+            _len _sub _1 -> _len;
+            _addr--!(-SL) -> _addr -> _x;
+        endwhile;
+        if not(_neg(_x)) then
+            _len _add _1 -> _len;
+        endif;
     else
         ;;; positive
         while _zero(_x) and _addr >@(SL) _lim do
             _len _sub _1 -> _len;
-            _addr--!(SL) -> _addr -> _x
-        endwhile
+            _addr--!(-SL) -> _addr -> _x
+        endwhile;
+        if _neg(_x) then
+            _len _add _1 -> _len;
+        endif;
     endif;
 
     ;;; _len is now the correct length -- see if can return an integer
@@ -171,13 +176,12 @@ define Bigint_copy_len(bint, _len) -> result;
         result@BGI_SLICES[bint!BGI_LENGTH] -> _Raddr;
         result@BGI_SLICES[_len _sub _1] -> _Rlast;
         if _neg(_Raddr!(-SL)[_-1] ->> _work) then
-            _work _biclear _:SIGN_MASK -> _Raddr!(SL)[_-1];
             _-1
         else
             _0
         endif -> _work;
         while _Raddr <@(SL) _Rlast do
-            _work _biclear _:SIGN_MASK -> _Raddr!(SL)++ -> _Raddr
+            _work -> _Raddr!(SL)++ -> _Raddr
         endwhile;
         _work -> _Raddr!(SL)
     endif
@@ -225,168 +229,76 @@ enddefine;
     ;;; sign extension of a bigint, given the address of
     ;;; after its last component
 define lconstant Bgi_sign_extn() with_nargs 1;
-    if _neg(!(-SL)[_-1]) then _:SLICE_MASK else _0 endif;
+    if _neg(!(-SL)[_-1]) then _-1 else _0 endif;
 enddefine;
 
     ;;; bigint x + bigint y
 define lconstant Bgi_+(x, y);
-    lvars carry, x, y, result,
-        _Raddr, _Xaddr, _Yaddr, _Rlast, _Xlim, _Ylim
+    lvars x, y, result,
+          _Rlen, _Xlen, _Ylen
         ;
-    x!BGI_LENGTH ->> _Rlast -> _Xlim;
-    y!BGI_LENGTH -> _Ylim;
-    ;;; get greater of the two lengths in _Rlast
-    if _Ylim _gr _Xlim then _Ylim -> _Rlast endif;
-    Get_bigint(_Rlast _add _1) -> result;   ;;; 1 extra for overflow
+    x!BGI_LENGTH ->> _Rlen -> _Xlen;
+    y!BGI_LENGTH -> _Ylen;
+    ;;; get greater of the two lengths in _Rlen
+    if _Ylen _gr _Xlen then _Ylen -> _Rlen endif;
+    Get_bigint(_Rlen _add _1) -> result;   ;;; 1 extra for overflow
 
-    ;;; set up addresses
-    result@BGI_SLICES -> _Raddr;
-    _Raddr@(SL)[_Rlast] -> _Rlast;
-    x@BGI_SLICES -> _Xaddr;
-    _Xaddr@(SL)[_Xlim] -> _Xlim;
-    y@BGI_SLICES -> _Yaddr;
-    _Yaddr@(SL)[_Ylim] -> _Ylim;
-
-    ;;; get sign extensions of x and y
-    Bgi_sign_extn(_Xlim) -> x;
-    Bgi_sign_extn(_Ylim) -> y;
-
-    _0 -> carry;
-    repeat
-        if _Xaddr <@(SL) _Xlim then
-            ((_Xaddr!(SL)++ -> _Xaddr) _biclear _:SIGN_MASK) _add carry -> carry
-        else
-            x _add carry -> carry
-        endif;
-        if _Yaddr <@(SL) _Ylim then
-            ((_Yaddr!(SL)++ -> _Yaddr) _biclear _:SIGN_MASK) _add carry -> carry
-        else
-            y _add carry -> carry
-        endif;
-        if carry _bitst _:SIGN_BIT then
-            carry _biclear _:SIGN_MASK -> _Raddr!(SL)++ -> _Raddr;
-            _1 -> carry
-        else
-            carry -> _Raddr!(SL)++ -> _Raddr;
-            _0 -> carry
-        endif;
-        quitunless(_Raddr <@(SL) _Rlast)
-    endrepeat;
-
-    ;;; do the last carry, sign extending if negative
-    (x _add y _add carry) _biclear _:SIGN_MASK -> carry;
-    if carry _gr _1 then
-        ;;; negative
-        carry _biset _:SIGN_MASK -> carry
-    endif;
-    carry -> _Raddr!(SL);
+    _bgi_add(x@BGI_SLICES, _Xlen, y@BGI_SLICES, _Ylen,
+             result@BGI_SLICES);
 
     Bigint_return(result) -> Get_store()
 enddefine;
 
     ;;; bigint x - bigint y
 define lconstant Bgi_-(x, y);
-    lvars carry, x, y, result,
-        _Raddr, _Xaddr, _Yaddr, _Rlast, _Xlim, _Ylim
+    lvars x, y, result,
+          _Rlen, _Xlen, _Ylen
         ;
-    x!BGI_LENGTH ->> _Rlast -> _Xlim;
-    y!BGI_LENGTH -> _Ylim;
-    ;;; get greater of the two lengths in _Rlast
-    if _Ylim _gr _Xlim then _Ylim -> _Rlast endif;
-    Get_bigint(_Rlast _add _1) -> result;   ;;; 1 extra for overflow
+    x!BGI_LENGTH ->> _Rlen -> _Xlen;
+    y!BGI_LENGTH -> _Ylen;
+    ;;; get greater of the two lengths in _Rlen
+    if _Ylen _gr _Xlen then _Ylen -> _Rlen endif;
+    Get_bigint(_Rlen _add _1) -> result;   ;;; 1 extra for overflow
 
-    ;;; set up addresses
-    result@BGI_SLICES -> _Raddr;
-    _Raddr@(SL)[_Rlast] -> _Rlast;
-    x@BGI_SLICES -> _Xaddr;
-    _Xaddr@(SL)[_Xlim] -> _Xlim;
-    y@BGI_SLICES -> _Yaddr;
-    _Yaddr@(SL)[_Ylim] -> _Ylim;
-
-    ;;; get sign extensions of x and y
-    Bgi_sign_extn(_Xlim) -> x;
-    Bgi_sign_extn(_Ylim) -> y;
-
-    _0 -> carry;
-    repeat
-        if _Xaddr <@(SL) _Xlim then
-            ((_Xaddr!(SL)++ -> _Xaddr) _biclear _:SIGN_MASK) _add carry -> carry
-        else
-            x _add carry -> carry
-        endif;
-        if _Yaddr <@(SL) _Ylim then
-            carry _sub ((_Yaddr!(SL)++ -> _Yaddr) _biclear _:SIGN_MASK) -> carry
-        else
-            carry _sub y -> carry
-        endif;
-        if carry _bitst _:SIGN_BIT then
-            carry _biclear _:SIGN_MASK -> _Raddr!(SL)++ -> _Raddr;
-            _-1 -> carry
-        else
-            carry -> _Raddr!(SL)++ -> _Raddr;
-            _0 -> carry
-        endif;
-        quitunless(_Raddr <@(SL) _Rlast)
-    endrepeat;
-
-    ;;; do the last carry, sign extending if negative
-    (x _sub y _add carry) _biclear _:SIGN_MASK -> carry;
-    if carry _gr _1 then
-        ;;; negative
-        carry _biset _:SIGN_MASK -> carry
-    endif;
-    carry -> _Raddr!(SL);
+    _bgi_sub(y@BGI_SLICES, _Ylen, x@BGI_SLICES, _Xlen,
+             result@BGI_SLICES);
 
     Bigint_return(result) -> Get_store()
 enddefine;
 
-define Bigint_negate_range(_saddr, _slim, _daddr);
-    lvars carry = _0, _saddr, _daddr, _slim;
-    _slim--@(SL) -> _slim;          ;;; stop before sign slice
-    while _saddr <@(SL) _slim do
-        carry _sub (_saddr!(SL)++ -> _saddr) -> carry;
-        if _neg(carry) then
-            carry _biclear _:SIGN_MASK -> _daddr!(SL)++ -> _daddr;
-            _-1 -> carry
-        else
-            carry -> _daddr!(SL)++ -> _daddr;
-            _0 -> carry
-        endif
-    endwhile;
-
-    ;;; sign slice
-    if _zero(carry) and _saddr!(-SL) == _:SIGN_MASK then
-        ;;; largest -ve number, overflows to further slice
-        _0 -> _daddr!(SL)++ -> _daddr;
-        _1 -> _daddr!(-SL);
-        true        ;;; meaning overflowed
-    else
-        carry _sub _saddr!(-SL) -> _daddr!(-SL);
-        false       ;;; meaning didn't
-    endif
+define Bigint_negate_range(_saddr, _slen, _daddr);
+    lvars _saddr, _daddr, _slen;
+    _bgi_negate_no_ov(_saddr, _slen, _daddr);
 enddefine;
 
-    ;;; produce a new negated bigint
+;;; Produce a new negated bigint, this one always produces
+;;; bigints, even if result will fit pop int.
 define Bigint_do_negate(bint) -> result;
-    lvars bint, result, _len, _addr;
+    lvars bint, result, _len;
     bint!BGI_LENGTH -> _len;
-    Get_bigint(_len _add _1) -> result;     ;;; allow 1 for overflow
-    bint@BGI_SLICES -> _addr;
-    unless Bigint_negate_range(_addr, _addr@(SL)[_len], result@BGI_SLICES) then
-        ;;; didn't overflow, can truncate extra slice
-        _len -> result!BGI_LENGTH;
-        result@V_WORDS[_len|SL.r]@~POPBASE -> Get_store()
-    endunless
+    if _neg(bint!BGI_SLICES[_len _sub _1]) then
+        Get_bigint(_len _add _1) -> result;     ;;; allow 1 for overflow
+        _bgi_negate(bint@BGI_SLICES, _len, result@BGI_SLICES);
+        if result!BGI_SLICES[_len _sub _1] _sgreq _0 then
+            ;;; no overflow
+            _len -> result!BGI_LENGTH;
+            result@V_WORDS[_len|SL.r]@~POPBASE -> Get_store()
+        endif;
+    else
+        Get_bigint(_len) -> result;
+        Bigint_negate_range(bint@BGI_SLICES, _len, result@BGI_SLICES);
+    endif;
 enddefine;
 
 define lconstant Bgi_negate() with_nargs 1;
-    Bigint_return(Bigint_do_negate()) -> Get_store()
+    lvars result = Bigint_do_negate();
+    Bigint_return(result) -> Get_store();
 enddefine;
 
 define lconstant Bgi_abs(bint);
     lvars bint;
     if Bigint_neg(bint) then
-        Bigint_return(Bigint_do_negate(bint)) -> Get_store()
+        Bgi_negate(bint);
     else
         bint
     endif
@@ -396,53 +308,70 @@ enddefine;
 ;;; --- MULTIPLICATION -------------------------------------------------------
 
 define lconstant Bgi_*(x, y);
-    lvars y, x, result, _Yaddr, _Raddr, _Xlim, _Ylim, _Xstart, _Rlim;
+    lvars y, x, result, _Yaddr, _Raddr, _Xlen, _Ylen, _Xstart,
+          need_neg = false;
 
-    x!BGI_LENGTH -> _Xlim;
-    y!BGI_LENGTH -> _Ylim;
+    x!BGI_LENGTH -> _Xlen;
+    y!BGI_LENGTH -> _Ylen;
+
+    if _neg(x!BGI_SLICES[_Xlen _sub _1]) then
+        Bigint_do_negate(x) -> x;
+        x!BGI_LENGTH -> _Xlen;
+        true -> need_neg;
+    endif;
+
+    if _neg(y!BGI_SLICES[_Ylen _sub _1]) then
+        Bigint_do_negate(y) -> y;
+        y!BGI_LENGTH -> _Ylen;
+        not(need_neg) -> need_neg;
+    endif;
+
     ;;; make x the longer of the two -- since the inner loop is done on x,
     ;;; this saves the outer loop being done as many times
-    if _Ylim _gr _Xlim then
+    if _Ylen _gr _Xlen then
         x, y -> x -> y;
-        _Xlim, _Ylim -> _Xlim -> _Ylim
+        _Xlen, _Ylen -> _Xlen -> _Ylen
     endif;
 
     ;;; get result structure
-    _Xlim _add _Ylim _add _1 -> _Rlim;  ;;; +1 -- see below
-    Get_bigint(_Rlim) -> result;
+    Get_bigint(_Xlen _add _Ylen) -> result;
 
-    ;;; set up addresses
-    result@BGI_SLICES -> _Raddr;    _Raddr@(SL)[_Rlim] -> _Rlim;
-    y@BGI_SLICES -> _Yaddr;         _Yaddr@(SL)[_Ylim] -> _Ylim;
-    x@BGI_SLICES -> _Xstart;        _Xstart@(SL)[_Xlim] -> _Xlim;
+    ;;; NO GC allowed below
 
-    ;;; do least sig slice of y by x
-    ;;; multiply x by signed y value into result
-    _bgi_mult(_Yaddr!(-SL)++ -> _Yaddr, _Xstart, _Xlim, _Raddr)
-                                        -> ()!(-SL);    ;;; insert last carry
+    ;;; Zero high slices of result
+    result@BGI_SLICES[_Xlen _add _1] -> _Raddr;
+    result@BGI_SLICES[_Xlen _add _Ylen] -> _Yaddr;
 
-    ;;; outer loop for rest of y
-    while _Yaddr <@(SL) _Ylim do
-        _Raddr@(SL)++ -> _Raddr;        ;;; next result position
-        ;;; multiply x by signed y value and add into result
-        _bgi_mult_add(_Yaddr!(-SL)++ -> _Yaddr, _Xstart, _Xlim, _Raddr)
-                                        -> ()!(-SL);    ;;; insert last carry
+    while _Raddr <@(SL) _Yaddr do
+        _0 -> _Raddr!(SL)++ -> _Raddr;
     endwhile;
 
-    if _neg(_Rlim!(-SL)[_-2])
-    and _neg(_Xlim!(-SL)[_-1]) and _neg(_Ylim!(-SL)[_-1]) then
-        ;;; Result -ve but both operands -ve -- the last carry slice has
-        ;;; overflowed to the sign bit (which was allowed for by adding
-        ;;; 1 to the result length). This happens in just one case,
-        ;;; where both operands are powers of (2**SLICE_BITS)
-        _Rlim!(SL)[_-2] _biclear _:SIGN_MASK -> _Rlim!(SL)[_-2];
-        _1 -> _Rlim!(SL)[_-1]       ;;; move overflow bit to extra slice
-    else
-        ;;; truncate the unused extra slice
-        result!BGI_LENGTH _sub _1 -> result!BGI_LENGTH
-    endif;
+    ;;; set up addresses
+    result@BGI_SLICES -> _Raddr;
+    y@BGI_SLICES -> _Yaddr;
+    ;;; Reuse variable despite misleading name...
+    _Yaddr@(SL)[_Ylen] -> _Ylen;
+    x@BGI_SLICES -> _Xstart;
 
-    Bigint_return(result) -> Get_store()
+    ;;; do least sig slice of y by x
+    ;;; unsigned multiply x by slice of y into result
+    _bgi_mult(_Yaddr!(SL)++ -> _Yaddr, _Xstart, _Xlen, _Raddr);
+
+    ;;; outer loop for rest of y
+    while _Yaddr <@(SL) _Ylen do
+        _Raddr@(SL)++ -> _Raddr;        ;;; next result position
+        ;;; unsigned multiply x by slice of y value and add into result
+        _bgi_mult_add(_Yaddr!(SL)++ -> _Yaddr, _Xstart, _Xlen, _Raddr);
+    endwhile;
+
+    ;;; end of NO GC section
+
+    Bigint_return(result) -> Get_store() -> result;
+    if need_neg then
+        Bgi_negate(result);
+    else
+        result;
+    endif;
 enddefine;
 
 
@@ -450,69 +379,21 @@ enddefine;
 ;;; --- SIMPLE DIVISION BY A SINGLE ------------------------------------------
 ;;; (see bigint_divide.p for full division)
 
-    ;;; signed divide by a single (divisor /= -1)
-define Bigint_div_range(_divisor, _saddr, _slim, _daddr) -> _rem;
-    lvars x, carry, _daddr, _nextcarry, _rem, _dlim, _slim, _saddr, _divisor;
-    _slim!(-SL)[_-1] -> x;      ;;; ms slice of dividend
-    _daddr@(SL){_slim, _saddr} -> _dlim;
-    _bgi_div(_divisor, _saddr, _slim, _dlim) -> _rem;
-    _0 -> carry;
-    if _neg(x) then
-        ;;; -ve dividend - remainder must be 0 or -ve
-        if _rem _sgr _0 then
-            if _neg(_divisor) then _-1 else _1 endif -> carry;
-        endif
-    elseif _neg(_divisor) then
-        ;;; +ve dividend, -ve divisor -- remainder must be 0 or +ve
-        if _rem _slt _0 then _1 -> carry endif
-    else
-        ;;; both positive, nothing more to do
-        return
-    endif;
-    ;;; correct the remainder
-    _rem _sub (_divisor _mult carry) -> _rem;
+    ;;; unsigned divide by a single, used for printing
+define Bigint_div_single(dd, _dr, quot);
+    lvars dd, rm, quot, _rem, _dr;
 
-    ;;; deal with carry and any negative slices
-    _dlim--@(SL) -> _dlim;
-    while _daddr <@(SL) _dlim do
-        _0 -> _nextcarry;
-        if _neg(carry) then
-            _-1 -> _nextcarry;
-            carry _biclear _:SIGN_MASK -> carry
-        endif;
-        if _neg(_daddr!(-SL) ->> x) then
-            _nextcarry _sub _1 -> _nextcarry;
-            x _biclear _:SIGN_MASK -> x
-        endif;
-        carry _add x -> x;          ;;; positive addition
-        if x _bitst _:SIGN_BIT then
-            _nextcarry _add _1 -> _nextcarry;
-            x _biclear _:SIGN_MASK -> x;
-        endif;
-        x -> _daddr!(SL)++ -> _daddr;
-        _nextcarry -> carry
-    endwhile;
-    ;;; propagate carry into sign slice
-    _daddr!(-SL) _add carry -> _daddr!(-SL)
-enddefine;
-
-define Bigint_div_single(dd, _dr, quot, _want_quot);
-    lvars dd, rm, quot, _addr, _rem, _dr, _want_quot;
-    dd@BGI_SLICES -> _addr;
-    Bigint_div_range(_dr, _addr, _addr@(SL)[dd!BGI_LENGTH], quot@BGI_SLICES)
+    _bgi_div(_dr, dd@BGI_SLICES, dd!BGI_LENGTH, quot@BGI_SLICES)
                                     -> _rem;        ;;; the remainder
-    if _want_quot then
-        Bigint_return(quot) -> Get_store() -> quot
-    else
-        quot -> Get_store()
-    endif;
+    Bigint_return(quot) -> Get_store() -> quot;
+
     if _pint_testovf(_rem) then
         -> rm
     else
         Get_bigint(_1) -> rm;
         _rem -> rm!BGI_SLICES[_0]
     endif;
-    rm, if _want_quot then quot endif
+    rm, quot;
 enddefine;
 
 
@@ -553,6 +434,8 @@ define Bigint_leastbit() -> _n with_nargs 1;
     endwhile;
     until _x _bitst _1 do
         _n _add _1 -> _n;
+        ;;; Unsigned shift would be clearer, but even with
+        ;;; signed shift we will get correct bit
         _shift(_x, _-1) -> _x
     enduntil;
 enddefine;
@@ -711,7 +594,7 @@ define lconstant Bgi_print(bint);
         enddefine;
 
         ;;; destructive divide, quotient back into dividend then truncate it
-        Bigint_div_single(_quot, _int(bgi_pr_divisors(_radix)), _quot, true)
+        Bigint_div_single(_quot, _int(bgi_pr_divisors(_radix)), _quot)
                                 -> _quot -> _rm;
         if isinteger(_quot) then
             ;;; leftmost part
