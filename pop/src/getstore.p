@@ -1029,11 +1029,11 @@ define updaterof active popmemlim n;
         if weakref[biginteger_key] Bigint_neg(n) then
             mishap(n, 1, '(BIG)INTEGER >= 0 NEEDED', ':type-integral-nonneg')
         else
-            if n > #_< 1<<POPINT_BITS  - 1 >_# then
+            if n > #_< 1<<WORD_COUNT_BITS  - 1 >_# then
                 false -> n
             else
                _pint(Pint_->_uint(n,
-                  #_< _int(1<<POPINT_BITS - 1) >_#)) -> n
+                  #_< _int(1<<WORD_COUNT_BITS - 1) >_#)) -> n
             endif
         endif
     endif;
@@ -1041,7 +1041,7 @@ define updaterof active popmemlim n;
         Check_integer(n, 0)
     else
         ;;; take false to mean max possible
-        #_< 1<<POPINT_BITS - 1 >_# -> n
+        #_< 1<<WORD_COUNT_BITS - 1 >_# -> n
     endif;
     Set_mem_stats();
     if _int(n) _slt _Ms_total then

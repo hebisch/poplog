@@ -61,6 +61,13 @@ defcm(  WORD_BITS,          INT_BITS );
      */
 defcm(  POPINT_BITS,        WORD_BITS-integer_length(WORD_BITS/BYTE_BITS) );
 
+
+    /*
+     * The max number of bits such that after convertion to word
+     * address the resulting address is positive.
+    */
+defcm(  WORD_COUNT_BITS,   WORD_BITS - integer_length(WORD_BITS/BYTE_BITS) );
+
     /*
      *  Type-names for machine code and bitfield pointers
      */
