@@ -191,6 +191,11 @@ do_call_sys:
     subq    $6, %rcx
     jbe     L1.4
     movq    $6, %rax
+    ;;; If number of stack arguments is odd we need to
+    ;;; push dummy to align the control stack
+    testq   $1, %rcx
+    jz      L1.3
+    pushq   $0
 
 L1.3:   pushq   (%USP)
     addq    $8, %USP

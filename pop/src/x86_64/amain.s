@@ -51,6 +51,10 @@ DEF_C_LAB (Sys$- _entry_point)
     .globl  EXTERN_NAME(main)
 EXTERN_NAME(main):
 
+    ;;; Align stack
+
+    pushq   $0
+
     ;;; Clear __pop_in_user_extern
 
     movq    $0, EXTERN_NAME(__pop_in_user_extern)

@@ -42,6 +42,9 @@ global constant macro (
     STRUCT_INT_ALIGN_BITS   = 32,   ;;; bit alignment for int
     STRUCT_DOUBLE_ALIGN_BITS = 64,  ;;; bit alignment for double
 
+    ;;; Stack alignment in bits
+    STACK_ALIGN_BITS = 128,
+
     CODE_POINTER_TYPE = "byte", ;;; type of pointer to machine code
     BIT_POINTER_TYPE = "byte",  ;;; type of pointer for bitfield access
 
