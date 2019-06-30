@@ -107,7 +107,7 @@ typedef int sigsave_t;
 #endif  /* !SIG_BLOCK */
 
 #ifndef SIGEMT
-#define SIGEMT SIGUNUSED        /* For Linux */
+#define SIGEMT SIGSYS           /* For Linux */
 #endif
 
 typedef sigset_t sigsave_t;
