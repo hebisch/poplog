@@ -23,7 +23,7 @@ constant
     ;;; know about new versions. Used as the version number in the string
     ;;; popversion.
     ;;; (See declaration in declare.ph -- in AIX this is a vars.)
-    156301 -> pop_internal_version;
+    160000 -> pop_internal_version;
 
 
     ;;; Initialise variables
