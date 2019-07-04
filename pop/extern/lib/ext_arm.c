@@ -1,5 +1,7 @@
 #include <string.h>
 
+#if defined(__arm__)
+
 struct registers_buffer {
     int i_reg[4];
     union {double d; struct {float sl; float sh;} sf2;} f_reg[8];
@@ -181,4 +183,5 @@ main(void) {
     return 0;
 }
 
+#endif
 #endif
