@@ -1066,7 +1066,7 @@ define lconstant shlib_searchlist() -> (extras, searchlist);
   #_IF DEF OSF1
     lconstant default_searchlist = ['/usr/shlib/'];
   #_ELSE
-    lconstant default_searchlist = ['/usr/lib/'];
+    lconstant default_searchlist = [''];
   #_ENDIF
     default_searchlist -> searchlist;
     ;;; environment variable LD_LIBRARY_PATH adds to the defaults
@@ -1096,6 +1096,7 @@ define lconstant process_link_args(args, dummy, link_item);
         lvars dir, name = false, aname = false;
         for dir in searchlist do
             unless name then nam <> SHLIB_EXTN -> name endunless;
+            if (dir = '') then return(name ->> full_name) ; endif;
             returnif(exists(dir dir_>< name ->> full_name));
 #_IF DEF AIX
             ;;; AIX allows shared object modules in .a archives, so
