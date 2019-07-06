@@ -421,6 +421,7 @@ L2.1:   ;;; Overflow -- pop the stack and return <false>
 DEF_C_LAB (_posword_mul_high)
     movl    (%USP), %eax
     movl    8(%USP), %edx
+    shll    $1, %eax
     addq    $8, %USP
     imull   %edx
     movq    %rdx, (%USP)
