@@ -432,8 +432,9 @@ DEF_C_LAB(Sys$- _external_callback_func)
 
     ;;; Create 3 word dummy stack frame for SF_NEXT_SEG_SP
     ;;; and SF_NEXT_SEG_HI
+    ;;; We allocate 4 words to preserve alignment
 
-    leaq    -24(%rsp), %rsp
+    leaq    -32(%rsp), %rsp
 
     ;;; Disable async callback
 
@@ -490,7 +491,7 @@ DEF_C_LAB(Sys$- _external_callback_func)
 
     ;;; Remove stack frame
 
-    leaq    24(%rsp), %rsp
+    leaq    32(%rsp), %rsp
 
     ;;; Re-enable async callback (restoring saved __pop_in_user_extern)
 
