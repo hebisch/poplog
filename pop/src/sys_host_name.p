@@ -22,7 +22,7 @@ define sys_host_name();
     lvars _offs;
     lstackmem stackbuff _obuf;
     lconstant _size = _:SIZEOF(stackbuff);
-    if _neg(_extern[SE] gethostname(_obuf, _size)) then
+    if _nonneg(_extern[SE] gethostname(_obuf, _size)) then
         if (_locc(_obuf, @@(b)[_size], _0) ->> _offs) == _-1 then
             @@(b)[_size] -> _offs
         endif;
