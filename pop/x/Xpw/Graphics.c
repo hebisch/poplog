@@ -11,6 +11,7 @@
 /* using Xpw header files locally, not in <X11/Xpw/...> */
 #define XpwNotInstalled
 
+#include <X11/Xlib.h>
 #include <X11/Xatom.h>      /* XA_COLORMAP definition */
 #include <X11/IntrinsicP.h>
 #include <X11/StringDefs.h>
@@ -32,34 +33,13 @@
  *
  ****************************************************************/
 
-extern          /* Xlib functions */
-            XDrawPoint(),
-            XDrawPoints(),
-            XDrawLine(),
-            XDrawLines(),
-            XDrawSegments(),
-            XDrawArc(),
-            XDrawArcs(),
-            XDrawRectangle(),
-            XDrawRectangles(),
-            XDrawString(),
-            XDrawImageString(),
-            XFillArc(),
-            XFillArcs(),
-            XFillRectangle(),
-            XFillRectangles(),
-            XFillPolygon(),
-            XPutImage(),
-            XClearArea(),
-            XClearWindow();
-
 extern void _XpwSyntheticExposeEvent();
 
 static XpwMethodRet /* methods with return values */
             CreateImage(),
             GetImage();
 
-static          /* methods private to pixmap widgets*/
+static void  /* methods private to pixmap widgets*/
             DrawRoundedRect(), FillRoundedRect(),
             CopyFrom(), CopyTo(),
             PutImage(), CreatePutImage(),
@@ -75,7 +55,7 @@ static          /* methods private to pixmap widgets*/
 #define getgc(w) (XtIsSubclass((Widget)w,xpwGraphicWidgetClass) ? \
             w->xpwgraphic.my_gc : w->xpwpixmap.private_gc)
 
-static ClearPixmap(w)
+static void ClearPixmap(w)
 XpwGraphicWidget w;
 {
     GC gc;
@@ -87,8 +67,9 @@ XpwGraphicWidget w;
     XSetForeground(dpy,gc,w->xpwcore.foreground_pixel);
 }
 
-static ClearPixmapArea(w, x,y,width,height)
+static void ClearPixmapArea(w, x,y,width,height)
 XpwPixmapWidget w;
+int x,y,width,height;
 {
     GC gc = w->xpwpixmap.private_gc;
     Pixmap pm = w->xpwpixmap.pixmap;
@@ -100,7 +81,7 @@ XpwPixmapWidget w;
     XSetForeground(dpy,gc,w->xpwcore.foreground_pixel);
 }
 
-static CopyFrom(w,dest_win,source_widget, x,y,dx,dy,ex,ey)
+static void CopyFrom(w,dest_win,source_widget, x,y,dx,dy,ex,ey)
 XpwGraphicWidget w;
 Widget source_widget;
 Drawable dest_win;
@@ -125,7 +106,7 @@ int x,y,dx,dy,ex,ey;
 }
 
 
-static CopyTo(w,dest_widget,x,y,dx,dy,ex,ey)
+static void CopyTo(w,dest_widget,x,y,dx,dy,ex,ey)
 XpwGraphicWidget w;
 Widget dest_widget;
 int x,y,dx,dy,ex,ey;
@@ -197,7 +178,7 @@ char *image_array;
     return((XpwMethodRet)image);
 }
 
-static PutImage(w, image, x,y, dst_x, dst_y, width, height)
+static void PutImage(w, image, x,y, dst_x, dst_y, width, height)
 XpwPixmapWidget w;
 unsigned int width, height;
 int x,y, dst_x, dst_y;
@@ -217,7 +198,7 @@ XImage *image;
 
 }
 
-static CreatePutImage(w,width, height, x,y,image_array,depth)
+static void CreatePutImage(w,width, height, x,y,image_array,depth)
 XpwPixmapWidget w;
 unsigned int width, height;
 int x,y, depth;
@@ -232,7 +213,7 @@ char *image_array;
 /* TAKEN FROM Xmu Code */
 
 static XArc arcs[8];
-static DrawRoundedRect (dpy, draw, gc, x, y, w, h, ew, eh)
+static void DrawRoundedRect (dpy, draw, gc, x, y, w, h, ew, eh)
     Display     *dpy;
     Drawable        draw;
     GC          gc;
@@ -300,7 +281,7 @@ static DrawRoundedRect (dpy, draw, gc, x, y, w, h, ew, eh)
     XDrawArcs (dpy, draw, gc, arcs, 8);
 }
 
-static FillRoundedRect (dpy, draw, gc, x, y, w, h, ew, eh)
+static void FillRoundedRect (dpy, draw, gc, x, y, w, h, ew, eh)
     Display     *dpy;
     Drawable        draw;
     GC          gc;
@@ -442,7 +423,7 @@ static XpwMethodRet /* methods with return values */
             AllocColorRange(),
             AllocStoreColor();
 
-static          /* basic methods */
+static void /* basic methods */
             SetPixelColor(),
             ClearGraphic(),
             ClearGraphicArea(),
@@ -454,7 +435,7 @@ static          /* basic methods */
  *
  ****************************************************************/
 
-static ClearGraphic(w)
+static void ClearGraphic(w)
 XpwPixmapWidget w;
 {
     if (XtWindow(w))
@@ -463,7 +444,7 @@ XpwPixmapWidget w;
     pixmap is repainted */
 }
 
-static ClearGraphicArea(w,x,y,width,height)
+static void ClearGraphicArea(w,x,y,width,height)
 XpwGraphicWidget w;
 int x,y,width,height;
 {
@@ -484,7 +465,7 @@ int x,y,width,height;
 
 #define XtColormap(widget) ((widget)->core.colormap)
 
-static CreateColormap(w)
+static void CreateColormap(w)
 XpwGraphicWidget w;
 {
     register Screen *screen = XtScreen(w);
@@ -591,7 +572,7 @@ Boolean exact, read_only;
 }
 
 /* Free a range of colors */
-static FreeColors(w, colorlist)
+static void FreeColors(w, colorlist)
 XpwGraphicWidget w;
 XpwColorList *colorlist;
 {
@@ -694,7 +675,7 @@ int r,g,b;
     return((XpwMethodRet)carray[0]);
 }
 
-static SetPixelColor(w, i, r, g, b)
+static void SetPixelColor(w, i, r, g, b)
 XpwGraphicWidget w;
 int i,r,g,b;
 {

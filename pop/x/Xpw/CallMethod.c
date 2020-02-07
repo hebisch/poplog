@@ -120,7 +120,7 @@ static MethodNameList methodNameList = {
 
 */
 
-_XpwMethodWarning(widget, id, name, type, message)
+void _XpwMethodWarning(widget, id, name, type, message)
 Widget widget;
 XpwMethodID id;
 String name, type, message;

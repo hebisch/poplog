@@ -25,11 +25,11 @@ RANLIB=$(CCROOT)/bin/ranlib
 # but may be for example /usr/local.  CHANGE THIS FOR YOUR SITE.
 
 # Sussex - for CTN/CRN X11R4
-XROOT=/usr/local/X11R4
+# XROOT=/usr/local/X11R4
 # Sussex - for CTN/CRN X11R3
 # XROOT=/usr/local/X11
 # Sussex - for System V (Bobcat) X
-# XROOT=/usr
+XROOT=/usr
 
 # LIBFILE specifies the name of the widget library package.
 # LIBDIR specifies where the library is to be installed.

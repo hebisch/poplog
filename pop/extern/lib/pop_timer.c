@@ -101,6 +101,7 @@ register bool virt;
 
 #ifdef UNIX
 
+#include <unistd.h>
 #include <signal.h>
 #include <sys/time.h>
 
@@ -159,15 +160,7 @@ long *clockintp;
     }
 #endif  /* SVR4 || HP-UX */
 
-#if defined(SVR4)
-/*  There's some confusion about this, but most systems now at least
-    allow the two-argument (BSD) form, if not actually require it...
-#define GETTIMEOFDAY(tvp) gettimeofday(tvp)
-*/
 #define GETTIMEOFDAY(tvp) gettimeofday(tvp, NULL)
-#else
-#define GETTIMEOFDAY(tvp) gettimeofday(tvp, NULL)
-#endif
 
 static void TIMER_GET_CLOCK(virt, tvp)
 register timeval *tvp;

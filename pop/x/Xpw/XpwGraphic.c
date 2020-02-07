@@ -40,7 +40,7 @@ static XpwMethodRet ApplyMethod();
 static void ExtractPosition();
 
 /* External declarations */
-extern _XpwCondUpdateUsersGC();
+extern void _XpwCondUpdateUsersGC();
 extern void _XpwRecolorPointer(), _XpwFreeColormap(), _XpwFreeColors();
 
 

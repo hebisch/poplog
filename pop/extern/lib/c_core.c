@@ -304,7 +304,7 @@ int block;
  *              Condition (= error signal) Handler                        *
  **************************************************************************/
 
-static copybytes();
+static void copybytes();
 
 static bool in_math_lib = FALSE;
 
@@ -628,7 +628,7 @@ int set_libc_errno(int x)
 
 void _pop_errsig_handler(int sig, siginfo_t *info, ucontext_t *context)
 {
-    extern __pop_errsig();
+    extern void __pop_errsig();
 
     int code = 0;
     caddr_t addr = NULL;
@@ -689,7 +689,7 @@ void _pop_errsig_handler(int sig, siginfo_t *info, ucontext_t *context)
 #endif /* !__sgi */
 #endif /* SVR4 */
 
-#if  0 /* (defined (linux) && !defined(__alpha)) || defined(SCO)
+#if  0 /* (defined (linux) && !defined(__alpha)) || defined(SCO) */
 #define _POP_ERRSIG_HANDLER_
 
 void
@@ -1006,7 +1006,7 @@ static int    async_maxfd[3]    /* max file desc in async_fds */
 
 #define TOT_ASYNC   (async_ctr[RDSET]+async_ctr[WRSET]+async_ctr[EXSET])
 
-static copybytes();
+static void copybytes();
 bool _pop_set_async_check();
 static timeval zero_tim;
 
@@ -1071,7 +1071,7 @@ bool _pop_set_async_check(on, fd, set)
     register bool ison;
     int tot_async, seln, flags, res;
 
-    if (!FD_ISSET(fd, &async_fds[set])) return;
+    if (!FD_ISSET(fd, &async_fds[set])) return (TRUE);
 
     on_fds = &async_on_fds[set];
     ison = FD_ISSET(fd, on_fds);
@@ -1220,7 +1220,7 @@ int pop_close(fd)
     return(close(fd));
     }
 
-long pop_fork() { 
+long pop_fork() {
         int fd;
         long pid;
     sigset_t all, save;
@@ -1586,7 +1586,7 @@ int realloc_srchlen = 4;    /* 4 should be plenty, -1 =>'s whole list */
  * header starts at ``freep''.  If srchlen is -1 search the whole list.
  * Return bucket number, or -1 if not found.
  */
-static findbucket(freep, srchlen)
+static int findbucket(freep, srchlen)
     ALLOCP freep;
     int srchlen;
     { register ALLOCP p;
@@ -1677,9 +1677,9 @@ void *calloc(size_t num, size_t size)
     return(mp);
     }
 
-cfree(p, num, size)
-    register char *p;
-    register unsigned num, size;
+void cfree(p, num, size)
+    char *p;
+    unsigned num, size;
     { free(p); }
 
 
@@ -1866,7 +1866,7 @@ int *dum;
 <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<*/
 
 
-static copybytes(from, to, nbytes)
+static void copybytes(from, to, nbytes)
 register char *from, *to;
 int nbytes;
     { register char *lim;
@@ -2139,6 +2139,8 @@ linux_setper(int argc, char * * argv, char * * envp)
     char *p;
     uname(&name);
     p = name.release;
+    /* Do not want <stdlib.h> here */
+    extern int atoi(const char *);
     major_version = atoi(p);
     p = strchr(p,'.')+1;
     minor_version = atoi(p);
@@ -2222,7 +2224,7 @@ linux_setper(int argc, char * * argv, char * * envp)
         lconstant macro _ERRNO = [DO_ERRNO_VAL];
 
     This also required a change to LIB unix_socets
-    
+
 --- Robert Duncan, Feb 17 1999
         Added an extra level of indirection to _WEAK_pop_external_callback
         for HP-UX on PA-RISC.

@@ -110,7 +110,7 @@ externaldef(xpwcompositewidgetclass)
 
 #define max(a,b) ((int)(a) > (int)(b) ? (a) : (b))
 
-static SetToMaxSize(composite)
+static void SetToMaxSize(composite)
 XpwCompositeWidget composite;
 {
     Widget child, parent;

@@ -19,7 +19,7 @@
 
 /* declarations */
 
-extern
+extern void
     _XpwTextCopyWait(),
     _XpwSetCharAttributes(),
     _XpwGetCharAttributes(),
@@ -31,8 +31,7 @@ extern MyGC _XpwGetWorkTextGC();
 XpwMethodRet
     _XpwTextMoveCursorTo();
 
-static
-    Clear();
+static void Clear();
 
 externaldef (xpwscrolltext) uint (*XpwUcToMb)();
 
@@ -1413,7 +1412,7 @@ WINCHAR_ZERO(wincharB_zero, WinCharB, dp->c0)
 WINCHAR_ZERO(wincharS_zero, WinCharS, dp->c0 = dp->c1)
 WINCHAR_ZERO(wincharI_zero, WinCharI, dp->s0 = dp->s1)
 
-static winrow_copy(sp, dp, len)
+static void winrow_copy(sp, dp, len)
   register WinRowB *sp, *dp;
   int len;
   { register WinRowB *slimp = sp+len;
@@ -1465,7 +1464,7 @@ static WinRowB expand_row(w, row, want_cols)
     return(new_rptr);
   }
 
-static clear_chars(w, scol, srow, ncols, nrows, set_end)
+static void clear_chars(w, scol, srow, ncols, nrows, set_end)
   XpwScrollTextWidget w;
   int scol, srow, ncols, nrows;
   Boolean set_end;
@@ -1498,7 +1497,7 @@ static clear_chars(w, scol, srow, ncols, nrows, set_end)
       }
   }
 
-static clear_text(w, scol, srow, ncols, nrows)
+static void clear_text(w, scol, srow, ncols, nrows)
   XpwScrollTextWidget w;
   register int scol, srow, ncols, nrows;
   { Boolean whole_rows;
@@ -1551,7 +1550,7 @@ static clear_text(w, scol, srow, ncols, nrows)
       }
   }
 
-static copy_row_chars(w, scol, srow, dcol, drow, ncols)
+static void copy_row_chars(w, scol, srow, dcol, drow, ncols)
   XpwScrollTextWidget w;
   int scol, srow, dcol, drow, ncols;
   {
@@ -1600,7 +1599,7 @@ static copy_row_chars(w, scol, srow, dcol, drow, ncols)
       }
   }
 
-static copy_text(w, scol, srow, ncols, nrows, c_dis, r_dis)
+static void copy_text(w, scol, srow, ncols, nrows, c_dis, r_dis)
   XpwScrollTextWidget w;
   register int scol, srow, ncols, nrows;
   int c_dis, r_dis;
@@ -1764,7 +1763,7 @@ static uint winchar_at(w, col, row, attr_p)
 
 /* CLEAR and associated methods */
 
-static Clear(w, col, row, ncols, nrows)
+static void Clear(w, col, row, ncols, nrows)
   XpwScrollTextWidget w;
   int row, col, nrows, ncols;
   { int num_rows = NumRows(w), nc;
@@ -1787,52 +1786,52 @@ static Clear(w, col, row, ncols, nrows)
 
 /* related methods */
 
-static ClearScreen(w)
+static void ClearScreen(w)
   XpwScrollTextWidget w;
   {  Clear(w, 0, 0, 0, 0); }
 
-static ClearLine(w, start_line)
+static void ClearLine(w, start_line)
   XpwScrollTextWidget w;
   int start_line;
   { Clear(w, 0, start_line, 0, 1); }
 
 
-static ClearLines(w, start_line, num_lines)
+static void ClearLines(w, start_line, num_lines)
   XpwScrollTextWidget w;
   int start_line, num_lines;
   { Clear(w, 0, start_line, 0, num_lines); }
 
-static ClearTail(w, col, row)
+static void ClearTail(w, col, row)
   XpwScrollTextWidget w;
   int col, row;
   { Clear(w, col, row, 0, 1); }
 
-static ClearTails(w, col, row, num_lines)
+static void ClearTails(w, col, row, num_lines)
   XpwScrollTextWidget w;
   int col, row, num_lines;
   { Clear(w, col, row, 0, num_lines); }
 
-static ClearChar(w, col, row)
+static void ClearChar(w, col, row)
   XpwScrollTextWidget w;
   int col, row;
   { Clear(w, col, row, 1, 1); }
 
-static ClearLineAtCursor(w)
+static void ClearLineAtCursor(w)
   XpwScrollTextWidget w;
   { Clear(w, 0, CursorRow(w), 0, 1); }
 
-static ClearTailAtCursor(w)
+static void ClearTailAtCursor(w)
   XpwScrollTextWidget w;
   { Clear(w, CursorCol(w), CursorRow(w), 0, 1); }
 
-static ClearCharAtCursor(w)
+static void ClearCharAtCursor(w)
   XpwScrollTextWidget w;
   { Clear(w, CursorCol(w), CursorRow(w), 1, 1); }
 
 
 /* SCROLL and associated methods */
 
-static VarTextScroll(w, row, nrows, c_dis, save_cursor)
+static void VarTextScroll(w, row, nrows, c_dis, save_cursor)
   XpwScrollTextWidget w;
   int row, nrows, c_dis;
   Boolean save_cursor;
@@ -1892,7 +1891,7 @@ static VarTextScroll(w, row, nrows, c_dis, save_cursor)
   }
 
 
-static Scroll(w, col, row, ncols, nrows, c_dis, r_dis)
+static void Scroll(w, col, row, ncols, nrows, c_dis, r_dis)
   XpwScrollTextWidget w;
   register int col, row, ncols, nrows, c_dis, r_dis;
   {
@@ -1968,48 +1967,52 @@ static Scroll(w, col, row, ncols, nrows, c_dis, r_dis)
 
 /* associated methods */
 
-static ScrollScreenUp(w)
+static void ScrollScreenUp(w)
  XpwScrollTextWidget w;
   { Scroll(w, 0, 1, 0, 0, 0, -1); }
 
-static ScrollScreenDown(w)
+static void ScrollScreenDown(w)
   XpwScrollTextWidget w;
   { Scroll(w, 0, 0, 0, 0, 0, 1); }
 
-static ScrollScreenLeft(w)
+static void ScrollScreenLeft(w)
   XpwScrollTextWidget w;
   { Scroll(w, 1, 0, 0, 0, -1, 0); }
 
-static ScrollScreenRight(w)
+static void ScrollScreenRight(w)
   XpwScrollTextWidget w;
   { Scroll(w, 0, 0, 0, 0, 1, 0); }
 
-static ScrollLines(w, start_line, num_lines, dist)
+static void ScrollLines(w, start_line, num_lines, dist)
   XpwScrollTextWidget w;
   int start_line, num_lines, dist;
   { Scroll(w, 0, start_line, 0, num_lines, 0, dist); }
 
-static ScrollTail(w, col, row, dist)
+static void ScrollTail(w, col, row, dist)
   XpwScrollTextWidget w;
   int row, col, dist;
   { Scroll(w, col, row, 0, 1, dist, 0); }
 
-static ScrollTails(w, col, row, num_rows, dist)
+static void ScrollTails(w, col, row, num_rows, dist)
   XpwScrollTextWidget w;
   int col, row, num_rows, dist;
   { Scroll(w, col, row, 0, num_rows, dist, 0); }
 
-static ScrollTailLeft(w, col, row)
+static void ScrollTailLeft(w, col, row)
+  XpwScrollTextWidget w;
+  int col, row;
   { Scroll(w, col, row, 0, 1, -1, 0); }
 
-static ScrollTailRight(w, col, row)
+static void ScrollTailRight(w, col, row)
+  XpwScrollTextWidget w;
+  int col, row;
   { Scroll(w, col, row, 0, 1, 1, 0); }
 
-static InsertLineAtCursor(w)
+static void InsertLineAtCursor(w)
   XpwScrollTextWidget w;
   { Scroll(w, 0, CursorRow(w), 0, 0, 0, 1); }
 
-static DeleteLineAtCursor(w)
+static void DeleteLineAtCursor(w)
   XpwScrollTextWidget w;
   { int row = CursorRow(w);
     if (row == NumRows(w)-1)
@@ -2259,7 +2262,7 @@ static XpwMethodRet Insert(w, col, row, string, len)
     return(len);
   }
 
-static InsertAtCursor(w, string, len)
+static void InsertAtCursor(w, string, len)
   XpwScrollTextWidget w;
   uchar *string;
   int len;
@@ -2269,7 +2272,7 @@ static InsertAtCursor(w, string, len)
     _XpwTextCursorOn(w, save_cursor);
   }
 
-static InsertCharAtCursor(w)
+static void InsertCharAtCursor(w)
   XpwScrollTextWidget w;
   { Boolean save_cursor = _XpwTextCursorOn(w, False);
     write_string(w, GetCursorX(w), CursorCol(w), CursorRow(w), 0, 1, NULL,
@@ -2285,7 +2288,7 @@ static InsertCharAtCursor(w)
    cleared first.
 */
 
-static Write(w, col, row, start_line, nlines, strings, offset, len, clear)
+static void Write(w, col, row, start_line, nlines, strings, offset, len, clear)
   XpwScrollTextWidget w;
   int col,row,offset,len,start_line, nlines,clear;
   uchar *strings[];
@@ -2318,7 +2321,7 @@ static Write(w, col, row, start_line, nlines, strings, offset, len, clear)
 /* writes str at row,col. If clear != 0, the whole line is cleared first.
 */
 
-static WriteLine(w, col, row, string, len, clear)
+static void WriteLine(w, col, row, string, len, clear)
   XpwScrollTextWidget w;
   int row, col, len, clear;
   uchar *string;
@@ -2329,7 +2332,7 @@ static WriteLine(w, col, row, string, len, clear)
 
 /* same as above, for multiple lines */
 
-static WriteLines(w, col, row, start_line, num_lines, strings, len, clear)
+static void WriteLines(w, col, row, start_line, num_lines, strings, len, clear)
   XpwScrollTextWidget w;
   int row, col, clear, len, start_line, num_lines;
   uchar *strings[];
@@ -2340,7 +2343,7 @@ static WriteLines(w, col, row, start_line, num_lines, strings, len, clear)
    row,col.
 */
 
-static WriteSubstr(w, col, row, string, offset, len, clear)
+static void WriteSubstr(w, col, row, string, offset, len, clear)
   XpwScrollTextWidget w;
   int col, row, offset, len, clear;
   uchar *string;
@@ -2359,23 +2362,22 @@ static XpwMethodRet WriteTrailSpacesAtCursor(w)
     _XpwTextCursorOn(w, save_cursor);
   }
 
-static XpwMethodRet WriteAtCursor(w, string, len)
-  XpwScrollTextWidget w;
-  uchar *string;
-  int len;
-  { int no_draw_mode = w->xpwscrolltext.no_draw_mode, col;
+static XpwMethodRet
+WriteAtCursor(XpwScrollTextWidget w, uchar * string, int len)
+{
+    int no_draw_mode = w->xpwscrolltext.no_draw_mode, col;
     uint attrs;
     Coord x;
 
-    if (no_draw_mode < 0)
-      { Boolean save_cursor = _XpwTextCursorOn(w, False);
+    if (no_draw_mode < 0) {
+        Boolean save_cursor = _XpwTextCursorOn(w, False);
         draw_text_write_spaces = True;
         write_string(w, GetCursorX(w), CursorCol(w), CursorRow(w), 0, len,
                                                 string, True, WS_WRITE);
         draw_text_write_spaces = False;
         _XpwTextCursorOn(w, save_cursor);
         return;
-      }
+    }
 
     /* computing width of chars etc */
     if (no_draw_mode & 1) return(0);    /* already passed limit */
@@ -2385,30 +2387,30 @@ static XpwMethodRet WriteAtCursor(w, string, len)
     col = w->xpwscrolltext.alt_cursor_column;
     attrs = w->xpwscrolltext.curr_attributes;
 
-    if (no_draw_mode != 0)
-      { /* calculating number of cols that fit */
+    if (no_draw_mode != 0) {
+        /* calculating number of cols that fit */
         draw_lim_x = no_draw_mode >> 2;
         draw_lim_col = -1;
         x = DrawString(w, string, x, col, 1, len, attrs,
                                                 DS_NO_DRAW|DS_X_LIM, 0);
-        if (draw_lim_col >= 0)
-          { int new_mode = draw_lim_col - NumFixedCols(w,1);
-            if (x > draw_lim_x)
-              { int rem = x - draw_lim_x;
+        if (draw_lim_col >= 0) {
+            int new_mode = draw_lim_col - NumFixedCols(w,1);
+            if (x > draw_lim_x) {
+                int rem = x - draw_lim_x;
                 if (!(no_draw_mode & 2)) rem = last_text_width - rem;
                 new_mode |= rem << 16;
-              }
+            }
             w->xpwscrolltext.no_draw_mode = (new_mode<<2) | 1;
             return(draw_lim_col - col);
-          }
-      }
-    else
+        }
+    } else {
         x = DrawString(w, string, x, col, 1, len, attrs, DS_NO_DRAW, 0);
+    }
 
     w->xpwscrolltext.alt_cursor_x = x;
     w->xpwscrolltext.alt_cursor_column = col+len;
     return(len);
-  }
+}
 
 static XpwMethodRet BeginTextWidthMode1(w)
   XpwScrollTextWidget w;
@@ -2536,7 +2538,7 @@ static XpwMethodRet GetVarRowWidth(w, row)
 
 
 
-static DeleteCharsAtCursor(w, nchars)
+static void DeleteCharsAtCursor(w, nchars)
   XpwScrollTextWidget w;
   int nchars;
   { if (VarWidthMode(w))
@@ -2549,7 +2551,7 @@ static DeleteCharsAtCursor(w, nchars)
         Scroll(w, CursorCol(w)+nchars, CursorRow(w),0,1, -nchars,0);
   }
 
-static DeleteCharAtCursor(w)
+static void DeleteCharAtCursor(w)
   XpwScrollTextWidget w;
   { DeleteCharsAtCursor(w, 1); }
 
@@ -2656,24 +2658,24 @@ XpwMethodRet _XpwTextMoveCursorTo(w, col, row)
     return(0);
   }
 
-static MoveCursorUp(w)
+static void MoveCursorUp(w)
   XpwScrollTextWidget w;
   { _XpwTextMoveCursorTo(w, CursorCol(w), CursorRow(w)-1); }
 
-static MoveCursorDown(w)
+static void MoveCursorDown(w)
   XpwScrollTextWidget w;
   { _XpwTextMoveCursorTo(w, CursorCol(w), CursorRow(w)+1); }
 
-static MoveCursorLeft(w)
+static void MoveCursorLeft(w)
   XpwScrollTextWidget w;
   { _XpwTextMoveCursorTo(w, CursorCol(w)-1, CursorRow(w)); }
 
-static MoveCursorRight(w)
+static void MoveCursorRight(w)
   XpwScrollTextWidget w;
   { _XpwTextMoveCursorTo(w, CursorCol(w)+1, CursorRow(w)); }
 
 
-static Bell(w, volume)
+static void Bell(w, volume)
   Widget w;
   int volume;
   { XBell(XtDisplay(w), volume); }

@@ -113,7 +113,7 @@ static int (*poll_handlers[2])();
 
 #define SET_POLL_TIMER()  OS_SET_POLL_TIMER(poll_time_curve[poll_index])
 
-#define DO_HANDLER(n)   ((p = poll_handlers[n]) ? (*p)() : 0)
+#define DO_HANDLER(n)   (p = poll_handlers[n], (p) ? (*p)() : 0)
 
 static void async_poll()
   { register int (*p)();
@@ -165,17 +165,21 @@ static caddr_t poll_other()
  */
 caddr_t (*_pop_set_Xt_poll(handler))()
 register int (*handler)();
-  { if (handler == NULL)
-      { _pop_set_poll_state(XT_POLL_NUM, NULL);
+{
+    if (handler == NULL) {
+        _pop_set_poll_state(XT_POLL_NUM, NULL);
         if (num_polling == 0) return(NULL);
         CANCEL_POLL_TIMER();
         return(poll_other);
-      }
-    else
-      { if (num_polling != 0) { poll_index = poll_index_base; SET_POLL_TIMER(); }
+    } else {
+        if (num_polling != 0) {
+            poll_index = poll_index_base;
+            SET_POLL_TIMER();
+        }
         _pop_set_poll_state(XT_POLL_NUM, handler);
-      }
-  }
+        return (NULL);
+    }
+}
 
 void _pop_retry_Xt_poll()
   { if (poll_handlers[XT_POLL_NUM] != NULL) return;

@@ -39,7 +39,7 @@ extern XmuCvtStringToBitmap();
 extern XmuCvtStringToPixmap();
 #endif
 */
-extern _XpwCondUpdateUsersGC();
+extern void _XpwCondUpdateUsersGC();
 
 externalref XtGCMask _xpwGCvaluemask;
 externalref XGCValues _xpwGCvalues;

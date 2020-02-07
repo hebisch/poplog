@@ -39,8 +39,8 @@ static void NotifyEvent();
 externalref XGCValues _xpwGCvalues;
 externalref XtGCMask  _xpwGCvaluemask;
 
-extern _XpwCondUpdateUsersGC();
-extern _XpwUpdateUsersGC();
+extern void _XpwCondUpdateUsersGC();
+extern void _XpwUpdateUsersGC();
 extern void XpwCopyAssoc();
 extern Pixmap XpwLocateBitmapFile();
 
@@ -121,7 +121,7 @@ static XtResource resources[] = {
 */
 
 static XpwMethodRet LoadFont(), LoadColor(), SetCursor(), LoadPixmap();
-static FreeFont(), FreeColor(), FreeCursor();
+static void FreeFont(), FreeColor(), FreeCursor();
 static XpwMethod methods[] = {
 /*  {id,                    proc,       num_args,       flags     }*/
 #define M METHOD_STRUCT
@@ -569,8 +569,8 @@ static void Destroy (gw)
 static void NotifyEvent (gw, event, params, num_params)
 Widget gw;
 XEvent *event;
-/*String *params;
-Cardinal *num_params;*/
+String *params;
+Cardinal *num_params;
 {
     /* notify the clients of the event: */
     XtCallCallbacks(gw, XtNxpwCallback, (caddr_t)event);
@@ -597,7 +597,7 @@ char *string;
     else return((XpwMethodRet)0);
 }
 
-static FreeFont(w,string)
+static void FreeFont(w,string)
 XpwCoreWidget w;
 char *string;
 {   /* do nothing now - leave free to the resource converters */
@@ -615,7 +615,7 @@ char *string;
     else return((XpwMethodRet)-1);
 }
 
-static FreeColor(w,string)
+static void FreeColor(w,string)
 XpwCoreWidget w;
 char *string;
 {
@@ -634,7 +634,7 @@ unsigned int shape;
     else return(0);
 }
 
-static FreeCursor(w,shape)
+static void FreeCursor(w,shape)
 XpwCoreWidget w;
 unsigned int shape;
 {
@@ -666,7 +666,7 @@ int fg, bg, depth;
     return((XpwMethodRet)None);
 }
 
-static FreePixmap(w, pixmap)
+static void FreePixmap(w, pixmap)
 Widget w;
 Pixmap pixmap;
 {

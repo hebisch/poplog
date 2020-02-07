@@ -12,7 +12,7 @@
 #include <X11/ShellP.h>
 #include <X11/Xatom.h>
 
-static DecodeDrop(widget, event, is_load)
+static void DecodeDrop(widget, event, is_load)
 Widget widget;
 XClientMessageEvent *event;
 Bool is_load;
@@ -45,7 +45,7 @@ Bool is_load;
 
 static int dummy_handler() { return(0); }
 
-static TakeClientMessage(w, client, event, continue_to_dispatch)
+static void TakeClientMessage(w, client, event, continue_to_dispatch)
 Widget w;
 Opaque client;
 XEvent *event;

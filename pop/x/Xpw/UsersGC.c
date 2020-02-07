@@ -75,7 +75,7 @@ XGCValues *values;
 */
 
 
-_XpwUpdateUsersGC(w, valuemask, values)
+void _XpwUpdateUsersGC(w, valuemask, values)
 XpwCoreWidget w;
 XGCValues *values;
 unsigned long valuemask;
@@ -93,25 +93,24 @@ unsigned long valuemask;
     if (w->xpwcore.users_gc) printf("_XpwUpdateUsersGC: usersGC=%i\n",w->xpwcore.users_gc);
 #endif
     if (w->xpwcore.users_gc == NULL) {
-    w->xpwcore.users_gc = XtGetGC((Widget)w, valuemask, values);
-    w->xpwcore.shared_gc = TRUE;
-    }
-    else {
-    if (w->xpwcore.shared_gc) {
+      w->xpwcore.users_gc = XtGetGC((Widget)w, valuemask, values);
+      w->xpwcore.shared_gc = TRUE;
+    } else if (w->xpwcore.shared_gc) {
         /*  we used to have a shared GC. Now we must create a non-shared
-        GC, copy accross the values from the shared GC, and
-        release the shared GC. */
-        if (!XtIsRealized((Widget)w))
-        newGC = XCreateGC(dpy, RootWindowOfScreen(screen),valuemask, values);
-        else
-        newGC = XCreateGC(dpy, win, valuemask, values);
+            GC, copy accross the values from the shared GC, and
+            release the shared GC. */
+        if (!XtIsRealized((Widget)w)) {
+          newGC = XCreateGC(dpy, RootWindowOfScreen(screen),valuemask, values);
+        } else {
+          newGC = XCreateGC(dpy, win, valuemask, values);
+        }
         /* copy fields of GC not specified in valuemask from old GC */
         XCopyGC(dpy, w->xpwcore.users_gc, ~valuemask, newGC);
         XtReleaseGC((Widget)w, w->xpwcore.users_gc);
         w->xpwcore.shared_gc = FALSE;
         w->xpwcore.users_gc = newGC;
-    }
-    else XChangeGC(dpy, w->xpwcore.users_gc, valuemask, values);
+    } else {
+        XChangeGC(dpy, w->xpwcore.users_gc, valuemask, values);
     }
     printgc(valuemask, values);
     debug_msg("not valuemask:");
@@ -132,7 +131,7 @@ unsigned long valuemask;
 */
 
 
-_XpwCondUpdateUsersGC(wc,w)
+void _XpwCondUpdateUsersGC(wc,w)
 Widget w;
 WidgetClass wc;
 {

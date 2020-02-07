@@ -37,7 +37,7 @@ typedef unsigned sigsave_t;
 /* == Hard Reference to the Vendor Shell Widget ================= */
 
 #ifndef __NUTC__
-externalref vendorShellWidgetClass;
+externalref WidgetClass vendorShellWidgetClass;
 static char *dummy = (char*)&vendorShellWidgetClass;
 #endif
 
@@ -156,7 +156,7 @@ static char *_SysErrorMsg (n)
 
 #define XTFORMATSTR "%s: %s -- %s"
 
-static Err_msg(name,type,class,defaultp,params,num_params, err_p)
+static void Err_msg(name,type,class,defaultp,params,num_params, err_p)
     String name,type,class,defaultp;
     String* params;
     Cardinal* num_params;
@@ -242,7 +242,7 @@ int PopXError(dpy, event)
     Display *dpy;
     XErrorEvent *event;
 {
-    char buffer[BUFSIZ], buffer2[BUFSIZ];
+    char buffer[BUFSIZ];
     char mesg[BUFSIZ];
     char number[32];
     char *mtype = "XlibMessage";
@@ -438,9 +438,13 @@ XEvent *event;
 String *params;
 Cardinal *num_params;
 {
-    if (*num_params == 1 && strcmp(*params,"WM_DELETE_WINDOW") == 0)
-        if (XtParent(w)) XtPopdown(w);
-        else XtDestroyWidget(w);
+    if (*num_params == 1 && strcmp(*params,"WM_DELETE_WINDOW") == 0) {
+        if (XtParent(w)) {
+            XtPopdown(w);
+        } else {
+            XtDestroyWidget(w);
+        }
+    }
 }
 
 /*  default action for garbage feedback
@@ -568,39 +572,37 @@ XtAppContext appcon;
     return(NULL);   /* not in table */
   }
 
-int _pop_set_async_appcon(appcon, clos, normaction)
-XtAppContext appcon;
-POPOBJ clos;
-Boolean normaction;
-  { register AppEntry *curr;
+int 
+_pop_set_async_appcon(XtAppContext appcon, POPOBJ clos, Boolean normaction)
+{
+    register AppEntry *curr;
     sigsave_t savesig;
     unsigned int m;
 
     BLOCK_SIG_ALL(savesig);
     curr = set_async_appcon((Boolean) clos, appcon);
 
-    if (clos != (POPOBJ)NULL)
-      { /* setting */
-        if (curr == NULL)
-            if (appcon_tab_end < APPCON_TAB_LIM)
-              { /* space for more */
+    if (clos != (POPOBJ)NULL) { /* setting */
+        if (curr == NULL) {
+            if (appcon_tab_end < APPCON_TAB_LIM) { /* space for more */
                 (appcon_tab_end++)->appcon = appcon;
                 curr = set_async_appcon(TRUE, appcon);
-              }
-            else
-              { RESTORE_SIG(savesig);
+            } else {
+                RESTORE_SIG(savesig);
                 return(-1);     /* no space left */
-              }
+            }
         curr->clos = clos;
         m = BITOF(curr);
-        if (normaction) __pop_appcons_normal |= m;
-        else __pop_appcons_normal &= ~m;
+        if (normaction) {
+            __pop_appcons_normal |= m;
+        } else {
+            __pop_appcons_normal &= ~m;
+        }
       }
-
-    else
+    } else {
         /* clearing */
-        if (curr != NULL)
-          { register AppEntry *p;
+        if (curr != NULL) {
+            register AppEntry *p;
 #define REMOVE_BIT(v)   v = ((v>>1) &~ m) | (v & m)
             m = BITOF(curr)-1;  /* bits below this one */
             REMOVE_BIT(appcons_enabled);
@@ -610,11 +612,12 @@ Boolean normaction;
             appcon_tab_end--;
             for (p = curr+1; curr < appcon_tab_end; curr++, p++)
               { curr->appcon = p->appcon;  curr->clos = p->clos; };
-          }
+        }
+    }
 
     RESTORE_SIG(savesig);
     return(0);
-  }
+}
 
 POPOBJ _pop_async_appcon_clos()
   { return(appcon_tab_end == appcon_tab ? (POPOBJ)NULL : appcon_tab[0].clos);

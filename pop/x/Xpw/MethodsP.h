@@ -40,7 +40,7 @@ typedef struct _XpwMethod {
 } XpwMethod, *XpwMethodList;
 
 extern XpwMethodRet _XpwMakeCall();
-extern _XpwMethodWarning();
+extern void _XpwMethodWarning();
 
 #define MAX_ARGS 10
 #define METHOD_STRUCT(id, proc, num_args, flags) \

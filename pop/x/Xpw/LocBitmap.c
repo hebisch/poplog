@@ -76,9 +76,9 @@ Display *dpy;
     XrmRepresentation rep_type;
     XrmValue value;
     xrm_name[0] = XrmStringToName ("bitmapFilePath");
-    xrm_name[1] = (XrmName)NULL;
+    xrm_name[1] = (XrmName) 0;
     xrm_class[0] = XrmStringToClass ("BitmapFilePath");
-    xrm_class[1] = (XrmClass)NULL;
+    xrm_class[1] = (XrmClass) 0;
     /* need to initialize display database */
     if (!XtDatabase(dpy)) (void) XGetDefault (dpy, "", "");
     if (XrmQGetResource(XtDatabase(dpy), xrm_name, xrm_class, &rep_type, &value)
@@ -90,7 +90,7 @@ Display *dpy;
 
 /* Frees list returned by lookup_file_paths */
 
-static free_file_paths(file_paths)
+static void free_file_paths(file_paths)
 char **file_paths;
   { if (file_paths)
       { if (file_paths[0]) free (file_paths[0]);

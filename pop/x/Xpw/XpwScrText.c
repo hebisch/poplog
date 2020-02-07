@@ -38,7 +38,10 @@ extern void
     _XpwRecolorPointer(),
     _XpwTextTestActiveChange();
 
-extern _XpwTextMoveCursorTo();
+extern int _XpwYCoordToRow();
+extern int _XpwXCoordToCol();
+
+extern XpwMethodRet _XpwTextMoveCursorTo();
 extern XFontStruct * _XpwFont8OfFontSet();
 extern XFontSet _XpwFontSetFromFont();
 

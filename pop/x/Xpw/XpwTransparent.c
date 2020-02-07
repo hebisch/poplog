@@ -23,7 +23,7 @@ static void NotifyMouseEvent();
 static void NotifyKeyboardEvent();
 static void NotifyMotionEvent();
 static void ExtractPosition();
-static RecolorPointer();
+static void RecolorPointer();
 
 /***************************************************************************
  *
@@ -185,7 +185,7 @@ Widget gcurrent, grequest, gnew;
     return (FALSE);
 }
 
-static RecolorPointer(w)
+static void RecolorPointer(w)
 XpwTransparentWidget w;
  {
     Display *dpy = XtDisplay(w);
