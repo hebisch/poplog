@@ -635,7 +635,7 @@ void _pop_errsig_handler(int sig, siginfo_t *info, ucontext_t *context)
 
     if (__pop_in_user_extern == -1) _exit(1);   /* outside Pop */
 
-#if defined(i386)
+#if defined(i386)||defined(__x86_64__)
     if (sig == SIGFPE) {
         extern greg_t __pop_fpe_handler;
         if (__pop_fpe_handler)
