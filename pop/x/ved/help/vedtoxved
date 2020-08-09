@@ -1,0 +1,126 @@
+HELP VEDTOXVED                                     Adrian Howard June 91
+
+Suggestions for transferring VED programs to XVed.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Introduction
+ -- -vedprocess- and -vedediting-
+ -- XVed and -vedstartwindow-
+ -- The use of -vedupperfile- and -vedlowerfile
+ -- Input and Output with XVed
+ -- Related Documentation
+
+-- Introduction -------------------------------------------------------
+
+XVed is a new product for POPLOG 14.1, and may not work with all
+programs that previously worked in terminal versions of VED or PWM VED.
+In most cases programs will operate as they did previously, but there
+are several differences in XVed that will cause some VED programs to
+break. These changes will mostly affect badly behaved programs that
+make assumptions about the type of terminal VED is attached to.
+
+This file gives some pointers to differences between XVed and previous
+VED editors, possible conversion problems, and suggestions for their
+solution.
+
+-- -vedprocess- and -vedediting- --------------------------------------
+
+From Poplog 14.1, -vedprocess- operates via a  POPLOG process
+(-vedprocessproc-). Unlike old VED and PWM, XVed suspends
+-vedprocessproc- when there is no VED input waiting, and resumed it when
+input appears on VED's input stream and Poplog is in a long term wait.
+
+In other words, you are no longer either running, or not-running VED.
+XVed is continuously starting and stopping. This means that the
+-vedediting- variable is not a valid test for whether the editor has
+control of the screen.
+
+The boolean value in the variable -vedinvedprocess- is -true- when the
+VED is running and -false- otherwise. This is the equivalent of checking
+that -vedprocess- is in the calling chain, ie:
+
+    iscaller(vedprocess) == true
+
+An alternative way of finding out if VED is running is to check that the
+VED process is active, ie:
+
+    isliveprocess(vedprocessproc) == vedprocessproc
+
+The fact that VED now operates via a process means that -dlocal-
+expressions in VED based procedures must take into account the fact that
+the VED process may be suspended or resumed.
+
+The following example does NOT take suspend and resume into account, and
+will in fact cause XVed to go into an (interruptable) loop:
+
+    define temp_file();
+        dlocal 0 %
+            vededitor(vedhelpdefaults, 'foo'),  ;;; Edit file on entry
+            ved_q()                             ;;; Quit file on exit
+        %;
+        ;;; .... make changes to 'foo' ....
+    enddefine;
+
+The (incorrect) entry/exit actions will be triggered every time the VED
+process is suspended or resumed. A better version of the procedure must
+check -dlocal_context- to ensure that it is not a suspend or resume that
+is causing the procedure to exit:
+
+    define temp_file();
+        dlocal 0 %
+            ;;; If entry not caused by resume
+            if dlocal_context <= 2 then
+                vededitor(vedhelpdefaults, 'foo'),  ;;; edit the file
+            endif,
+            ;;; If exit not caused by suspend
+            if dlocal_context <= 2 then
+                ved_q()                             ;;; quit the file
+            endif
+        %;
+        ;;; .... make changes to 'foo' ...
+    enddefine;
+
+See HELP *DLOCAL for more details of -dlocal- expressions.
+
+-- XVed and -vedstartwindow- ------------------------------------------
+
+This variable is completely ignored in XVed since the concept of split
+screen buffers has disappeared. To find out the number of rows in the
+current buffer do:
+
+    xved_value("currentWindow", "numRows");
+
+To find out the number of rows of the next window to be created do:
+
+    xved_value("nextWindow", "numRows");
+
+(see REF *XVED for details of setting and reading XVed window values).
+
+-- The use of -vedupperfile- and -vedlowerfile ------------------------
+
+Since screens are never split in XVed the value of -vedupperfile- is
+always the ved file structure associated with the currently selected
+file (-vedcurrentfile-) while the value of -vedlowerfile- is always
+-false-.
+
+-- Input and Output with XVed -----------------------------------------
+
+A basic point that needs to be emphasised is that XVed is *not* a
+terminal. It will not respond to escape sequences that would, for
+example, move the cursor on a VT220 terminal.
+
+Some programs assume that -rawcharin- and -rawcharout- could be used for
+communication with VED. This assumption is INCORRECT. Raw input and
+output will, by default, operate in the base *terminal* window, not in
+the current XVed window. All character input and output to XVed should
+be by the low-level -vedscr_...- procedures (see REF *VEDPROCS/Low level
+VED input and output).
+
+-- Related Documentation ----------------------------------------------
+
+REF *XVED - Overview of XVed
+REF *VEDPROCS/Low level VED input and output - Low level VED IO
+
+--- C.x/x/ved/help/vedtoxved -----------------------------------------
+--- Copyright University of Sussex 1991. All rights reserved. ----------

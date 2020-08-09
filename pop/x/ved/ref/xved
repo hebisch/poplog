@@ -1,0 +1,2457 @@
+REF XVED                                        Jonathan Meyer, Apr 1991
+                                            Revised John Gibson Jan 1997
+
+        COPYRIGHT University of Sussex 1997. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<    THE X-BASED VED EDITOR   >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+This file documents  the facilities  provided by the  XVed editor.  This
+editor is built on top of  the Poplog Ved editor, but with  enhancements
+that make full use of the windowing facilities of the X Window System.
+    This is a comprehensive guide to  the XVed system. If you have  just
+started using XVed, you should read the section Loading and Running XVed
+first. TEACH * XVED will give you a basic outline of the XVed system and
+documentation.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   "Flavours" of XVed
+      1.1   Vanilla XVed
+      1.2   Motif and OpenLook XVed
+
+  2   Loading and Running XVed
+      2.1   Loading XVed
+      2.2   Making Ved Use XVed
+      2.3   Server Keyboard Setup
+      2.4   XVed Initialisations when Ved is Run
+      2.5   The XVed Standalone Saved Image
+
+  3   XVed Resources
+      3.1   XVed Window Structure
+      3.2   Setting Resources
+            ... xved_value
+            ... vedset xved
+            ... <ENTER> window
+      3.3   Application Settings
+      3.4   General Window Settings
+      3.5   Next & Default Window Settings
+      3.6   Special Icon Resources
+      3.7   Event and Key Mapping Tables
+
+  4   Keyboard Handling
+      4.1   Specifying Key Mappings via Event Translation
+      4.2   vedset keys
+
+  5   Mouse Handling
+      5.1   Events in a Button Dialog
+      5.2   vedset mouse
+
+  6   Selections & The Clipboard
+      6.1   The Clipboard
+      6.2   Selections
+
+  7   Menu Specifications
+
+  8   GUI Specific Information
+      8.1   OpenLook
+      8.2   Motif
+      8.3   Reverse Video
+
+  9   XVed and the Window Manager
+
+ 10   XVed Internal Event Handling
+      10.1  Button Events
+      10.2  Other Events
+
+ 11   Caveat
+
+
+
+
+---------------------
+1  "Flavours" of XVed
+---------------------
+
+The XVed  interface comes  in three  different forms,  to support  three
+different levels of GUI:
+
+    # vanilla     A multi-window version of Ved.
+    # motif       vanilla plus Motif menus, scrollbars and dialogs
+    # openlook    vanilla plus OpenLook menus, scrollbars and dialogs
+
+The "vanilla" level  of support is  the basic starting  point for  XVed.
+Motif and  OpenLook  add  additional  features on  top  of  the  Vanilla
+version, such as dialog boxes and popup prompts.
+
+
+1.1  Vanilla XVed
+-----------------
+In its basic "vanilla" form, XVed includes the following:
+
+    # a single window for each Ved buffer that is being edited
+    # customisation of window fonts, colours, and many other attributes
+    # facilities for interacting with Ved via the mouse
+    # support for OpenLook drag-and-drop
+    # interclient cut and paste via the X clipboard
+    # iconifying, resizing, raising and otherwise managing Ved windows
+
+Reasons for wanting to use the vanilla version of XVed include:
+
+    # greatly reduced memory usage and disk space usage
+    # independence from Motif or OpenLook widgets
+    # increased speed of window creation due to fewer widgets
+
+
+1.2  Motif and OpenLook XVed
+----------------------------
+The following  additional  components are  available  in the  Motif  and
+OpenLook versions of XVed:
+
+1) Scrollbars
+   Each buffer has  a vertical and/or  horizontal scrollbar attached  to
+   it. The scrollbar is used to position the insertion point in the  Ved
+   buffer.
+
+2) A Popup Menu
+   By default this menu is attached to the third mouse button. This menu
+   is shared  by ALL  the  XVed windows  (and  on the  OpenLook  version
+   includes a pushpin so that it can be pinned to the workspace).
+
+   This menu is  described by the  list held in  the "Menu"  application
+   setting (which can only be set from Poplog, not from .Xdefaults).
+
+   (The popup menu is  also available when running  a Motif or  OpenLook
+   XVed in vanilla mode.)
+
+3) Dialogs
+
+
+
+
+
+---------------------------
+2  Loading and Running XVed
+---------------------------
+
+In a standard Poplog system, XVed is incorporated into the 'startup.psv'
+image run by pop11,  prolog, etc. The next  section applies only if  you
+wish to load XVed into basepop11.
+
+
+2.1  Loading XVed
+-----------------
+The command:
+
+        uses xved;
+
+will load XVed  if it  is not  already loaded.  To load  XVed, you  will
+require Poplog 14.1 or  later, and static X  toolkit and X11  libraries.
+Additionally, XVed can be used with Motif or OpenLook widgetsets.
+
+Note that XVed cannot be loaded when:
+
+    # Ved is currently running
+    # You are using anything earlier than Poplog 14.1
+
+When you  load  XVed,  and  if sysxsetup  contains  its  default  value,
+sysxsetup will be redefined as xvedsetup. This allows you to make  saved
+images including  xved, and  then start  them with  the %x  option  (see
+REF * SYSTEM).
+
+XVed itself is entirely user-level Pop-11 code (although there are hooks
+in the system that have been added explicitly with XVed in mind). If you
+load XVed before  starting the X  toolkit, you can  safely make a  saved
+image containing XVed (although the %nort option should be used to start
+the Poplog system so  that runtime actions are  delayed until the  saved
+image is run).
+
+The script $popcom/mkxved is an example of how to make a standalone XVed
+saved image.
+
+The following example makes a simple  saved image that starts XVed  when
+restored:
+
+        pop11 %nort
+        : uses xved
+        Loading Sussex XVed
+        <loading messages>
+        Loaded XVed
+        : if syssave('xved.psv') then
+        :    syssetup();
+        :    xvedsetup();
+        :    'myfile.p' -> vedargument; chain(ved_ved);
+        : endif;
+
+You can  control which  version  of XVed  (and  which features  of  that
+version) is  loaded by  defining the  variable XVED_LOAD_OPTIONS  before
+loading the XVed system.
+
+
+XVED_LOAD_OPTIONS                                             [variable]
+        This (initially undefined) variable can be used to control which
+        aspects of XVed are loaded. It should be a list of words,  where
+        the first element of the list is one of:
+
+            # vanilla
+            # openlook
+            # motif
+
+        In addition, various units within XVed can also be requested  by
+        adding additional words to XVED_LOAD_OPTIONS:
+
+            # scrollbars
+            # menubar
+            # dialogs
+
+        If this constant  is undefined when  LIB * XVED is loaded,  XVed
+        will provide a default value  based on the information found  in
+        INCLUDE * XDEFS. For example, on  systems with OpenWindows,  the
+        default value of XVED_LOAD_OPTIONS is:
+
+            [openlook scrollbar menubar dialogs]
+
+        Once  XVed   has   finished   loading,  it   will   cancel   the
+        XVED_LOAD_OPTIONS identifier, although the value of the constant
+        xved will be set to the  head of the XVED_LOAD_OPTIONS list,  so
+        that programs can test which flavour of XVed is loaded.
+
+        NOTE: It is possible  to load XVed in  segments. You can  have a
+        series of layered  saved images where  the first image  contains
+        "vanilla" XVed, and subsequent layers contain either  "openlook"
+        or "motif" XVed units. You do this by setting  XVED_LOAD_OPTIONS
+        to be the desired segment, and then explicilty using  LIB * XVED
+        to force XVED to reload:
+
+            vars XVED_LOAD_OPTIONS = [vanilla];
+            lib xved;
+            ;;; make saved image here
+            vars XVED_LOAD_OPTIONS = [openlook scrollbar];
+            lib xved;
+            ;;; make second saved image here
+
+
+2.2  Making Ved Use XVed
+------------------------
+You cannot start using XVed until the procedure xvedsetup is called:
+
+
+xvedsetup()                                                  [procedure]
+    This  procedure  initialises  XVed   and  the  X  Toolkit,   opens a
+    connection to  the  X server,  fetches  a keyboard  setting  library
+    relevant to the server, and prints out a banner (if appropriate). It
+    also sets up Ved to use XVed when Ved is started.
+
+
+When XVed is  loaded, xvedsetup is  added to * sysxsetup  (which in  the
+normal system also contains the initialisation procedure for the  Poplog
+User Interface). Thus in the normal system, running
+
+        pop11 %x
+
+or
+
+        prolog %x
+
+etc, will execute xvedsetup as part of sysxsetup.
+
+Alternatively, you can  omit the %x  flag and call  either xvedsetup  or
+sysxsetup explicitly.
+
+
+2.3  Server Keyboard Setup
+--------------------------
+During xvedsetup, XVed will attempt  to determine what type of  keyboard
+it is being  attached to, and  pick up  a key binding  library which  is
+appropriate. The  current server  key library  is held  in the  variable
+vedserverxvedkeys.
+
+Initially, the X server VendorString is examined, and a key mapping  may
+be based on this string. Unfortunately, all MIT X servers have the  same
+server vendor string, so this information is not always going to work.
+
+If the first check was unsuccessful, the next test is that the server is
+on the local machine - if this is the case, XVed will use a key  mapping
+library suitable for the machine based upon the sys_machine_type.
+
+Finally, if this  fails, XVed makes  some crude guesses  based upon  the
+name of the host that it is connecting to.
+
+If all of this fails, the  value of vedserverxvedkeys when xvedsetup  is
+first called is  used. This  means that the  last xved  key library  you
+manually load will  get picked  up (each  xved key  library assigns  its
+keybinding procedure to vedserverxvedkeys).
+
+Finally, there is a reasonable  (if different) default binding for  keys
+if no server keyboard binding is found (see HELP * XVEDKEYS).
+
+The following are the supplied xved key libraries:
+
+    vedxvedkeys      see HELP * XVEDKEYS
+    vedncdxvedkeys   see HELP * NCDXVEDKEYS
+    veddxvedkeys     see HELP * DXVEDKEYS
+    vedsunxvedkeys   see HELP * SUNXVEDKEYS
+    vedhpxvedkeys    see HELP * HPXVEDKEYS
+
+
+2.4  XVed Initialisations when Ved is Run
+-----------------------------------------
+When Ved is started, * vedsetup calls the procedure * vedinitterm, which
+normally calls * veduseterm to  set up the keyboard  and screen for  the
+appropriate terminal type.
+
+In XVed  mode (i.e.  after xvedsetup  has been  called), vedinitterm  is
+redefined so that  in addition to  calling veduseterm('xved'), it  first
+calls the user-definable procedure vedxvedinit:
+
+vedxvedinit()                                       [procedure variable]
+        This variable  procedure  is  called  by  the  XVed  version  of
+        * vedinitterm, immediately before calling veduseterm('xved'). It
+        may be used to initialise XVed resource and mouse bindings.
+
+        XVed resource bindings may  be set with  vedset xved, and  mouse
+        bindings with vedset mouse (see sections below).
+
+        By  default,  vedxvedinit  is  a  procedure  which  just   calls
+        * vedxvedmouse to set up the standard mouse bindings. Therefore,
+        if you redefine  vedxvedinit, and  you want  the standard  mouse
+        bindings, you  must  make  your  vedxvedinit  call  vedxvedmouse
+        explicitly. (Note that the behaviour of vedxvedmouse is affected
+        by some  XVed  application resources,  hence  resource  bindings
+        should always be done first.)
+
+        Note that (as for other versions of Ved), key bindings should go
+        into your * vedinit  procedure or  be specified  as Ved  runtime
+        actions. (You  can  also  deal with  mouse  and  non-application
+        resource bindings in this way, but application resource bindings
+        should always be put in vedxvedinit.)
+
+
+
+2.5  The XVed Standalone Saved Image
+------------------------------------
+The XVed standalone saved image is primarily useful when you wish to run
+XVed either from a window manager menu  or as the editor for some  other
+application.
+
+The script $popcom/mkxved is used to build the saved image. Once this is
+made you can type:
+
+        % pop11 +xved [file ...]
+
+or just
+
+        % xved [file ...]
+
+to edit a file using XVed.
+
+The XVed saved image calls  the procedure xved_standalone_setup when  it
+is restored. This  procedure processes command  line options, starts  up
+XVed, opens the specified  files, and goes into  a loop processing  XVed
+input until there are no files or input:
+
+
+xved_standalone_setup()                                      [procedure]
+        Initialises XVed, processes any  arguments in * poparglist,  and
+        goes into a loop waiting until  the Ved input stream and  buffer
+        list is empty, whereupon it exits from XVed and Poplog.
+
+        The XVed saved image calls this procedure on startup to  process
+        arguments and  run  XVed. The  procedure  handles a  variety  of
+        command line  options, which  fall  into 3  categories:  special
+        options, X toolkit options, and file options.
+
+        Special Options
+        The following  options are  handled  before other  command  line
+        option processing takes place:
+
+            -help
+                Prints out  a usage  message for  the command  and  then
+                exits.
+
+            -im
+                Starts an  'immediate mode'  buffer (see  HELP * VED_IM)
+                before editing  any of  the specified  files.  Immediate
+                mode buffers are  useful for typing  commands to one  of
+                the Poplog compilers.
+
+            -stdio filename
+                Sets * ved_chario_file so  that any input  or output  on
+                Poplog   standard    devices   (pop_charin_device    and
+                pop_charout_device) is redirected to the Ved buffer with
+                the specified name. This  allows you to simulate  having
+                standard input  and output  devices even  when XVed  was
+                started in a script or from a menu.
+
+                If you specify a stdio file, popdevin and popdevout  are
+                set to /dev/null.
+
+                This option is  recommended if  you want  to start  XVed
+                from a window manager menu or a session startup script.
+
+        Toolkit Options
+        All of the standard  X Toolkit arguments  can used. See  MAN * X
+        for a list  of the  options and their  arguments. The  following
+        lists some of the options:
+
+            -display displayname
+                Allows you to connect to a remote X server, passing  the
+                name of the X server on the command line.
+
+            -fn name, -font name
+                Specifies the default font to use for windows.
+
+            -geometry geom
+                Sets the  initial geometry  for  XVed windows.  You  can
+                specify the number of columns  and rows and the X  and Y
+                coordinates of the window, and also specify the location
+                of the icon.
+
+            -iconic
+                Sets the initial state of the Ved windows to iconic,  so
+                that new windows appear as icons.
+
+            -xrm string
+                Allows you  to specify  additional  X resources  on  the
+                command line.
+
+        File Options
+        After processing special  and toolkit options,  the rest of  the
+        contents of the command line options in * poparglist are treated
+        as file options  and files. You  can specify zero  or more  file
+        options or files. The  file options and  files are processed  in
+        sequence. For each option or file an appropriate action is added
+        to Ved's input stream:
+
+            -do command
+                Adds an action to call  * veddo on command. This  option
+                can be used to perform one or more Ved <ENTER> commands.
+
+            =line_number, = line_number
+                Adds an action to sets * vvedgotoplace so that, for  the
+                next file, XVed will  automatically go to the  specified
+                line number.
+
+            filename
+                Adds an action to edit the specified file.
+
+        Examples
+        The following starts XVed and fetches a few documentation files:
+
+            xved -do 'help initial' -do 'help xved'
+
+        The following edits your  login file at line  10, and then  sets
+        vedwriteable to false for that file:
+
+            xved =10  ~/.login  -do ':false -> vedwriteable'
+
+        To start xved in inverse video with a large font, use:
+
+            xved -fn 9x15 -rv
+
+
+
+
+-----------------
+3  XVed Resources
+-----------------
+
+The resource values that control the behaviour of XVed are of two kinds:
+"application"  settings  (which  affect  all  windows),  and  per-window
+settings for default  window, next  window and  current window.  Default
+window settings can be set for different classes and types of window.
+
+The values of all  XVed resources can be  set inside Poplog with  vedset
+xved (or the procedure which that calls, xved_value). Most (but not all)
+can also  be set  with the  usual X  resources mechanism  (i.e. in  your
+.Xdefaults).
+
+Note that xved_value settings take precedence over .Xdefaults  settings.
+However, there are no xved_value settings  by default , and all  default
+values are set at the .Xdefaults level. (Except for those resources that
+are xved_value-only.)
+
+
+
+3.1  XVed Window Structure
+--------------------------
+A single top level (iconifiable) XVed  window will be created each  time
+Ved opens a new buffer (or rather, when the buffer is set 'onscreen').
+
+The XVed window  (held in  the variable  * wvedwindow) is  in fact  an X
+Toolkit "Widget"  -- see  REF * XpwScrollText for  details of  the  Text
+widget XVed uses to display its  buffers. (It will therefore respond  to
+calls of things such as XtVaSetValues, etc. Use this knowledge with care
+-- XVed will not  respond kindly if you  call XtDestroyWidget to  kill a
+Ved window.)
+
+An XVed  window is  in fact  a structure  of three  widgets, as  follows
+(where wvedwindow is the Text widget):
+
+        Widget      Resource Class      Resource Name
+        ------      --------------      -------------
+        Shell       XVed                xved
+        |
+        Wrapper     (see below)         xved_value class setting
+        |
+        Text        XpwScrollText       xved_value type setting
+
+The resource names  of the  Wrapper and Text  widgets are  set from  the
+class and type  settings from  xved_value (see  General Window  Settings
+below), and depend upon the file.
+
+The 'Wrapper' widget is different for the different flavours of XVed  --
+in the Vanilla version it is an XpwComposite widget containing just  the
+Text widget,  but the  Motif and  Openlook versions  use other  wrapping
+widgets which also contain scrollbars and/or a menubar.
+
+Thus the resource class of the Wrapper should be treated as unknown, and
+when specifying  resources  in  .Xdefaults you  should  use  either  the
+resource name for that component or "*", e.g.
+
+            XVed*font: 9x15
+            XVed.Program*font: 6x13
+
+The corresponding vedset xved form would be
+
+        vedset xved
+            []        font = '9x15'
+            [Program] font = '6x13'
+        endvedset;
+
+
+
+3.2  Setting Resources
+----------------------
+The main programming interface  to XVed is, like  the X Toolkit  itself,
+via a value fetching/setting procedure xved_value. The vedset xved form
+provides a simple syntactic interface to xved_value.
+
+
+...  xved_value
+---------------
+
+xved_value(context, name)      -> item                       [procedure]
+xved_value(context, name_list) -> (item1, ..., itemN)
+item              -> xved_value(context, name)
+item1, ..., itemN -> xved_value(context, name_list)
+        This procedure  is  used  to customise  XVed  windows  and  XVed
+        itself. If context is a word, it must be one of:
+
+            "application"     specifies global XVed settings
+            "currentWindow"   dynamically change current window settings
+            "nextWindow"      specify settings for next created window
+            "defaultWindow"   specify default window settings
+
+        Instead of "defaultWindow", context may also be a list
+
+                [class type]
+
+        to specify that "defaultWindow"  resources are constrained  to a
+        particular window class and  type. Either class  or type may  be
+        the word "*" to match any  class/type, and trailing "*"s in  the
+        list may be omitted (hence [] is the same as "defaultWindow").
+
+        (context may also  be a  Ved file  structure or  an XVed  window
+        structure to set values for that file/window.)
+
+        The last  argument may  be either  a single  value name  (i.e. a
+        word), or a list of them. For  a list of length N, N values  are
+        returned or  updated.  The  value names  are  specific  to  each
+        context, though  all  of the  Window  types share  many  setting
+        names.
+
+        The "application" context  refers to XVed  variables that  users
+        can modify.  Application settings  can be  specified at  startup
+        time in  your * vedxvedinit  procedure,  or in  your  .Xdefaults
+        file, using a resource line like:
+
+            XVed.name: value
+
+        For example, the following specifies the WarpContexts setting:
+
+            XVed.WarpContexts: [ved_ved ved_rb vedfileselect]
+
+        The "currentWindow" setting  refers to  the window  held in  the
+        variable  wvedwindow.   xved_value   will   dynamically   change
+        attributes such as fonts, colours and cursors for XVed  windows.
+        This lets you for example increase the size of the font used  in
+        a window to make it more legible.
+
+        Both the "nextWindow" and  "defaultWindow" settings are in  fact
+        pseudo-windows -- they don't refer to actual X windows.
+
+        The "nextWindow" setting contains a set of attributes which  are
+        used when the next Ved window is created, and then cleared. Many
+        of  the  "nextWindow"  settings  can  also  be  applied  to  the
+        "currentWindow", although  there are  additional settings  which
+        can only be specified  when new windows  are created. Note  that
+        the "nextWindow" is consulted AFTER vedveddefaults is called for
+        a new file, so users can write things in their vedinit.p like:
+
+            define vedveddefaults;
+
+            #_IF DEF xved       ;;; only compiled if XVed is loaded
+                if vedusewindows == "x"
+                and isstartstring('/tmp', vedpathname) then
+                    'cross' -> xved_value("nextWindow", "pointerShape");
+                endif;
+            #_ENDIF
+
+            enddefine;
+
+        "defaultWindow" is perhaps the most special context. It is  used
+        to specify fallback defaults for XVed. "defaultWindow"  settings
+        can contain  the  same  types  of  values  as  "nextWindow"  and
+        "currentWindow" settings. However, they can also be  procedures,
+        in which case the procedures are called to dynamically  generate
+        the default  value for  an  attribute. Such  dynamic  defaulting
+        procedures take the form:
+
+                default_p() -> default_value
+
+        The default_p will  get called from  within the window  creation
+        procedures, and in other places when  a new value is needed.  At
+        the stage when it is called, the environment for the Ved  buffer
+        will have been created -  so variables such as vedpathname  will
+        be set correctly for the buffer.
+
+        Many of the  slots in "defaultWindow"  start with  XVed-supplied
+        dynamic defaulting procedures, which  are used to create  things
+        such as window names, icons, etc. A dynamic defaulting procedure
+        should return a default_value which  is of the correct type  for
+        the setting, based on the  current values of Ved variables.  For
+        example, this is the XVed-supplied dynamic defaulting  procedure
+        for generating icon labels:
+
+            define make_icon_label;
+                ;;; return icon label for current window
+                sys_fname_name(vedpathname);
+            enddefine;
+
+            ;;; install dynamic defaulting procedure
+            make_icon_label -> xved_value("defaultWindow", "iconName")
+
+        As well as default values for windows, the "defaultWindow"  also
+        holds   two   special   tables,   the   "eventTable"   and   the
+        "keyMapTable". See below for details.
+
+        For "nextWindow" and "defaultWindow"  types, a setting can  have
+        the special value "undef" to indicate that no value is provided.
+        With "undef" settings,  the settings  will be  derived from  the
+        widget's  default   values,  or   from  the   users   .Xdefaults
+        specifications.  Settings   applicable   to   "nextWindow"   and
+        "defaultWindow" can be specified  in the users .Xdefaults  using
+        the resource line:
+
+            XVed*name: value
+
+        For example, the following will set the font of all XVed buffers
+        to '9x15':
+
+            XVed*font: 9x15
+
+        The following examples illustrate the sort of things you can  do
+        with xved_value:
+
+            ;;; set the main (colour 0) colours of the window ...
+            'orange', 'blue' -> xved_value("currentWindow",
+                                            [foreground background]);
+
+            ;;; ... specifying the status line colours in RRGGBB format
+            '#666688', '#ffff88' -> xved_value("currentWindow",
+                                [statusForeground statusBackground]);
+
+            ;;; change the mouse pointer shape for the window
+            'cross' -> xved_value("currentWindow", "pointerShape");
+
+            ;;; set the location of the next window Ved makes:
+            150, 200 -> xved_value("nextWindow", [x y]);
+
+            ;;; disable mouse warping:
+            true -> xved_value("application", "WarpPointer");
+
+            ;;; set default colours for all windows ...
+            'black', 'white' -> xved_value([], [foreground background]);
+
+            ;;; ... and a different default for class Documentation
+            'red', 'yellow' -> xved_value([Documentation],
+                                            [foreground background]);
+
+
+...  vedset xved
+----------------
+vedset xved is a simple syntactic interface to * xved_value. It has  the
+form
+
+    vedset xved
+        context
+            resource_name = value
+            resource_name = value
+            .....
+        context
+            resource_name = value
+            resource_name = value
+            .....
+        .....
+    endvedset
+
+where each assignment  of value  to resource_name is  for the  preceding
+context.
+
+context is the same  as the context argument  to xved_value, and can  be
+one of
+
+    application
+    defaultWindow
+    nextWindow
+    currentWindow
+
+Instead of defaultWindow,  context may also  be a list  [class type]  to
+constrain the following assignments to windows of a particular class and
+type. Either  class  or type  may  be *  (to  match any),  and  trailing
+asterisks in the list may be omitted (thus all of [* *], [*] and []  are
+equivalent to defaultWindow).
+
+For each resource_name, value must be  a single Pop-11 lexical item.  If
+value is a word, it is converted to a string, with the special exception
+that the words true and false are converted to the corresponding boolean
+values. Anything  that is  not  a single  Pop-11  lexical item  must  be
+specified as a quoted string.
+
+Note that context, resource_name and  value all undergo macro  expansion
+(with autoloading disabled).  value may also  be % expression % to  mean
+the result of evaluating the Pop-11 expression.
+
+For example,
+
+    vedset xved
+        application
+            WarpPointer     = true
+
+        []
+            foreground      = black
+            background      = white
+            pointerShape    = cross
+            geometry        = '80x48'
+
+        [Documentation]
+            foreground      = red
+            background      = yellow
+            geometry        = '74x24'
+
+        [Documentation help]
+            foreground      = blue
+
+        [Select]
+            autoGeometry    = '120x48/20x8'
+    endvedset;
+
+
+...  <ENTER> window
+-------------------
+There is also a simple Ved interface to altering window resources via an
+extension to  the ved_window  command.  See HELP * ved_window  for  more
+details.
+
+
+
+3.3  Application Settings
+-------------------------
+
+AlwaysRaiseWindow                                      [xved value name]
+        Boolean, default false. If  true, XVed will  try and ensure  the
+        window you are editing in is always fully visible, by raising it
+        to the front of the screen.
+
+
+AutoWindowPlacement                                    [xved value name]
+        Boolean,  default  false.  If  true,  XVed  will  place  windows
+        starting at the top left corner of the screen, alternating  left
+        and right  across the  screen, staggered  downwards and  inwards
+        towards the centre, thus:
+
+                    -1-----       -----2-
+                    |-3-----     -----4-|
+                    ||-5-----   -----6-||
+                    -||     |   |     ||-
+                     -|     |   |     |-
+                      -------   -------
+
+        If AutoWindowPlacement is false, each  window will be placed  in
+        accordance with any geometry resource specification for it.
+
+
+AutoCut                                                [xved value name]
+        Boolean, default  true.  If this  resource  is true,  XVed  will
+        automatically perform a  'cut' on selected  text when you  start
+        typing. This allows you to select some text and then replace  it
+        quickly by  typing  over it.  Also,  hitting a  key  bound  onto
+        vedchardelete while there  is an active  selection will cut  the
+        selection instead of deleting a character.
+
+        If the  resource  is false,  typing  while there  is  an  active
+        selection will just cancel the selection.
+
+
+BellVolume                                             [xved value name]
+        Integer, value  0-100, default  100 This  setting specifies  the
+        loudness of the beep generated by vedscreenbell in XVed. 100  is
+        full volume, and 0 is silent.
+
+
+DialogForeground                                       [xved value name]
+DialogBackground                                       [xved value name]
+        These settings control the foreground and background colours  of
+        XVed specific dialog boxes (ie, all dialog boxes not supplied by
+        the Poplog User Interface --- see HELP * POPLOG_UI.) The default
+        values  for   these   settings   are   XtDefaultForeground   and
+        XtDefaultBackground.
+
+
+EditKeysEnabled                                        [xved value name]
+        Boolean, default  false.  Some  keyboards  (notably  Sun  type 4
+        keyboards) have keys marked Cut, Copy and Paste. These keys  are
+        historically used for different  purposes by Ved. The  (default)
+        value of false causes XVed to use the traditional key  bindings.
+        The value of true  causes XVed to make  the Cut, Copy and  Paste
+        keys work  on  the  current selection.  Changing  this  resource
+        invokes a call to vedset.
+
+
+KeypadKeysEnabled                                      [xved value name]
+        Boolean, default true. On  terminals with keypads, setting  this
+        attribute false  will  make the  keypad  behave like  a  numeric
+        keypad rather than sending cursor control sequences.
+
+
+MaxWindows                                             [xved value name]
+        Integer, default 1000000. XVed will limit its use of windows  to
+        this number.
+
+        Whenever a window is to be  created for a new or existing  file,
+        and there  are  already MaxWindows  windows,  the last  file  on
+        vedbufferlist that currently has a  window will have its  window
+        destroyed. The new window then  replaces it, in the same  screen
+        position.
+
+
+MenuForeground                                         [xved value name]
+MenuBackground                                         [xved value name]
+        These settings control the foreground and background colours  of
+        the popup menu. Their default values are XtDefaultForeground and
+        XtDefaultBackground respectively.
+
+
+MultiClickTimeOut                                      [xved value name]
+        Integer, default  200. Time  interval in  milliseconds used  for
+        multiple button click detection.
+
+
+PopFocusOnly                                           [xved value name]
+        Boolean, default  false. If  this is  true, XVed  will warp  the
+        pointer and/or input focus to a window ONLY if it can  determine
+        that a Poplog window currently has  the input focus -- that  is,
+        regardless of the  values of WarpPointer  and SetInputFocus,  it
+        will not steal the pointer/focus  away from a non-Poplog  window
+        receiving keyboard input.
+
+        NOTE, however, that in order for XVed to be able to identify the
+        Poplog base (i.e. terminal) window as 'belonging' to Poplog, the
+        environment variable/logical name WINDOWID must be set to  its X
+        window ID. This  is done  automatically by xterm  in Unix.  (But
+        not, unfortunately, by  the corresponding  terminal emulator  in
+        VMS. Even in Unix, WINDOWID will  not be available if Poplog  is
+        running on a different machine from the xterm.)
+
+        If WINDOWID is not set,  PopFocusOnly being true will  therefore
+        prevent XVed warping pointer/focus to  a window Ved'ed from  the
+        base window.
+
+
+ResourceFile                                           [xved value name]
+        String. Its default value is:
+
+            $HOME/.Xdefaults.
+
+        This setting should  be the  filename of  the resource  database
+        that  default   settings  should   be   saved  in   by   <ENTER>
+        savedefaults.
+
+
+SearchDoesSelect                                       [xved value name]
+        Boolean, default false. If this is set to true, then  performing
+        a search using <ENTER>/, <ENTER>"  etc. causes the matching text
+        to be highlighted and selected. See REF * VEDSEARCH.
+
+
+SetInputFocus                                          [xved value name]
+        Boolean, default  true. Specifies  whether XVed  should set  the
+        input focus when Ved switches to  a new window. If this  setting
+        is false, XVed will  not explicitly set  the input focus  when a
+        window is entered.
+
+        In a click-to-type  regime, it makes  sense to have  WarpPointer
+        false and SetInputFocus true. In a pointer-following regime, you
+        should usually have both true or both false, so that the pointer
+        and the focus always stay together. (See also PopFocusOnly.)
+
+
+SetLineBreakOnResize                                   [xved value name]
+        Boolean, default false. If true,  XVed will adjust the point  at
+        which lines are  broken to  be close to  the right  edge of  the
+        window you are editing in, whenever the window is resized.
+
+
+ShowFileName                                           [xved value name]
+        Boolean, default true.  If true,  XVed will  display the  string
+        * vednamestring as the default message on the status line:  this
+        contains the name of the file being edited.
+
+        If false, no message is displayed by default. You may find  this
+        preferable if  you  have  window  manager  title  bars  on  your
+        windows, since  the vednamestring  information is  displayed  in
+        those also.
+
+
+StatusAtTop                                            [xved value name]
+        Boolean, default true.  If true,  XVed will  display the  status
+        line at the top of each window, otherwise at the bottom.
+
+
+UseOldMouseBindings                                    [xved value name]
+        Boolean, default  true for  Openlook, false  otherwise.  Setting
+        this value to true will restore the default mouse bindings prior
+        to Version 15+.
+
+
+UsePwmMouseBindings                                    [xved value name]
+        Boolean, default false. Setting this  value to true will  modify
+        the mouse bindings  used by LIB * VEDXVEDMOUSE  to be more  like
+        those provided by LIB * VEDMICE.
+
+
+UseXVedIcons                                           [xved value name]
+        Boolean, default true. If true,  XVed windows will have  special
+        pictures for their icons (illustrating the type of window,  i.e.
+        "help", "ref" etc).
+
+        If false, no  special icons  are created, and  you get  whatever
+        style of icon the window manager gives you. (This saves a bit on
+        memory resources, makes window creation a little faster, etc.)
+
+
+VScrollStep                                            [xved value name]
+HScrollStep                                            [xved value name]
+        Integer, default 1 (for both). These variables control the  step
+        size for vertical  and horizontal  scrolling respectively.  That
+        is, when  scrolling  a  file up/down  L  lines  or  left/right C
+        columns, XVed will do the scroll in steps of the size given.
+
+        Setting these variables  to values of  2 (or even  3) will  give
+        faster scrolling, especially  on colour  machines. (However,  as
+        the step size increases, the effect is less smooth.)
+
+
+Vanilla                                                [xved value name]
+        Boolean, default  false. If  true,  specifies that  XVed  should
+        operate in vanilla mode even when the Openlook or Motif parts of
+        XVed are loaded --  that is, no  scrollbars, menubars or  dialog
+        boxes.
+
+        (Vanilla  mode  generally  uses  less  resources,  requires  the
+        creation of less  widgets, and  is therefore  faster, etc.  Note
+        that  you  can  also  turn  off  scrollbars/menubars  with   the
+        per-window menubarOn, scrollbarOn and hscrollbarOn resources  --
+        these will only be created when turned on.)
+
+
+WarpPointer                                            [xved value name]
+        Boolean, default false. Specifies  whether XVed should warp  the
+        pointer when Ved switches  to a new window.  If this setting  is
+        false, XVed will never cause the X mouse pointer to be moved.
+
+        In a click-to-type  regime, it makes  sense to have  WarpPointer
+        false and SetInputFocus true. In a pointer-following regime, you
+        should usually have both true or both false, so that the pointer
+        and the focus always stay together. (See also PopFocusOnly.)
+
+
+WarpContexts                                           [xved value name]
+        List or Boolean (default true). A List of words specifying  when
+        Ved  is  allowed  to  warp   the  input  focus  or  mouse.   See
+        * vedwarpcontext for details.
+
+
+
+3.4  General Window Settings
+----------------------------
+The following settings  are available  on "currentWindow",  "nextWindow"
+and "defaultWindow" contexts:
+
+
+foreground                                             [xved value name]
+background                                             [xved value name]
+statusForeground                                       [xved value name]
+statusBackground                                       [xved value name]
+highlightForeground                                    [xved value name]
+highlightBackground                                    [xved value name]
+color2Foreground                                       [xved value name]
+color2Background                                       [xved value name]
+color3Foreground                                       [xved value name]
+color3Background                                       [xved value name]
+color4Foreground                                       [xved value name]
+color4Background                                       [xved value name]
+color5Foreground                                       [xved value name]
+color5Background                                       [xved value name]
+color6Foreground                                       [xved value name]
+color6Background                                       [xved value name]
+color7Foreground                                       [xved value name]
+color7Background                                       [xved value name]
+color0AForeground                                      [xved value name]
+color0ABackground                                      [xved value name]
+color1AForeground                                      [xved value name]
+color1ABackground                                      [xved value name]
+color2AForeground                                      [xved value name]
+color2ABackground                                      [xved value name]
+color3AForeground                                      [xved value name]
+color3ABackground                                      [xved value name]
+color4AForeground                                      [xved value name]
+color4ABackground                                      [xved value name]
+color5AForeground                                      [xved value name]
+color5ABackground                                      [xved value name]
+color6AForeground                                      [xved value name]
+color6ABackground                                      [xved value name]
+color7AForeground                                      [xved value name]
+color7ABackground                                      [xved value name]
+        These colours are used to paint the text in a Ved window.
+
+        foreground and  background  are  the  basic  (colour  0)  window
+        colours  for  the  whole  window  excluding  the  status   line;
+        statusForeground" and  statusBackground  are colour  0  for  the
+        status line.
+
+        The remaining  colours are  used for  text that  has  attributes
+        containing the  colour  numbers  1 -  7  (without  the  'active'
+        attribute)  and  colour  numbers  0A  -  7A  (with  the   active
+        attribute). The highlight- colours  are in fact colour  number 1
+        (and are so called for backward compatibility reasons).
+
+        To provide  some sort  of standard  for the  use of  colours  on
+        colour displays, and to allow sensible behaviour for  monochrome
+        displays, Ved uses the convention that the even-numbered colours
+        2(A), 4(A), and 6(A) are 'foreground-only' (i.e. have the  usual
+        background), whereas the odd-numbered colours 1(A), 3(A),  5(A),
+        and 7(A) change the background as well.
+
+        In accordance with this, XVed is set up so that
+
+         # On a monochrome display, the resources for colours 2 - 7  and
+           0A - 7A are not used. The even-numbered colours will  display
+           as the  basic colours,  whereas  the odd-numbered  ones  will
+           display as colour  1 (which  is the  basic colours  inverted,
+           i.e. inverse video).
+
+         # On a  colour display,  the backgrounds  of the  even-numbered
+           colours  default  to  the   basic  background  colour   (i.e.
+           background or statusBackground).
+
+        For colour  displays, XVed  provides a  default set  of  colours
+        which are set as 'fallback' resources (which means they will NOT
+        be used if there is an 'app-defaults' file for XVed). These are
+
+           color2Foreground: red          color3Foreground: yellow
+                                          color3Background: red
+           color4Foreground: green4       color5Foreground: yellow
+                                          color5Background: green4
+           color6Foreground: blue         color7Foreground: white
+                                          color7Background: blue3
+
+           color2AForeground: brown       color3AForeground: coral
+           color4AForeground: olivedrab4  color5AForeground: green3
+           color6AForeground: slateblue3  color7AForeground: dodgerblue
+
+        (The backgrounds  for the  odd-numbered active  colours are  not
+        set, so they default to the basic foreground, i.e. foreground or
+        statusForeground.)
+
+        Note that apart from  the above fallback  resources (and in  the
+        absence of any other settings,  e.g. in a user .Xdefaults),  the
+        resources for colours 1 - 7 and 0A - 7A will be empty, i.e. have
+        the value -1. They do not have X resource class XtCForeground or
+        XtCBackground, and  are  not  initialised  by  the  Text  widget
+        either. (In  accordance  with the  colour  convention  described
+        above,  empty  components   for  even  colours   will  use   the
+        corresponding colour 0 component,  whereas empty components  for
+        odd colours  will  use  the colour  1  component.  The  colour 1
+        components themselves  default to  the inverse  of the  colour 0
+        components, i.e.  colour  1 by  default  is 'reverse  video'  on
+        colour 0.)
+
+        On the  other  hand,  the  colour 0  resources  will  always  be
+        initialised  to   something,   since   they   all   have   class
+        XtCForeground or  XtCBackground,  and have  widget  defaults  as
+        well, viz
+
+          Resource              Class           Default
+          --------              -----           -------
+          foreground            XtCForeground   XtDefaultForeground
+          background            XtCBackground   XtDefaultBackground
+          statusForeground      XtCForeground   XtDefaultForeground
+          statusBackground      XtCBackground   XtDefaultBackground
+
+        (N.B You can  assign a valid  X colour string  such as 'red'  or
+        'blue' or '#1a2b3f' to  any colour resources,  but you will  NOT
+        get a string  back if  you fetch the  value of  the setting  for
+        "currentWindow" (it  will  return  the X  pixel  value  for  the
+        colour).
+
+
+cursorColor                                            [xved value name]
+        Specifies the colour  of the  text cursor when  drawn in  normal
+        colour,  i.e.  colour  0  (if  the  cursor  character  given  to
+        vedscreencursoron specifies a  colour 1 -  7, the foreground  of
+        that is used).
+
+        Setting this resource to -1 (empty) will cause the row-dependent
+        colour 0 foreground to be used instead (statusForeground when on
+        the status line, and foreground otherwise).
+
+
+selectionColorNum                                      [xved value name]
+        The  colour  number  (0  -  7)  to  be  used  for   highlighting
+        selections.   The   default   value   is   1,   which    selects
+        highlightForeground/Background.
+
+
+y and x                                                [xved value name]
+        These integer settings are  used to control  the location of  an
+        XVed window on  the screen. The  x and y  settings refer to  the
+        distance in pixels from the top left corner of the screen to the
+        top left corner of the (whole) XVed window.
+
+
+numRows                                                [xved value name]
+numColumns                                             [xved value name]
+        The numRows and numColumns settings specify the width and height
+        of the Ved buffer  in terms of rows  and columns (remember  that
+        the status line  takes up one  row, and the  start character  of
+        each buffer line is also used).  Thus the view area of the  text
+        is (numRows-1, numColumns-1).
+
+
+geometry                                               [xved value name]
+        This integrates the x, y, numRows and numColumns settings into a
+        standard X geometry string, i.e.
+
+                [numColumns][xnumRows][+x+y]
+
+        where brackets  [...] specify  optional parts.  Assigning to  it
+        changes any  of the  four resources  that are  specified in  the
+        string.
+
+        Note that as an X resource in your .Xdefaults, you should always
+        use geometry rather than any of the individual ones, e.g.
+
+            XVed*geometry: 80x24
+            XVed.Documentation*geometry: 74x20+400+200
+
+        etc.
+
+
+autoGeometry                                           [xved value name]
+        Setting  this  resource  for  "nextWindow"  or   "defaultWindow"
+        specifies that a new window should be auto-sized on the basis of
+        the number of lines in the  buffer and/or the maximum length  of
+        any  buffer   line.  (This   resource  is   not  applicable   to
+        "currentWindow".)
+
+        The resource string is either an X geometry, or two X geometries
+        separated by a `/`, i.e.
+
+                [maxColumns][xmaxRows][/[minColumns][xminRows]]
+
+        where brackets [...] specify optional parts.
+
+        If maxColumns is present, the  window width will be  auto-sized.
+        numColumns will be set to the length of the longest buffer  line
+        plus 2, but up to a maximum of maxColumns; the minimum width  is
+        the greater of 12 or minColumns if present.
+
+        If maxRows is  present, the  window height  will be  auto-sized.
+        numRows will be set to the number of buffer lines plus 2, but up
+        to a maximum of maxRows; the minimum height is the greater  of 4
+        or minRows if present.
+
+        For example:
+
+                120x48/20x8
+
+        specifies that both width and height should be auto-sized, with
+        maximum size 120x48 and minimum size 20x8. Alternatively,
+
+                120/20
+
+        specifies that only  the width should  be auto-sized. (I.e.  the
+        height  will  default  to  whatever  value  if  would  have  had
+        otherwise. Note that an  auto-size value overrides any  geometry
+        spec, except an explicit "nextWindow" one.)
+
+        You can use  autoGeometry in  your .Xdefaults  (for example)  to
+        auto-size windows produced by vedfileselect and ved_ls etc:
+
+            XVed.Select*autoGeometry: 120x48/20x8
+
+
+
+hMargin                                                [xved value name]
+vMargin                                                [xved value name]
+        The hMargin and vMargin specify the amount of padding space that
+        appears around the text (i.e. Ved)  part of the XVed window,  in
+        pixels.
+
+        Either one or both may also have a negative value, meaning use a
+        percentage of the corresponding character cell dimension, i.e of
+        the font width or font height.  This allows the margins to  grow
+        and shrink automatically with different font sizes.
+
+        The default values are -50 for hMargin (i.e. 50% of font  width)
+        and -30 for vMargin (i.e. 30% of font height).
+
+
+borderWidth                                            [xved value name]
+        The margin around the text (i.e. Ved) part of the XVed window in
+        pixels. Default 1.
+
+
+borderColor                                            [xved value name]
+        The colour  of the  border  around the  text  part of  the  XVed
+        window. Also used for the 1-pixel border around the status line.
+
+
+font                                                   [xved value name]
+boldFont                                               [xved value name]
+altFont                                                [xved value name]
+boldAltFont                                            [xved value name]
+        These settings specify  the X  fonts to  use for  the XVed  text
+        window. For example, '6x13'  can usually be  used for font.  All
+        the fonts can be any size. (Including proportional, but this  is
+        not likely  to give  very  satisfactory results.  Regardless  of
+        their size, or  whether fixed-width or  proportional, all  fonts
+        are drawn to the maximum spacing required by any of them.)
+
+        If specified, altFont should normally be an italic-style font or
+        something similar (this is  what Poplog documentation  assumes).
+        For example, the 6 x 12 font
+
+            -schumacher-clean-medium-i-*--12-*-*-*-c-60-*-1
+
+        could be  used  with '6x13'  on  MIT systems.  Another  possible
+        combination is
+
+             font: -b&h-lucidatypewriter-medium-r-*-*-14-*-*-*-m-90-*-1
+          altFont: -adobe-courier-medium-o-*--14-*-*-*-m-90-*-1
+
+        (both 9 x 14), or (specifying bold fonts as well),
+
+                font: -misc-fixed-medium-r-normal-*-13-*-*-*-c-70-*-*
+            boldFont: -misc-fixed-bold-r-normal-*-13-*-*-*-c-70-*-*
+             altFont: -adobe-courier-medium-o-*-*-12-*-*-*-m-70-*-*
+         boldAltFont: -adobe-courier-bold-o-*-*-12-*-*-*-m-70-*-*
+
+        which mixes 7 x 13 with 7 x 12.
+
+        If not specified (or  set to 0), text  in Ved buffers marked  as
+        'alt font'  will come  out in  the normal  font but  underlined.
+        (This also happens if altFont is the same as font.)
+
+        If specified, boldFont should be a bold version of font; if  not
+        specified (or set to  0), bold text  is drawn by  'overstriking'
+        with font. (Which also happens if boldFont is the same as font.)
+        Similiarily for boldAltFont versus altFont.
+
+        Changing any font will  cause the window  to resize to  maintain
+        the same number of rows and columns.
+
+
+noBlink                                                [xved value name]
+        This boolean (default false) controls whether text in the window
+        with the 'blink' attribute actually blinks or not.
+
+
+drawGraphicChars                                       [xved value name]
+        This  boolean  (default  true)  indicates  whether  or  not  the
+        XpwScrollText widget representing  the XVed  window should  draw
+        its own version of  graphics characters (e.g.  as used to  paint
+        the status line and  mark ranges). With this  true, you can  use
+        any fixed-width  font(s)  for  an  XVed  window,  regardless  of
+        whether the font  actually supports the  graphics characters  or
+        not.
+
+        (Note that the widget only supports those characters in the  Ved
+        standard graphics set,  i.e. the  line-drawing characters  and a
+        few others -- see Graphics Characters in REF * VEDPROCS.)
+
+
+pointerShape                                           [xved value name]
+pointer2Shape                                          [xved value name]
+        pointerShape controls which  X cursor is  displayed in the  text
+        (i.e. Ved) part of an XVed window.  It can be set to one of  the
+        standard cursor  shapes, as  a  string, though  (like  colours),
+        fetching this  setting  is not  guaranteed  to return  a  string
+        (currentWindow types will return the XID of the cursor).
+
+        pointer2Shape is an alternate pointer used when the mouse  moves
+        into  a   'text   action'   (see  Embedded   Text   Actions   in
+        REF * VEDPROCS).
+
+
+pointerForeground                                      [xved value name]
+pointerBackground                                      [xved value name]
+        Foreground and background  colours to  be used  for the  cursors
+        specified by pointerShape and pointer2Shape.
+
+
+iconic                                                 [xved value name]
+        A boolean setting  indicating whether  the window  is iconic  or
+        not. Can  be used  to iconify  a  window. Can  also be  used  to
+        specify that new windows should be created in iconified form.
+
+
+menubarOn                                              [xved value name]
+scrollbarOn                                            [xved value name]
+hscrollbarOn                                           [xved value name]
+        In Openlook  and Motif  XVed, these  booleans control  whether a
+        menubar  (menubarOn),  vertical   scrollbar  (scrollbarOn)   and
+        horizontal scrollbar (hscrollbarOn) are displayed in the window.
+        (By default, menubarOn and scrollbarOn are true and hscrollbarOn
+        is false.)
+
+
+
+scrollbarForeground                                    [xved value name]
+scrollbarBackground                                    [xved value name]
+menubarForeground                                      [xved value name]
+menubarBackground                                      [xved value name]
+        Foreground and background colours to be used for the menubar and
+        scrollbars in Openlook and Motif XVed.
+
+
+title                                                  [xved value name]
+iconName                                               [xved value name]
+        These strings specify the labels  that appear on an XVed  window
+        and its icon. Usually set by dynamic-defaulting procedures.
+
+
+raised                                                 [xved value name]
+        A boolean setting that, when set,  will cause an XVed window  to
+        be raised to the front of  the window stack. For nextWindow  and
+        defaultWindow types,  this  setting is  ignored.  Fetching  this
+        setting for the "currentWindow" will  return true if the  window
+        is unobscured by any other window, and false if it is  partially
+        obscured, wholly obscured or iconified.
+
+
+shellBorderWidth                                       [xved value name]
+        Specifies the borderWidth  for the XVed  shell window, i.e.  the
+        margin around the whole XVed window. It has no default value.
+
+        (This resource is xved_value-only; in .Xdefaults, you would  set
+        this as XVed.borderWidth.)
+
+
+translations                                           [xved value name]
+        X Toolkit event translations  for the text  part of the  window.
+        This resource may be either a string or a list of strings:  if a
+        string is given, that is used unchanged.
+
+        A list  is converted  to a  single string  by concatenating  the
+        given strings with a newline appended to the end of each  except
+        the last.  If  the  first string  in  the  list is  not  one  of
+        '#override', '#augment'or '#replace', then '#override' as  added
+        as the default.
+
+
+class                                                  [xved value name]
+type                                                   [xved value name]
+        These two slots  contain the  resource names of  the new  buffer
+        'Wrapper' widget (the  class setting)  and the  new buffer  Text
+        widget (the  type setting).  Dynamic defaulting  procedures  are
+        used to create names  based upon the type  of the buffer.  (Note
+        that you cannot  update these values  for "currentWindow",  only
+        interrogate them.)
+
+        If vedfileprops is a word  containing a `.` character, then  the
+        part  preceding  the  `.`  is  used  as  the  class.   Otherwise
+        (depending on vedfileprops), class is set to one of:
+
+            # Program
+            # Text
+            # Documentation
+            # Library
+            # Sourcefile
+
+        If vedfileprops is a word, the type is set to vedfileprops  with
+        any leading  'Class.' part  removed. If  vedfileprops is  false,
+        type is set to one of:
+
+            # pop11
+            # prolog
+            # lisp
+            # ml
+
+        for compilable files, and "ved" otherwise.
+
+        This allows you to  specify resources for  XVed windows in  your
+        * vedxvedinit or  .Xdefaults based  upon this  information.  For
+        example, the following could  be used to  set colours and  fonts
+        for several types of Ved buffer:
+
+            vedset xved
+                [Program]
+                    font = '9x15'
+                [Text]
+                    background = skyblue
+                [Library pop11]
+                    background = pink
+                    foreground = black
+                [Documentation ref]
+                    pointerShape = cross
+            endvedset;
+
+        The equivalent .Xdefaults lines would be:
+
+            XVed.Program*font: 9x15
+            XVed.Text*background: skyblue
+            XVed.Library.pop11.background: pink
+            XVed.Library.pop11.foreground: black
+            XVed.Documentation.ref.pointerShape: cross
+
+
+
+3.5  Next & Default Window Settings
+-----------------------------------
+In  addition  to  the  general  settings  listed  above,  the  following
+additional  settings   can   be   specified   for   "defaultWindow"   or
+"nextWindow" contexts:
+
+
+iconX                                                  [xved value name]
+iconY                                                  [xved value name]
+        These two  settings  are  integers  that  specify  the  x  and y
+        coordinates of the buffer's icon. By default these are undefined
+        Icon placement is left to the window manager.
+
+
+iconWindow                                             [xved value name]
+        Contains the XID of a Window which is to be the icon of the  new
+        buffer, or false to  specify no special  icon for the  buffer. A
+        dynamic-defaulting  procedure  for  this  setting  creates  icon
+        windows using bitmaps  held in $usepop/pop/x/ved/bitmaps,  based
+        on the vedfileprops of the new file.
+
+
+
+3.6  Special Icon Resources
+---------------------------
+There are three resources for the foreground colour, background  colour,
+and font used by all  XVed icons. These are  not part of the  xved_value
+system and have  to be  specified in  the users  resource database  file
+(usually .Xdefaults or  .xrdb). The resources  and their default  values
+are:
+
+            XVed.Icon.foreground:   <XtDefaultForeground>
+            XVed.Icon.background:   <XtDefaultBackground>
+            XVed.Icon.font:         <XtDefaultFont>
+
+
+
+3.7  Event and Key Mapping Tables
+---------------------------------
+Two special resources, keyMapTable and  eventTable, are used to  specify
+the mapping of keys and XVed internal events onto strings and procedures
+respectively.  Each  XVed  window  can  have  its  own  keyMapTable  and
+eventTable  --  accessing  the  table  on  the  "currentWindow"  or  the
+"nextWindow" for the first time causes it to be created.
+
+XVed will consult a windows local table  first, but if no entry for  the
+event or key name is found, XVed  will also consult the tables with  the
+same name held  in the "defaultWindow".  The "defaultWindow" tables  are
+therefore very important -- they  specify XVed-wide mappings for  events
+and keys.
+
+
+
+
+--------------------
+4  Keyboard Handling
+--------------------
+
+XVed translates X Key events into ASCII strings, which it adds to  Ved's
+input  queue.  For  compatibility,  function  keys  still  send   escape
+sequences (although it would  be perfectly possible  to write X  toolkit
+actions that  bypassed  escape  sequences  altogether).  However,  these
+escape sequences  are not  based on  any traditional  terminal  emulator
+escape sequences, but instead on the X KeySym number for the key.
+
+XVed uses a fairly sophisticated series of rules to turn an X Key  event
+into something  that is  presentable to  Ved (ie.  the ASCII  string  or
+escape sequence).
+
+When a key  is pressed,  there are  several sources  of information  for
+determining what action to take. Each key is uniquely identified by an X
+KeySym.  This  is  an  integer  representing  the  key  in  a   keyboard
+independent way.  Additionally,  we  are  given  the  current  state  of
+keyboard modifiers  (shift,  control,  etc).  There  is  also  a  string
+representing what X thinks is the correct ASCII string for the key is.
+
+The first thing  the Key event  handler does  is to look  for any  entry
+corresponding to the keysym of the key in the "keyMapTable" of both  the
+"currentWindow" and  the  "defaultWindow".  Since these  are  the  first
+tables consulted for key  mappings, they can be  used to override  other
+key translations. Because each window  can have a local key  translation
+table (created when you first fetch  it), you can force certain  windows
+to only accept specific kinds of keys.
+
+Entries in the keyMapTable should have  an X "KeySym" as their key,  and
+either a  string  or a  procedure  as their  value.  If the  entry  is a
+procedure, it is called with the keysym and the modifier mapping (as  an
+integer set of bits) for the key:
+
+    KEYMAP_P(X_KEYSYM, MODIFIERS) -> STRING_UNDEF_OR_FALSE
+
+KEYMAP_P is expected to return:
+
+    a string
+        this will be added to Ved's input queue
+
+    false
+        nothing should be sent for this key.
+
+    "undef"
+        this means that the key is unrecognized, and the
+        key callback will continue to process the key to see
+        if it can find a valid value for it.
+
+Note  that  assigning  nullstrings   to  keysyms  in  the   keyMapTables
+effectively disables them.
+
+If the search of both keyMapTables is unfruitful, the key callback  will
+follow a set of builtin rules  for determining what action to take.  The
+rules are designed so that there  is a reasonable default behaviour  for
+any X Server.  This behaviour is  independent of server  implementation,
+server keyboard etc. Ie. the <Up>  key on any keyboard will always  send
+the same sequence.
+
+By default, in XVed, the  keyboard sends escape sequences for  non-ASCII
+keys based upon  their X  "KeySym". This means  that it  is possible  to
+determine  what  escape  sequence  a   logical  keyname  will  send   by
+translating that  name first  into  a keysym  and  then into  an  escape
+sequence.
+
+The following lists the steps that the Key handler goes through:
+
+    interrupt key
+        An interrupt signal is generated
+
+    ascii keys
+        If the standard X binding for the  key is an ASCII string, XVed
+        will add that ASCII string to the input queue.
+
+    default
+        The escape sequence based on the  keysym of the key as a
+        hexadecimal number is added to the input queue.
+
+
+
+4.1  Specifying Key Mappings via Event Translation
+--------------------------------------------------
+The Ved window widget has a "string" action that can be used to  specify
+direct mappings between any  X Event and strings  to add to Ved's  input
+stream. This  allows  you  to  specify  translations  for  keys  in  the
+translations resource (either with xved_value or in your .Xdefaults).
+
+The "string" action uses  a similar syntax to  the string action of  the
+XTERM  client.  The  following  vedset  xved  translation  binding  sets
+function keys R1-R4  to send  <ESCAPE>[11 followed by  the function  key
+number and a tilde:
+
+    vars my_translations = [
+        '#override'
+        '<Key>R1: string(0x1b) string("[111~")'
+        '<Key>R2: string(0x1b) string("[112~")'
+        '<Key>R3: string(0x1b) string("[113~")'
+        '<Key>R4: string(0x1b) string("[114~")'
+    ];
+
+    vedset xved [] translations = % my_translations % endvedset;
+
+(Note that <ESCAPE>  can be coded  in Pop  strings as \e,  so the  above
+could be specified more simply  as string("\e[111~") etc; however,  this
+does  not  work  in  .Xdefaults.  Note  also  that  the  '#override'  is
+unnecessary, since this is the default.)
+
+The corresponding thing in a .Xdefaults file would be
+
+    XVed*XpwScrollText.translations: #override \
+        <Key>R1: string(0x1b) string("[111~") \n\
+        <Key>R2: string(0x1b) string("[112~") \n\
+        <Key>R3: string(0x1b) string("[113~") \n\
+        <Key>R4: string(0x1b) string("[114~")
+
+String actions bypass the rules described above for keypress handling.
+
+
+4.2  vedset keys
+----------------
+Ved bindings for ASCII input characters can be specified exactly as  for
+other versions of Ved with vedset keys (see HELP * vedset).
+
+In addition, key sequences expressed in parenthesis can be used to refer
+to non-ASCII keys by using their logical KeySym names. For example,  the
+following specifies the behaviour for the cursor keys:
+
+    vedset keys
+        charup      = (Up)
+        chardown    = (Down)
+        charleft    = (Left)
+        charright   = (Right)
+    endvedset;
+
+KeySyms can also be specified by  using the (keysym:X) form, where X  is
+the KeySym number in hexidecimal. This  is useful where the keysym  does
+not have a logical name (ie. it is an unnamed keysym). For example:
+
+    vedset keys
+        loadline = (keysym:1000FF6D) ;;; this is the HP "System" keysym
+    endvedset
+
+vedset will convert such bracketed expressions into the escape sequences
+used by the named KeySym.
+
+
+
+
+-----------------
+5  Mouse Handling
+-----------------
+
+The standard bindings  for mouse  buttons are  set up  by the  procedure
+vedxvedmouse. (Note  that  this  procedure  is  called  by  the  default
+* vedxvedinit; if you redefine  vedxvedinit, you must call  vedxvedmouse
+in your new definition to get the standard bindings.)
+
+
+vedxvedmouse()                                      [procedure variable]
+        Sets up  the  standard  XVed mouse  bindings  (as  described  in
+        HELP * XVEDMOUSE).
+
+
+You can use vedset  mouse to add  additional (or alternative)  bindings.
+This requires knowledge  of the  possible button events  that can  occur
+within a 'dialog' for a single button.
+
+
+5.1  Events in a Button Dialog
+------------------------------
+The sequence of possible events in  a button dialog is shown below.  The
+first event  is always  a buttonPress;  this may  then terminate  with a
+buttonRelease event, or turn into  a buttonHold (holding the button  for
+twice MultiClickTimeout), or  a buttonDrag (moving  the mouse while  the
+button is held). buttonHold either terminates with buttonHoldRelease, or
+turns into buttonDrag, which then ends with buttonDragRelease:
+
+                         buttonPress
+                              |
+              --------<-------+--------->---------
+              |               |                  |
+              |           buttonHold --->--- buttonDrag
+              |               |                  |
+              |               |                  |
+      buttonRelease   buttonHoldRelease    buttonDragRelease
+
+Subsumed within this description is the processing of 'clicks', that is,
+presses and releases of the button within MultiClickTimeout. Each of the
+events except  the initial  buttonPress is  qualified by  the number  of
+clicks N associated with it.
+
+An N-click  buttonRelease  means there  were  N clicks  (including  this
+release), and no further press occurred within MultiClickTimeout.
+
+An N-click buttonHold or buttonDrag  means there were N clicks  followed
+by a  further  press within  MultiClickTimeout  (and no  release  within
+another MultiClickTimeout, although note that if a release comes  within
+twice MultiClickTimeout without  the mouse moving,  i.e. before Hold  or
+Drag  is   generated,   then   it   becomes   an   N+1   buttonRelease).
+buttonHoldRelease and buttonDragRelease events  have the same number  of
+clicks as the preceding buttonHold or buttonDrag.
+
+Note that a buttonRelease always has N  >= 1; only the other events  can
+have N = 0.
+
+
+5.2  vedset mouse
+-----------------
+For mouse button bindings, the following form of vedset is used:
+
+    vedset mouse ( attribute [, attribute ...] )
+        assignment
+        assignment
+        .....
+    endvedset
+
+Each assignment for mouse bindings is a statement of the form:
+
+    function = [ num-click] event-type btn [or btn ...]
+                     [ num times ]
+                     [with modifier or modifier]
+
+The rules for converting  from function to a  procedure are the same  as
+those used by vedset  keys except that the  prefix for the procedure  is
+vedmouse__ rather than ved. The standard vedmouse__ procedures available
+are described in REF * XVEDMOUSE (see Button Events below for details of
+how to define your own vedmouse__ procedures).
+
+event-type should be one of the XVed button events described above,  but
+without the button prefix, i.e:
+
+    press
+    release
+    drag
+    dragRelease
+    hold
+    holdRelease
+
+The adjective num-click can be used in front of event-type to select the
+appropriate number  of  clicks for  events  other than  press.  (If  not
+specified, the number  of clicks  defaults to 1  for release  and 0  for
+anything else.)
+
+In addition, a 1-click release can be specified as event type click,  or
+a num-click release as click with the num times clause. Thus
+
+    function = release btn
+    function = 1-click release btn
+    function = click btn
+    function = click btn 1 times
+
+are all the same, as are
+
+    function = 2-click release btn
+    function = click btn 2 times
+
+etc. The num times clause can only be used with click and not with other
+event types.
+
+btn should be one of:
+
+    btn1
+    btn2
+    btn3
+    btn4
+    btn4
+    btn5
+    anyBtn
+
+and modifier should be one of:
+
+    shift
+    control
+    meta
+    mod1
+    mod2
+    mod3
+    mod4
+    mod5
+    anyModifier
+    noModifier
+
+(where meta is synonymous with mod1).
+
+The attribute list specifies how the new bindings are to be added to any
+existing bindings, as well as telling the vedset command what window  to
+apply the changes to. The following are valid attributes:
+
+    Attribute         Action
+    ---------         ------
+    override          clear any mouse bindings before adding new ones
+
+    at front          concatenate new bindings in front of existing ones
+
+    at back           concatenate new bindings after any existing ones
+
+    defaultWindow     specifies the eventTable for the defaultWindow
+
+    currentWindow     specifies the eventTable for the currentWindow
+
+    nextWindow        specifies the eventTable for the nextWindow
+
+For each vedset command, code will be planted which concatenates the new
+function onto the existing handler in the eventTable for the event type.
+Each function is also enclosed in a wrapper which checks that the  event
+corresponds to the specified bindings.  ie. the function is only  called
+if the correct event  type, button, modifier and  click count is set  in
+the events data vector.
+
+This allows  generic mouse  event  handlers which  can be  rebound  onto
+different mouse events.
+
+See HELP * XVEDMOUSE for details of the default mouse bindings.
+
+
+
+
+-----------------------------
+6  Selections & The Clipboard
+-----------------------------
+
+6.1  The Clipboard
+------------------
+XVed provides an active  clipboard, which can be  used to cut and  paste
+text between XVed and  any other X based  program that communicates  via
+the X server's selection mechanism.
+
+The active  variable  vvedclipboard  is  the  main  interface  to  the X
+clipboard:
+
+
+vvedclipboard -> string_or_false                       [active variable]
+string_or_false -> vvedclipboard
+        vvedclipboard is an active variable that represents the  current
+        value of an X server's PRIMARY or CLIPBOARD selection. Accessing
+        vvedclipboard will cause  XVed to request  the current value  of
+        first the X server's PRIMARY  selection, and then the  CLIPBOARD
+        selection if the PRIMARY selection is empty. Try:
+
+            vvedclipboard =>
+
+        The value returned will  always be a Pop-11  string or false  if
+        both the PRIMARY and the CLIPBOARD selections are empty.
+
+        You can also assign a string to vvedclipboard:
+
+            'hello' -> vvedclipboard;
+
+        This will cause  XVed to  request the ownership  of the  PRIMARY
+        selection. Assigning the word "CLIPBOARD" as well, i.e.
+
+            'hello', "CLIPBOARD" -> vvedclipboard;
+
+        will instead  set the  CLIPBOARD selection.  Future requests  of
+        either selection's value  from any  X clients  sharing the  same
+        display will transfer the  string that you  assign to the  other
+        client.
+
+        vvedclipboard can optionally be given  a procedure to call  when
+        it looses  the  ownership  of the  selection  (as  happens  when
+        another client requests the selection). The procedure should  be
+        passed  as   an  additional   argument   when  you   assign   to
+        vvedclipboard:
+
+            'hello', vedscreenbell -> vvedclipboard;
+            'hello', vedscreenbell, "CLIPBOARD" -> vvedclipboard;
+
+
+
+6.2  Selections
+---------------
+XVed provides  a high  level interface  to interact  with the  clipboard
+described above using a set of selection facilities driven by the mouse.
+
+See HELP * XVEDMOUSE for instructions  on how to  mark a selection.  The
+following operations can be performed on selections.
+
+XVed selections  complement the  Ved  marked ranges  (see  HELP * MARK).
+Unlike marked ranges,  selections are  not anchored to  a row/column  in
+your document. Instead, you make a selection using the mouse (either  in
+a Ved buffer, or in any other X text editor), and then ask Ved to  apply
+some action  to  the  selection.  Operations that  you  can  apply  to a
+selection are:
+
+    Operation   Result
+    ---------   ------
+    Cut         moves the selected text from document to clipboard
+    Copy        copies the selection onto the clipboard
+    Paste       pastes the clipboard into the document
+    Compile     compiles the clipboard
+    Get Help    gets help on the text held in the clipboard
+
+Typing any textual characters while you have a selection displayed  will
+cause that selection to be cut.
+
+
+
+
+----------------------
+7  Menu Specifications
+----------------------
+
+Every Motif/OpenLook XVed window  has two menus  associated with it:  An
+(optional) menubar  across the  top  of each  window (in  the  "menubar"
+window setting slot), and a popup  menu (held in the "Menu"  application
+setting) within the  Ved window  (available on  mouse button  3) .  Each
+window can have a different menubar. The popup menu is shared among  all
+of the  XVed windows  (and is  also available  when running  in  vanilla
+mode).
+
+Each menu on the menubar or popup  menu is specified using lists of  the
+form:
+
+        [MENU_TITLE
+            ITEM_1
+            ITEM_2
+            ...
+            ITEM_N
+        ]
+
+The menubar  and popup  menu consists  of a  list of  several such  menu
+specifications - one for each top-level menu button. item can be several
+things:
+
+    a vector
+        Vectors of the form {label action} are used to specify basic
+        menu options. The label should be  a string, and is used  to
+        label the  corrosponding menu  button.  The action  is  then
+        applied when the menu option is selected. action can be:
+
+            A procedure
+                taking no arguments
+
+            A string
+                The string is executed using * veddo
+
+            A word or an ident
+                Either * valof  or  * idval is  used  to get  the  value
+                associated with the item -- which should be a  procedure
+                taking no arguments.
+
+        action can  also be  a vector  of any  of the  above -  each
+        operation in the vector is then applied in sequence.
+
+    a list
+        You use nested  lists to  specify walking  menus. The  first
+        element of  the list  is the  name of  the menu-option  that
+        activates the walking menu.
+
+    "fixable"
+        If the word "fixable" appears in the menu specification, the
+        menu is  given a  pushpin in  OpenLook. Future  versions  of
+        Motif XVed will make tearoff Motif menus when this attribute
+        is set).
+
+    "space"
+        This word indicates  that a separator  should be created  at
+        this point in the menu. You  can have as many separators  as
+        you like - use them to improve the presentation of the menu.
+
+See  LIB * VEDXVEDMENU   and  LIB * VEDXVEDMENUBAR   for  example   menu
+specifications.
+
+You can change  both the menubar  and the popup  menu dynamically.  Note
+however that  doing so  may take  some time  for large  menus since  the
+previous menu needs  to be destroyed  and the new  one created. XVed  is
+optimized to add additional menus onto  the end of the menubar or  popup
+menu, so it is quickest  to add any new option  menus at the end of  any
+existing options. For example, the following  adds a very short menu  to
+the current windows menubar:
+
+       xved_value("currentWindow", "menubar") <> [
+         ['Print'
+               {'Print File' ved_print}
+               {'Print Range' ved_printmr}
+               space
+               {'Print Output' 'print output.p'}
+         ]
+        ] -> xved_value("currentWindow", "menubar");
+
+
+
+
+---------------------------
+8  GUI Specific Information
+---------------------------
+
+8.1  OpenLook
+-------------
+Because of bugs in the Sun "OLIT" or OpenLook widget set in  OpenWindows
+version 2.0 (which  uses calls to  obsolete and non  standard X  toolkit
+routines), XVed does not create its own 'application context' when using
+OpenLook widgets.  Instead it  shares  the default  application  context
+which is created by the OpenLook procedure OlInitialize.
+
+This will only effect  you if you are  involved with writing your  own X
+applications, since you will then have to share the default  application
+context with XVed. The implications of this are:
+
+  # Creating more  than one  display  connection to  the X  server  does
+    causes OpenLook widgets to stop working.
+
+  # Writing programs that break the toolkits default connection to the X
+    Server (ie.  XptDefaultAppContext or  XptDefaultDisplay) will  cause
+    XVed to stop working, with possibly unpredictable results.
+
+  # Disabling asynchronous  event handling  without manually  requesting
+    for events to be handled  using XptAppProcessEvents will cause  XVed
+    to become inactive.
+
+  # Remaining within a  callback procedure  for long  periods will  also
+    cause XVed to become inactive.
+
+If you  are not  involved with  developing X  programs, or  are  writing
+fairly straightforward applications, these situations should not arise.
+
+
+8.2  Motif
+----------
+As well as a popup menu on  each window, Motif XVed users will find  the
+same menu attached as a menubar across the top of each Ved window.  This
+goes a long way  towards making up  for the lack of  a puspin for  these
+menus.
+
+
+8.3  Reverse Video
+------------------
+Notice that if  you wish  to use reverse  video with  Motif or  OpenLook
+XVed, the following  resource names and  values need to  be set in  your
+.Xdefaults file or equivalent.
+
+        ! get XVed in inverse video
+        XVed*Foreground: white
+        XVed*FontColor: white
+        XVed*Background: black
+        ! get property sheets in inverse video
+        Propsheet*FontColor: white
+        Propsheet*Foreground: white
+        Propsheet*Background: black
+
+
+
+
+------------------------------
+9  XVed and the Window Manager
+------------------------------
+
+XVed attempts to work with the window manager. It will do things such as
+set the  size hints  for  windows, and  respond  to requests  to  delete
+windows, iconify windows, and so on.
+
+Some versions  of XVed  will not  work well  with all  window  managers.
+Specifically, the "OpenLook" flavour of XVed do not work well with  TWM,
+UWM or  MWM window  managers.  This is  because the  OpenLook  widgetset
+expects certain  conditions to  hold which  are not  respected by  these
+window managers.
+
+One thing to be  clear about is the  difference between 'Delete  Window'
+and 'Destroy  Window'  in window  managers  such as  TWM.  The  'Destroy
+Window' operation will actually break  the socket connecting the  client
+to the server - equivalent to an xkill or a 'kill -9' in Unix  parlance.
+XVed cannot continue to work after a Destroy Window request.
+
+The 'Delete Window' operation on the  other hand will send the  window a
+message asking it to  close. XVed respects  these messages and  responds
+accordingly.
+
+If you are a TWM user you might want to have a line reading:
+
+    "Delete Window" f.delete
+
+in your twm  menu. This "Delete  Window" option will  let you quit  XVed
+menus3 and icons safely.
+
+
+
+
+--------------------------------
+10  XVed Internal Event Handling
+--------------------------------
+
+XVed 'internal  events'  are  generated within  for  example  X  Toolkit
+callback procedures  for X  events  such as  mouse button  clicks,  menu
+selections, scrollbar  dragging,  window deletion,  etc.  Such  callback
+handlers generally do  a little  interpretation of the  event, and  then
+place one or more XVed 'events'  on Ved's input stream. Each XVed  event
+consists of an XVed Window, an event  name (a word), and a single  piece
+of event data (which can be anything).
+
+When Ved  comes across  an XVed  event  in its  input stream,  it  first
+selects the file that belongs to the window that the event occurred  in.
+Then it calls xved_dispatch_event to handle the event:
+
+
+xved_dispatch_event(window, name, data)                 [vars procedure]
+        Searches for a handler for the XVed "Event" specified by name (a
+        word).  First,   the   "eventTable"   property   held   in   the
+        "currentWindow" is examined. If a procedure exists in the  table
+        under the key  name, it  is called with  then name  and data  as
+        arguments. If  a handler  is not  found in  the  "currentWindow"
+        table, the "defaultWindow" table is searched in the same manner.
+
+        xved_dispatch_event could be defined as:
+
+            define vars xved_dispatch_event(window, name, data);
+                lvars window, name, handler_p, data table;
+                ;;; search this window's table
+                xved_value("currentWindow", "eventTable") -> table;
+                if table(name) ->> handler_p then
+                    handler_p(window, name, data) -> (,,);
+                    return;
+                endif;
+
+                ;;; search default windows table
+                xved_value("defaultWindow", "eventTable") -> table;
+                if table(name) ->> handler_p then
+                    handler_p(window, name, data) -> (,,);
+                    return;
+                endif;
+            enddefine;
+
+        Event handlers take the form:
+
+            HANDLER_P(window, name, data) -> (window, name, data)
+
+        that is, they  must return  their arguments as  results --  this
+        allows handlers to be chained together, i.e.
+
+            HANDLER1_P <> HANDLER2_P
+
+        will work as an event handler, since the arguments to the  first
+        get returned and passed on to the second.
+
+        To assign a handler to an event, first fetch the event table:
+
+            vars table = xved_value("defaultWindow", "eventTable");
+
+        Then assign  the procedure  into the  appropriate entry  of  the
+        table.  The  following  example  makes  the  "buttonHold"  event
+        generate a bell (see below for more button event types):
+
+            vedscreenbell -> table("buttonHold");
+
+        (Technical  aside:  Each  XVed  "Event"  appears  to  Ved   as a
+        procedure on ved_char_in_stream - so handlers for events can  do
+        exactly the same sorts of  things that handlers for key  presses
+        do; each event will  cause Ved to  cycle through vedprocess,  so
+        changes to  Ved variables  such as  vedline and  vedcolumn  work
+        correctly. Also, an  XVed "Event"  is not  executed inside  an X
+        toolkit callback  procedure, so  the X  toolkit is  in a  normal
+        state when the procedure is called).
+
+
+
+10.1  Button Events
+-------------------
+This section gives more details of the mouse button handling system. See
+Mouse Handling above for  an introduction, and how  to set mouse  button
+bindings with vedset mouse.
+
+The majority of events currently generated  by XVed are for the  pointer
+device.
+
+The raw XVed X Pointer event callback does some processing of the event,
+and then notifies  Ved that  an event has  happened by  raising an  XVed
+event. The  callback does  not  implement any  button policy,  but  does
+simplify the task  of determining  what sort  of button  event is  being
+dealt with.
+
+Note that the button event callback filters button events -- it  doesn't
+allow "chords" -- more  than one  button  at the  same time  (X  Servers
+sometimes map  two  buttons pressed  together  into a  different  button
+number but that is  accepted). It also ensures  that only one button  is
+active for any given button "dialog", so it will ignore events for mouse
+button 2 if  you are  currently in the  middle of  doing something  with
+mouse button 1.
+
+The following  XVed Event  name types  can be  set in  one of  the  XVed
+"eventTable" properties:
+
+
+buttonPress                                            [xved event name]
+buttonHold                                             [xved event name]
+buttonDrag                                             [xved event name]
+buttonHoldRelease                                      [xved event name]
+buttonDragRelease                                      [xved event name]
+buttonRelease                                          [xved event name]
+        These XVed button  events are  described in Events  in a  Button
+        Dialog above.
+
+
+The event data field of a button event handler is an 11 element  vector.
+The  include  file   INCLUDE * XVED_CONSTANTS  contains  the   following
+constants that are used  for accessing and  decoding the information  in
+this vector:
+
+
+XVM_BUTTON                                            [include constant]
+XVM_MODIFIERS                                         [include constant]
+XVM_CLICKS                                            [include constant]
+XVM_COL                                               [include constant]
+XVM_ROW                                               [include constant]
+XVM_START_COL                                         [include constant]
+XVM_START_ROW                                         [include constant]
+XVM_X                                                 [include constant]
+XVM_Y                                                 [include constant]
+XVM_START_X                                           [include constant]
+XVM_START_Y                                           [include constant]
+        These constants, defined  in INCLUDE * XVED_CONSTANTS, are  used
+        to decode XVed button events.  They specify indexes to a  vector
+        that is passed  as the event  data for button  events. An  event
+        handler uses the data to  determine how to interpret the  event.
+        The following example illustrates the use of the constants:
+
+         include xved_constants;
+
+         define show_event(window, name, data) -> (window, name, data);
+             lvars window, name, data, button_num, button_col;
+             data(XVM_BUTTON) -> button_num;
+             data(XVM_COL) -> button_col;
+             vedputmessage(
+                    sprintf(button_col, button_num, name,
+                            'button event: %p %p (column %p)'));
+         enddefine;
+
+         vars table;
+         xved_value("currentWindow", "eventTable") -> table;
+         show_event -> table("buttonPress");
+         show_event -> table("buttonDrag");
+
+        XVM_BUTTON
+            is an integer 1-5 representing the button number.
+
+        XVM_MODIFIERS
+            is an  integer representing the  current state  of the
+            keyboard modifiers (see below for a list of modifier bits).
+
+        XVM_CLICKS
+            contains  the number  of clicks  associated with  the
+            event (as described above).
+
+        XVM_ROW and XVM_COL
+            are  the  position of  the mouse  when  the button event
+            occurred (in Ved screen rows and columns).
+
+        XVM_START_ROW and XVM_START_COL
+            are the starting row and  column at which the initial
+            buttonPress occurred.
+
+        XVM_X and XVM_Y
+            are  the position of the  mouse when the  button event
+            occurred (in pixels).
+
+        XVM_START_X and XVM_START_Y
+            are  the starting x  and y at  which the initial buttonPress
+            occurred.
+
+
+Modifiers are  represented  as  an  integer with  one  or  more  of  the
+following bits set:
+
+
+XVM_NOMODMASK                                         [include constant]
+XVM_SHIFTMASK                                         [include constant]
+XVM_LOCKMASK                                          [include constant]
+XVM_CONTROLMASK                                       [include constant]
+XVM_METAMASK                                          [include constant]
+XVM_MOD1MASK                                          [include constant]
+XVM_MOD2MASK                                          [include constant]
+XVM_MOD3MASK                                          [include constant]
+XVM_MOD4MASK                                          [include constant]
+XVM_MOD5MASK                                          [include constant]
+XVM_ANYMODMASK                                        [include constant]
+        Constants representing bits  that are set  in the  XVM_MODIFIERS
+        field of a button event according  to the state of the  keyboard
+        modifiers.
+
+        If  no   modifiers  are   held  down,   XVM_NOMODMASK  is   set.
+        XVM_ANYMODMASK represents any combination of modifiers.
+
+        XVM_SHIFTMASK, XVM_LOCKMASK,  XVM_CONTROLMASK  and  XVM_METAMASK
+        are set according to the status of the shift, lock, control  and
+        meta  keys   respectively.   XVM_MOD1MASK   is   the   same   as
+        XVM_METAMASK, and XVM_MOD2MASK  through XVM_MOD5MASK  correspond
+        to any other modifiers that are defined with xmodmap.
+
+        The following  mask would  test for  the shift  and control  key
+        being on at the same time:
+
+        define event_hander(window, name, data) -> (window, name, data);
+           lvars window, name, data, ok;
+           data(XVM_MODIFIERS) == XVM_SHIFTMASK || XVM_CONTROLMASK ->ok;
+           returnunless(ok);
+            ...
+        enddefine;
+
+
+xvedignorepixelmotion                                         [variable]
+        This variable controls whether  buttonDrag events are  generated
+        for a mouse movement which does not cross the current  character
+        cell boundary, i.e. does not change the pointer row or column.
+
+        The initial button press sets this variable false; thereafter it
+        is up to an event  handler (e.g. for a drag)  to set it true  if
+        generation of further drag events for pixel-only movement is not
+        required in the current button dialog.
+
+
+When a vedmouse__  button handler is  called, the event  vector is  made
+available in the variable vvedmousedata:
+
+
+vvedmousedata                                                 [variable]
+        Set to the mouse event vector  for the event before calling  the
+        specified vedmouse__ handler for it.  (See above for details  of
+        the vector contents.)
+
+
+Handlers should be defined thus:
+
+        define vedmouse__myhandler();
+            < process vvedmousedata ... >
+
+            ;;; if the handler accepts the event, it should set this
+            ;;; variable true:
+
+            true -> xvedeventhandled;
+        enddefine;
+
+Setting xvedeventhandled true  stops further handlers  being called  for
+this   event.   Note   that   a   handler   may   also   wish   to   set
+xvedignorepixelmotion true (see above).
+
+
+
+10.2  Other Events
+------------------
+The following events are also be generated by XVed callbacks:
+
+
+createWindow                                           [xved event name]
+        Dispatched  when  a  window  is  created  (NB.  this  event   is
+        dispatched directly, and  does not  cause Ved  to cycle  through
+        vedprocess);
+
+
+destroyWindow                                          [xved event name]
+        Dispatched when  a  window  is  destroyed  (NB.  this  event  is
+        dispatched directly, and  does not  cause Ved  to cycle  through
+        vedprocess);
+
+
+selectWindow                                           [xved event name]
+        This event  is  dispatched whenever  XVed  selects a  new  input
+        source. When it  is received "currentWindow"  will refer to  the
+        new input window.
+
+
+unselectWindow                                         [xved event name]
+        This event is dispatched  just before XVed  selects a new  input
+        source.
+
+
+dragLoad                                               [xved event name]
+        Passed a  list of  strings as  data. The  default handler  calls
+        ved_ved for  each  string.  This  event  is  generated  when  an
+        XV_DO_DRAG_LOAD client message  is sent to  an XVed window,  for
+        example, when the OpenLook filemanager drops a file on XVed.
+
+
+dragMove                                               [xved event name]
+        Passed a string as data. The default handler inserts the  string
+        into the current Ved  buffer - this event  is generated when  an
+        XV_DO_DRAG_MOVE client message  is sent to  an XVed window,  for
+        example by dragging some text from another OpenLook application.
+
+
+clearSelection                                         [xved event name]
+        Generated by the Key  event handler if a  selection needs to  be
+        reset before the key press can be dealt with.
+
+
+scrollbarMoved                                         [xved event name]
+hscrollbarMoved                                        [xved event name]
+        Passed the new position of the vertical or horizontal scrollbar.
+        These event handlers will scroll to the specified position.
+
+
+menuAction                                             [xved event name]
+        Used to handler the user selecting a menu item.
+
+
+
+
+----------
+11  Caveat
+----------
+
+This note  is for  Poplog users  who have  written programs  that  drive
+terminal versions of Ved.
+
+As from Poplog 14.1, XVed  is a new part of  Poplog. Because of this  it
+was reasonable to make some bold changes to the way that Ved works (when
+under XVed) so  that it  is more adapted  to a  windowing, event  driven
+environment.
+
+These changes will NOT effect current Ved users who continue to use  Ved
+from a terminal. However,  it is possible that,  if you switch to  XVed,
+your old Ved programs will not continue working.
+
+It is reasonably  straightforward to  write or modify  programs so  that
+they continue to work under  both windowing XVed and non-windowing  Ved.
+Efforts have been taken to ensure  that the changes are well  documented
+so that, if you do end up changing Ved programs, the changes are easy to
+implement.
+
+The two fundamental changes introduced for XVed are:
+
+  # Under XVed, vedprocess is a  proper Poplog process. It is  suspended
+    when there is  no Ved  input waiting  waiting to  be processed,  and
+    resumed when input appears on Ved's input stream and Poplog is  in a
+    long term wait. The Ved process  will continue to stay active  until
+    there are no more  inputs to be processed,  at which point Ved  will
+    suspend itself.
+
+    In other words, Ved is continuously  being started and stopped -  it
+    is no longer the case that you are either running Ved or not running
+    Ved.
+
+    There are many advantages  to this - one  is that Ved maintains  its
+    own stack. Another is that you can run Ved 'asynchronously', at  the
+    same time as for example loading programs from the top level window.
+
+  # Ved no longer  directly uses poprawdevin  and poprawdevout to  write
+    output or  receive input.  Instead,  it uses  a set  of  redefinable
+    procedures that, under non-windowing Ved  are simply written to  use
+    the standard devices. Under XVed, these procedures are redefined  to
+    instead send output and read input from the current XVed window.
+
+    This for the  first time  means that  Ved is not  tied to  a set  of
+    terminal devices for its input and output. The standard devices  are
+    not taken over  by XVed, and  so writing to  poprawdevout will  have
+    exactly the same effect whether you  are running XVed or not.  Error
+    messages and  trace  output  will appear  in  your  terminal  window
+    without interrupting your interaction with Ved. The 'VED HERE: PRESS
+    RETURN TO CONTINUE' message does not appear in XVed.
+
+In essence, the programs that will be effected are those that:
+
+  # Assume that vedediting is an indication  of when Ved has control  of
+    the screen.
+
+  # Use the standard  input/output devices,  or rawcharin/rawcharout  to
+    present data/receive input from the user.
+
+  # Assume that  they  are  talking  to  a  terminal,  and  send  escape
+    sequences or expect escape sequences for specific terminal types.
+
+  # Rewrite the vedprocess loop to manually drive Ved.
+
+See HELP * VEDTOXVED for hints on how to translate programs from XVed to
+Ved.
+
+
+
+
+--- C.x/x/ved/ref/xved
+--- Copyright University of Sussex 1997. All rights reserved.
