@@ -1,0 +1,579 @@
+HELP OBJECTCLASS                              Steve Knight, January 1990
+                                        Revised Aaron Sloman, April 1992
+                                    Revised Robert Duncan, November 1995
+
+    uses objectclass;
+
+An object-oriented extension to Pop-11. For an index of objectclass
+documentation see HELP * OBJECTCLASS_HELP.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   About Objectclass
+
+  2   Getting Started
+
+  3   Declaring Classes
+
+  4   Creating Objects
+
+  5   Declaring Mixins
+
+  6   Recompiling Old Objectclass or Mixin Definitions
+
+  7   Loops in the Inheritance Hierarchy
+
+  8   Defining Methods
+
+  9   Multi-Methods
+
+ 10   Using call_next_method
+
+ 11   Private Methods
+
+ 12   Updater Methods
+
+ 13   Further Reading
+
+
+-----------------------------------------------------------------------
+1  About Objectclass
+-----------------------------------------------------------------------
+
+This library makes available an object-oriented programming (OOP)
+extension to Pop-11, remarkable in the way that it neatly maps OOP ideas
+onto existing Pop-11 concepts. The correspondence of ideas is as
+follows:
+
+    methods:
+        procedures, which act according to the type of their arguments
+
+    instances:
+        records, the instance variables of which are simply the fields
+        of the record and are accessed by appropriate methods
+
+    classes:
+        keys, although the keys that  play the role of classes are given
+        some extra fields (via hidden properties) so that they can
+        provide inheritance of behaviour
+
+Because this is a natural mapping, the overhead of a method call is
+relatively low.  This means that the objectclass package provides an
+efficient means of doing object-oriented programming.
+
+
+-----------------------------------------------------------------------
+2  Getting Started
+-----------------------------------------------------------------------
+
+In order to use any objectclass syntax or procedures your program must
+include the line:
+
+    uses objectclass;
+
+You should mark and load this line now if you want to compile any of the
+examples in this file.
+
+A good way to start learning about the package is to do the above and
+then look at:
+
+    TEACH * OBJECTCLASS_EXAMPLE
+
+Alternatively, if you just want to browse the objectclass documentation
+and libraries without compiling anything you need only do:
+
+    uses objectclass_help;
+
+which extends the appropriate search lists without compiling any code.
+This can be a lot quicker than loading the whole library.
+
+
+-----------------------------------------------------------------------
+3  Declaring Classes
+-----------------------------------------------------------------------
+
+New classes are introduced with the define-form *define_class. To
+illustrate, here's an example which creates a class of points in a
+2-dimensional space such as might be used to represent points on a
+display screen.
+
+    uses objectclass;
+
+    define :class point2d;
+        slot xCoord = 0;
+        slot yCoord = 0;
+    enddefine;
+
+This creates a new class point2d and a set of associated procedures.
+The class itself is a standard, recordclass key and is assigned to the
+variable point2d_key:
+
+    point2d_key =>
+    ** <key point2d>
+
+This is the same as if the key had been created by the more traditional
+*defclass form. Likewise, the procedures which define_class creates have
+similar functions and names to those created by defclass.
+
+Firstly, there is a collection of constructors and destructors:
+
+    conspoint2d(x, y) -> P      creates point P from coords x and y
+    destpoint2d(P) -> (x, y)    generates x and y from point P
+    newpoint2d() -> P           constructs a new default point
+
+If you've used defclass then you'll have expected conspoint2d and
+destpoint2d.  The constructors are described in more detail in the next
+section on creating objects.
+
+Secondly, define_class creates a recogniser ispoint2d which returns true
+for 2D points and any sub-classes. Obviously those sub-classes haven't
+been written yet but when and if they are, ispoint2d will recognise
+them.
+
+    ispoint2d(P) -> bool        recognises 2D points or sub-classes
+
+Lastly, define_class creates two slots or instance variables.  In this
+documentation we shall call them slots or fields but most other OOPS
+call them instance variables, following the name established by the
+famous language SmallTalk.
+
+    xCoord(P) -> x              gets the x-coord of point P
+    x -> xCoord(P)              sets the x-coord of point P
+
+    yCoord(P) -> y              gets the y-coord of point P
+    y -> yCoord(P)              sets the y-coord of point P
+
+You can create 2D points with either conspoint2d or newpoint2d:
+
+    vars P = newpoint2d();
+    P =>
+    ** <point2d xCoord:0 yCoord:0>
+
+    conspoint2d(4, 5) -> P;
+    P =>
+    ** <point2d xCoord:4 yCoord:5>
+
+And the slot procedures let you read and modify a point's coordinates:
+
+    P.xCoord =>
+    ** 4
+
+    6 -> P.xCoord;
+    P =>
+    ** <point2d xCoord:6 yCoord:5>
+
+Note how objects print (by default) slightly differently from ordinary
+records by naming their fields as well as their values.
+
+You can create a new derived class by inheriting from point2d.  Such a
+class is called a sub-class, which is an odd name when you consider
+that it has more detail and structure than the original!
+
+    define :class point3d is point2d;
+        slot zCoord = 0;
+    enddefine;
+
+This definition assigns to:
+
+    point3d_key
+    conspoint3d(x, y, z) -> P
+    destpoint3d(P) -> (x, y, z)
+    newpoint3d() -> P
+    ispoint3d(P) -> bool
+    xCoord(P) -> x
+    yCoord(P) -> y
+    zCoord(P) -> z
+    x -> xCoord(P)
+    y -> yCoord(P)
+    z -> zCoord(P)
+
+3D points inherit from 2D points:
+
+    ispoint2d(newpoint3d()) =>
+    ** <true>
+
+    vars P = newpoint3d();
+    77 -> P.xCoord;
+    22 -> P.yCoord;
+    P =>
+    ** <point3d xCoord:77 yCoord:22 zCoord:0>
+
+Notice that you cannot apply zCoord to a 2D point.  This is the kind
+of mishap message that results
+
+    zCoord(newpoint2d()) =>
+    ;;; MISHAP - Method "zCoord" failed
+
+The full syntax for creating objectclasses is described in
+
+    REF * DEFINE_CLASS
+
+but what you've seen here is enough to start writing worthwhile
+programs.
+
+
+-----------------------------------------------------------------------
+4  Creating Objects
+-----------------------------------------------------------------------
+
+Objects (or instances) are records with as many fields as they have
+slots. This includes slots inherited from superclasses. There are
+several ways to create instances.  They only differ in small ways but
+are designed to make your programs look tidier and more efficient.
+
+The simplest way to build an object of class XXX is to call consXXX.
+This is exactly the same as a standard recordclass constructor and
+expects one argument for each slot. This isn't quite as useful as it is
+with recordclasses because of slot-inheritance. Inheriting slots means
+that you can't always work out how many slots a class has by looking at
+its own definition.  The "ownership" of that information is now
+distributed throughout the superclass definitions. So if you want your
+programs to be modular, you may be obliged to pretend that you don't
+know how many slots a class has and therefore don't know how many
+arguments consXXX takes.
+
+To get round this problem, there is another constructor called newXXX --
+a nullary procedure that returns an object with all its slots set to
+default values. This means that you can create an instance without
+caring about the number of slots it has. You declare the default values
+of slots as part of the class definition (the point classes created
+above have their slots set to zero) and you can also use class
+"wrappers" to do more complex initialisations of new instances. These
+topics are discussed fully in REF * OBJECTCLASS.
+
+The problem with newXXX is that you usually have to assign to quite a
+few slots immediately after you have created the object, which makes for
+some quite ugly code. You can combine object creation and slot
+assignment with the *instance syntax, like this:
+
+    instance point3d
+        xCoord = 77;
+        yCoord = 22
+    endinstance -> P;
+
+    P =>
+    ** <point3d xCoord:77 yCoord:22 zCoord:0>
+
+And *define_instance is a minor variation that lets you give a name to
+the object at the same time:
+
+    define :instance startPosition:point2d;
+        xCoord = 77;
+        yCoord = 22;
+    enddefine;
+
+    startPosition =>
+    ** <point2d xCoord:77 yCoord:22>
+
+More detailed information on both these forms is provided in
+
+    REF * OBJECTCLASS.
+
+
+-----------------------------------------------------------------------
+5  Declaring Mixins
+-----------------------------------------------------------------------
+
+A variant of the objectclass define-syntax is that of mixins:
+
+    define :mixin <name>;
+        ...
+    enddefine;
+
+The syntax is identical to a class definition but with the keyword
+:mixin replacing :class.
+
+A mixin is an objectclass which cannot be instantiated.  Since mixins
+cannot be instantiated, the :mixin declaration does not introduce the
+constructors or destructor.  Furthermore, since mixins are only
+placeholders in the objectclass hierarchy they are very inexpensive.
+
+An obvious question to ask is when do you use mixins?  The answer is
+simply that you use them liberally!  Whenever you think that it is
+useful to extract some commonality between two classes, it is so
+inexpensive to use a mixin and potentially so useful, you really should.
+
+
+-----------------------------------------------------------------------
+6  Recompiling Old Objectclass or Mixin Definitions
+-----------------------------------------------------------------------
+
+One question which naturally arises is, what happens when I recompile an
+existing objectclass (or mixin) definition? The answer is the same as
+for defclass: if the definition has remained unchanged, nothing happens,
+but if there has been a change, all the variables are re-assigned
+consistently with the new definition.
+
+Re-assigning includes the key: if the definition is changed, a new key
+is created. Any existing instances created from the old definition can't
+be magically updated with the new key and so will not be recognised as
+belonging to the changed class. By default, even methods defined on the
+class will stop working on those instances. You can change this
+behaviour by setting the variable *pop_oc_sensitive_methods, but there's
+nothing you can do to make old instances grow any extra slots added by
+the new definition. This is something to bear in mind when recompiling,
+though the behaviour is much the same as for defclass. (Some object-
+oriented systems do enable the addition or deletion of fields from
+already-created instances but pay a significant efficiency penalty.)
+
+
+-----------------------------------------------------------------------
+7  Loops in the Inheritance Hierarchy
+-----------------------------------------------------------------------
+
+It is natural to wonder whether or not you can create loops in the
+inheritance hierarchy.  This is impossible in objectclass.
+
+If you try creating a circularity with something like
+
+    define :class foo is foo;
+    enddefine;
+
+then the :class syntax is able to detect a mistake and will either give
+an error if this is the first definition of class foo, or else warn you
+that the new class has an old version of itself as a superclass. This is
+only a warning because it is -- just about -- possible that this is what
+was intended!
+
+
+-----------------------------------------------------------------------
+8  Defining Methods
+-----------------------------------------------------------------------
+
+In objectclass, a method is just a procedure which is constrained to
+operate only on arguments of specified types (classes). For example, you
+could write a method for finding the distance of a point from the
+origin:
+
+    define :method distance(p:point2d);
+        sqrt(p.xCoord ** 2 + p.yCoord ** 2);
+    enddefine;
+
+    distance(conspoint2d(3, 4)) =>
+    ** 5.0
+
+The argument p is constrained to be of class point2d. It's the
+responsibility of objectclass to enforce this constraint, so that if you
+apply distance to something other than a point you'll get
+
+    distance(6) =>
+    ;;; MISHAP - Method "distance" failed
+
+But constraints do respect inheritance, so this method will work on
+anything for which ispoint2d returns <true>:
+
+    distance(conspoint3d(3, 4, 12)) =>
+    ** 5.0
+
+You can define several methods with the same name, provided that they
+all have different constraints. This allows you to define different
+versions of an operation appropriate to different classes. A more
+sensible implementation of distance for 3D points would take into
+account the z-coordinate too:
+
+    define :method distance(p:point3d);
+        sqrt(p.xCoord ** 2 + p.yCoord ** 2 + p.zCoord ** 2);
+    enddefine;
+
+    distance(conspoint3d(3, 4, 12)) =>
+    ** 13.0
+
+A set of methods all having the same name combine into a composite
+object called a generic procedure. The first method defined with a
+particular name creates the generic procedure. Subsequent definitions
+with the same name add themselves to it. The name itself is used to
+denote the generic procedure as a whole rather than any particular
+method. So when you apply distance, it's really the generic procedure
+that's being applied. It examines the arguments it's been supplied with
+and chooses a method which is best suited to them. If there's no
+applicable method defined, it mishaps with the "Method failed" error.
+
+Sometimes there may be more than one method that could apply to a
+particular argument set. Applied to a 3D point, either method of
+distance would be legitimate. In these cases, objectclass will always
+choose the most specific method, i.e. the method whose constraint
+classes are closest in the inheritance hierarchy to the actual classes
+of the supplied arguments. Given a choice of point2d and point3d
+methods, it's natural to choose the point3d method for an actual 3D
+point.
+
+Since the method parts of a generic procedure are related only by name,
+there's no actual requirement that they should all do the same thing
+with respect to their constraint classes. However, it is a good idea to
+make sure that a given generic procedure does have a consistent meaning
+for all the classes to which it applies, or your programs will rapidly
+become incomprehensible.
+
+
+-----------------------------------------------------------------------
+9  Multi-Methods
+-----------------------------------------------------------------------
+
+A method definition may constrain more than one of its arguments, as in
+this definition which computes the angle between two points:
+
+    define :method angle_between(p:point2d, q:point2d);
+        arctan2(p.xCoord, p.yCoord) - arctan2(q.xCoord, q.yCoord);
+    enddefine;
+
+This support for so-called "multi-methods" distinguishes objectclass
+from some other object-oriented systems which give one argument ("this"
+or "self") special status. The multi-method approach fits more naturally
+into the Pop-11 programming style. But for some combinations of
+constraints it can become ambiguous as to which method should be applied
+to any particular set of arguments. This is resolved in objectclass by
+treating the rightmost arguments as more "significant" than those on
+their left. Normally this isn't important but you can check out the
+whole story in REF * OBJECTCLASS.
+
+The constraints on method arguments are optional. If you leave off the
+constraint for a particular argument, then that argument can have any
+type. If you leave off all the constraints, then the method will apply
+to any combination of arguments. This provides a useful catch-all
+definition, to be used when no other more specific method can be
+applied.
+
+    ;;; catch-all
+    define :method angle_between(p, q);
+        arctan2(p.xCoord, p.yCoord) - arctan2(q.xCoord, q.yCoord);
+    enddefine;
+
+A catch-all like this is called a default method. A generic procedure
+with a default method can never fail.
+
+
+-----------------------------------------------------------------------
+10  Using call_next_method
+-----------------------------------------------------------------------
+
+It is often useful to be able to extend a method without having to
+redefine it all over from scratch.  This is achieved in objectclass by
+the syntax form *call_next_method.  Its syntax is similar to that of a
+procedure call:
+
+    call_next_method(<expr1>, ..., <exprN>)
+
+You treat call_next_method in exactly the same way as a call to the
+method itself, passing the appropriate arguments and so on.  What it
+does is to force execution to begin at the next applicable method
+definition to the one that's currently executing.
+
+For example, the distance method defined above on 3D points could have
+been written
+
+    define :method distance(p:point3d);
+        sqrt(call_next_method(p) ** 2 + p.zCoord ** 2);
+    enddefine;
+
+    distance(conspoint3d(3, 4, 12)) =>
+    ** 13.0
+
+Here, call_next_method applies the distance method next-best suited to
+3D points, clearly that defined on point2d. This may not be the most
+sensible thing to do here when compared to the earlier version, but
+illustrates how call_next_method allows derived classes to share and
+incrementally extend code defined by their superclasses.
+
+The fact that call_next_method is a syntax word means that you can call
+the next method without ever getting a handle on it. As a rule,
+objectclass won't let you see individual method parts, only the generic
+procedure as a whole.
+
+
+-----------------------------------------------------------------------
+11  Private Methods
+-----------------------------------------------------------------------
+
+It is often the case that you want to hide certain methods from the
+outside world.  This is normally because you want to prevent other parts
+of the program from relying on the particular implementation you've
+used.  The objectclass library elegantly allows you to do this through
+ordinary Pop-11 declarations.
+
+Firstly, you can localise identifiers using Pop-11 sections.  This works
+in the normal fashion so there's not much to add to this.  If you don't
+know about sections you can read HELP * SECTIONS.
+
+Secondly, the define_class syntax allows you to make individual slot
+methods lconstant or lvars.  For example,
+
+    define :class myclass;
+        slot lvars left;            ;;; the left and right methods are
+        slot lvars right;           ;;; made local to the file.
+        slot direction = 0;
+    enddefine;
+
+In addition, you can make all the class identifiers private by default
+by putting a declaration after the :class keyword.  Here's the same
+definition done using that technique.
+
+    define :class lvars myclass;    ;;; make all identifiers lvars
+        slot left;
+        slot right;
+        slot vars direction = 0;    ;;; ...except for direction
+    enddefine;
+
+Finally, you can add declarations to method definitions too:
+
+    define :method lconstant reverse(x:myclass);
+        (x.left, x.right) -> (x.right, x.left);
+    enddefine;
+
+Note that such a declaration applies to the name (here reverse) and so
+to the generic procedure as a whole, not to the individual method part
+being defined. In other words, you can't add to a public generic
+procedure a private method part which becomes invisible outside its
+defining lexical scope.
+
+
+-----------------------------------------------------------------------
+12  Updater Methods
+-----------------------------------------------------------------------
+
+Generic procedures can have updaters just as ordinary procedures do.
+Called in update mode, a generic procedure will select from any updater
+methods defined for it. To define an updater method, add the *updaterof
+keyword to the method header:
+
+    define :method polarCoords(p:point2d) -> (r, theta);
+        dlocal popradians = true;
+        lvars r = distance(p);
+        lvars theta = arctan(p.yCoord/p.xCoord);    ;;; when x /= 0
+    enddefine;
+
+    define :method updaterof polarCoords(r, theta, p:point2d);
+        dlocal popradians = true;
+        r*cos(theta) -> p.xCoord;
+        r*sin(theta) -> p.yCoord;
+    enddefine;
+
+    vars P = newpoint2d();
+    (1, pi/4) -> polarCoords(P);
+    P =>
+    ** <point2d xCoord:0.707107 yCoord:0.707107>
+
+
+-----------------------------------------------------------------------
+13  Further Reading
+-----------------------------------------------------------------------
+
+An extended example, based on documentation for the flavours package, is
+provided by
+
+    TEACH * OBJECTCLASS_EXAMPLE
+
+It is well worth working through this file to get a fast understanding
+of the "typical" way in which the objectclass package gets used.
+
+For the fine detail, see
+
+    REF * OBJECTCLASS
+
+A full list of other objectclass documentation is provided in
+
+    HELP * OBJECTCLASS_HELP
+
+
+--- C.all/lib/objectclass/help/objectclass
+--- Copyright University of Sussex 1995. All rights reserved.

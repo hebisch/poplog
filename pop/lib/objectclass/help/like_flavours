@@ -1,0 +1,307 @@
+HELP LIKE_FLAVOURS                             Steve Knight, August 1990
+
+This note compares LIB FLAVOURS with LIB OBJECTCLASS.  This comparison
+is summarised by the following table and discussed in more detail in the
+following sections.
+
+ -- Summary
+ -- Incremental Compilation
+ -- Efficiency
+ -- Integration
+ -- Inheritance
+ -- Mono Vs Multi Methods
+ -- Technique for Extending Methods
+ -- Meta-Class Support
+ -- Method Hiding
+ -- Other Facilities
+ -- Further reading
+
+-- Summary ------------------------------------------------------------
+
+Category                    Flavours                Objectclass
+--------                    --------                -----------
+incremental compilation     excellent               good
+efficiency                  good                    excellent
+integration with keys       not integrated          good
+type of inheritance         multiple                multiple
+method-dispatch             mono-method             multi-method
+method-extension            before/after daemons    run super method
+meta-class support          good                    minimal
+method hiding               none                    good
+
+-- Incremental Compilation --------------------------------------------
+
+The problem addressed here is the fact that class definitions can be
+compiled several times in the course of a programming session.  Usually
+those definitions will remain unchanged but occasionally there will be
+an alteration.  This raises a couple of difficulties -- how to react to
+recompilations and what to do about instances of obsolete classes. How
+do the different OOP systems cope with this?
+
+Flavours takes the approach of maximum flexibility.  A flavour
+definition is treated like a re-entract environment.  When new instance
+variables or methods are added to a flavour, all instances of that
+flavour immediately see the effect.  The cost of this is twofold.
+Firstly, keeping instances up to date requires an extra level of
+indirection which costs both in store and in time since compile-time
+knowledge cannot be exploited.  Secondly, when extra fields are added to
+a flavour the initialise method is not re-run and the new instances can
+be corrupted.
+
+Objectclasses takes a compromise route -- adopting the exact policy used
+by recordclass and defclass.  Recompilations of unchanged class
+definitions have no effect.  However, when a class-definition is
+changed, a new class is allocated.  This has the benefit of never
+corrupting existing objects at the expense of never being able to update
+them.
+
+The objectclass policy is less flexible and does not respect the demands
+of an incremental environment as well as the flavours policy.  However,
+the experience of using recordclass and defclass show that the trade-off
+of some flexibility for extra efficiency is a viable one.
+
+
+-- Efficiency ---------------------------------------------------------
+
+The Flavour's system method-dispatch policy suffers from performance
+problems in many areas.  By contrast the Objectclass system generates
+methods that are almost as efficient as hand-written code.  (In fact,
+occasionally more efficient.)
+
+Flavours addresses some of these problems by providing special syntax
+for accessing instance variables and methods in more efficient ways.
+There are even different categories of instance variables (ivars,
+divars).  All of these ideas work at the expense of exposing the
+implementation policy for a given class.
+
+Another approach used by the Flavours system is to cache the last
+dispatch lookup.  This provides a significant improvement in performance
+for certain programs.
+
+The superior performance of the Objectclass package can be attributed to
+the fact that class-structure is immutable.  This is exactly the same
+benefit that accrues to the existing *KEYS system in Pop11.  There is
+additional complexity caused by the need to re-link methods (and the
+super-methods hierarchy) on the fly but these impose only a small
+cost-overhead.  (They were a pain to write.)
+
+Rough measurements suggest that the overhead associated with a
+method-dispatch in the Flavours system is between 5-20 times higher than
+that for the Objectclass system.
+
+
+-- Integration --------------------------------------------------------
+
+The flavours system sits apart from the ordinary world of Pop11
+datatypes. Flavours are not keys and instances are not records or
+vectors.  On the other hand, within the methods of the flavour system
+ordinary Pop11 code and data structures can be used.  On the other hand,
+method invocation is not the same as ordinary procedure application, so
+it isn't possible to use familiar control abstractions such as applist
+an appdata with methods.  In short, the flavours system is an
+upward-extension to the Pop11 language.
+
+The objectclass package, by contrast, was explicitly designed to
+smoothly integrate with the existing Pop11 data types.  This design
+criterion led to the decision to represent classes as keys, methods as
+procedures, and instances as records.  This choice means that ordinary
+Pop11 idioms fluidly extend to objectclass programming.  Furthermore, by
+sticking to this model powerful programming constructs such as sections
+and lconstant declarations properly extend to all aspects of the
+objectclass package.  This is not true of the flavours package.
+
+Furthermore, the objectclass package incorporates a mechanism to include
+previously built datatypes into the objectclass view of the world.  This
+backwards-compatibility mechanism (extantclass) is only partially
+effective because many Pop11 variables are compiled as constants.  In
+these cases, it is not possible to redefine field-accessors in the way
+you might wish.  However, within this restriction, extantclass does the
+job.
+
+The value of integration is hard to assess.  However, the objectclass
+package clearly shows one possible evolutionary road for the Pop family
+of languages.
+
+
+-- Inheritance --------------------------------------------------------
+
+Both flavours and objectclass embrace multiple inheritance, although
+they tackle the inevitable complexities rather differently.  The
+flavours system provides an "escape hatch" for when the built-in
+inheritance strategy proves problematic -- the meta-flavours.  By
+contrast, part of the objectclass manifesto is proper encapsulation
+which means that its inheritance strategy is fixed.  (Any other strategy
+exposes the implementation of classes when they are used as parents.)
+
+In addition, methods have to properly and efficiently dispatched.  This
+is complicated in the presence of multiple inheritance.  The crucial
+different between the two systems is that the flavours system can only
+dispatch on a single argument whereas the objectclass system permits
+method dispatch on multiple arguments.  This is covered in detail in the
+next section.
+
+
+-- Mono Vs Multi Methods ----------------------------------------------
+
+The flavours system identifies method-invocation with "message-passing".
+ This means that each method is dispatched on the basis of a message
+that characterises the method.  In the case of the flavours system, this
+is a Pop11 word.  This suffers from two basic problems: methods don't
+interact properly with sections and some methods need to distinguish the
+types of several arguments.
+
+On the other hand, the "mono"-methods choice has the advantage of
+associating methods with a particular class.  This provides a nicely
+integrated explanation of inheritance based around the inheritance
+hierarchy. Another advantage is that within a method the
+instance-variables can be made available as variables, since one of the
+arguments (self) is special.
+
+The objectclass system uses the multi-methods system, popularised by
+various Lisp-based object systems, including CLOS.  This system has the
+disadvantage of needing a relatively complex explanation for
+method-shadowing.  On the other hand, it subsumes the mono-method
+approach and provides for general method-dispatching.  The objectclass
+solution also solves the problem of integrating with sections, since
+methods procedures which are bound to ordinary variables.
+
+It is occasionally argued that multi-methods incur a cost-overhead.  The
+objectclass package is specially designed to avoid this.  Although
+dispatching on several arguments inevitably takes longer than
+dispatching on a single argument, the objectclass package does not incur
+any overhead when the multi-methods facility is not exploited.  (In
+short, you only pay for what you use & what you use is cheap in any
+case.)
+
+The multi-methods model of the objectclas package is more general and
+integrates more nicely into the Pop11 procedural programming model.  In
+fact, writing a method is exactly like writing the class-apply of a
+recordclass. However, the argument is not one sided, since flavour's
+methods are easy to understand and can conveniently refer to instance
+variables and this is quite an attractive feature.
+
+(As a point of interest, this convenience feature was deliberately
+rejected in the objectclass package because it leads to a loss of data
+abstraction. Using it means that the method being defined is exposed to
+the implementation of instance variables as slots or methods.  This
+causes lots of problems when the implementation of the object is changed
+which is supposed to be easy with OOPS.)
+
+
+-- Technique for Extending Methods ------------------------------------
+
+The Objectclass package provides the most common and popular way of
+extending methods -- you are able to invoke the super-method by calling
+-call_next_method-. This is implemented very efficiently in the
+Objectclass package by a smart-linking technique.
+
+In the Flavours package, you extended a method by adding before or after
+demons.  These demons did not obey the usual inheritance rules so that
+it was impossible to redefine a method and prevent the demons being run.
+ As a consequence, it was not always safe to think of adding a demon as
+extending a method in the same way.
+
+The inability to safely extend Flavours methods was one of the primary
+factors in the decision to create an alternative OOPS in Pop11.
+
+
+-- Meta-Class Support -------------------------------------------------
+
+The meta-class support provided by the Flavours system is comprehensive
+and excellent whereas that of the Objectclass system is virtually
+non-existant. However, the requirement for meta-class support in the
+Objectclass system is not especially great -- partly because of the
+presence of multi-methods. Multi-methods reduce the importance of
+meta-classes considerably.
+
+For example, since multi-methods in the Objectclass system can be
+specified without any class tagging, there is no need for a
+vanilla-class.  Since there is no vanilla-class, there's less need to
+create a new class hierarchy.
+
+The other main use for meta-classes, which is to alter the inheritance
+hierarchy, also does not apply in the Objectclass system.  (See the
+previous section on the important of correct inheritance in providing
+encapsulation.)
+
+However, it is probably still true that the higher levels of the class
+system could be improved.  Since the Objectclass package mirrors the
+keys-system of Pop11, this is unlikely to be easy to provide.
+
+
+-- Method Hiding ------------------------------------------------------
+
+Since the objectclass package uses ordinary identifiers all the time for
+all of the entities, it works perfectly with the Pop11 sections
+mechanism.  In particular, methods can be hidden using the sections
+mechanism.  The flavours package doesn't provide any form of method
+hiding and since methods are actually represented by words you cannot
+use the sections mechanism to implement this.
+
+The objectclass package can also exploit the lconstant and lvars
+declarations to achieve the effect of method hiding.  The flavours
+package can't use this mechanism either since methods are not associated
+with variables but words.
+
+
+-- Other Facilities ---------------------------------------------------
+
+It should also be added that Flavours is a more developed and  mature
+system than Objectclass at the time of writing.  It provides a
+number of additional "peripheral" capabilities which have no direct
+analogue in Objectclass.  This section tries to list some of these areas
+where the packages differ.
+
+Dynamic Instance Variables
+    Flavours provides a way of dynamically localising instance variables
+    so that they are accessible outside the scope of a method.  This
+    solves a nasty problem raised by the fact that methods are different
+    semantic entities from procedures with different scoping rules.
+
+    There is no directly corresponding facility in Objectclass and
+    neither is there any need for it.  The same effect is achieved by
+    dlocalising arguments of a method.
+
+Behaviour Enquiries
+    In Flavours it is possible to enquire about the behaviour of any
+    instance at run-time using the method -willrespondto-.  This ability
+    requires retention of the method structure at run-time which is
+    direct opposition to the Objectclass approach of discharging all
+    work at compile time.
+
+    A similar effect can be achieved by dynamically localising method
+    failure.  So the typical uses of -willrespondto- in Flavours can
+    be simulated by -failsafe- in Objectclass.  However, the full
+    power of -willrespondto- can only be effected by using -method_path-
+    which inhibits optimisation (see below).
+
+Optimisation at Delivery Time
+    In Objectclass, special attention was paid to the issues of being
+    able to deliver applications.  As a consequence it is possible to
+    force the compilation of methods and junk run-time tables prior
+    to the ultimate syssave.  The procedure -optimise_objectclass-
+    provides modest control over the internals relevant to delivery.
+
+    This contrasts with Flavours in which no controls have been
+    provided.  There's no reason to suppose that this feature couldn't
+    be grafted onto Flavours, of course.
+
+    One issue that's carefully pinned down in Objectclass is the
+    ability to destroy the run-time method tables.  This is only
+    safe if no class/method creation happens at run-time.  As a
+    consequence, the programmer is warned if there is a conflict and
+    can override the warning if appropriate.  This ability is of
+    considerable practical importance, since it reduces the storage
+    of methods to zero.
+
+
+-- Further reading ----------------------------------------------------
+
+HELP * FLAVOURS             an overview of flavours
+HELP * OBJECTCLASS          an overview of the objectclass system
+
+-----------------------------------------------------------------------
+
+
+--- C.all/lib/objectclass/help/like_flavours
+--- Copyright University of Sussex 1993. All rights reserved.

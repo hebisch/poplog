@@ -1,0 +1,907 @@
+TEACH INHERITANCE                               Robert Duncan, July 1996
+
+Inheritance in objectclass. See HELP * OBJECTCLASS for an overview.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+
+  2   Inheritance Example
+
+  3   Class Hierarchies
+
+  4   Multiple Inheritance
+
+  5   Common Ancestors
+
+  6   Method Selection
+      6.1   Specialisation
+      6.2   Ambiguity
+
+  7   An Algorithm for Method Selection
+      7.1   A Pop-11 Program
+
+
+-----------------------------------------------------------------------
+1  Introduction
+-----------------------------------------------------------------------
+
+Inheritance describes a relationship between classes where one class is
+the parent of another: the parent class is the base class or superclass
+while the child is the derived class or subclass.
+
+In objectclass, inheritance is declared in the *is part of a class
+definition. For example:
+
+    define :class mammal is animal;
+    enddefine;
+
+Here, a new class mammal is derived from an existing class animal.
+
+Inheritance transmits properties of the base class to the derived class.
+In objectclass, this means:
+
+1.  Slots of the base class are included in the slots of the derived
+    class
+
+2.  Methods defined on the base class will also work on instances of the
+    derived class
+
+3.  The recogniser (the is-predicate) for the base class is extended to
+    recognise instances of the derived class
+
+Since the derived class has all the slots and methods of the base class,
+an instance of the derived class can stand in place of an instance of
+the base class: this is why it makes sense for the base-class recogniser
+to be extended to recognise instances of the derived class also. But the
+derived class can add new slots and methods, or redefine its inherited
+slots and methods, to extend or refine the behaviour of the base class.
+This is called specialisation. None of these new properties added to the
+derived class are passed back to the base class: inheritance is strictly
+one-way. In particular:
+
+1a. Slots added to the derived class are not accessible from instances
+    of the base class
+
+2a. Methods defined on the derived class will not work on instances of
+    the base class
+
+3a. The recogniser for the derived class will not recognise instances of
+    the base class
+
+So a mammal is a kind of animal, but may have additional properties
+specific to mammals. You can read the keyword is in a class definition
+as shorthand for is-a-kind-of.
+
+
+-----------------------------------------------------------------------
+2  Inheritance Example
+-----------------------------------------------------------------------
+
+All the features of inheritance discussed above are exhibited in the
+following example.
+
+        ;;; an employee is identified by name and number
+    define :class employee;
+        slot employee_name;
+        slot employee_number;
+    enddefine;
+
+        ;;; how to print an employee
+    define :method print_instance(x:employee);
+        printf('<employee %p: %p>', [%
+            employee_number(x),
+            employee_name(x)
+        %]);
+    enddefine;
+
+        ;;; Kevin is an employee
+    define :instance kevin :employee;
+        employee_name = "Kevin";
+        employee_number = 108;
+    enddefine;
+
+    kevin =>
+    ** <employee 108: Kevin>
+
+        ;;; a manager is a kind of employee who has charge of some staff
+    define :class manager is employee;
+        slot staff_list == [];
+    enddefine;
+
+        ;;; a manager has methods for managing staff which are not
+        ;;; applicable to employees in general
+    define :method add_to_staff(e:employee, x:manager);
+        unless member(e, staff_list(x)) then
+            e :: staff_list(x) -> staff_list(x);
+        endunless;
+    enddefine;
+
+    define :method show_staff(x:manager);
+        printf('%p\'s staff:\n', [% employee_name(x) %]);
+        lvars e;
+        for e in staff_list(x) do
+            printf('\t%p\n', [% employee_name(e) %]);
+        endfor;
+    enddefine;
+
+        ;;; Doreen is a manager
+    define :instance doreen :manager;
+        employee_name = "Doreen";
+        employee_number = 67;
+    enddefine;
+
+        ;;; ... but is still an employee
+    isemployee(doreen) =>
+    ** <true>
+
+    doreen =>
+    ** <employee 67: Doreen>
+
+        ;;; Doreen is in charge of Kevin
+    add_to_staff(kevin, doreen);
+    show_staff(doreen);
+    Doreen's staff:
+        Kevin
+
+        ;;; Kevin is not a manager, and can't do management-type things
+    ismanager(kevin) =>
+    ** <false>
+
+    add_to_staff(newemployee(), kevin);
+
+    ;;; MISHAP - Method "add_to_staff" failed
+
+
+-----------------------------------------------------------------------
+3  Class Hierarchies
+-----------------------------------------------------------------------
+
+Inheritance is a transitive relation. A derived class may have other
+classes derived from it, and they may have further classes derived from
+them, and so on; the properties of a class are passed on not only to its
+immediate children but to its children's children, and to each
+subsequent generation. In the class definition
+
+    define :class section_head is manager;
+        slot section_name;
+    enddefine;
+
+section_head is declared as a subclass of manager and so inherits all
+the slots and methods of a manager, but the slots and methods of manager
+include all the slots and methods inherited from employee, so the new
+class inherits all those slots and methods too: section_head is thus a
+subclass of both manager and employee. Where necessary to avoid
+ambiguity, the terms direct subclass and direct superclass can be used
+to distinguish those classes connected directly by the is clause of a
+class definition: section_head is a direct subclass of manager and an
+indirect subclass of employee.
+
+The network of inheritance relations between classes is called the class
+hierarchy or the inheritance hierarchy. The hierarchy for the example
+above forms a simple chain, illustrated in the following diagram where
+inheritance flows from top to bottom:
+
+                            -----------------
+                            |   employee    |
+                            -----------------
+                                    |
+                            -----------------
+                            |    manager    |
+                            -----------------
+                                    |
+                            -----------------
+                            | section-head  |
+                            -----------------
+
+Class hierarchies are rarely as straightforward as this. Much of the
+power of object-oriented programming comes from the fact that a given
+base class may have more than one subclass derived from it so that it
+can be specialised in different ways for different purposes. This turns
+the class hierarchy into a tree:
+
+                            -----------------
+                            |   employee    |
+                            -----------------
+   ... -----------------------------+----------------------------- ...
+         -----------------  -----------------  -----------------
+         |  programmer   |  |   secretary   |  |    manager    |
+         -----------------  -----------------  -----------------
+                                    |                  |
+                            -----------------  -----------------
+                            |      P/A      |  | section-head  |
+                            -----------------  -----------------
+
+Classes are ordered by their positions in the class hierarchy. So we can
+write:
+
+    section-head < manager < employee
+
+The use of "<" reflects the fact that manager is lower in the class
+hierarchy than employee, or alternatively, that manager is less general
+than employee. If it seems contradictory to say that manager is somehow
+less than employee when it offers more functionality, remember that the
+properties of employee are spread more widely because they apply to
+secretaries and programmers as well as managers, and since every manager
+is an employee, there can't be more managers than there are employees.
+
+Not all classes can be ordered in the hierarchy: section-head and
+personal-assistant are incomparable, for example, because neither one
+inherits from the other. So inheritance describes only a partial order
+on classes.
+
+
+-----------------------------------------------------------------------
+4  Multiple Inheritance
+-----------------------------------------------------------------------
+
+In a single inheritance scheme, a class may have at most one direct
+superclass. This is the case in the employee example given above.
+Single inheritance generates class hierarchies with an attractive
+property: regardless of the size of the hierarchy, each class has
+exactly one path linking itself to all its superclasses, and slots and
+methods are inherited unambiguously along that path.
+
+Objectclass allows multiple inheritance whereby a class may have more
+than one direct superclass. Multiple inheritance is declared by
+including a list of superclass names in the is part of a class
+definition. For example:
+
+        ;;; single inheritance (as before)
+    define :class contractor is employee;
+        slot contract_agency;
+        slot contract_period;
+    enddefine;
+
+        ;;; multiple inheritance
+    define :class project_leader is contractor, manager;
+        slot project_code;
+    enddefine;
+
+This says that a project-leader is both a contractor and a manager and
+so combines the properties of both classes. This is an obvious extension
+of what has gone before and easy enough to understand in principle. But
+there are some practical difficulties arising from the fact that, with
+multiple inheritance, a class may have more than one inheritance path.
+This is made clear by considering that part of the employee class
+hierarchy containing project-leader:
+
+                            -----------------
+                            |   employee    |
+                            -----------------
+                          ---------------------
+                  -----------------   -----------------
+                  |  contractor   |   |    manager    |
+                  -----------------   -----------------
+                          ---------------------
+                           -------------------
+                           | project-leader  |
+                           -------------------
+
+There are two potential problems here:
+
+1.  The common ancestor problem. The employee class is a common ancestor
+    of both contractor and manager, so project-leader would seem to be
+    inheriting the properties of employee twice over. Does that mean,
+    for example, that a project leader should have two employee numbers?
+
+2.  The ambiguity problem. Suppose that both contractor and manager
+    define variants of the same method. Which definition should be
+    inherited by project-leader?
+
+Objectclass provides definite answers to both these questions (explained
+in the following sections). There is no doubt, however, that hierarchies
+like this are harder to understand than the simpler hierarchies
+generated by single inheritance and so are best avoided. The use of
+non-instantiable mixin classes can often help here. For example, an
+alternative approach to the contractor problem would be to define
+
+    define :mixin contractor;
+        slot contract_agency;
+        slot contract_period;
+    enddefine;
+
+    define :class project_leader is contractor, manager;
+        slot project_code;
+    enddefine;
+
+which generates the hierarchy
+
+                                      -----------------
+                                      |   employee    |
+                                      -----------------
+                                              |
+                  -----------------   -----------------
+                  |  contractor   |   |    manager    |
+                  -----------------   -----------------
+                          --------------------|
+                                     -------------------
+                                     | project-leader  |
+                                     -------------------
+
+The contractor mixin no longer inherits anything but defines just a
+collection of properties which can be mixed-in to any appropriate
+employee-derived class to augment its functionality. For more discussion
+of mixins see REF * OBJECTCLASS.
+
+Removing common ancestors won't necessarily avoid method ambiguities.
+You can reduce the occurrence of accidental ambiguities by using longer,
+more descriptive names for slots and methods.
+
+
+-----------------------------------------------------------------------
+5  Common Ancestors
+-----------------------------------------------------------------------
+
+Look again at the example hierarchy described above, which shows two
+distinct inheritance paths from employee to project-leader:
+
+                            -----------------
+                            |   employee    |
+                            -----------------
+                          ---------------------
+                  -----------------   -----------------
+                  |  contractor   |   |    manager    |
+                  -----------------   -----------------
+                          ---------------------
+                           -------------------
+                           | project-leader  |
+                           -------------------
+
+There are essentially two ways in which this might be interpreted. The
+approach taken by objectclass, which would seem most natural for this
+example, is to say that a project-leader is a single employee looked at
+in two different ways -- once through the mode of employment (as a
+contractor) and again through the employee's functional role (as a
+manager) -- the properties of the employee being common to both. While
+this may seem an obvious interpretation, it does demand discipline from
+the class designer in ensuring that the two ways of viewing the common
+ancestor class are entirely compatible, or it becomes impossible to
+safely combine the two. There may be no problem where the common
+properties are constant -- as is likely with an employee's name and
+number -- but it gets harder if the properties can be modified, since
+both the contractor and manager subclasses may want to change them in
+different, possibly conflicting, ways.
+
+An alternative approach is to say that a project-leader is really two
+employees -- one a contractor and the other a manager -- and that each
+of these separate individuals should have their own private properties.
+In this example, that means a project-leader would have two different
+names. Such schizophrenia is clearly undesirable, and as a rule this
+approach is unhelpful where inheritance is used to model the
+is-a-kind-of relationship.
+
+There are circumstances, however, where this behaviour is valid.
+Consider, for example, the same shape of hierarchy, but describing the
+class of I/O streams capable of both input and output:
+
+                            -----------------
+                            |    stream     |
+                            -----------------
+                          ---------------------
+                  -----------------   -----------------
+                  |   i-stream    |   |   o-stream    |
+                  -----------------   -----------------
+                          ---------------------
+                           -------------------
+                           |    io-stream    |
+                           -------------------
+
+The base class has a pointer indicating the current position within the
+stream:
+
+    define :class stream;
+        slot stream_pointer == 0;
+    enddefine;
+
+If the stream ancestor class is common to both the i-stream and o-stream
+inheritance paths, then an I/O stream has only a single stream pointer
+and both input and output must occur at the same point within the
+stream. But if i-stream and o-stream have separate copies of the stream
+pointer, then an I/O stream can perform input and output operations
+entirely independently.
+
+Implementing the latter scheme requires extra complexity in the language
+to allow for distinguishing two separate slots both having the same
+name. Objectclass won't do this, but you can find it, for example, in
+C++ where such behaviour is the default.
+
+
+-----------------------------------------------------------------------
+6  Method Selection
+-----------------------------------------------------------------------
+
+Another interesting feature of multiple inheritance is how methods are
+selected in the presence of ambiguity, i.e. where more than one method
+definition is applicable.
+
+Methods of the same name are distinguished by the types of their
+arguments. The name and argument types together make up the signature
+of the method. For the method defined above:
+
+    define :method add_to_staff(e:employee, x:manager);
+        ...
+    enddefine;
+
+the signature is written
+
+    add_to_staff(employee, manager)
+
+A method is applicable to a set of actual parameters if its signature
+matches the types of those parameters. In the application
+
+    add_to_staff(kevin, doreen);
+
+the one and only add_to_staff method is applicable because Kevin is an
+employee and Doreen is a manager. Argument matching uses the class
+recognisers and so the method is equally applicable to any classes
+derived from employee and manager, for example
+
+    add_to_staff(newmanager(), newsection_head());
+
+However, in the case
+
+    add_to_staff(newemployee(), kevin);
+
+the add_to_staff method is not applicable because Kevin is not a
+manager, and this application fails.
+
+This example is straightforward because there is only one add_to_staff
+method defined. For any given set of arguments, that definition is
+either applicable or not. More often, there will be a choice of
+applicable methods and the issue then is which one should be applied
+(applying all of them is rarely a good idea, although there may be
+mechanisms to provide for this in specialised circumstances).
+
+6.1  Specialisation
+-------------------
+Leaving aside the case where ambiguity arises through accidental name
+clashes, which is certainly an error, there are two situations which can
+produce multiple applicable methods. One is through specialisation,
+where a derived class redefines a superclass method in order to add or
+modify its inherited functionality. For example, when a section-head
+takes on a new member of staff, aside from the normal managerial
+duties they may feel obliged to take the new employee for lunch, for
+which purpose we could define a new method
+
+    define :method add_to_staff(e:employee, s:section_head);
+        call_next_method(e, s);
+        lunch(e, s);
+    enddefine;
+
+The application
+
+    add_to_staff(newmanager(), newsection_head());
+
+now has two applicable methods: the original definition, discussed
+above, and the new definition specialised for section-heads. Clearly, in
+order for specialisation to work at all -- i.e. to allow derived classes
+to modify their inherited behaviour -- the new definition must be chosen
+in preference to the original. This doesn't, of course, affect the
+application
+
+    add_to_staff(kevin, doreen);
+
+for which still only the original definition is applicable, Doreen not
+being a section-head. Nor does it preclude the derived class from
+practising its inherited behaviour: the syntax form *call_next_method
+transfers control to the original, inherited definition, avoiding any
+need to duplicate that code.
+
+Additional complications can arise when a method has more than one typed
+argument: this is called multiple-dispatch and is a feature of
+objectclass. When one manager takes on another, there may be a need to
+reassign responsibilities for staff:
+
+    define :method add_to_staff(m1:manager, m2:manager);
+        call_next_method(m1, m2);
+        assign_staff(m1, m2);
+    enddefine;
+
+Now the application
+
+    add_to_staff(newmanager(), newsection_head());
+
+has three applicable methods, with signatures
+
+    (a) add_to_staff(employee, manager)
+    (b) add_to_staff(manager, manager)
+    (c) add_to_staff(employee, section_head)
+
+Since both (b) and (c) are specialisations of (a) one of those is likely
+to be preferred, but the rule for deciding which is arbitrary. In
+objectclass, preference is given to arguments appearing rightmost in the
+signature, and since section-head is a specialisation of manager, method
+(c) is chosen first. However, (b) is the next-best choice, and will be
+applied in turn by call_next_method; this gives the proper
+interpretation of a section head's duties when taking on a new manager,
+namely:
+
+    1.  add new employee to staff list
+    2.  assign staff responsibilities to new manager
+    3.  go to lunch
+
+6.2  Ambiguity
+--------------
+It can occur that two otherwise unrelated superclasses both supply
+definitions for the same method. Consider how employees take leave: a
+contractor may have contractual obligations to sort out, a manager will
+need to provide some cover. So we have
+
+    define :method take_leave(c:contractor);
+        ...
+    enddefine;
+
+    define :method take_leave(m:manager);
+        ...
+    enddefine;
+
+How does a project-leader take leave? Both methods are applicable, but
+only one can be chosen. Again this requires an arbitrary rule, and
+objectclass gives precedence to the superclass appearing first in the
+class declaration, i.e. given
+
+    define :class project_leader is contractor, manager;
+        ...
+    enddefine;
+
+contractor is named first as a base class and so contractor methods take
+precedence over those of manager.
+
+Actually, neither choice is ideal because the functions of the two
+methods are complimentary and a project-leader should really do both:
+sort out contracts and arrange cover. In this particular case,
+call_next_method in the contractor method would call the manager method
+and so give the right answer, but that wouldn't necessarily work if the
+contractor class were used as a basis for other class derivations for
+which there were no other applicable methods (when call_next_method
+would fail). Ideally, the project-leader class would define its own
+take_leave method which combined the functions of the two superclass
+versions: this is often what's wanted in such cases, but is not
+currently possible in objectclass (again, because it requires mechanisms
+for distinguishing two things with the same name).
+
+The best solution here might be to follow the mixin route discussed
+earlier so that a contractor becomes no longer an employee and so
+doesn't take leave. Instead, the contractor method could be renamed to
+be specific to contracts (arrange_contracts or something) and the
+project-leader class could then have a take_leave method which combined
+the two functions as required:
+
+    define :method take_leave(p:project_leader);
+        call_next_method(p);    ;;; this will call take_leave(manager)
+        arrange_contracts(p);
+    enddefine;
+
+
+-----------------------------------------------------------------------
+7  An Algorithm for Method Selection
+-----------------------------------------------------------------------
+
+It is important that the choice of method applied in any given case
+should be predictable, regardless of the complexity of the class
+hierarchy or the number of methods defined, and the principles discussed
+informally above provide the basis for a deterministic method selection
+algorithm.
+
+Consider the application of a method M to a set of arguments X1,...,Xm
+written:
+
+    M(X1, ..., Xm)
+
+Selecting which method to apply requires three main steps:
+
+1.  Identify the set of applicable methods
+
+2.  Sort the set
+
+3.  Apply the first (least) member of the sorted set
+
+Step (1) is straightforward enough: a method with signature
+
+    M(C1, ..., Cm)
+
+is applicable if every argument Xi is of the corresponding class Ci,
+i.e. if the recogniser isCi would return true for it.
+
+If there are no applicable methods at all, so that the set computed at
+(1) is empty, then step (3) is impossible and the application must fail.
+If there is only one applicable method, then steps (2) and (3) are
+trivial. Otherwise, there must be a deterministic sorting algorithm
+applied at (2) to ensure consistent and predictable results. The
+resulting order not only determines which method will be applied, but
+also assigns a well-defined meaning to call_next_method which transfers
+control to the next method in the sorted set.
+
+The sorting algorithm works on the method signatures. All the methods
+necessarily have the same name, so only the argument classes are
+considered. Given a set of applicable method signatures:
+
+    M(C11, ..., C1m)
+    M(C21, ..., C2m)
+    ...
+    M(Cn1, ..., Cnm)
+
+objectclass sorts first on column m -- the rightmost column -- then on
+column m-1 and so on down to column 1. This process is bound to lead to
+a single least member because all the signatures must differ in at least
+one argument position (it's impossible to have two methods with the same
+signature, because if a method is defined with a signature identical to
+that of an existing method, the new definition replaces the previous
+one).
+
+How might a set of classes {C1m, C2m, ..., Cnm} be ordered? The class
+hierarchy provides part of the solution because Cim < Cjm whenever Cim
+is a subclass of Cjm. This puts specialised methods first in the list.
+But the class hierarchy is only a partial order. Some classes -- like
+contractor and manager -- cannot be ordered in this way. A total order
+depends on the class of the actual argument, Xm, and in particular on a
+special property of the class called the class precedence list, or CPL
+for short.
+
+Whenever a new class is defined, objectclass constructs its CPL. The CPL
+contains the class itself and all its superclasses, both direct and
+indirect. The CPL defines the necessary ordering: Cim < Cjm precisely
+when Cim comes before Cjm in the CPL. The CPL defines a total order
+because all the classes {C1m, C2m, ..., Cnm} must occur in the CPL: if
+there was some class Cjm which wasn't in the CPL, it couldn't be a
+superclass of Xm and the method
+
+    M(Cj1, ..., Cjm)
+
+would not be included in the applicable set.
+
+The sole remaining task is to define the CPL. This is quite complex, but
+is done just once for each new class defined. The CPL contains the class
+itself and all its superclasses. The principles for sorting the list
+are as follows:
+
+1.  Every class in the CPL precedes its superclasses. This preserves the
+    ordering imposed by the class hierarchy.
+
+2.  Direct superclasses are placed in declaration order. This is the
+    arbitrary disambiguation rule discussed earlier.
+
+3.  The order of CPLs of the direct superclasses is preserved. This
+    provides consistency, avoiding surprises which might subvert
+    superclass semantics.
+
+Condition (3) suggests that the CPL can be constructed recursively,
+based on an order-preserving merge of the direct superclass CPLs.
+A Pop-11 program to compute the CPL is given below.
+
+As a concrete example:
+
+    CPL(employee)       = [employee]
+    CPL(contractor)     = [contractor employee]
+    CPL(manager)        = [manager employee]
+    CPL(project-leader) = [project-leader contractor manager employee]
+
+which gives
+
+    project-leader < contractor < manager < employee
+
+So for a project-leader, contractor methods will always be preferred
+over manager methods.
+
+For a given class definition it is not always possible to construct a
+CPL: some of the constraints (1)--(3) may be in conflict. This is rarely
+a problem and may be taken as indicative that the class hierarchy is in
+need of review. It can often be resolved simply, however, by changing
+the order of direct superclasses.
+
+7.1  A Pop-11 Program
+---------------------
+You may skip this section if you wish.
+
+/***********************************************************************
+
+topologicalSort(graph, chooseNext) -> list
+    A topological sort orders the nodes of a directed, acyclic graph
+    such that node X precedes node Y whenever there is a path from X to
+    Y in the graph. In this implementation, the graph is a property
+    which maps a node to a list of its immediate predecessors. Typically
+    there will be more than one solution, so whenever there is a choice
+    of which node should go next in the order, the procedure chooseNext
+    is applied to make a selection: this can ensure that -- for a given
+    graph -- the result is always the same, regardless of the order in
+    which nodes are stored in the property.
+
+***********************************************************************/
+
+define topologicalSort(graph, procedure chooseNext) -> result;
+    lvars result = [];
+    lvars count = length(graph);    ;;; this is the number of nodes
+    until count == 0 do
+        ;;; find all nodes without predecessors
+        lvars node, preds, choices = [];
+        for node, preds in_property graph do
+            if preds == [] then
+                node :: choices -> choices;
+            endif;
+        endfor;
+        ;;; select one to be next in the order
+        lvars next;
+        if choices == [] then
+            ;;; no node without predecessors: the graph must be cyclic,
+            ;;; so there's no solution
+            return(false -> result);
+        elseif back(choices) == [] then
+            front(choices) -> next;
+        else
+            ;;; more than one choice: use the selection procedure to
+            ;;; make a choice based on the result so far
+            chooseNext(result, choices) -> next;
+        endif;
+        next :: result -> result;
+        ;;; remove the chosen node from the graph
+        false -> graph(next);
+        count - 1 -> count;
+        ;;; ...not forgetting all its links
+        lvars node, preds;
+        for node, preds in_property graph do
+            delete(next, preds) -> graph(node);
+        endfor;
+    enduntil;
+    ;;; result was accumulated in reverse order
+    rev(result) -> result;
+enddefine;
+
+/***********************************************************************
+
+directSupers(class) -> list
+    Returns a list of the direct superclasses of a class. This encodes
+    the class hierarchy. The version given here is only an example which
+    encodes the hierarchies described in this file. It's redefinable, so
+    you can try the algorithm against different hierarchies: you could
+    set it to *class_supers to compute the CPLs for real objectclass
+    classes. NB: direct superclasses will appear in the CPL in the same
+    order as they do in this list so for objectclass that should always
+    be the declaration order.
+
+***********************************************************************/
+
+define vars directSupers =
+    newproperty([
+        [employee           []]
+        [programmer         [employee]]
+        [secretary          [employee]]
+        [personal_assistant [secretary]]
+        [manager            [employee]]
+        [section_head       [manager]]
+        [contractor         [employee]]
+        [project_leader     [contractor manager]]
+    ], 16, [], "perm");
+enddefine;
+
+/***********************************************************************
+
+CPL(class) -> list
+    Computes the class precedence list for a given class. The strategy
+    used is to encode the order constraints on the CPL -- discussed
+    above -- as a graph and then use a topological sort to flatten the
+    graph into a list respecting those constraints. The definition is
+    recursive and expensive so, rather than repeatedly recompute the
+    same values, intermediate results are cached in a property: this is
+    valid only so long as the class hierarchy remains constant.
+
+***********************************************************************/
+
+define CPL(class) -> result;
+
+        ;;; This procedure does the real work, but only for classes not
+        ;;; encountered before
+    define computeCPL(class);
+
+            ;;; This is the graph which will encode the order
+            ;;; constraints: it maps a node to its known predecessors in
+            ;;; the order, such that
+            ;;;     Cx < Cy if member(Cx, predecessors(Cy))
+            ;;; The graph must retain an entry for every class, which
+            ;;; precludes use of the obvious [] default
+        define lvars predecessors =
+            newproperty([], 32, false, "perm");
+        enddefine;
+
+            ;;; Generate order constraints from an ordered list of
+            ;;; classes, i.e. given [C1, C2, C3, ...] this implies
+            ;;; C1 < C2, C2 < C3, etc.
+        define addConstraints(classes);
+            lvars pred = hd(classes), class;
+            for class in tl(classes) do
+                lvars preds = predecessors(class) or [];
+                unless member(pred, preds) then
+                    pred :: preds -> predecessors(class);
+                endunless;
+                class -> pred;
+            endfor;
+        enddefine;
+
+            ;;; The CPL must preserve the order of direct superclass
+            ;;; CPLs...
+        lvars super;
+        for super in directSupers(class) do
+            addConstraints(CPL(super));
+        endfor;
+
+            ;;; ...and must also preserve direct superclasses in
+            ;;; declaration order, and with the derived class first
+        addConstraints(class :: directSupers(class));
+
+            ;;; The derived class has no predecessors and provides a
+            ;;; unique starting point for the sort. This assignment
+            ;;; assumes that the class hasn't been encountered already
+            ;;; in the class hierarchy, but that would mean the class
+            ;;; inheriting from itself which is nonsense; that should
+            ;;; be checked elsewhere, however, before this procedure is
+            ;;; run
+        [] -> predecessors(class);
+
+            ;;; The topological sort needs a decision procedure for use
+            ;;; whenever there is a choice of solutions: sofar is the
+            ;;; sorted list computed so far, with the most recent node
+            ;;; first, and choices is a list of the nodes which could
+            ;;; possibly come next. This procedure chooses the class
+            ;;; which has the most recent direct subclass in the list
+            ;;; computed so far; the choice is designed to ensure that
+            ;;; the result is deterministic, i.e. that the same class
+            ;;; hierarchy will generate the same CPL regardless of the
+            ;;; order in which things have been declared
+        define chooseNext(sofar, choices) -> next;
+            lvars class;
+            for class in sofar do
+                lvars supers = directSupers(class);
+                ;;; class will have at most one of its supers among the
+                ;;; available choices because for any two classes drawn
+                ;;; from supers one must precede the other, meaning that
+                ;;; both can't possibly be without predecessors
+                for next in choices do
+                    returnif(member(next, supers));
+                endfor;
+            endfor;
+            mishap(0, 'THIS SHOULD NEVER HAPPEN!');
+        enddefine;
+
+            ;;; Do the sort: this may return false if the CPL can't be
+            ;;; computed
+        topologicalSort(predecessors, chooseNext);
+    enddefine;
+
+        ;;; Result cache (experts might want to use *newanyproperty with
+        ;;; an active default)
+    define cache =
+        newproperty([], 32, false, "tmparg");
+    enddefine;
+
+        ;;; Check the cache for a previous result...
+    unless cache(class) ->> result then
+        ;;; ...do it the hard way
+        computeCPL(class) ->> result -> cache(class);
+    endunless;
+enddefine;
+
+/***********************************************************************
+
+Examples from above
+
+***********************************************************************/
+
+CPL("employee") =>
+** [employee]
+
+CPL("manager") =>
+** [manager employee]
+
+CPL("section_head") =>
+** [section_head manager employee]
+
+CPL("contractor") =>
+** [contractor employee]
+
+CPL("project_leader") =>
+** [project_leader contractor manager employee]
+
+
+--- C.all/lib/objectclass/teach/inheritance
+--- Copyright University of Sussex 1996. All rights reserved.

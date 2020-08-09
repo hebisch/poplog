@@ -1,0 +1,1077 @@
+TEACH OBJECTCLASS_EXAMPLE                       Aaron Sloman, April 1992
+                                    Revised Robert Duncan, November 1995
+
+A tutorial example of using LIB * OBJECTCLASS. A full listing of the
+code from this tutorial can be found in LIB * OBJECTCLASS_EXAMPLE. For
+an overview of the library see HELP * OBJECTCLASS.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Getting started
+
+  2   Example: defining class person
+
+  3   Procedures created automatically by define :class
+      3.1   Constructors and destructors
+      3.2   Recogniser
+      3.3   Slot accessors and updaters
+
+  4   Four ways of creating a person
+      4.1   Using consperson
+      4.2   Using newperson
+      4.3   Using instance ... endinstance
+      4.4   Using define :instance
+
+  5   Defining methods
+
+  6   Defining subclass adult of person
+
+  7   The marry method
+
+  8   Multi-methods
+
+  9   Improving the printing of adults
+
+ 10   Inheritance
+
+ 11   The professor class
+
+ 12   Multiple inheritance
+
+ 13   Specialisation and call-next-method
+
+ 14   More about methods
+      14.1  Untyped arguments
+      14.2  Updater methods
+      14.3  Slot methods
+
+ 15   Wrappers
+
+ 16   Further reading
+
+
+-----------------------------------------------------------------------
+1  Getting started
+-----------------------------------------------------------------------
+
+Before you can use any of the features of objectclass you must compile
+the line
+
+    uses objectclass;
+
+You should do this now if you want to try out the examples in this file,
+e.g. by using the "mark and load" facilities described in TEACH * MARK
+and TEACH * LMR.
+
+If you want to get an overview of objectclass first, have a look at some
+of the introductory material in HELP * OBJECTCLASS.
+
+A full description of all the syntax forms and procedures introduced in
+this file is given in REF * OBJECTCLASS.
+
+
+-----------------------------------------------------------------------
+2  Example: defining class person
+-----------------------------------------------------------------------
+
+We are going to start by defining a class called person, which will
+represent people whose age, name and sex interest us. Later we shall
+define subclasses of people with additional features of interest,
+including adults (who are capable of having spouses) and professors (who
+have subjects, and who sometimes retire).
+
+Here is a simple definition for a class to represent people. We assume
+each person has a name, an age and a sex, and we specify default values
+for these attributes.
+
+    define :class person;
+        slot person_name = undef;
+        slot person_age  = 0;
+        slot person_sex  = undef;
+    enddefine;
+
+The names you choose for attributes (slots) are important because, once
+a name has been used to denote a slot, it can't generally be used for
+anything else. Names like "name", "age" and "sex" are attractive, but
+you're bound to want to use these as ordinary variables later on, and
+that would conflict with their use for slot access. So for safety, start
+all attribute names with a reminder of the class to which they are
+relevant. This will be more verbose, but less likely to lead to errors.
+(Naming problems like this become less acute the more you reduce the
+visibility of names by using sections and lexical variables: see
+HELP * SECTIONS, * LEXICAL.)
+
+
+-----------------------------------------------------------------------
+3  Procedures created automatically by define :class
+-----------------------------------------------------------------------
+
+A :class declaration creates a new class and a set of procedures to go
+with it. The class itself is actually a Poplog key: most people don't
+need to know that, but if you're interested you can find out more about
+keys from REF * KEYS. It's the procedures associated with the class
+which are of greater importance to most users because they provide the
+interface to the class. The procedure names are derived systematically
+from the class name.
+
+
+3.1  Constructors and destructors
+---------------------------------
+Constructors create new instances of a class, i.e. objects having the
+attributes described in the class definition. There are two constructors
+defined -- the cons and new constructors -- which differ in the amount
+of information you have to provide to create an instance:
+
+    ;;; create a new person
+    vars fred = consperson("fred", 5, "male");
+
+    fred =>
+    ** <person person_name:fred person_age:5 person_sex:male>
+
+    ;;; create another person, with default attributes
+    vars anonymous = newperson();
+
+    anonymous =>
+    ** <person person_name:undef person_age:0 person_sex:undef>
+
+There are other ways of creating instances described later.
+
+A destructor extracts all the attributes from an object:
+
+    destperson(anonymous) =>
+    ** undef 0 undef
+
+    vars (freds_name, freds_age, freds_sex) = destperson(fred);
+
+    freds_name =>
+    ** fred
+
+    freds_age =>
+    ** 5
+
+
+3.2  Recogniser
+---------------
+A recogniser is a predicate which identifies instances of a class: the
+recogniser isperson returns <true> for objects created from class person
+and <false> for anything else.
+
+    isperson(fred) =>
+    ** <true>
+
+    isperson(anonymous) =>
+    ** <true>
+
+    isperson("fred") =>
+    ** <false>
+
+We'll see later that isperson will also recognise instances created from
+subclasses of person.
+
+
+3.3  Slot accessors and updaters
+--------------------------------
+The attributes of an object can be read and modified using slot
+procedures: one of these is created for each slot in the class
+definition.
+
+    person_name(fred) =>
+    ** fred
+
+    person_age(fred) =>
+    ** 5
+
+    6 -> person_age(fred);  ;;; it must be his birthday
+    person_age(fred) =>
+    ** 6
+
+Objectclass uses the term "slot" to denote what other object-oriented
+systems call "instance variables". The word "slot" is borrowed from
+CLOS, the Common Lisp Object System, which is similar to objectclass in
+many ways, while "instance variable" is the name used by SmallTalk,
+possibly the most famous of object-oriented programming languages. Slots
+are accessed and updated through straightforward procedure calls,
+needing no special syntax.
+
+
+-----------------------------------------------------------------------
+4  Four ways of creating a person
+-----------------------------------------------------------------------
+
+You've seen the consperson and newperson procedures already. There are
+also two syntax forms based on the instance keyword. All of these have
+their advantages and disadvantages.
+
+
+4.1  Using consperson
+---------------------
+This is the fastest way to create a person because it can build an
+instance directly from the attributes you give it:
+
+    consperson("mary", 32, "female") =>
+    ** <person person_name:mary person_age:32 person_sex:female>
+
+It's also familiar to most Pop-11 programmers, because it's like the
+constructors for built-in classes such as *conspair and those created by
+*defclass. But it has one BIG disadvantage: you have to know exactly the
+number and order of slots before you can use it. That's not too bad for
+a person with only three slots, although the order (name, age, sex) is
+arbitrary compared to, say, (name, sex, age) -- try remembering the
+right one tomorrow! Things get a lot worse as the number of slots
+increases, especially when you have to remember slots inherited from
+superclasses, and of course if you ever need to add an attribute to the
+person class such as colour of hair or taste in music, then every call
+to consperson that you've ever written will have to be hunted down and
+changed accordingly.
+
+
+4.2  Using newperson
+--------------------
+This creates a person with all its attributes set to the default values
+specified in the class definition:
+
+    newperson() =>
+    ** <person person_name:undef person_age:0 person_sex:undef>
+
+This frees you from ever having to remember what all the different slots
+are and what order they come in, but of course every instance created by
+this method looks the same, and for any particular use you're probably
+going to have to set some slots explicitly to the values you want:
+
+    vars mary = newperson();
+    "mary" -> person_age(mary);
+    "female" -> person_sex(mary);
+
+This can get tedious and looks untidy. It's also a bit slower, because
+newperson calls consperson to build an instance and then fills in the
+slot values.
+
+
+4.3  Using instance ... endinstance
+-----------------------------------
+The instance syntax form packages up the creation of an object and
+initialisation of selected slots:
+
+    instance person
+        person_name = "mary";
+        person_sex  = "female";
+    endinstance =>
+    ** <person person_name:mary person_age:0 person_sex:female>
+
+It uses newperson to create the object, so any slots you don't set
+explicitly will still get predictable values. And it's not just slots
+you can set with this form: any updater method which applies to person
+will do.
+
+
+4.4  Using define :instance
+---------------------------
+This is just a minor variation on the above which gives a name to the
+object it creates:
+
+    define :instance mary:person;
+        person_name = "mary";
+        person_sex  = "female";
+    enddefine;
+
+    mary =>
+    ** <person person_name:mary person_age:0 person_sex:female>
+
+
+-----------------------------------------------------------------------
+5  Defining methods
+-----------------------------------------------------------------------
+
+Once you've defined a class, you can define methods which operate only
+on instances of that class. An objectclass method is a just a procedure,
+but constrained to apply only to arguments of a particular class or set
+of classes. Here's an example of how to give a person a birthday:
+
+    define :method birthday(p:person);
+        lvars age = person_age(p) + 1;
+        age -> person_age(p);
+        [Happy birthday ^(person_name(p)) - now aged ^age] =>
+    enddefine;
+
+    person_age(fred) =>
+    ** 6
+
+    ;;; it's his birthday again
+    birthday(fred);
+    ** [Happy birthday fred - now aged 7]
+
+    person_age(fred) =>
+    ** 7
+
+This looks much like an ordinary procedure. What's the difference? So
+far, just the fact that we've defined birthdays only for persons, and
+not for other objects such as words or lists of people:
+
+    birthday("fred");
+
+    ;;; MISHAP - Method "birthday" failed
+    ;;; INVOLVING:  fred
+
+    birthday([^fred ^mary]);
+
+    ;;; MISHAP - Method "birthday" failed
+    ;;; INVOLVING:  [<person person_name:fred ... etc.]
+
+Things get more interesting when we define subclasses, next.
+
+
+-----------------------------------------------------------------------
+6  Defining subclass adult of person
+-----------------------------------------------------------------------
+
+When people grow up they may acquire a spouse. So we define a new
+subclass of persons, called adults, who are able to have a spouse. But
+the spouse may be nonexistent, which we'll make the default.
+
+    define :class adult is person;      ;;; specify inheritance
+        slot person_spouse = false;     ;;; and an additional slot
+    enddefine;
+
+Because of the is clause in the define header, the adult class is made a
+subclass of person. This means that every instance of adult is also an
+instance of person and inherits all the attributes of a person. For
+example:
+
+    define :instance adam:adult;
+        person_name = "adam";
+        person_sex = "male";
+        person_age = 33;
+    enddefine;
+
+    adam =>
+    ** <adult person_name:adam person_age:33 person_sex:male
+        person_spouse:<false>>
+
+    isperson(adam) =>
+    ** <true>
+
+    person_spouse(adam) =>
+    ** <false>
+
+The inheritance includes methods too, so that adults can have birthdays:
+
+    birthday(adam);
+    ** [Happy birthday adam - now aged 34]
+
+But inheritance (or subclassing, or whatever we choose to call it) is
+strictly one way: an adult is surely a person, but not all persons are
+adults.
+
+    isadult(adam) =>
+    ** <true>
+
+    isadult(fred) =>
+    ** <false>
+
+    person_spouse(fred) =>
+
+    ;;; MISHAP - Method "person_spouse" failed
+
+
+-----------------------------------------------------------------------
+7  The marry method
+-----------------------------------------------------------------------
+
+We shall now define a method for linking two adults in marriage.
+
+    define :method marry(p1:adult, p2:adult);
+
+        ;;; check to see if the marriage is legal
+        define check_bigamy(p1, p2);
+            if person_spouse(p1)            ;;; already married
+            and person_spouse(p1) /== p2    ;;; ... to someone else!
+            then
+                mishap('BIGAMY', [^p1 ^p2]);
+            endif
+        enddefine;
+        check_bigamy(p1, p2);
+        check_bigamy(p2, p1);
+
+        ;;; check for same sex
+        if person_sex(p1) == person_sex(p2) then
+            [hmm - very modern] =>
+        endif;
+
+        ;;; marry them
+        define take_spouse(p1, p2);
+            ;;; take the vows
+            [I ^(person_name(p1))
+                take thee ^(person_name(p2))
+                to be my lawfully wedded
+                other] =>
+            ;;; update the spouse slot
+            p2 -> person_spouse(p1);
+        enddefine;
+        take_spouse(p1, p2);
+        take_spouse(p2, p1);
+
+    enddefine;  /* marry */
+
+Having defined the method we can now use it:
+
+    define :instance eve:adult;
+        person_name = "eve";
+        person_sex = "female";
+        person_age = 35;
+    enddefine;
+
+    marry(adam, eve);
+    ** [I adam take thee eve to be my lawfully wedded other]
+    ** [I eve take thee adam to be my lawfully wedded other]
+
+    person_name(person_spouse(adam)) =>
+    ** eve
+
+    person_name(person_spouse(eve)) =>
+    ** adam
+
+Is adam the spouse of his spouse?
+
+    person_spouse(person_spouse(adam)) == adam =>
+    ** <true>
+
+What if adam tries to marry someone else?
+
+    marry(adam,
+        instance adult
+            person_name = "jezebel";
+            person_sex  = "female";
+        endinstance);
+
+    ;;; MISHAP - BIGAMY
+    ;;; INVOLVING:  <adult person_name:adam person_age:34 person_sex:male
+        person_spouse:<adult person_name:eve person_age:35
+        person_sex:female person_spouse:(LOOP <adult>)>> <adult
+        person_name:jezebel person_age:0 person_sex:female
+        person_spouse:<false>>
+
+As an aside, notice that the marriage of adam and eve creates a circular
+structure: adam's spouse slot contains eve, while eve's spouse slot
+contains adam. When printing adam -- as in this mishap message --
+objectclass prints eve's spouse simply as
+
+    (LOOP <adult>)
+
+If it didn't do this, the printing would get stuck in an infinite loop.
+We'll see shortly how to abbreviate printing to show only the attributes
+we want.
+
+
+-----------------------------------------------------------------------
+8  Multi-methods
+-----------------------------------------------------------------------
+
+The purpose of the marry method is to illustrate the definition and use
+of a multi-method, i.e. a method which has a class constraint on more
+than one argument. The marry method will fail unless both its arguments
+are adults:
+
+    marry(fred, mary);
+
+    ;;; MISHAP - Method "marry" failed
+    ;;; INVOLVING:  <person person_name:fred person_age:7
+        person_sex:male> <person person_name:mary person_age:0
+        person_sex:female>
+
+Not all object-oriented languages accept multi-methods, allowing only
+one argument to be constrained. Typically, this argument has a special
+status and may be denoted by a particular name such as "this" or "self".
+See TEACH * FLAVOURS for an example.
+
+Objectclass supports multi-methods because they fit more naturally into
+the Pop-11 programming style: with all arguments treated alike, a method
+call maps naturally onto a normal procedure call. Moreover, a method
+such as marry is inherently symmetrical: there's no reason why one or
+other partner should be identified for special status, and using multi-
+methods allows us to write the definition in the most obvious way.
+
+
+-----------------------------------------------------------------------
+9  Improving the printing of adults
+-----------------------------------------------------------------------
+
+The default printing of adults, especially married adults, is extremely
+verbose:
+
+    adam =>
+    ** <adult person_name:adam person_age:34 person_sex:male
+        person_spouse:<adult person_name:eve person_age:35
+        person_sex:female person_spouse:(LOOP <adult>)>>
+
+Printing can be customised for a class by defining a method called
+print_instance. We can improve the look of adults by shortening the
+attribute names and printing just the name of the spouse (if there is
+one):
+
+    define :method print_instance(a:adult);
+        printf('<adult name:%P sex:%P age:%P', [%
+            person_name(a),
+            person_sex(a),
+            person_age(a),
+        %]);
+        if person_spouse(a) then
+            printf(' spouse:%P', [%
+                person_name(person_spouse(a))
+            %]);
+        endif;
+        printf('>');
+    enddefine;
+
+    adam =>
+    ** <adult name:adam sex:male age:34 spouse:eve>
+
+    newadult() =>
+    ** <adult name:undef sex:undef age:0>
+
+See HELP * PRINTF if necessary.
+
+
+-----------------------------------------------------------------------
+10  Inheritance
+-----------------------------------------------------------------------
+
+The class adult inherited the attributes name, age and sex from class
+person and added a new one of its own, the spouse. We'd now like to
+define a new class professor which is like an adult, in that it has all
+the adult attributes and can do all the things that an adult can do,
+such as getting married, but also has some additional properties and
+behaviours specific to professors. We can do this by creating a new
+subclass of adult which will inherit all the attributes of an adult,
+including those which were themselves inherited from person, together
+with any methods we have already defined or which we may define in the
+future.
+
+Without inheritance, defining the new professor class would be rather
+painful. It would mean creating an entirely new class with explicit
+declarations for all the adult slots as well as the professorial ones,
+and then copying all the methods defined on adults and persons, such as
+marry, to make them work on professors too. Not only would this copying
+be tedious and error-prone but, if we ever wanted to change the way the
+marry method worked on adults, we'd have to remember to duplicate that
+change for professors too.
+
+By using inheritance we get all the adult behaviour ready-packaged and
+free of charge, and in constructing the professor class we need
+concentrate only on what makes professors different from adults: the
+extra attributes they have and the things they can do which ordinary
+adults can't. This process of creating a subclass and then adding to or
+refining its behaviour is known as specialisation.
+
+See TEACH * INHERITANCE for more details of how properties are inherited
+by subclasses from their superclasses.
+
+
+-----------------------------------------------------------------------
+11  The professor class
+-----------------------------------------------------------------------
+
+Here is the definition of a professor, as an adult with the additional
+professorial attributes of a telephone number and a discipline:
+
+    define :class professor is adult;
+        slot telephone_number;
+        slot discipline;
+    enddefine;
+
+We have abandoned the person_ (or professor_) prefix on the new slot
+names because they seem to be explicit enough -- and long enough -- as
+they are. We haven't specified any default values for the new slots
+either, so let's see how they turn out:
+
+    define :instance roger:professor;
+        person_name = "penrose";
+    enddefine;
+
+    telephone_number(roger) =>
+    ** undef
+
+    discipline(roger) =>
+    ** undef
+
+If a slot value is unspecified it defaults to "undef".
+
+Professors are adults, so they print like adults, although we may want
+to abbreviate this even more for professors: who cares about the age,
+sex and spouse of a professor?
+
+    roger =>
+    ** <adult name:penrose age:0 sex:undef>
+
+    define :method print_instance(p:professor);
+        printf('<professor %P>', [% person_name(p) %]);
+    enddefine;
+
+    roger =>
+    ** <professor penrose>
+
+Additional methods specific to professors are possible. First let's
+introduce a new class for subjects on which professors can write:
+
+    define :class subject;
+        slot subject_name = 'undecided';
+    enddefine;
+
+Here's how a professor writes a paper on a subject.
+
+    define :method write_paper(p:professor, s:subject);
+        [^(person_name(p))
+            is writing a paper on ^(subject_name(s))] =>
+        /* now insert code for a professor to write a paper */
+    enddefine;
+
+    define :instance vars rel:subject;
+        subject_name = "relativity";
+    enddefine;
+
+    rel =>
+    ** <subject subject_name:relativity>
+
+    write_paper(roger, rel);
+    ** [penrose is writing a paper on relativity]
+
+Here's how a professor writes a paper on another professor.
+
+    define :method write_paper(p:professor, s:professor);
+        [^(person_name(p))
+            is writing a paper criticising ^(person_name(s))] =>
+        /* now insert code for a professor to write a paper */
+    enddefine;
+
+    write_paper(roger,
+        instance professor
+            person_name = "jones"
+        endinstance);
+    ** [penrose is writing a paper criticising jones]
+
+So a professor has all the slots that an adult has as  well as the  two
+extra  ones specified, and a professor  is receptive to all the methods
+that a person or an  adult is, as well  as the extra method write_paper
+which was (rather poorly) defined  above.
+
+    define :instance marvin:professor;
+        person_name = "marvin";
+        person_sex = "male";
+        person_age = 53;
+        telephone_number = '(691) 455 554';
+        discipline = "computers_and_philosophy";
+    enddefine;
+
+    marvin =>
+    ** <professor marvin>
+
+    discipline(marvin) =>
+    ** computers_and_philosophy
+
+    marry(marvin,
+        instance adult
+            person_name = "nina";
+            person_sex = "female";
+        endinstance);
+    ** [I marvin take thee nina to be my lawfully wedded other]
+    ** [I nina take thee marvin to be my lawfully wedded other]
+
+    birthday(marvin);
+    ** [Happy birthday marvin - now aged 54]
+
+    person_age(marvin) =>
+    ** 54
+
+    write_paper(marvin, conssubject("ai"));
+    ** [marvin is writing a paper on ai]
+
+    write_paper(marvin, roger);
+    ** [marvin is writing a paper criticising penrose]
+
+
+-----------------------------------------------------------------------
+12  Multiple inheritance
+-----------------------------------------------------------------------
+
+A feature of objectclass which is not present in all object-oriented
+programming systems is that you can specify that a class should inherit
+from more than one superclass. This is called multiple inheritance.
+
+Suppose that you wanted to create a new class of french professors. You
+could create a class called french_professor which inherits from
+professor and defines all the features (slots and methods) that are
+special to professors who happen also to be french.
+
+    define :class french_professor is professor;
+        /* features special to french professors */
+    enddefine;
+
+Alternatively you could define a french_person class which encapsulates
+the features of frenchness and then mix the professor class with the
+french_person class to create a class which captures the features of
+frenchness and the features of professordom.  Given a french_person
+class you can create the class of french professors by doing:
+
+    define :class french_professor is professor, french_person;
+        /* features special to french professors that are not true
+            of professors in general or french people in general
+        */
+    enddefine;
+
+The advantages of creating a french professor by this second method is
+that you can keep all features of french people together and quite
+separate from details which are only true of french professors.  More
+importantly you now have a class for a french person that you can mix
+with other classes. For example if you define a student class you can
+easily create a french student class.  If you do this then you can
+change some detail about french people and both the french professor
+class and the french student class will change automatically.  In this
+sense the french person class is a useful placeholder.
+
+Multiple inheritance needs to be used with caution. For example, if you
+wanted to create a class of toy trucks, you could not simply start with
+a truck class and a toy class and combine their features. Similarly, it
+is not possible to have a "good thing" class and combine it with teacher
+and truck classes to obtain good teacher and good truck classes.
+
+Multiple inheritance can lead to a complex network, or lattice, of
+classes through which attributes and methods are propagated by
+inheritance. For example, the classes described above could be part of a
+larger collection with something like the following structure.
+
+                                --------
+                                |ANIMAL|
+                                --------
+                              ------------
+                          --------  ------------
+                          |PERSON|  |CHIMPANZEE|
+                          --------  ------------
+                         --------------
+                      -------  ---------------
+                      |ADULT|  |FRENCH-PERSON|
+                      -------  ---------------
+                         |            |
+                    -----------       |
+                    |PROFESSOR|       |
+                    -----------       |
+                         --------------
+                       ------------------
+                       |FRENCH-PROFESSOR|
+                       ------------------
+
+A graph like this is called an inheritance hierarchy. The rules for
+propagation of inheritance through the hierarchy are described in
+TEACH *INHERITANCE.
+
+
+-----------------------------------------------------------------------
+13  Specialisation and call-next-method
+-----------------------------------------------------------------------
+
+An important part of specialisation is not just the addition of new
+attributes and methods but also the refinement or modification of
+existing, inherited methods to take account of new features and
+responsibilities within the subclass. Take, for example, a class
+representing part of a diagram displayed on screen; the class has a move
+method which will redraw an instance at a different point on the screen.
+But some parts of a diagram will be more complex than others, with
+connections which need to be maintained. When a complex component is
+moved, it must not only redraw itself at the new location, but also
+ensure that its connections are preserved, possibly moving other parts
+of the diagram as a result. The class of difficult drawings must clearly
+provide its own version of the move method to do this, but we wouldn't
+want that method to have to duplicate the basic redrawing code which
+would be just the same as that for all other parts of the diagram.
+
+We'd like to be able to call the superclass method to do the drawing for
+us, to avoid duplication of code and preserve the modularity of design.
+This is a common requirement in methods defined on subclasses, to be
+able to say "now go and do what you would have done had this method not
+been here". In objectclass this can be achieved with the syntax form
+call_next_method.
+
+As an example, let's consider professors' birthdays. Professors have
+birthdays like anybody else, but as they get older they also start to
+look forward to retirement.
+
+    define :method birthday(prof:professor);
+        ;;; a professor's birthday is like anybody else's birthday
+        call_next_method(prof);
+        ;;; ...but with the possibility of retirement
+        lvars age = person_age(prof);
+        if age >= 65 then
+            [^(person_name(prof))
+             is now retired] =>
+        elseif 65 - age < 5 then
+            [^(person_name(prof))
+             has only ^(65 - age) years before retiring] =>
+        endif;
+    enddefine;
+
+    define :instance albert:professor;
+        person_age = 63;
+        person_name = "einstein";
+        discipline = "relativity";
+    enddefine;
+
+    albert =>
+    ** <professor einstein>
+
+    birthday(albert);
+    ** [Happy birthday einstein - now aged 64]
+    ** [einstein has only 1 years before retiring]
+
+    birthday(albert);
+    ** [Happy birthday einstein - now aged 65]
+    ** [einstein is now retired]
+
+call_next_method searches back through the inheritance hierarchy to find
+a method with the same name defined by some superclass (or classes -- it
+works for multi-methods too). Here it finds the birthday method defined
+for persons which looks after the mechanics of incrementing the age and
+giving the birthday greeting; the professor class need only concern
+itself with the matter of retirement, special to professors.
+
+Just to check that persons who are not professors don't get this
+treatment:
+
+    define :instance vars margaret:adult;
+        person_name = "margaret";
+        person_age = 63
+    enddefine;
+
+    birthday(margaret);
+    ** [Happy birthday margaret - now aged 64]
+
+    birthday(margaret);
+    ** [Happy birthday margaret - now aged 65]
+
+
+-----------------------------------------------------------------------
+14  More about methods
+-----------------------------------------------------------------------
+
+14.1  Untyped arguments
+-----------------------
+Not all the arguments in a method definition need to be typed. Here's
+another variation on the write_paper method defined earlier:
+
+    define :method write_paper(p:professor, title);
+        [^(person_name(p))
+         is writing a paper called ^title] =>
+        /* now insert code for a professor to write a paper */
+    enddefine;
+
+    write_paper(marvin, 'The Future of AI');
+    ** [marvin is writing a paper called The Future of AI]
+
+This leaves the second argument title untyped, providing a fallback for
+applications of write_paper in which the first argument is a professor,
+but the second argument is not recognised by either of the methods
+defined previously. Those methods will still be used for arguments they
+do recognise:
+
+    write_paper(marvin, roger);
+    ** [marvin is writing a paper criticising penrose]
+
+Because the title argument is completely untyped, it will work for
+arguments of any kind even when they don't make much sense:
+
+    write_paper(marvin, 0);
+    ** [marvin is writing a paper called 0]
+
+This is just the behaviour we'd expect from ordinary, untyped Pop-11
+procedures. It's reasonable to argue that a title for a paper should
+always be a string, so we might be tempted to write a definition like
+this instead:
+
+    define :method write_paper(p:professor, title:string);
+        ...
+    enddefine;
+
+But although string is a well-known Pop-11 datatype, it's not a class
+that objectclass recognises, and if you tried to compile this definition
+you'd get an error
+
+    ;;; MISHAP - CLASS NAME NEEDED
+    ;;; INVOLVING:  string
+
+Objectclass does provide a syntax form define_extant which can help
+integrate existing datatypes into the objectclass world, but you'll have
+to consult REF * OBJECTCLASS for the details.
+
+A method may leave all its arguments untyped, providing a catch-all
+definition which can never fail. Such a method is called a default
+method.
+
+
+14.2  Updater methods
+---------------------
+Objectclass methods can have updaters, just as ordinary Pop-11
+procedures can. Updaters modify the state of an instance, i.e. its slot
+values. We've already seen that slot procedures have updaters created
+for them automatically
+
+    person_age(adam) =>         ;;; access the slot
+    ** 34
+
+    35 -> person_age(adam);     ;;; update the slot
+
+    person_age(adam) =>
+    ** 35
+
+You can define updaters for other methods by adding the updaterof
+keyword to the method header:
+
+    define :method years_to_retirement(prof:professor) -> years;
+        ;;; base method computes how many years a professor has left
+        ;;; before retirement
+        max(65 - person_age(prof), 0) -> years;
+    enddefine;
+
+    define :method updaterof years_to_retirement(years, prof:professor);
+        ;;; the updater does the inverse: given the number of years
+        ;;; before retirement, we can deduce the professor's age
+        65 - years -> person_age(prof);
+    enddefine;
+
+    years_to_retirement(albert) =>
+    ** 0
+
+    years_to_retirement(marvin) =>
+    ** 11
+
+    ;;; we may not know roger's age...
+    person_age(roger) =>
+    ** 0
+
+    ;;; but we can work it out if we know when he'll retire
+    12 -> years_to_retirement(roger);
+    person_age(roger) =>
+    ** 53
+
+You can use updaters like this in instance forms.
+
+    person_age(
+        instance professor
+            years_to_retirement = 6;
+        endinstance) =>
+    ** 59
+
+
+14.3  Slot methods
+------------------
+The procedures created by define_class for accessing and updating slots
+are really just methods with a magic implementation. To see that this is
+true, let's look at the telephone_number slot belonging to professors:
+having a telephone may be a sine qua non of professorship, but other
+people have telephones too and there's no reason why we shouldn't record
+those. We can do that transparently with a method definition:
+
+    ;;; create a property for holding phone numbers
+    define telephone_book =
+        newassoc([]);
+    enddefine;
+
+    ;;; ordinary mortals have their telephone numbers in the book
+    define :method telephone_number(p:adult);
+        telephone_book(p);
+    enddefine;
+
+    define :method updaterof telephone_number(n, p:adult);
+        n -> telephone_book(p);
+    enddefine;
+
+    telephone_number(marvin) =>
+    ** (691) 455 554
+
+    telephone_number(adam) =>
+    ** <false>
+
+    '(0171) 232 3000' -> telephone_number(adam);
+    telephone_number(adam) =>
+    ** (0171) 232 3000
+
+Marvin's number is held in a slot, while adam's is held in a property.
+It's impossible for a user of the telephone_number method to tell the
+difference. This is a good thing, because it means we can change these
+representations at a later date without anybody else having to change
+their code. If it turns out that everyone has a telephone, we could move
+the telephone_number slot from professors to adults and do away with the
+telephone book property; on the other hand, if we use professors'
+telephones very rarely, we could decide it's wasteful to have a number
+held in each instance and do away with the slot altogether, keeping the
+occasional number we do need in the property. In either case, the
+interface remains exactly the same.
+
+
+-----------------------------------------------------------------------
+15  Wrappers
+-----------------------------------------------------------------------
+
+Wrappers allow you to add extra code to the procedures which objectclass
+creates for you, in particular the cons and new procedures and the slot
+accessors and updaters. You declare wrappers as part of the class
+definition, using the on syntax:
+
+    define :class student is adult;
+        slot student_course;
+        ;;; print a message for each new student
+        on new(student) do
+            printf('One more student to teach!\n');
+    enddefine;
+
+    newstudent() =>
+    One more student to teach!
+    ** <adult name:undef sex:undef age:0>
+
+The different wrapper types you can have are
+
+    cons        called from consstudent
+    new         called from newstudent
+    access      called on each slot access
+    update      called on each slot update
+
+Since newstudent calls consstudent it also runs the cons wrapper. The
+access and update wrappers apply to all slot operations. You can
+restrict attention to a particular slot with a method wrapper:
+
+    define :wrapper updaterof student_course(course, s:student, slot_p);
+        slot_p(course, s);
+        printf('One more student enrolled for %P\n', [^course]);
+    enddefine;
+
+    define :instance bill:student;
+        person_name = "bill";
+        person_age = 19;
+        student_course = "csai";
+    enddefine;
+    One more student to teach!
+    One more student enrolled for csai
+
+
+-----------------------------------------------------------------------
+16  Further reading
+-----------------------------------------------------------------------
+
+HELP * OBJECTCLASS_HELP provides an index to all the available
+documentation on objectclass. It lists several TEACH files which cover
+in more detail particular concepts only touched on in this file, such as
+inheritance.
+
+For a more detailed overview of the library, read HELP * OBJECTCLASS.
+And for the definitive reference guide see REF * OBJECTCLASS.
+
+If you want to compare other object-oriented systems, TEACH * FLAVOURS
+introduces an alternative OOP library within Pop-11 and includes some
+useful background material. Also, Poplog Common Lisp includes a full
+implementation of CLOS, the Common Lisp Object System; for further
+information see HELP * CLISP and, from inside Common Lisp, REF * CLOS.
+
+Objectclass implements its classes as keys and its instances as records.
+To learn more about these concepts, fundamental to Poplog, take a look
+at REF * DATA, * KEYS, * DEFSTRUCT.
+
+
+--- C.all/lib/objectclass/teach/objectclass_example
+--- Copyright University of Sussex 1995. All rights reserved.

@@ -1,0 +1,159 @@
+TEACH METHODS                                    Steve Knight, August 1990
+
+ -- Syntax for methods, define:method
+ -- A Question About Multi-Methods
+ -- Method Interpretation
+ -- Method Failure
+ -- Method Compilation
+
+-- Syntax for methods, define:method ----------------------------------
+
+The syntax for methods is
+
+    define :method [updaterof] [IDENTSPEC] NAME( ARG[:CLASS], ... );
+        STATEMENTS
+    enddefine;
+
+The arguments are optionally "typed" by class-names.  For each class
+name there must exist a corresponding variable with the suffix "_key"
+added.  This convention strikes a sensible balance between readability
+and Pop11's naming conventions.
+
+Note that the arguments are also declared as "lvars" on your behalf.
+This is a deliberate departure from existing Pop11 practice. It keeps
+the argument list shorter and it means that you can't accidently forget
+to declare an argument.
+
+The IDENTSPEC is optional but may be any Pop11 ident-specification, such
+as lconstant, lvars, vars, dlocal and so on.  If omitted, it defaults to
+vars.  Method declarations always add the "procedure" attribute to
+method identifiers.
+
+This form of method definition is called multi-methods.  This is because
+a method dispatches on the types of multiple arguments to determine
+which method-definition to execute.  Multi-methods are quite elegant but
+slightly complicate the method-shadowing algorithm.  This is discussed
+below.
+
+It is also possible to define the updater of a particular method.  This
+simply requires the use of the keyword "updaterof", exactly the same as
+with ordinary procedure definitions (and the same as in the flavours
+package.)  The updater is executed when the method is applies in updater
+mode.  These's nothing exciting about this.
+
+
+-- A Question About Multi-Methods -------------------------------------
+
+One of the interesting problems that arises with multi-methods is
+overlapping definitions.  Here's an example that involves a parent class
+P and a child class C.  There are two method definitions for method M
+that can be thought of as being equally appropriate when applied to two
+values of class C.
+
+    define :class P;
+    enddefine;
+
+    define :class C;
+        is P;
+    enddefine;
+
+    define :method M( x:P, y:C );
+        "this" =>
+    enddefine;
+
+    define :method M( x:C, y:P );
+        "that" =>
+    enddefine;
+
+What happens when you execute the following?
+
+    M( newC(), newC() );
+
+It will either print '** this' or '** that' but which one?  Every
+object-oriented system that supports multi-methods must resolve this
+issue. There are various solutions such as
+    1.  make a definite choice (on the basis of prefered arguments)
+    2.  outlaw overlapping definitions
+    3.  make an arbitrary choice and warn the user
+This package chooses the first solution.  It treats the rightmost argument
+as the most determining and so it will print '** this'.
+
+The rules underpinning the way methods are constructed from their
+multiple definitions are detailed in the next section.
+
+
+-- Method Interpretation ----------------------------------------------------
+
+The interpretation of method-arguments to dispatch to the appropriate
+method-definition is the crux of inheritance.  There is a more readable
+account of this process in the tutorial TEACH * INHERITANCE.
+
+On entry to a generic procedure, each argument is examined in turn
+against all the method definitions.  At each step a number of the
+method-definitions are eliminated until a single definition remains.
+When there is a single definition left it is executed.  (See the next
+section on Method Failure to see why there is always a matching
+definition.)
+
+The basis for elimination of method-definitions is a type-match between
+the datakey of the argument and the classes of the corresponding
+argument in the definitions.  Conceptually, the inheritance hierarchy is
+searched in a depth-first, left-to-right order and the first of the
+classes found is considered to be the best match.  All the definitions
+which do not use the "best" class for that argument are eliminated.
+
+
+-- Method Failure -----------------------------------------------------
+
+In principle, there may be no matching definitions for the method to
+execute.  However, when a method is created it is given a catchall
+definition of the following (rough) form:
+
+    define :method M();
+        method_failure( M )
+    enddefine;
+
+    define :method updaterof M();
+        -> method_failure( M )
+    enddefine;
+
+Where the method "method_failure" is defined roughly as
+
+    define :method method_failure( m ); lvars m;
+        mishap( 'Method failure', [^m] )
+    enddefine;
+
+    define :method updaterof method_failure( m ); lvars m;
+        mishap( 'Update method failure', [^m] )
+    enddefine;
+
+Thus every method is guaranteed to produce a matching clause which the
+user can easily redefine.  Another benefit is that "method_failure" can
+be redefined on a class-by-class basis to give the precise action
+required (such as applying the method to a component to achieve exotic
+effects such as delayed evaluation.)
+
+
+-- Method Compilation -------------------------------------------------------
+
+Although the model given above suggests that applying a method involves
+searching the inheritance hierarchy at various points, the objectclass
+package only ever does that search once.  One of the ideas behind the
+objectclass package was to avoid run-time costs by compiling the methods
+behind the scenes.
+
+The moment at which methods are constructed is called method-compile-time.
+This is normally the first time you call a method after you've added a new
+class or a new method definition.
+
+To avoid this overhead, you can force all the hidden compilations to take
+place by calling
+    optimise_objectclass( "all" );
+This not only causes all the generic procedures to be brought up to date
+but also some other procedures, such as the class recognisers.
+
+For an in-depth review of efficiency, see REF * OBJECTCLASS/Methods.
+
+-----------------------------------------------------------------------
+--- C.all/lib/objectclass/teach/methods
+--- Copyright University of Sussex 1993. All rights reserved.

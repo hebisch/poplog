@@ -1,0 +1,2508 @@
+REF OBJECTCLASS                   Jonathan Meyer & Steve Knight, 1992/93
+                                      Revised by Robert Duncan, Nov 1995
+
+AS: fixed wrapper_invoker entry 29 Mar 2006
+
+        COPYRIGHT University of Sussex 1996. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<                                  >>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<   OBJECT-ORIENTED MULTI-METHOD   >>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<       EXTENSION TO POP-11        >>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<                                  >>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+The  objectclass  library   defines  an  object-oriented,   multi-method
+extension to Pop-11 based on keys (see REF * KEYS).  For an overview  of
+the library see HELP * OBJECTCLASS.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Classes
+      1.1   The Different Kinds of Class
+            ... Standard Classes
+            ... Mixin Classes
+            ... Singleton Classes
+            ... Extant Classes
+            ... Note on Recompiling Classes
+            ... Class Define-Forms
+      1.2   Inheritance
+            ... The Class Precedence List
+            ... Inheritance Syntax
+      1.3   Slots
+            ... Shared Slots
+            ... The Order of Slots
+            ... Slot Syntax
+      1.4   Class Wrappers
+            ... Wrapper Syntax
+            ... Alternative Wrapper Syntax
+      1.5   Operations on Classes
+
+  2   Objects
+      2.1   Creating Objects
+            ... The class cons procedure
+            ... The class new procedure
+            ... The create_instance procedure
+            ... The instance syntax forms
+      2.2   Operations on Objects
+            ... Printing Objects
+
+  3   Generic Procedures and Methods
+      3.1   Overview
+            ... Methods
+            ... Generic Procedures
+            ... Method Dispatch
+            ... Implementation Notes
+      3.2   Syntax of Method Definitions
+      3.3   Method Wrappers
+      3.4   Method Chaining
+      3.5   Operations on Generic Procedures
+            ... Tracing Methods
+            ... Cancelling Methods
+      3.6   Pre-Defined Generic Procedures
+
+  4   Browsing Classes and Generic Procedures
+      4.1   Name Filters
+
+  5   Objectclass and Popc
+
+  6   Objectclass Procedures and Variables
+
+
+
+----------
+1  Classes
+----------
+
+1.1  The Different Kinds of Class
+---------------------------------
+The objectclass library distinguishes four kinds of class:
+
+     #  standard classes, created by define_class
+
+     #  mixin classes, created by define_mixin
+
+     #  singleton classes, created by define_singleton
+
+     #  extant classes, created by define_extant
+
+Currently, there is no way of creating  a class other than by using  one
+of these define-forms.
+
+...  Standard Classes
+---------------------
+A standard  class  is a  record-type  key (see  REF * KEYS)  created  by
+conskey, but with extra properties maintained by objectclass. When a new
+class (key)  X  is  created  by define_class,  it  is  assigned  to  the
+identifier X_key. Associated with  the class will be  a standard set  of
+procedures assigned to the following identifiers:
+
+     consX     the class constructor (based on the class_cons of X_key)
+     destX     the class destructor (same as the class_dest of X_key)
+     newX      the class new procedure
+     isX       the class recogniser
+
+define_class will also create generic procedures and methods as required
+for access to any specified slots. The following example illustrates the
+use of the define-form and the identifiers it creates:
+
+    define :class Item;
+        slot
+            itemPartNo == false,
+            itemDescription == 'Unknown Item';
+    enddefine;
+
+    Item_key =>
+    ** <key Item>
+
+    consItem('XXX-99-1', 'Large Widget') =>
+    ** <Item itemPartNo:XXX-99-1 itemDescription:Large Widget>
+
+    vars item = newItem();
+    item =>
+    ** <Item itemPartNo:<false> itemDescription:Unknown Item>
+
+    item.isItem =>
+    <true>
+
+    item.itemPartNo =>
+    ** <false>
+
+    'XXX-99-1' -> item.itemPartNo;
+    'Large Widget' -> item.itemDescription;
+    item =>
+    ** <Item itemPartNo:XXX-99-1 itemDescription:Large Widget>
+
+    item.destItem =>
+    ** XXX-99-1 Large Widget
+
+The behaviour  of  define_class  is  similar to  that  of  the  standard
+defclass construct (see REF * DEFCLASS). The principal differences are:
+
+    #   the cons  procedure  may have  extra  code added  to  the  basic
+        class_cons procedure if the class declares any cons wrappers
+
+    #   the new procedure has no equivalent in defclass
+
+    #   the is procedure  recognises not  only direct  instances of  the
+        class  itself,  but  also  instances  of  any  derived   classes
+        subsequently declared
+
+    #   the slot access procedures are generic and so may be  overloaded
+        on different classes
+
+Moreover, the name  of the  newly-created class (Item  in the  preceding
+example) may be used  in an inheritance specification  in a later  class
+definition, or as an argument class constraint in a method definition.
+
+...  Mixin Classes
+------------------
+A mixin class (or mixin for short) has similar properties to a  standard
+class except that it cannot be  instantiated, so there are no cons,  new
+or dest procedures created for it. Also, to ensure that instances cannot
+be created by back-door means, the  mixin assigned to the _key  variable
+is not  a true  key at  all, but  a dummy  item used  by objectclass  to
+identify the mixin, and so does not support the usual class_  operations
+defined on keys (such as class_cons).
+     An intended  use of  mixins is  to define  supplementary state  and
+behaviour which can be "mixed-in" to enrich later class definitions, but
+they can  also  be used  to  create  abstract classes  which  will  have
+concrete implementations --  as standard  or extant  classes --  derived
+later. There  is also  an efficiency  benefit to  using mixins  wherever
+instances are not required.
+
+...  Singleton Classes
+----------------------
+Singleton classes are proper classes, but are intended to have only one,
+unique instance. So again, cons, dest and new procedures are not defined
+for them; instead, the define_singleton form creates the single instance
+itself and assigns it to the class name. For example:
+
+    define :singleton NoItem is Item;
+        slot itemDescription = 'Bogus Item';
+    enddefine;
+
+    NoItem =>
+    <NoItem itemPartNo:<false> itemDescription:Bogus Item>
+
+In order to have even one instance, a new key has to be created for  the
+singleton class and is made available through the _key variable as for a
+standard class. This leaves open the possibility of creating  additional
+instances of the class by  using the class_cons procedure directly,  but
+this is clearly against the spirit of the definition.
+
+...  Extant Classes
+-------------------
+The define_extant form  is designed to  help integrate objectclass  into
+the existing Poplog class  system. Defining an extant  class X does  not
+create a new key,  but takes an existing  key from the identifier  X_key
+and promotes it as close as  possible to full objectclass status, as  if
+it had been declared  by define_class.
+    For this to work at all, the number and types of slots declared  for
+the class must match exactly the *class_field_spec of the existing  key.
+But even so,  there are  limits to  what can  be achieved:  typically, a
+pre-existing key will already have cons, etc. procedures defined for  it
+whose definitions may conflict with what is required by objectclass  and
+which may -- especially for system  keys -- be declared constant  and/or
+protected and  so  cannot  easily  be  redefined.  The  steps  taken  by
+objectclass, then, to promote an extant class are as follows:
+
+    #   cons and  dest  procedures  are not  defined  at  all:  existing
+        versions, if available, can continue to be used, but will ignore
+        any cons wrappers declared for the class
+
+    #   the standard new procedure is created
+
+    #   the is procedure  is created in  the usual way  so that it  will
+        recognise any subclasses defined later; any existing  recogniser
+        of the same name previously declared constant or protected  will
+        be cancelled first, but this does mean that the new version will
+        not be visible to code already compiled
+
+    #   slot access  methods are  created as  normal, but  any  existing
+        field-access procedures with the  same names are not  explicitly
+        cancelled first, so any which  cannot be redefined will  cause a
+        mishap; such problem slots can be declared with different  names
+        to the  existing field-access  procedures, but  of course  those
+        original access procedures will remain  and could still be  used
+        for object access and update, by-passing objectclass mechanisms
+
+The following example  incorporates the existing  pair and nil  classes,
+used for constructing lists, into an abstract Sequence class:
+
+    define :mixin Sequence;
+    enddefine;
+
+    define :mixin List is Sequence;
+    enddefine;
+
+    define :extant nil is List;
+    enddefine;
+
+    define :extant pair is List;
+        slot
+            first,
+            rest == [];
+    enddefine;
+
+    newpair() =>
+    ** [undef]
+
+    [1 2 3 4].isSequence =>
+    ** <true>
+
+    [1 2 3 4].first =>
+    ** 1
+
+
+...  Note on Recompiling Classes
+--------------------------------
+A potential problem can arise when recompiling a define_class  statement
+(or one of its  relatives) for which records  of the class have  already
+been  created  and  are  still  in  existence.  Since  all  objects  are
+identified by their keys (which are  unique to each class) the  creation
+of a  new  key  on  recompilation would  invalidate  all  such  existing
+structures using the old key, in the sense that they would no longer  be
+recognised by the procedures associated with the new key.
+    To obviate this problem, objectclass  operates as follows: If a  key
+identifier X_key already exists for the class name X being defined,  and
+contains a key whose specifications  -- in terms of slots,  superclasses
+and wrappers  -- exactly  match the  new definition,  then the  existing
+class is reused instead  of a new one  being created. Thus any  existing
+instances continue to belong to the recompiled class.
+    If you really want to create a  new class, you can stop the old  key
+being reused  by  assigning  any  non-key  value  to  X_key  before  the
+define_class statement, e.g:
+
+        undef -> X_key;
+
+Alternatively, you can assign <false> to pop_oc_reuse (see below).
+
+...  Class Define-Forms
+-----------------------
+
+define_class                                        [define_form syntax]
+        Defines a new standard class:
+
+            define :class [declaration] name [attributes] [;]
+                [fieldspecs]
+            enddefine
+
+        Only the class name is mandatory and the definition will declare
+        and assign  the  following  identifiers derived  from  name,  as
+        described above:
+
+            name_key
+            consname
+            destname
+            newname
+            isname
+
+        together with any slot access and update procedures required  by
+        slot specifications  in fieldspecs.  The optional  parts of  the
+        definition are as follows:
+
+        declaration
+            Specifies the default declaration for identifiers created by
+            the definition. May be any of the words
+
+                vars constant lvars lconstant
+
+            If omitted,  the  default  is derived  from  the  prevailing
+            compile_mode (see  HELP * COMPILE_MODE)  as with  any  other
+            define-form.
+
+        attributes
+            A (square) bracketed list of  attribute names (words) to  be
+            passed  in  the  attribute_vec  argument  to  conskey   (see
+            REF * CONSKEY for  legal values  and their  meanings).  Note
+            that if neither "writeable" nor "nonwriteable" is  specified
+            explicitly, a  default will  be  supplied according  to  the
+            value of pop_oc_writeable_default described below.
+
+        fieldspecs
+            A list  of  fields  describing the  inheritance,  slots  and
+            wrappers of the new class using  the is, slot and on  syntax
+            forms described below.
+
+
+define_mixin                                        [define_form syntax]
+        Defines a new mixin class:
+
+            define :mixin [declaration] name [attributes] [;]
+                [fieldspecs]
+            enddefine
+
+        where the declaration,  name, attributes and  fieldspecs are  as
+        for define_class above. Creates the following identifiers:
+
+            name_key
+            isname
+
+        together with any slot access and update procedures required  by
+        slot specifications in fieldspecs.
+
+
+define_singleton                                    [define_form syntax]
+        Defines a new singleton class:
+
+            define :singleton [declaration] name [attributes] [;]
+                [fieldspecs]
+            enddefine
+
+        where the declaration,  name, attributes and  fieldspecs are  as
+        for define_class above. Creates the following identifiers:
+
+            name
+            name_key
+            isname
+
+        together with any slot access and update procedures required  by
+        slot specifications in fieldspecs.
+
+
+define_extant                                       [define_form syntax]
+        Declares a new extant class:
+
+            define :extant [declaration] name [;]
+                [fieldspecs]
+            enddefine
+
+        where  the  declaration,   name  and  fieldspecs   are  as   for
+        define_class above;  no attributes  can be  sensibly  specified,
+        because the definition does not create a new key. The definition
+        creates the following identifiers:
+
+            newname
+            isname
+
+        together with any slot access and update procedures required  by
+        slot specifications in fieldspecs.
+
+
+1.2  Inheritance
+----------------
+Inheritance is specified in a class definition by one or more clauses of
+the form:
+
+    is <class-list> ;
+
+The keyword isa can be used interchangeably in place of is according  to
+taste. The  <class-list> is  a comma-separated  list of  names, each  of
+which must be  already defined as  a class,  i.e. there must  be a  _key
+identifier in scope  for it.  More than one  class name  is allowed,  to
+support multiple inheritance.
+    Unlike some  other class-based  object systems,  objectclass has  no
+notion of an  implicit "root"  class from  which all  other classes  are
+ultimately descended:  if a  class is  defined without  any  inheritance
+explicitly specified, then it inherits  nothing. (The fact that  generic
+procedures support default methods compensates for what might  otherwise
+appear to be an omission. See below.)
+    If a class B  inherits from class  A, then B is  said to be  derived
+from A; alternatively, B is a subclass of A and A a superclass of B. The
+subclass/superclass relation is transitive:  if class C is  subsequently
+declared as a subclass of B, then C is also implicitly a subclass of  A;
+B is called the  direct superclass of C,  and A an indirect  superclass.
+Sometimes it is convenient to think  of the relation as transitive  too,
+so that every  class is a  subclass (and superclass)  of itself. But  no
+class can really inherit from itself, either directly or indirectly.
+
+As an example, the definition
+
+    define :class CompoundItem is Item;
+        slot itemParts == [];
+    enddefine;
+
+creates a  new  class  CompoundItem  derived  from  Item.  An  immediate
+consequence of the derivation is that every instance of CompoundItem  is
+also considered  an instance  of Item,  and the  isItem recogniser  will
+recognise CompoundItems too:
+
+    newCompoundItem().isItem =>
+    ** <true>
+
+The inverse is not true, however:
+
+    newItem().isCompoundItem =>
+    ** <false>
+
+So inheritance is strictly one-way, as might be expected.
+    A derived class inherits specific properties from its  superclasses,
+namely:
+
+    #   slots
+
+    #   wrappers
+
+    #   methods
+
+Every instance of CompoundItem has the slots of an Item, in addition to
+the itemParts slot declared explicitly within the class definition:
+
+    vars item = newCompoundItem();
+    'YYY-58-4' -> item.itemPartNo;
+    'Complex Gadget' -> item.itemDescription;
+    item =>
+    ** <CompoundItem itemPartNo:YYY-58-4 itemDescription:Complex Gadget
+        itemParts:[]>
+
+Likewise, any methods defined on Items will also work on CompoundItems:
+
+    define :method report(x:Item);
+        printf('Item:\t');
+        pr_field(x.itemPartNo, 12, false, `\s`);
+        npr(x.itemDescription);
+    enddefine;
+
+    report(item);
+    Item:   YYY-58-4    Complex Gadget
+
+
+...  The Class Precedence List
+------------------------------
+Through multiple  inheritance  and the  transitivity  of  inheritance, a
+class  will  typically  have  many  superclasses.  If  a  class  C   has
+superclasses S1,...,Sn  and just  one  of those  superclasses  defines a
+method M, then that method is  inherited unambiguously by C. But in  the
+case where more than one superclass provides an explicit definition  for
+M, which definition should be inherited by C?
+    Any  potential   ambiguities   are  resolved   in   objectclass   by
+construction of a class precedence list (CPL) for each class. The CPL is
+a linearization of the set of superclasses, imposing a total ordering on
+superclasses
+
+    S1 < S2 < ... < Sn
+
+If two or more  superclasses Si,Sj,... define a  method M, then  class C
+inherits M from whichever of the Si,Sj,... comes first in the CPL.
+    The CPL for a class is constructed by merging the CPLs of its direct
+superclasses, in  such  a way  as  to preserve  their  respective  class
+orderings. Preserving order is important for consistency, as it  ensures
+that a class cannot inherit anything that isn't defined or inherited  by
+one  of  its   direct  superclasses  (i.e.   inheritance  can't   skip a
+generation). There  may be  more than  one arrangement  of  superclasses
+which satisfies  this requirement,  but it's  rarely necessary  to  know
+exactly which one is chosen by objectclass except in obscure cases. Most
+of the consequences of the CPL order can be inferred from the  following
+rules:
+
+(1) A class C always precedes its proper superclasses  S1,...,Sn  in any
+    CPL in which it occurs. So if C defines its own variant of method M,
+    then C and any  subclass of C will  always prefer that variant  of M
+    over any  defined by  S1,...,Sn.  This allows  a class  to  override
+    methods defined by its superclasses. For example:
+
+        define :class X;
+        enddefine;
+        ;;;
+        define :method whoami(x:X);
+            'An instance of X';
+        enddefine;
+        ;;;
+        newX().whoami =>
+        ** An instance of X
+
+        define :class Y is X;
+        enddefine;
+        ;;;
+        define :method whoami(x:Y);
+            'An instance of Y';
+        enddefine;
+        ;;;
+        newY().whoami =>
+        ** An instance of Y
+
+        define :class Z is Y;
+        enddefine;
+        ;;;
+        newZ().whoami =>
+        ** An instance of Y
+
+    The definition of method whoami for Y overrides the definition on X,
+    both for Y and any subclass of Y.
+
+(2) Direct superclasses are always placed  in declaration order. If  the
+    definition of a class C contains the inheritance specification
+
+        is D1,...,Dk ;
+
+    then the ordering
+
+        D1 < ... < Dk
+
+    will be maintained in the CPLs of C and any subclasses of C. So  the
+    designer  of  a  class  can  choose  which  superclasses  should  be
+    preferred for inheritance. For example:
+
+        define :class A;
+        enddefine;
+        ;;;
+        define :method whoami(x:A);
+            'An instance of A';
+        enddefine;
+
+        define :class B;
+        enddefine;
+        ;;;
+        define :method whoami(x:B);
+            'An instance of B';
+        enddefine;
+
+        define :class C is A,B;
+        enddefine;
+        ;;;
+        newC().whoami =>
+        ** An instance of A
+
+        define :class D is B,A;
+        enddefine;
+        ;;;
+        newD().whoami =>
+        ** An instance of B
+
+    Here, by changing the order of the direct superclasses A and B,  the
+    class designer  can choose  which version  of the  whoami method  is
+    inherited by the derived classes C and D.
+
+The rationale  behind  these rules  and  details of  the  algorithm  for
+constructing the CPL are discussed in
+
+    R.Ducournau, M.Habib, M.Huchard, M.L.Mugnier
+    Proposal for a Monotonic Multiple Inheritance Linearization
+    OOPSLA '94, ACM SIGPLAN Notices, 10/94, pp. 164--175
+
+An example Pop-11 algorithm is presented in TEACH * INHERITANCE.
+
+It is  very easy  to  write down  a class  definition  for which  it  is
+impossible  to  construct  a  class  precedence  list  satisfying  these
+constraints. For example, building on the example at (1) above:
+
+    define :class ? is X,Y;
+    enddefine;
+
+Rule (2) demands that  X precede Y, but  rule (1) demands the  opposite,
+and objectclass  will refuse  to compile  this definition.  Fortunately,
+such problem cases rarely cause difficulties in realistic programs.
+
+...  Inheritance Syntax
+-----------------------
+
+is class-list ;                                     [objectclass syntax]
+isa class-list ;
+        Declares  inheritance   of   a  class.   The   class-list   is a
+        comma-separated  list  of  names   which  must  all  have   been
+        previously defined  as  classes  using one  of  the  objectclass
+        define-forms. Those classes become superclasses of the new class
+        being defined.
+
+
+adopting class-list ;                               [objectclass syntax]
+        Declares the  new class  being defined  as a  superclass of  the
+        existing classes identified by class-list. The existing  classes
+        must be compatible with  the new class in  the sense that  their
+        slots must be a superset of the new class's slots.
+
+
+
+1.3  Slots
+----------
+The slots of a  class determine the private  state of its instances.  An
+instance carries a value for each slot which can be accessed and updated
+independently of the value  held by any other  instance. Slots are  like
+the instance variables of other object-oriented languages, but are  read
+and modified by generic procedure calls, requiring no special syntax.
+    A  slot  is  characterised  by  three  attributes:  a  name,   which
+determines the generic procedure used  to access and update the  slot; a
+typespec, which can restrict or modify values assigned to the slot,  and
+an initial  value, which  is  assigned to  the  slot for  each  instance
+created by the class new procedure.
+    Slots are inherited, so the full  set of slots possessed by a  class
+is the union of those slots explicitly declared in the class  definition
+together with  the  slots of  its  direct superclasses.  More  than  one
+superclass may declare a slot with the same name, but slots are  unique,
+so the derived class will  have only one slot  with that name. The  type
+and initial value for  the slot are  taken from the  first class in  the
+class precedence list which defines the slot (NB: duplicate slots should
+really have compatible types, but this is not checked).
+    Slots are specified as part of a class definition in clauses of  the
+form:
+
+    slot <slot-list> ;
+
+A slot with all its attributes specified might look like this:
+
+    slot timeStamp :int = theCurrentTime();
+
+Here, the slot  name is  timeStamp: the class  definition will  create a
+generic procedure with this name (if  it doesn't exist already) and  add
+to it methods which  access and update the  slot. The typespec is  :int,
+which stores  the  value  as  a  machine  integer,  presumably  so  that
+instances of this  class can be  passed to externally-loaded  procedures
+(objectclass supports the same set of typespecs allowed by defclass; see
+REF * DEFSTRUCT). The initial value is computed for each new instance by
+calling the procedure theCurrentTime.
+    Only the slot  name must  be specified;  the slot  type defaults  to
+"full" which allows  any Poplog value  to be assigned,  and the  initial
+value defaults to "undef"  for full fields and  0 for numerics. This  is
+the same  as  defclass.  The  definition  of  extant  class  pair  above
+illustrates typical partial slot specifications:
+
+    slot first, rest == [];
+
+This declares two  slots, first and  rest, both full  fields, with  rest
+initialised to []. Hence:
+
+    newpair().first =>
+    ** undef
+
+    newpair().rest =>
+    ** []
+
+These examples also  show the  two different  ways in  which an  initial
+value can be specified, using either  single (=) or double (==)  equals.
+The distinction is this: an "==" initialiser is evaluated exactly  once,
+at the time the  class definition is compiled,  and the resulting  value
+saved away to be assigned to the slot for each new instance created;  an
+"=" initialiser  is evaluated  afresh  for every  instance, and  so  can
+return a different value each time (such as a timestamp).
+    Code to evaluate any "=" initialisers is compiled into the class new
+procedure. While this is executing, the variable myself is bound to  the
+instance being created,  so initialisers  can use this  to change  their
+behaviour depending  on  the  values already  assigned  to  other  slots
+(although complex initialisations  like this are  better handled  with a
+class new wrapper, described below).
+
+...  Shared Slots
+-----------------
+An alternative form of slot specification:
+
+    shared_slot <slot-list> ;
+
+can be  used  to  declare  shared slots  (also  known  as  class  slots;
+ordinary, non-shared slots are sometimes called instance slots when  the
+distinction is important).  A shared  slot associates a  value with  the
+class itself, rather than  with each instance:  accessing a shared  slot
+will return the same value for all instances of the class, and  updating
+it will change that value for all instances.
+    While a shared  slot description allows  both forms of  initialiser,
+the difference between "=" and "==" initialisation is rather more subtle
+than before. Since all instances are sharing a single slot, the  initial
+value for that slot is only  ever computed once. The different forms  of
+initialiser control  when  that  computation  is  done:  the  "=="  form
+computes its value  when the class  is defined, as  before, but the  "="
+form computes its value on the first occasion when the slot is accessed.
+If the slot is  never accessed, or is  explicitly assigned before  being
+accessed, the initial value is never computed. This may be important  if
+the computation is lengthy.
+    Shared slots can be defined separately from their class definitions:
+see define_shared_slot below.
+
+...  The Order of Slots
+-----------------------
+An objectclass instance is  a Poplog record, with  the class as its  key
+and one field for each instance  slot. There are three circumstances  in
+which the order of slots within the record may be of significance:
+
+    #   when using the class cons procedure, which expects one  argument
+        for each slot in record order
+
+    #   when accessing  slots  using  non-objectclass  procedures, e.g.
+        class_access, sysFIELD, etc.
+
+    #   when passing an instance to an externally-loaded procedure
+
+The arrangement of slots can be determined by the following method:
+
+    #   start with the class definition, removing everything except slot
+        and is (inheritance) specifications;
+
+    #   recursively replace each direct superclass with its own list  of
+        slots;
+
+    #   remove duplicates,  with earlier  slots taking  precedence  over
+        later occurrences.
+
+For example, given
+
+    define :class A;
+        slot s1, s2;
+    enddefine;
+
+    define :class B;
+        slot s2, s3;
+    enddefine;
+
+    define :class C is A,B;
+        slot s1, s4;
+    enddefine;
+
+the order of slots for class C can be determined as follows:
+
+    ;;; isolate slots and superclasses
+    is A, B;
+    slot s1, s4;
+
+    ;;; recursively expand superclasses
+    slot s1, s2;
+    slot s2, s3;
+    slot s1, s4;
+
+    ;;; remove duplicates
+    slot s1, s2, s3, s4;
+
+Note that this ordering is independent  of the types and initial  values
+associated with each slot, which are determined through the usual  class
+precedence rules.
+    The default pointer position for a  class is determined in the  same
+way as  for any  recordclass created  by conskey,  but you  can set  the
+pointer position explicitly by placing the pointer symbol
+
+    >->
+
+in front of a slot, as in
+
+    define :class Point;
+    >-> slot xCoord :short, yCoord :short;
+    enddefine;
+
+which forces slot xCoord to the pointer position (see REF * DATA).
+
+...  Slot Syntax
+----------------
+
+slot slot-list ;                                    [objectclass syntax]
+        Declares  one  or  more  instance  slots.  The  slot-list   is a
+        comma-separated sequence  of slot  specifications, each  of  the
+        form
+
+            [declaration] name [typespec] [initialiser]
+
+        Only the name is mandatory and names the generic procedure  used
+        to access the slot. The optional components are as follows:
+
+        declaration
+            Declaration for the  generic procedure name.  May be any  of
+            the words
+
+                vars constant lvars lconstant
+
+            If omitted it defaults to the declaration specified for  the
+            class as a whole.
+
+        typespec
+            Declares the type of the slot. Valid forms are described  in
+            REF * DEFSTRUCT. The default is "full".
+
+        initialiser
+            Declares an  initial  value  for the  slot.  There  are  two
+            alternative forms
+
+                = expression
+                == expression
+
+            The difference is  explained above. The  default is  "undef"
+            for full slots and 0 for numerics.
+
+
+shared_slot slot-list ;                             [objectclass syntax]
+        Declares one or more shared  (or class) slots. The slot-list  is
+        as for a slot declaration described above.
+
+
+
+1.4  Class Wrappers
+-------------------
+Wrappers add extra code to the procedures created by a class definition,
+to be  executed  at  significant  points during  the  lifetime  of  each
+instance. The supported wrapper types are:
+
+    cons        run after an object has been created with the cons
+                procedure
+
+    new         run after an object has been created and initialised
+                with the new procedure
+
+    access      run each time an instance slot is accessed
+
+    update      run each time an instance slot is updated
+
+    destroy     run when an object is reclaimed by the garbage collector
+
+Wrappers of all kinds accumulate through inheritance and are executed in
+inheritance order,  either  forwards  or  backwards  through  the  class
+precedence list depending  on the  wrapper type.  Currently, you  cannot
+override or cancel superclass wrappers.
+    A wrapper is  specified in  a class definition  by a  clause of  the
+form:
+
+    on <wrapper-name>(<variable-list>) do <expression> ;
+
+The <expression> is evaluated for  each instance at the point  indicated
+by the  <wrapper-name> which  must be  one of  those listed  above.  The
+<variable-list> declares a  set of  identifiers which  are bound  during
+evaluation of the  wrapper; this will  include at least  a name for  the
+current instance.
+
+An example of using wrappers:
+
+    define :class CountedItem is Item;
+        ;;; keep a count of the number of items in circulation
+        shared_slot counter == 0;
+        on cons(item) do
+            item.counter + 1 -> item.counter;
+        on destroy(item) do
+            item.counter - 1 -> item.counter;
+    enddefine;
+
+    newCountedItem().counter =>
+    ** 1
+    newCountedItem().counter =>
+    ** 2
+    newCountedItem().counter =>
+    ** 3
+
+    sysgarbage();
+    newCountedItem().counter =>
+    ** 1
+
+    define :class DatedItem is CountedItem;
+        ;;; mark each item with the date
+        slot dateStamp;
+        on new(item) do
+            npr(sysdaytime() ->> item.dateStamp);
+        ;;; note any changes
+        on update(item, p) do
+            printf('Updated item %p\n', [^item]);
+    enddefine;
+
+    newDatedItem().counter =>
+    Updated item <DatedItem itemPartNo:<false> itemDescription:Unknown
+        Item dateStamp:Thu Nov 16 10:16:48 GMT 1995>
+    Thu Nov 16 10:16:48 GMT 1995
+    ** 2
+
+Note here  how DatedItem  inherits the  counting cons  wrapper from  the
+CountedItem class and also  how the update wrapper  is invoked when  the
+dateStamp slot is initialised by new.
+
+
+...  Wrapper Syntax
+-------------------
+
+on cons(variable) do expression;                    [objectclass syntax]
+        The expression is  evaluated each  time an  instance is  created
+        using the  class  cons procedure,  with  variable bound  to  the
+        newly-created object.  cons  wrappers  are run  in  reverse  CPL
+        order, i.e.  the expression  will be  evaluated after  any  cons
+        wrappers inherited from superclasses.  Since the cons  procedure
+        is called by the new procedure, cons wrappers are also  executed
+        by new and so you should use a cons wrapper to attach code which
+        must be executed for every instance.
+
+
+on new(variable) do expression;                     [objectclass syntax]
+        Like a cons wrapper,  but evaluated after  an instance has  been
+        created and initialised with the class new procedure, i.e. after
+        all instance slots have been assigned their initial values.  Use
+        this  for  more  complex  initialisations,  or  those  involving
+        multiple slots.
+
+
+on access(variable_1, variable_2) do expression;    [objectclass syntax]
+        The expression is evaluated before an instance slot is  accessed
+        with  variable_1  bound  to  the  object  to  be  accessed   and
+        variable_2 bound  to  the  access procedure  that  will  do  it,
+        including any superclass  wrappers. access wrappers  are run  in
+        CPL order,  i.e. the  expression will  be evaluated  before  any
+        access wrappers inherited from superclasses.
+
+
+on update(variable_1, variable_2) do expression;    [objectclass syntax]
+        The expression  is evaluated  after an  instance slot  has  been
+        updated, with variable_1  bound to the  object that was  updated
+        and variable_2  bound  to  the update  procedure  that  did  it,
+        including any superclass  wrappers. update wrappers  are run  in
+        reverse CPL order, i.e. the  expression will be evaluated  after
+        any update wrappers inherited from superclasses.
+
+
+on destroy(variable) do expression;                 [objectclass syntax]
+        The  expression   is  evaluated   as  a   destroy  action   (see
+        REF * PROPS) when the garbage collector determines there are  no
+        remaining references to an instance, with variable bound to  the
+        object being destroyed. destroy wrappers  are run in CPL  order,
+        i.e the expression will be evaluated before any destroy wrappers
+        inherited from superclasses.
+
+        The destroy action is attached to  each object as it is  created
+        with the class  cons procedure; objectclass  maintains its  own,
+        private destroy property so  you cannot (either deliberately  or
+        accidentally) cancel or change a destroy action once installed.
+
+        NB: destroy wrappers are only run after a garbage collection and
+        not when an object is ``destroyed'' due to process termination.
+
+
+...  Alternative Wrapper Syntax
+-------------------------------
+An alternative syntax for wrappers allows the form:
+
+    on <wrapper-name> do <procedure-expression> ;
+
+Here the  possible  <wrapper-names>  are as  before;  the  absence  of a
+parenthesised <variable-list> distinguishes the two forms. In this  case
+the wrapper expression must evaluate to  a procedure which is called  at
+the wrapper  point;  the  procedure should  expect  a  single  argument:
+another procedure which must be explicitly  called to do the real  work.
+So in the example:
+
+    on cons do my_wrapper ;
+
+the procedure my_wrapper -- which should  already be defined -- will  be
+applied  to  a  constructor  procedure  consisting  of  the   class_cons
+procedure plus any inherited superclass wrappers. This constructor  must
+be called in order to create  an instance: arguments to the  constructor
+will be on the stack. The form
+
+    on cons(x) do <expression> ;
+
+is simply shorthand for
+
+    on cons do apply <> procedure(x); <expression>; endprocedure;
+
+Similar equivalences for other wrapper forms can be deduced. The purpose
+of this alternative syntax is that the wrapper procedure can choose when
+(or, indeed,  if) to  apply  the underlying  procedure. A  cons  wrapper
+might, for example, choose to return  an object from a free list  rather
+than allocate new store.
+
+
+1.5  Operations on Classes
+--------------------------
+
+isclass(class) -> word                                       [procedure]
+isclass(item) -> <false>                                     [procedure]
+        A recogniser  for classes  created by  the objectclass  library.
+        Applied to such a class, isclass returns a word describing  what
+        kind of  class it  is; applied  to any  other item,  it  returns
+        <false>. Words returned by isclass may be:
+
+            "mixin"
+                if class is a mixin defined by define_mixin
+
+            "singleton"
+                if class is a singleton defined by define_singleton
+
+            "object"
+                if class is a standard class or extant class defined by
+                define_class or define_extant
+
+        Note  that,  although  classes  are  typically  represented   by
+        standard Poplog  keys  (mixin  classes  may  be  an  exception),
+        isclass will only recognise keys created by objectclass  itself,
+        or  those  which   have  been  promoted   to  class  status   by
+        define_extant. So:
+
+            isclass(integer_key) =>
+            ** <false>
+
+            define :class X;
+            enddefine;
+
+            isclass(X_key) =>
+            ** object
+
+
+class_name(class) -> word                                    [procedure]
+        Returns the name of a class. The name is always a word.
+
+
+class_isa(class) -> isa_p                                    [procedure]
+        Returns the recogniser  procedure for class  which respects  the
+        class hierarchy, i.e, a procedure which returns <true> if it  is
+        applied to an instance of class  or one of its descendents,  and
+        <false> otherwise.
+
+
+class_construct(class) -> cons_p                             [procedure]
+        Returns  the  constructor  procedure  for  class.  This  is  the
+        procedure bound to the cons procedure for the class. It consists
+        of  the  class_cons  procedure  created  by  conskey,   possibly
+        augmented by  wrappers  defined for  the  class or  any  of  its
+        superclasses. NB: this  procedure is invalid  for mixins,  which
+        don't have constructors.
+
+
+class_new(class) -> new_p                                    [procedure]
+        Returns a procedure new_p which creates a new instance of  class
+        with slots set to  their default values.  NB: this procedure  is
+        invalid for mixins, which cannot have instances.
+
+
+class_slots(class) -> list                                   [procedure]
+        Returns a list of the slot access procedures for class. Normally
+        these will be generic procedures.
+
+        Note for experts: This procedure actually returns a list with an
+        unshared  spine.  The  elements  of   the  list  are  the   slot
+        identities, i.e. the items used to distinguish different slots.
+
+
+destclass(class) -> (slot_p_1, slot_p_2, ..., slot_p_n)      [procedure]
+        Explodes all  of the  slot access  procedure of  class onto  the
+        stack. Same as
+
+            class_slots(class).dl
+
+
+appclass(class, p)                                           [procedure]
+        Applies procedure p  to every  slot access  procedure of  class.
+        Same as
+
+            applist(class_slots(class), p)
+
+
+class_example(class) -> object                               [procedure]
+object -> class_example(class)
+        Returns an example instance of  a class. The example is  created
+        on the first call  using class_new and the  same object is  then
+        returned  for  all  subsequent  calls.  The  updater  sets   the
+        class_example to a  particular instance. NB:  this procedure  is
+        invalid for mixins, which cannot  have instances. If class  is a
+        singleton class then the class_example  is the only instance  of
+        that class.
+
+
+class_slot(generic, class)                                   [procedure]
+-> class_slot(generic, class)
+        Applies a generic procedure (or, in update mode, the updater  of
+        a generic procedure)  to the class_example  of a class.  Defined
+        simply as:
+
+            generic(class_example(class))
+
+
+class_infs(class) -> list                                    [procedure]
+        Returns a  list of  all the  direct inferiors  (or children)  of
+        class. class may be a mixin, and list may contain mixins.
+
+        (Note for experts:  The spine of  the list is  guaranteed to  be
+        unshared.)
+
+
+class_supers(class) -> list                                  [procedure]
+        Returns a list of the direct superclasses (or parents) of  class
+        in inheritance order. class may be a mixin, and list may contain
+        mixins.
+
+        (Note for experts:  The spine of  the list is  guaranteed to  be
+        unshared.)
+
+
+KEY_SLOT class generic                                           [macro]
+        This convenience macro arranges for the named procedure  generic
+        to act as  a non-inheriting class-variable  for class. In  other
+        words, sub-classes  act as  if the  class variables  are  copied
+        rather than shared. Uses a property  to map a class to its  slot
+        value. See LIB * KEY_SLOT for more details.
+
+
+fast_add_superclass(parent_class, child_class)               [procedure]
+        Makes parent_class  a  direct superclass  of  child_class.  This
+        unusual ability is  not intended to  be used at  run-time to  do
+        bizarre things to the class  hierarchy. Its purpose is to  allow
+        you to incorporate  existing, useful  classes into  a new  class
+        hierarchy, perhaps because you would suffer a performance hit or
+        because you want to avoid some syntactic inconvenience.
+
+        There is a strong restriction on the use of fast_add_superclass:
+        you  cannot  add  a  (candidate)  superclass  to  a  (candidate)
+        subclass if  the  superclass  would  add  a  new  field  to  the
+        subclass. This restriction prevents some of the worst  potential
+        abuses.
+
+
+
+----------
+2  Objects
+----------
+An object is an instance of a standard class, singleton class or  extant
+class. An object is a  Poplog record with the class  as its key and  one
+field for each instance slot.
+
+
+2.1  Creating Objects
+---------------------
+
+...  The class cons procedure
+-----------------------------
+For a class named X, the class cons procedure is assigned by objectclass
+to  the  identifier  consX.  The  declaration  for  the  identifier   is
+determined by the <declaration> part of the class definition. Also,  for
+a given class  you can obtain  the class cons  procedure dynamically  by
+calling class_construct.
+    The cons procedure expects  one argument for  each instance slot  of
+the class and the order of arguments  must match the order of fields  in
+the instance  record. The  set of  slots includes  those inherited  from
+superclasses. For example:
+
+    consItem('XXX-99-1', 'Large Widget') =>
+    ** <Item itemPartNo:XXX-99-1 itemDescription:Large Widget>
+
+    consCompoundItem('YYY-58-4', 'Complex Gadget', []) =>
+    ** <CompoundItem itemPartNo:YYY-58-4 itemDescription:Complex Gadget
+        itemParts:[]>
+
+The cons procedure  creates an instance  using the class_cons  procedure
+created by conskey and  then applies any  cons wrappers associated  with
+the class. If there are no wrappers, the cons and class_cons  procedures
+are equivalent.
+    Inheritance makes it  hard to keep  track of the  proper number  and
+order of slots possessed by any  one class. Indeed if a superclass  is a
+library class, its  layout of slots  may not even  be made public.  This
+means that it is not always  easy to determine statically the  arguments
+expected by a cons procedure. Also, if a superclass is recompiled with a
+different set  of  slot specifications,  any  calls to  constructors  of
+derived classes will  be invalidated because  their argument lists  will
+change. For these reasons, the  cons procedure should be used  sparingly
+and should rarely be exported as part of a public interface.
+
+...  The class new procedure
+----------------------------
+For a class named X, the class new procedure is assigned by  objectclass
+to the identifier newX. The declaration for the identifier is determined
+by the <declaration>  part of the  class definition. Also,  for a  given
+class you  can obtain  the class  new procedure  dynamically by  calling
+class_new.
+    The new procedure takes no arguments  and returns a new instance  of
+its class, with slots assigned their initial values as specified in  the
+class definition. For example:
+
+    newItem() =>
+    ** <Item itemPartNo:<false> itemDescription:Unknown Item>
+
+    newCompoundItem() =>
+    ** <CompoundItem itemPartNo:<false> itemDescription:Unknown Item
+        itemParts:[]>
+
+The new procedure uses the cons procedure to create an instance with its
+slots set  to  default  values,  computes  and  assigns  any  additional
+initialisers specified in the class definition and then applies any  new
+wrappers associated  with  the  class.  Because  new  calls  cons,  cons
+wrappers are also run, but before the initialisation step.
+
+...  The create_instance procedure
+----------------------------------
+
+create_instance(prototype, slot_inits) -> object             [procedure]
+create_instance(prototype, slot_inits, modify_p) -> object
+        Creates  a  new  instance  from  a  prototype,  sets  its  slots
+        according to  slot_inits and  then  runs the  optional  modify_p
+        procedure to perform additional initialisations.
+
+        The prototype may be a class or an object. If it is a class, the
+        new instance is  created by  calling the new  procedure of  that
+        class; if  it is  an  object, the  new  instance is  created  by
+        calling copy  on  the object.  NB:  in this  latter  case,  copy
+        creates a new instance without running any cons or new  wrappers
+        defined for the object's class.
+
+        slot_inits  denotes  an  even-length  sequence  of   alternating
+        procedure and data  items. These  may be supplied  in a  list, a
+        vector, or exploded on the stack with a count, i.e.
+
+            [p1, item1, ..., pN, itemN]         ;;; list
+            {p1, item1, ..., pN, itemN}         ;;; vector
+             p1, item1, ..., pN, itemN, 2*N     ;;; stack
+
+        Procedures will typically  be slot access  procedures, but  need
+        not be. create_instance  calls the updater of each procedure  in
+        turn to assign the corresponding data item to the  newly-created
+        object.
+
+        If supplied,  modify_p  must  be  a  procedure  that  takes  one
+        argument and returns no results. It is applied to the new object
+        after all the slot_inits have been run.
+
+        Example:
+
+            create_instance(CompoundItem_key, [
+                ^itemDescription    'Complex Gadget'
+                ^itemPartNo         'YYY-58-4'
+            ]) =>
+            ** <CompoundItem itemPartNo:YYY-58-4 itemDescription:Complex
+                Gadget itemParts:[]>
+
+
+...  The instance syntax forms
+------------------------------
+
+instance                                                        [syntax]
+        Creates an anonymous object with initialisation. Has the form:
+
+            instance class-name
+                initialisers
+            endinstance
+
+        where class-name  denotes an  existing class.  This creates  and
+        returns a new object by calling  the new procedure of the  named
+        class. The  object  is  then  further  initialised  through  the
+        sequence of initialisers each of the form:
+
+            procedure-name = expression ;
+
+        The procedure-name  must  denote  a generic  procedure  with  an
+        updater applicable to an object of this class; typically it will
+        be a slot name, but need not be. The expression is evaluated and
+        the  result  assigned  to  the  named  updater  applied  to  the
+        newly-created object.
+
+        Example:
+
+            instance CompoundItem
+                itemDescription = 'Complex Gadget';
+                itemPartNo      = 'YYY-58-4';
+            endinstance =>
+            ** <CompoundItem itemPartNo:YYY-58-4 itemDescription:Complex
+                Gadget itemParts:[]>
+
+
+define_instance                                     [define_form syntax]
+        This is  a variation  on the  above which  gives a  name to  the
+        object created. It takes the form
+
+            define :instance declaration name : class-name ;
+                initialisers
+            enddefine
+
+        The class-name and initialisers are as before and the process of
+        creating and  initialising an  object  is the  same as  for  the
+        instance form. The difference is  that a new identifier name  is
+        defined and bound to  the newly-created object; the  declaration
+        for the identifier is determined from the declaration part which
+        has the usual options. For example:
+
+            define :instance gadget :CompoundItem;
+                itemDescription = 'Complex Gadget';
+                itemPartNo      = 'YYY-58-4';
+            enddefine;
+
+            gadget =>
+            ** <CompoundItem itemPartNo:YYY-58-4 itemDescription:Complex
+                Gadget itemParts:[]>
+
+
+
+2.2  Operations on Objects
+--------------------------
+
+isinstance(item) -> bool                                     [procedure]
+        Recogniser for objectclass instances. Returns <true> if item  is
+        an instance of an objectclass or <false> otherwise. Defined as
+
+            isclass(datakey(item))
+
+
+set_slots(object, slot_inits)                                [procedure]
+        Applies  to  an  object  a  sequence  of  updates  described  by
+        slot_inits. The possible formats of slot_inits are as  described
+        for create_instance above.
+
+
+...  Printing Objects
+---------------------
+Printing  of  objects  is  controlled  by  sys_print_instance.  This  is
+assigned to the class_print  of each new  class created by  objectclass,
+and so is the default printer used for all objects. You can change  this
+default in  the  usual way  (see  HELP * CLASS_PRINT) but  this  is  not
+recommended:   sys_print_instance    uses    the    generic    procedure
+print_instance to actually display an object, so you can change the  way
+objects are printed by  adding methods to that  as described below.  The
+virtue of having sys_print_instance  as the default  printer is that  it
+will avoid calling print_instance in the following circumstances:
+
+    #   when the  value  of  pop_pr_level  falls to  0:  in  this  case,
+        sys_print_instance switches  to  "minimal" printing,  where  the
+        display of each object is truncated to
+
+            <class-name ...>
+
+        (the variable pop_oc_print_level is treated  in the same way  as
+        pop_pr_level but applies only to objectclass printing)
+
+    #   if a loop is encountered in the structure being printed: in this
+        case,  sys_print_instance  prints  just  "(LOOP)"  rather   than
+        calling print_instance for  a second  time on  the same  object;
+        this behaviour  is independent  of the  print level  and can  be
+        controlled with the flag pop_oc_print_loop_check
+
+Having these checks performed by sys_print_instance means that  problems
+of print depth  and recursion  can safely be  ignored by  print_instance
+methods.
+
+
+sys_print_instance(item)                                     [procedure]
+        Default print procedure assigned to the class_print of each  new
+        key created by objectclass.
+
+
+pop_oc_print_level -> int                                     [variable]
+pop_oc_print_level -> false
+int -> pop_oc_print_level
+false -> pop_oc_print_level
+        Similar to *pop_pr_level but applies only to objects printed  by
+        sys_print_instance,  i.e.  typically  only  objects  created  as
+        instances of  objectclasses.  Unlike  pop_pr_level,  it  may  be
+        assigned <false> (the default) in which case it is ignored.
+
+
+pop_oc_print_loop_check -> bool                               [variable]
+bool -> pop_oc_print_loop_check
+        If <true> (the default) sys_print_instance will check for cycles
+        in the structures  it prints  and avoid going  into an  infinite
+        loop by  printing "(LOOP)"  instead of  calling  print_instance.
+        Setting this <false>  suppresses the checks  and so can  improve
+        printing speed.
+
+
+
+---------------------------------
+3  Generic Procedures and Methods
+---------------------------------
+
+3.1  Overview
+-------------
+
+...  Methods
+------------
+In objectclass, a  method is a  procedure constrained to  apply only  to
+arguments  which  are  instances  of  specified  classes.  These   class
+constraints are expressed as part of the method header. For example:
+
+    define :method isPartOf(x:Item, y:CompoundItem);
+        member(x, y.itemParts);
+    enddefine;
+
+Here, the  arguments x  and y  are constrained  to be  instances of  the
+classes Item and CompoundItem respectively. It is the responsibility  of
+objectclass to ensure that these constraints are respected, such that at
+the start of execution of the method body, the condition
+
+    isItem(x) and isCompoundItem(y)
+
+is guaranteed to  be true. In  all other respects,  the definition  of a
+method is the same as that of any other procedure.
+    The combination  of  method  name  and  argument  class  constraints
+determines the signature of a method: the example above has signature
+
+    isPartOf(Item, CompoundItem)
+
+A program may define  any number of methods  of the same name,  provided
+that they  all  have  different  signatures. If  more  than  one  method
+definition specifies the same signature,  the last to be compiled  takes
+precedence and the earlier definitions are discarded.
+    Not all the arguments  to a method need  be constrained: the  define
+header
+
+    :method isPartOf(x, y:CompoundItem);
+
+leaves x unconstrained, while
+
+    :method isPartOf(x, y);
+
+has no  constraints at  all.  The signatures  of  these methods  can  be
+written
+
+    isPartOf(_, CompoundItem)
+    isPartOf(_, _)
+
+A method which has  no constraint on a  particular argument is  called a
+default method for that  argument, and a method  with no constraints  at
+all is called simply the default method.
+    An updater method is defined by adding the updaterof keyword to the
+definition, as for an ordinary procedure:
+
+    define :method updaterof isPartOf(flag, x:Item, y:CompoundItem);
+        if not(flag) then
+            delete(x, y.itemParts) -> y.itemParts;
+        elseif not(isPartOf(x, y)) then
+            x :: y.itemParts -> y.itemParts;
+        endif;
+    enddefine;
+
+This method has signature:
+
+    ->isPartOf(_, Item, CompoundItem)
+
+A slot  specification  in  a class  definition  implicitly  defines  two
+methods: one to access the slot and one to update it. The definition
+
+    define :class Item;
+        slot itemPartNo, itemDescription;
+    enddefine;
+
+creates four new methods:
+
+    itemPartNo(Item)
+    ->itemPartNo(_, Item)
+    itemDescription(Item)
+    ->itemDescription(_, Item)
+
+Likewise for a shared slot (see also define_shared_slot below).
+
+...  Generic Procedures
+-----------------------
+A set of methods all with the same name is called a generic procedure. A
+generic procedure can be pictured as a box containing its method parts:
+
+    -- isPartOf ------------------------
+    |                                  |
+    |   isPartOf(Item, CompoundItem)   |
+    |   isPartOf(_, CompoundItem)      |
+    |   isPartOf(_, _)                 |
+    |                                  |
+    ------------------------------------
+
+As a  whole,  the procedure  box  implements some  logical  or  abstract
+operation, while the individual method parts provide the implementations
+for that operation appropriate to their argument types. In  objectclass,
+although you can add  methods to the box  with define_method and  delete
+them with cancel_method,  you can  never get  inside the  box, i.e.  you
+cannot access methods directly. This is to avoid the danger of a  method
+being applied to arguments for which it was not designed.
+    You can  create  an empty  generic  procedure with  the  define-form
+define_generic, but this is  not necessary: the first  time a method  is
+defined with a particular name, a generic procedure containing just that
+single method is created automatically. Subsequent definitions with  the
+same name are added to the existing procedure.
+    A generic procedure is a true Poplog procedure and so can be used in
+any context  where a  procedure  is expected.  When applied,  a  generic
+procedure selects one of its methods to run based on the classes of  the
+arguments supplied to the call.  The process of choosing and  applying a
+method is known as dispatching.
+    In any particular application  of a generic  procedure there may  be
+more than one  method which  could be  applied to  the given  arguments:
+given the procedure isPartOf pictured above and the call
+
+    isPartof(newItem(), newCompoundItem())
+
+any of the three  available methods could be  applied. In such a  case a
+single method is chosen using a deterministic algorithm described below.
+    It can also occur  that there is no  method whose signature  matches
+the classes of the arguments supplied; in this case the dispatch  fails,
+typically causing a mishap.  A generic procedure  with a default  method
+can never fail.
+
+...  Method Dispatch
+--------------------
+Consider a generic procedure P having n methods
+
+    -- P ------------------
+    |                     |
+    |   P1(C11,...,C1m)   |
+    |   P2(C21,...,C2m)   |
+    |   ...               |
+    |   Pn(Cn1,...,Cnm)   |
+    |                     |
+    -----------------------
+
+and an application
+
+    P(X1,...,Xm)
+
+The dispatch  algorithm  must  select  and  apply  one  of  the  methods
+P1,...,Pn  most appropriate  to  the arguments  (X1,...,Xm).  This  is a
+three-step process:
+
+(a) Determine the set of applicable  methods. A method Pi is  applicable
+    to arguments  (X1,...Xm) precisely  when  for each  k  (1 <= k <= m)
+    either Pi is  the default  method for  k (so  Cik = _) or  Xk is  an
+    instance of Cik (so  isCik(Xk) is  true). If the  set of  applicable
+    methods is empty, dispatch fails. If the set contains only a  single
+    method, then that must  be the one to  apply. Otherwise, move on  to
+    step (b).
+
+(b) Sort the set of applicable  methods. Suppose there are s  applicable
+    methods, s <= n, denoted P1,...,Ps. For a particular argument Xk  we
+    can define a total order on the constraints C1k,...,Csk based on the
+    class precedence list of  the class of Xk.  For any two  constraints
+    Cik and Cjk, Cik /= Cjk, define
+
+        Cik < Cjk
+
+    whenever Cjk = _ (so that Pj is a default method for k) or when  Cik
+    precedes Cjk in the  class precedence list of  Xk. This ordering  on
+    constraints extends to method signatures by applying a right-to-left
+    lexicographical  ordering:  i.e,  Pi < Pj  if,  for  the   largest k
+    (1 <= k <= m) for  which Cik /= Cjk,  Cik < Cjk. The  choice of  the
+    rightmost argument as  being the  most significant will  come as  no
+    surprise to users familiar with  Pop-11's stack semantics where  the
+    rightmost argument to a procedure call is on top of the stack.
+
+(c) Apply the  least member  of the  sorted set.  That there  must  be a
+    unique least member  follows from  the requirement  that all  method
+    signatures be distinct.
+
+If this algorithm seems complicated, it is often sufficient to  remember
+that a method defined on a  derived class takes precedence over  methods
+defined on its superclasses. This  is a requirement for the  objectclass
+style of  object-oriented  programming, where  a  derived class  may  be
+expected to specialise the behaviour of its superclasses.
+
+An example of dispatch:
+
+    define :method example(x:Item, y:CompoundItem);
+        npr(';;; Selected: example(Item, CompoundItem)');
+    enddefine;
+
+    define :method example(x:CompoundItem, y:Item);
+        npr(';;; Selected: example(CompoundItem, Item)');
+    enddefine;
+
+    example(newCompoundItem(), newCompoundItem());
+    ;;; Selected: example(Item, CompoundItem)
+
+Here, the  condition CompoundItem < Item  will  always be  true  because
+CompoundItem is a subclass  of Item. Sorting  on the rightmost  argument
+first gives
+
+    example(Item, CompoundItem) < example(CompoundItem, Item)
+
+
+...  Implementation Notes
+-------------------------
+Method dispatch is  not as expensive  as it may  sound: determining  the
+least applicable method can be reduced to a sequence of inline key tests
+and branches.  However, the  required tests  change as  new methods  are
+added to a generic procedure, or as  new classes are added to the  class
+hierarchy. So an objectclass generic procedure has two forms: linked and
+unlinked. Generic procedures  are created  unlinked: in  this form,  new
+methods can be added to the  procedure at little cost. When an  unlinked
+procedure is  applied  for  the  first time,  inline  dispatch  code  is
+generated and executed on  the fly; this is  expensive, but the code  is
+saved so that subsequent calls can execute it directly. The procedure is
+then in  linked form.  If subsequently  a  new method  is added  to  the
+procedure,  or  some  change  occurs   in  the  class  hierarchy   which
+invalidates the dispatch code, that code is discarded and the  procedure
+returned to unlinked form, to be relinked on the next call.
+    The overhead of calling a linked generic procedure -- as compared to
+a standard Pop-11  procedure doing the  same job --  is typically  quite
+small. A linked generic procedure is a closure of a specialised dispatch
+procedure which selects and chains a particular method. From application
+of a generic  procedure to execution  of a particular  method body,  the
+sequence of events is
+
+    closure call        ;;; the generic procedure
+    procedure call      ;;; the dispatch procedure
+    tests               ;;; dispatch code
+    procedure call      ;;; selected method
+
+Compare this to a standard procedure call which -- to do the same job --
+would have to  include its  own tests  to ``dispatch''  to a  particular
+block of code:
+
+    procedure call      ;;; the procedure itself
+    tests               ;;; dispatch code
+
+This implies a small cost of one closure call and one procedure call for
+each  generic.  However,  benchmarks  suggest  that  the  dispatch  code
+generated by the  objectclass linker can  often outperform  hand-written
+tests, further reducing the margin.
+    Two special cases  require further mention.  Firstly, if a  selected
+method corresponds to  a slot access  or update, fast  code for this  is
+generated inline, avoiding the need for the final method call. Thus slot
+access  compares  favourably  with  similar  recordclass  field  access.
+Secondly, although in general the complexity of the class hierarchy will
+increase the  average  number  of tests  required  for  dispatch,  mixin
+classes -- which have no instances --  need never be tested for. So  you
+can improve the  overall dispatch performance  by using mixins  wherever
+possible.
+    Calling an unlinked generic procedure  is always expensive. You  can
+use optimise_objectclass to link generics explicitly.
+
+
+3.2  Syntax of Method Definitions
+---------------------------------
+The *compile_mode +oldvar flag is  turned off during compilation of  the
+following define-forms, so that input and output arguments not otherwise
+declared will always default to lvars. This affects any local  procedure
+definitions, too.
+
+define_generic                                      [define_form syntax]
+        Declares a generic procedure without defining any methods:
+
+            define :generic [declaration] name ( [input-locals] )
+                [output-locals] [with-list] ;
+            enddefine
+
+        Use this  to  satisfy  a  forward reference  or  to  declare  an
+        abstract  operation.  The  name  is  the  name  of  the  generic
+        procedure to be declared. Optional parts of the declaration  are
+        as follows:
+
+        declaration
+            Declaration for name. May be any of the words
+
+                vars constant lvars lconstant
+
+            If omitted, the  default is determined  from the  prevailing
+            *compile_mode as for any other define-form except that  name
+            will always be declared  as "procedure" type, regardless  of
+            the compile mode.
+
+        input-locals
+        output-locals
+            The input and  output variables of  the generic, written  as
+            for an ordinary procedure  definition. The number of  inputs
+            declared here determines the arity (pdnargs) of the  generic
+            procedure, unless  overridden  by  a  subsequent  with_nargs
+            clause; any methods added to this generic must have the same
+            arity.
+
+        with-list
+            Declares additional properties of the generic procedure. The
+            only such properties currently supported are
+
+            with_props item
+                Sets the  pdprops of  the generic  to item;  if this  is
+                omitted, the pdprops will be set to name.
+
+            with_nargs N
+                Sets the  pdnargs  of  the  generic to  N;  if  this  is
+                omitted, the  pdnargs  will  be set  to  the  number  of
+                inputs.  Any  methods  added  to  the  generic  must  be
+                defined with exactly N arguments.
+
+            with_nargs variadic
+                Declares that  methods  added  to  the  generic  may  be
+                defined with varying numbers of arguments.
+
+        At most one explicit use  of define_generic is allowed for  each
+        generic procedure: this helps guard against name clashes between
+        files.
+
+        Example:
+
+            define :generic productionCost(item) -> price;
+            enddefine;
+
+        Declares a generic procedure productionCost with arity 1.
+
+
+define_method                                       [define_form syntax]
+        Adds a method to a generic procedure:
+
+            define :method [updaterof] [declaration] name
+                ( [typed-input-locals] ) [output-locals] [with-list] ;
+                procedure-body
+            enddefine
+
+        The name identifies  the generic procedure  to be augmented;  if
+        this does not already exist, it  is implicitly created as if  by
+        define_generic  using  information  extracted  from  the  method
+        header. If  the optional  keyword  updaterof is  specified,  the
+        method is added to the *updater of the generic.
+
+        The typed-input-locals declare the names, number and classes  of
+        arguments expected  by  the  method.  This  is  similar  to  the
+        argument list of a normal procedure definition, except that each
+        argument can be optionally followed by a class constraint, as
+
+            [idprops] variable [:class-name]
+
+        The class-name must denote an existing class, and constrains the
+        method to apply only to instances of that class. For example:
+
+            define :method productionCost(item:CompoundItem) -> cost;
+                lvars part, cost = 10;
+                for part in item.itemParts do
+                    cost + part.productionCost -> cost;
+                endfor;
+            enddefine;
+
+        This defines a  method of the  generic procedure  productionCost
+        appropriate to instances of the class CompoundItem.
+
+        The output-locals, with-list and procedure-body are the same  as
+        for a  standard  procedure  definition. The  procedure  body  is
+        executed when the method is dispatched, with the input  argument
+        names  bound  to   the  actual  arguments   of  the  call.   Any
+        output-locals will be returned  in the usual way  at the end  of
+        the method call. As with ordinary procedures, methods may return
+        results additional  to those  specified  by their  outputs,  and
+        different methods of  the same  generic procedure  need not  all
+        declare the  same outputs.  Output arguments  cannot have  class
+        constraints, as they do not form part of the method signature.
+
+
+define_shared_slot                                  [define_form syntax]
+        Adds a shared slot to a class:
+
+            define :shared_slot [declaration] name
+                ( variable : class-name );
+                procedure-body
+            enddefine
+
+        The class-name  must denote  an existing  class. The  effect  is
+        identical to declaring  a shared_slot in  the definition of  the
+        class, but is  more convenient where  the initialisation of  the
+        slot  is  complex:  this  form  allows  arbitrary  code  in  the
+        procedure-body  to  be  evaluated  when  the  initial  value  is
+        computed, whereas  a  shared_slot  specification  allows  only a
+        single expression. The procedure-body is evaluated when the slot
+        is first  accessed with  the variable  bound to  the  particular
+        instance being accessed; it must return exactly one result,  and
+        that same  result  is then  returned  for each  subsequent  slot
+        access until the slot is explicitly updated with a new value.
+
+        A shared_slot is implemented by access and update methods  added
+        to  the  generic  procedure  name,  and  this  will  be  created
+        automatically if needed.
+
+
+define_if_needed                                    [define_form syntax]
+        Implements a kind  of ``lazy''  instance slot:
+
+            define :if_needed [declaration] name
+                ( variable : class-name );
+                procedure-body
+            enddefine
+
+        Adds access and  update methods  to the  generic procedure  name
+        which behave very  much like  ordinary slot  methods defined  on
+        class-name, except that  the initial  value of the  slot is  not
+        computed each time  an instance  is created, but  only when  the
+        slot is  first accessed;  the value  is computed  by  evaluating
+        procedure-body with  the variable  bound to  the instance  being
+        accessed. An if_needed method uses  a property to map  instances
+        to their ``slot'' values: it does not add a new instance slot.
+
+
+3.3  Method Wrappers
+--------------------
+A method wrapper is a closure around a particular method part which  can
+enhance or modify the behaviour of that method.
+
+define_wrapper                                      [define_form syntax]
+        Adds a wrapper  to an existing  method definition:
+
+            define :wrapper [updaterof] name
+                ( [typed-input-locals] variable ) [output-locals]
+                [with-list] ;
+                procedure-body
+            enddefine
+
+        The typed-input-locals  are the  same as  for define_method  and
+        declare  a   set  of   input  arguments   with  optional   class
+        constraints. For a  wrapper definition to  be valid, there  must
+        already  exist  a  method  with  the  same  name  and   argument
+        constraints (signature).  The effect  of  the definition  is  to
+        replace that method  with a  closure of  the wrapper  procedure,
+        with the  additional  variable  bound  to  the  original  method
+        definition. When  the method  is dispatched  it is  the  wrapper
+        which gets called, and the wrapper procedure can choose when  --
+        or indeed, if -- to call the original method.
+
+        The wrapped method can be a  slot or shared-slot method as  well
+        as one created by define_method. A common use of wrappers is, in
+        fact, to augment slot methods with extra access or update  code.
+        For example, the slot  rest defined on  extant class pair  above
+        can be modified to accept only list values:
+
+            define :wrapper updaterof rest(x, p:pair, upd_p);
+                unless x.isList then
+                    mishap('LIST NEEDED', [^x]);
+                endunless;
+                ;;; do the update
+                upd_p(x, p);
+            enddefine;
+
+        You can  have at  most one  wrapper attached  to any  particular
+        method.  A  second  or  subsequent  wrapper  definition   simply
+        replaces the previous version.
+
+
+wrapper_deref(method) -> method                              [procedure]
+        Obsolete procedure for stripping any wrappers from a method
+        to obtain the innermost "kernel" procedure.  The new wrapper
+        variable wrapper_kernel is the recommended way to get a handle
+        on the kernel procedure.
+
+
+wrapper_invoker                                      [protected variable]
+        This variable is automatically bound to the generic procedure
+        to which the wrapper is attached.  The anticipated main use
+        is for "on update" wrappers whereby it is possible to determine
+        which slot is responsible for the invocation.
+
+
+wrapper_kernel                                       [protected variable]
+        This variable is automatically bound to the inner "kernel"
+        procedure.  The anticipated main use is to debug
+        wrappers.  Using the wrapper_kernel it is possible to invoke
+        the underlying action but bypass all earlier/later wrappers.
+
+
+
+3.4  Method Chaining
+--------------------
+Method chaining is relevant in applications of generic procedures  where
+more than  one  method is  applicable.  Recall  that in  this  case  the
+applicable methods are sorted  into order, and  normally only the  first
+one is applied. But through  call_next_method, that method can call  the
+next one in the sequence, which may in turn call the method following it
+and so on, so that the initial call can lead to a chain of method calls.
+Method chaining is  used most often  when a derived  class needs to  add
+code incrementally  to  its  superclass  methods,  a  process  known  as
+specialisation: the superclass method code can be used directly --  i.e.
+without  having  to  be  duplicated  --   but  with  refinements   added
+appropriate to the derived class. For example:
+
+    define :method report(x:CompoundItem);
+        ;;; print standard report
+        call_next_method(x);
+        ;;; add additional information
+        printf('Parts:');
+        applist(x.itemParts, itemPartNo<>printf(%'\t%p\n'%));
+    enddefine;
+
+    define :instance grommet:CompoundItem;
+        itemPartNo = 'YYY-62-6';
+        itemDescription = 'Mini Grommet';
+        itemParts = [%
+            instance Item;
+                itemPartNo = 'ZZZ-18-0';
+            endinstance;
+            instance Item;
+                itemPartNo = 'ZZZ-19-3';
+            endinstance;
+        %];
+    enddefine;
+
+    report(grommet);
+    Item:   YYY-62-6    Mini Grommet
+    Parts:  ZZZ-18-0
+            ZZZ-19-3
+
+
+call_next_method(expr1, ..., exprN)                             [syntax]
+        Allowed only inside  a method  definition, this  calls the  next
+        method from the sorted list of methods applicable to the current
+        call. If the current  method is the last  such method, the  call
+        will mishap. Note that although you can pass arbitrary arguments
+        to call_next_method, there is no check that these are valid  for
+        the next  method  to be  called:  most often,  you  should  pass
+        exactly the same arguments as were supplied to the current call.
+
+
+call_all_next_methods(expr1, ..., exprN)                        [syntax]
+        Allowed only  inside a  method definition,  this calls  all  the
+        remaining methods from the sorted list of methods applicable  to
+        the current call. The values  of expr1,...,exprN are saved  in a
+        list and  exploded onto  the stack  for each  subsequent  method
+        invocation. As with call_next_method, it is your  responsibility
+        to ensure  that  the  arguments  are  valid  for  all  remaining
+        methods.
+
+
+input_locals                                                    [syntax]
+-> input_locals
+output_locals                                                   [syntax]
+-> output_locals
+        Allowed only inside a method definition, these will push or  pop
+        the input or output arguments of the enclosing method. They  are
+        designed particularly for use with call_next_method through  the
+        idiom
+
+            call_next_method(input_locals) -> output_locals;
+
+
+
+3.5  Operations on Generic Procedures
+-------------------------------------
+
+isgeneric(item) -> bool                                      [procedure]
+        Returns <true>  if  item  is a  generic  procedure  and  <false>
+        otherwise. Note that traced  generics AREN'T generics: they  are
+        closures of systrace.  Therefore if  you use  isgeneric in  your
+        program, be aware that tracing generic procedures may cause your
+        program to behave differently.
+
+
+will_apply_to(item1, ..., itemN, generic)                    [procedure]
+                -> item1, ..., itemN, bool
+        Determines  whether  a  generic  procedure  has  any  applicable
+        methods for arguments item1,..., itemN. Returns <true> if so, or
+        <false> if the  application of  the generic  procedure to  those
+        arguments would fail.  The arguments are  left untouched on  the
+        stack; this leads to the following idiom for using will_apply_to
+        to determine which of generic procedures P, Q, and R to apply to
+        arguments X1, X2, X3 and X4:
+
+            apply(
+                X1, X2, X3, X4,
+                will_apply_to(P) and P or
+                will_apply_to(Q) and Q or
+                R
+            )
+
+
+fail_safe(item_1, item_2, ..., item_n, generic) -> bool      [procedure]
+        Applies a  generic procedure  in such  a way  that if  the  call
+        fails,  the  result  is  <false>,  otherwise  it  is   <true>. A
+        successful call may return additional results. For example:
+
+            rest(99) =>
+
+            ;;; MISHAP - Method "rest" failed
+            ;;; INVOLVING:  99
+
+            fail_safe(99, rest) =>
+            ** <false>
+
+            fail_safe([1 2 3], rest) =>
+            ** [2 3] <true>
+
+
+...  Tracing Methods
+--------------------
+The standard Pop-11  trace mechanism will  work with generic  procedures
+but will only  show calls  to the  generic procedure  itself. Using  the
+objectclass trace_method form and its variants reveals the signatures of
+the particular methods being called.
+
+trace_method generic_1, generic_2, ..., generic__n;             [syntax]
+        Traces the named generic procedures  so that each call  displays
+        the particular method  applied with its  arguments and  results.
+        Uses systrace_proc for display, so that the output is similar to
+        that of a normal trace (see HELP * TRACE).
+
+
+untrace_method generic_1, generic_2, ..., generic__n;           [syntax]
+        Removes tracing from the named generic procedures.
+
+
+trace_every_method                                              [syntax]
+        Adds tracing to all generic procedures currently defined.
+
+
+untrace_every_method                                            [syntax]
+        Removes tracing from all generic procedures.
+
+
+...  Cancelling Methods
+-----------------------
+
+cancel_method signature, ...;                                   [syntax]
+cancel_method name, ...;
+        The first form cancels a method (or methods) with the  specified
+        signature(s); the second form cancels all methods with the given
+        name(s). Cancelling a method means deleting it from the  generic
+        procedure of the same name. Cancelling all the methods  leaves a
+        generic procedure  without any  methods so  that calling  it  is
+        bound to fail. For example:
+
+            /* cancel the report method on Items */
+            cancel_method report(Item);
+
+            /* cancel all report methods */
+            cancel_method report;
+
+        In a method signature,  use the word "_"  to denote the  default
+        method for an argument, e.g.
+
+            cancel_method isPartOf(_, CompoundItem);
+
+
+method_path(classes, generic) -> method                      [procedure]
+method -> method_path(classes, generic)
+        Returns or updates the method associated with a list of  classes
+        in a generic procedure. method_path returns <false> if there  is
+        no such method  defined; assigning <false>  to the updater  will
+        delete a method.
+
+
+3.6  Pre-Defined Generic Procedures
+-----------------------------------
+Default methods are defined by objectclass for all these procedures.
+
+print_instance(object)                               [generic procedure]
+        Called whenever  an objectclass  instance is  printed by  syspr.
+        Define a  method  for  this  to change  the  way  instances  are
+        displayed. Example:
+
+            define :class Term;
+                slot termFunctor, termArgs == [];
+            enddefine;
+
+            define :method print_instance(t:Term);
+                printf('%p(', [% t.termFunctor %]);
+                lvars args;
+                for args on t.termArgs do
+                    pr(args.hd);
+                    unless null(args.tl) then printf(', ') endunless;
+                endfor;
+                printf(')');
+            enddefine;
+
+            vars term = consTerm("+", [3 4]);
+
+            term =>
+            ** +(3, 4)
+
+        See the section on Printing Objects above.
+
+
+apply_instance(object)                               [generic procedure]
+        The default  class_apply of  all objectclass  classes.  Define a
+        method for this  if you  want to  change the  way instances  are
+        applied. For example:
+
+            define :method apply_instance(t:Term);
+                ;;; assume argument indexing
+                t.termArgs();
+            enddefine;
+
+            term(1) =>
+            ** 3
+
+
+=_instance(object1, object2) -> bool                 [generic procedure]
+        The default  class_=  of  all classes  created  by  objectclass.
+        Define a method for this if you want to change the way instances
+        are compared for equality. For example:
+
+            define :method =_instance(t1:Term, t2:Term);
+                ;;; force terms to be unique
+                t1 == t2;
+            enddefine;
+
+            term = term =>
+            ** <true>
+
+            term = copy(term) =>
+            ** <false>
+
+        The default  method  calls  sys_=  which  tests  for  structural
+        equality. See REF * DATA.
+
+
+hash_instance(object) -> int                         [generic procedure]
+        The default class_hash  of all classes  created by  objectclass.
+        Define a method for this if you want to change the way instances
+        are hashed,  e.g. for  property  lookup (see  REF * PROPS).  For
+        example:
+
+            define :method hash_instance(t:Term);
+                syshash(t.termFunctor) + t.termArgs.length;
+            enddefine;
+
+        Note that if  you redefine =_instance  and/or hash_instance  for
+        any class, you should always ensure that, for any x and y, if
+
+            =_instance(x, y)
+
+        then
+
+            hash_instance(x) == hash_instance(y)
+
+
+fail_generic(object, generic)               [generic procedure variable]
+        Called when the application of a generic to an object has failed
+        because there is no method applicable to the object. The default
+        method causes a mishap. You can add methods to this if you  want
+        to change the  way failure  behaves for  particular generics  or
+        classes. Note that the second argument will always be a  generic
+        procedure, and so cannot be  sensibly constrained. Also, if  the
+        failed  generic  expects  more  than  one  argument,  then   the
+        remainder will be on the stack below the object.
+
+
+
+------------------------------------------
+4  Browsing Classes and Generic Procedures
+------------------------------------------
+
+ved_oc [ options ] [ pattern... ]                            [procedure]
+        A basic class browser. Without arguments, this command  produces
+        a vertical listing  of all  the currently  loaded classes.  This
+        listing can  be  expanded  through  the  use  of  the  following
+        options. Note that a leading '+' selects an option and a leading
+        '-' deselects an option. Options from the command line are  used
+        in  combination  with  a  default  option  string.  Options  are
+        processed from left to right and later options override  earlier
+        ones.
+
+        Attribute display options
+          +c +children      show the subclasses
+          +p +parents       show the parent classes
+          +s +slots         show the slots of the class
+          +t +type          show the type of class e.g. mixin
+          ++                turn on all display options
+          --                suppress all display options
+
+        Filter options
+          +a +ancestors     expand to include ancestors
+          +d +descendants   expand to include descendants
+          +i +ignored       include ignored
+          +l +leaf          filter out classes with children
+          +o +obsolete      include obsolete classes
+          +r +root          filter out classes with parents
+
+        Sort options
+          +A +Alphabetical  list alphabetically (default)
+          +H +Hierarchical  list by generality, most general first
+          +R +Reverse       reverse the list after sorting
+
+        These options can be concatenated together. For example:
+
+            <ENTER> oc +pRc
+
+        would produce a vertical listing  of all classes including  both
+        parent  and   child  class   information,  listed   in   reverse
+        alphabetical order.
+
+        The list of  classes displayed can  be constrained by  supplying
+        one or  more patterns  (regular expressions):  a class  will  be
+        displayed only  if its  name matches  any of  the patterns.  The
+        +ancestors option causes all the ancestors of the classes to  be
+        included too.  Similarly  the +descendants  option  include  the
+        descendants of the named classes. For example,
+
+            ENTER oc +td truck lorry
+
+        produces a vertical listing of just the truck and lorry  classes
+        and all their subclasses, recursively, together with class  type
+        information. If  no  patterns  are supplied  then  the  variable
+        vved_oc_implicit_classes is used to  determine which classes  to
+        display.
+
+        Construction of the class list proceeds as follows :-
+
+        A complete list of classes known to the system is prepared.  Any
+        obsolete classes are immediately  removed from the list,  unless
+        the +obsolete option  has been used.  [NB: obsolete classes  are
+        created when you recompile a class definition in such a way that
+        the old key cannot be  reused, or when pop_oc_reuse is  <false>.
+        When this happens,  a new key  is allocated and  the old key  is
+        marked as  obsolete.  Such  obsolete keys  are  normally  of  no
+        interest.]
+
+        The  list  of  patterns  supplied   on  the  command  line   (or
+        vved_oc_implicit_classes) is then  used to filter  out a set  of
+        matching class names.
+
+        Regardless  of  whether  the   list  of  classes  is   specified
+        explicitly or implicitly, any classes filtered by vved_oc_ignore
+        or vved_oc_ignore_list  are  then  removed from  the  list.  The
+        +ignore option  can  be  used  to  disable  this  stage  of  the
+        filtering.  Use  ved_oci   to  add  or   delete  patterns   from
+        vved_oc_ignore_list.
+
+        This list of classes is then filtered according to the +root and
+        +leaf options and finally  expanded according to the  +ancestors
+        and +descendants options.
+
+
+ved_oca [ class ]                                   [procedure variable]
+ved_oca_showtree [ class ]                          [procedure variable]
+        Displays an indented list of the ancestors of a class. The basic
+        version simply  creates a  text buffer.  The "showtree"  version
+        uses lib showtree.
+
+
+ved_ocd [ class ]                                   [procedure variable]
+ved_ocd_showtree [ class ]                          [procedure variable]
+        Displays an indented  list of  the descendants of  a class.  The
+        basic version  simply  creates  a text  buffer.  The  "showtree"
+        version uses lib showtree.
+
+
+ved_ocg [ pattern... ]                              [procedure variable]
+        Describes generic procedures whose names match any of the  given
+        patterns (regular expressions).
+
+
+ved_oci                                             [procedure variable]
+ved_oci +pattern
+ved_oci -pattern
+        Manipulates  the  vved_oc_ignore_list  name  filter.  Given   an
+        explicit argument, ved_oci will add (+) or delete (-) a  regular
+        expression from the name filter. Without an argument, ved_oci is
+        sensitive to whether it is used in the display buffer or not. If
+        it is used in an ordinary buffer it simply displays the  regular
+        expressions in  the filter.  If it  is used  inside the  display
+        buffer it asks the user to choose between
+
+            d   take the current line and remove it from the ignored
+                regexps
+
+            r   read the whole of the display buffer and create the
+                ignore filter from that
+
+            c   cancel
+
+        This  is  designed   to  enable  quick   configuration  of   the
+        vved_oc_ignore_list name filter.
+
+
+vved_oc_ignore_list                                           [variable]
+        List of name filters used  by ved_oc: class names recognised  by
+        filters in the list  are excluded from  the display, unless  the
+        ignore option is specified. The default value is the empty list,
+        which excludes nothing. Regular expression filters can be  added
+        and removed from this list with the ved_oci command.
+
+
+vved_oc_ignore                                                [variable]
+        Name filter  used  by ved_oc:  class  names recognised  by  this
+        filter are excluded from the  display, unless the ignore  option
+        is specified. This  variable is provided  for complex  filtering
+        not handled by  ved_oci. The  default value is  the empty  list,
+        which excludes nothing.
+
+
+vved_oc_implicit_classes                                      [variable]
+        Name filter used by ved_oc: if no explicit patterns are supplied
+        on the  command line,  this filter  is applied  to all  existing
+        class names and any name recognised by the filter is included in
+        the display (unless subsequently excluded  by one of the  ignore
+        filters). The default value is  the empty vector, which  matches
+        all names.
+
+
+vved_oc_defaults                                              [variable]
+        Default option  string for  ved_oc, implicitly  prefixed to  any
+        options supplied  on  the  command  line  (with  an  intervening
+        space). Options are  processed from left  to right, so  explicit
+        options can override  these defaults. The  default value is  the
+        empty string (meaning no default options); a typical use of this
+        variable would be
+
+            '+tpcs' -> vved_oc_defaults;
+
+        which would arrange that the  type, parents, children and  slots
+        of classes would be displayed  unless overridden on the  command
+        line, e.g. by doing
+
+            <ENTER> oc -s
+
+        to suppress display of slot information.
+
+
+4.1  Name Filters
+-----------------
+A name filter is responsible for recognising names. It can be any of the
+following data types:
+
+    #   A string or word, interpreted as a regular expression: a name is
+        recognised if  it  matches  the expression.  The  expression  is
+        implicitly constrained to match the  whole name, so an  ordinary
+        string stands for itself; use
+
+            @?@*string@?@*
+
+        for a partial match on string.
+
+    #   A procedure:  a  name is  recognised  if the  procedure  returns
+        non-false when applied to it.
+
+    #   A list of filters,  interpreted as the  union of its  members: a
+        name is recognised if it is recognised by any of the filters.
+
+    #   A vector  of  filters, interpreted  as  the conjunction  of  its
+        members: a name  is recognised if  it is recognised  by all  the
+        filters.
+
+
+-----------------------
+5  Objectclass and Popc
+-----------------------
+You can compile  an objectclass program  into a stand-alone  application
+with Popc subject to the following restrictions:
+
+(1) Only the  syntax  forms  defined  by  the  objectclass  library  are
+    supported by  Popc.  Run-time operations  such  as  class_construct,
+    create_instance, will_apply_to, and most of the others described  in
+    this file, are  simply not available  in a stand-alone  application.
+    This is because  all objectclass information  is stripped from  keys
+    compiled into the application -- making them indistinguishable  from
+    ordinary Poplog keys -- and generic procedures are frozen into their
+    linked form.
+
+(2) The whole program must be compiled as a single object file. You  can
+    still compile a program from several source files, but only if  they
+    are compiled together into one module using the '-g' option of Popc:
+
+        popc -g program.w \( file1.p file2.p ... \)
+
+    This is because poplink  is unable to  link generic procedures  from
+    method parts defined in  separate modules. An unfortunate  corollary
+    of this restriction  is that you  cannot separately-compile  library
+    modules containing objectclass definitions.
+
+For an objectclass program to be compiled with Popc, it must include the
+line:
+
+    uses-now objectclass;
+
+See HELP * POPC for general information about using Popc.
+
+
+
+---------------------------------------
+6  Objectclass Procedures and Variables
+---------------------------------------
+
+optimise_objectclass(level)                                  [procedure]
+        Use this procedure to force relinking of generic procedures  and
+        is-predicates, and  optionally  to  reclaim space  used  by  the
+        objectclass library. level can be a single keyword or a list  of
+        keywords indicating which optimisations to perform. The order of
+        keywords is not important.
+
+        The keyword "all" forces linking of all objectclass procedures.
+
+        The  keyword  "irreversible"  implies  "all"  but   additionally
+        instructs optimise_objectclass  to destroy  the run-time  tables
+        needed for linking of further methods. This is provided  because
+        creating new  methods  on  the  fly  is  a  relatively  uncommon
+        operation in delivered applications. However, since it is such a
+        potentially destructive operation, it  checks to see whether  or
+        not you have loaded code which requires these tables; if it has,
+        then "irreversible" is the same as "all".
+
+        Since the syntax words made available by lib objectclass will no
+        longer work,  the  "irreversible" keyword  also  disables  these
+        keywords.
+
+        The keyword "unchecked" forces  the destruction of the  run-time
+        tables without checking whether  or not this  is safe. Use  this
+        only if you definitely know what you are doing.
+
+        The use of "irreversible"  also causes methods  to be marked  as
+        non-writeable. If you are familiar with sys_lock_system then you
+        may well want to take advantage of this feature, too.
+
+        Keyword         Meaning
+        -------         -------
+        all             The same as [isas methods]
+
+        delivery_time   The same as all the other keywords with the
+                        exception of "unchecked"
+
+        irreversible    Irreversibly link methods, checking whether or
+                        not this is legal.  This keyword automatically
+                        entails "all".  Destroys the run-time tables
+                        and marks methods as non-writeable.
+
+        isas            Force the linking of all is-predicates.
+
+        methods         Force the linking of all generic procedures.
+
+        unchecked       Don't check whether it is safe to destroy the
+                        run-time tables.  Just do it anyway.
+
+        zap_methods     Sets the pdprops of generic procedures to
+                        <false>.  This makes printing and debugging much
+                        harder.
+
+        zap_method_parts
+                        Sets the pdprops of all method parts to <false>.
+                        This only matters if you are using the pop
+                        debugger.
+
+        zap_objectclass_section
+                        Cancels and zaps the objectclass section.  Don't
+                        do this unless you have finished compiling.
+                        Auxiliary autoloaded utilities and libraries
+                        depend on the existence of this section.
+
+
+link_all_generics()                                          [procedure]
+        Forces  all  generic  procedures  to  become  linked.  This   is
+        sometimes useful when you would like to distinguish the costs of
+        method linking from that  of the general  program. Has the  same
+        effect as doing
+
+            optimise_objectclass("methods")
+
+        but may be quicker.
+
+
+pop_oc_reuse -> bool                                          [variable]
+bool -> pop_oc_reuse
+        Determines  whether  existing  classes  can  be  reused   during
+        recompilation of objectclass definitions.  If <false>, a key  is
+        never reused,  and  a new  key  is constructed  every  time  you
+        compile an objectclass definition using define_class or similar.
+        If <true>  (the  default),  and  you  recompile  an  objectclass
+        definition without modifying it in  any way, the old class  will
+        be reused.
+
+
+pop_oc_sensitive_methods -> item                              [variable]
+item -> pop_oc_sensitive_methods
+        Controls  the  way  methods  react  when  existing  classes  are
+        recompiled and a  new key  is allocated. This  happens when  the
+        class definition changes or when pop_oc_reuse is set to <false>.
+        It can have the following values
+
+            Value           Meaning
+            -----           -------
+            <false>         ignore the new class
+            "both"          respond to both the old and new class
+            "new"           only respond to instances of the new class
+
+        The default value is "new".
+
+
+pop_oc_trace -> item                                          [variable]
+item -> pop_oc_trace
+        Controls debugging messages printed by objectclass. It can  have
+        the following values:
+
+            Value           Meaning
+            -----           -------
+            <false>         no tracing
+            "cancel"        trace cancelling or unprotecting identifiers
+            "link"          trace LINKING OF generic procedures
+            "replace"       trace objectclass replacement
+            "upgrade"       trace method upgrades for new keys
+            [ ... ]         trace the union of the flags
+            <true>          trace everything
+
+        The default value is <false>.
+
+
+pop_oc_writeable_default -> item                              [variable]
+item -> pop_oc_writeable_default
+        Determines the default writeable/nonwriteable attribute for  new
+        keys created by  objectclass, when not  specified explicitly  in
+        the class definition. It can have the following values:
+
+            Value           Meaning
+            -----           -------
+            <false>         no default
+            "writeable"     writeable default
+            "nonwriteable"  nonwriteable default
+
+        This is relevant when  making saved images with  sys_lock_system
+        or creating  stand-alone  applications with  Popc.  The  default
+        value is "writeable".
+
+
+pop_oc_version -> int                                         [constant]
+        This is a simple integer defining  the version of objectclass in
+        use, in the form
+
+                (major * 1000) + minor
+
+        where major  is the  major version  number and  minor the  minor
+        version number within the former.
+
+
+
+--- C.all/lib/objectclass/ref/objectclass
+--- Copyright University of Sussex 2006. All rights reserved.
