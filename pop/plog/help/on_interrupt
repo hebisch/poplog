@@ -1,0 +1,123 @@
+PLOGHELP ON_INTERRUPT                           Simon Nichols, June 1991
+
+    ?- library(on_interrupt).
+
+    ?- on_interrupt(OldAction, NewAction).
+
+The predicate on_interrupt/1, defined in LIBRARY ON_INTERRUPT, provides
+a means for Prolog programs to trap interrupts (such as occur when you
+type the terminal interrupt character, usually CTRL-C).
+
+The arguments to on_interrupt/2 are both terms which represent either
+goals or the special action 'abort'. Each goal specifies an action to be
+performed when an interrupt occurs: this is called the "interrupt
+action". When on_interrupt/2 is called, OldAction is unified with the
+existing interrupt action. If NewAction is instantiated, it becomes the
+new interrupt action; if it is an uninstantiated variable, it is also
+unified with the existing interrupt action.
+
+To find out the current interrupt action, do
+
+    ?- on_interrupt(OldAction, _).
+    OldAction = abort ?
+    yes
+
+The default action is 'abort', which aborts all current executions and
+returns control to the Prolog top level.  The current input and output
+files are switched back to be the user's terminal. This is similar to
+the default behaviour which results from calling the predicate abort/0
+(see PLOGHELP * ABORT). However, abort/0 actually invokes the current
+interrupt action.
+
+To change the current interrupt action, do
+
+    ?- on_interrupt(OldAction, interrupt_handler).
+    OldAction = abort ?
+    yes
+
+Given a definition of interrupt_handler/0 , such as the (rather
+pointless)
+
+    interrupt_handler :-
+        nl, write('Interrupt handler here ...'),
+        abort.
+
+then the effect of an interrupt (or a call of abort/0) will be
+
+    ?- ^C
+    Interrupt handler here ...
+    Setprolog
+    ?-
+
+Note that a call to abort/0 inside an interrupt action always invokes
+the default definition of abort/0.
+
+Here is a more substantial example, illustrating the use of
+on_interrupt/2 in conjunction with the predicates catch/3 and throw/2,
+defined in LIBRARY CATCH (see PLOGHELP * CATCH).
+
+    start :-
+        on_interrupt(OldAction, throw(loop)),
+        (   loop(1)
+        ;   on_interrupt(_, OldAction)
+        ).
+
+    loop(N) :-
+        catch(step(N, N1), loop, N1=N),
+        loop(N1).
+
+    step(N, N1) :-
+        write('Step'), tab, write(N), nl,
+        read(T),
+        T \= end_of_file,
+        N1 is N + 1.
+
+This program does nothing more than read terms until end of file is
+reached, signalled on UNIX usually by CTRL-D, on VMS by CTRL-Z and in
+VED immediate mode (see HELP * IM) by the command <ENTER> end_im. The
+prompt is StepN, where N is an integer representing the current step
+number. Interrupting the program causes the same step to be restarted,
+as shown by the same step number.
+
+The entry point to the program, the predicate start/0, establishes as an
+interrupt action the goal
+
+    throw(loop)
+
+where 'loop' is the tag. The predicate loop/1 calls step inside a call
+of catch/3. This call of catch/3 specifies 'loop' as the tag and as the
+recovery action the goal
+
+    N1=N
+
+which keeps the step number unchanged. If the call to step/2 succeeds
+without interruption, N1 will be instantiated to N + 1, and so we
+proceed to the next step. If an interrupt occurs during the evaluation
+of step/2, the goal
+
+    throw(loop)
+
+is called which will terminate the current flow of control, returning
+immediately to the invocation of catch/3 within loop/1. This will then
+invoke the goal
+
+    N1=N
+
+causing the current step to be resumed.
+
+In general, a program which wants to guard against interrupts will have
+the form:
+
+    start :-
+        on_interrupt(OldAction, throw(tag)),
+        (   loop
+        ;   on_interrupt(_, OldAction)
+        ).
+
+    loop :-
+        catch(main_processing, tag, handler),
+        loop.
+
+
+--- C.all/plog/help/on_interrupt
+--- Copyright University of Sussex 1991. All rights reserved. ----------

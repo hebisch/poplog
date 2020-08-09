@@ -1,0 +1,387 @@
+HELP LISPVED                                  John Williams, August 1985
+                                                       Revised June 1995
+
+This HELP file documents some of the ways in which the Ved editor can
+assist in the process of preparing and testing Lisp programs. It assumes
+the reader is familiar with the basics of Ved - how to move the cursor,
+<ENTER> commands, marking ranges of text, and so on. If you do come
+across unfamiliar concepts here, try looking in HELP * VED.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Invoking the Editor
+  2   File Names
+  3   Leaving the Editor
+  4   Wiggling Brackets
+  5   More Facilities for Manipulating Lists
+  6   Finding Function Definitions
+  7   Processing Functions
+  8   Tidying Functions
+  9   Compilation in Ved
+ 10   Immediate Mode
+ 11   Debugging Aids
+
+-----------------------------------------------------------------------
+1  Invoking the Editor
+-----------------------------------------------------------------------
+
+There are two ways to get into Ved from the Lisp top-level loop. The
+first, and simplest, is to type:
+
+    ved myfile.lsp
+
+The other way to get from Lisp to the editor is to use the Common Lisp
+function ed. For example:
+
+    (ed "myfile.lsp")
+
+If given a file-name (i.e. string) as argument, ed invokes Ved on the
+specified file. If ed is not given an argument, it returns you to the
+file most recently edited.
+
+ed may also be given a symbol as argument. For details, see Finding
+Function Definitions, below.
+
+
+-----------------------------------------------------------------------
+2  File Names
+-----------------------------------------------------------------------
+
+When choosing a file name, it is important to give it the correct file
+extension: the part of the filename that starts at the last dot. For
+example, the extension of myfile.lsp is .lsp. The file extension tells
+Ved what language a file contains: .lsp signifies Lisp, .pl denotes
+Prolog, and .p indicates Pop-11. This is how Ved knows which compiler to
+use on a file.
+
+(Note for experienced users: Ved uses the Lisp variable *lispfiletypes*
+to identify Lisp program files. See REF * POPLOG_ONLY for details).
+
+
+-----------------------------------------------------------------------
+3  Leaving the Editor
+-----------------------------------------------------------------------
+
+To leave Ved, use either <ENTER> lisp or <ENTER> pop. The first will
+take you into Lisp, whether the editor was originally entered from Lisp
+or not. The latter returns you to the top-level compiler from which Ved
+was invoked. To ensure returning to Pop-11, use <ENTER> pop11. If you
+have Prolog loaded, then <ENTER> prolog will leave Ved and restart the
+Prolog top-level.
+
+
+-----------------------------------------------------------------------
+4  Wiggling Brackets
+-----------------------------------------------------------------------
+
+Ved has a number of utilities that assist with that perennial problem of
+producing Lisp code, matching parentheses. As you may have noticed, Ved
+is set up so that typing a closing round bracket in a .lsp file causes
+the cursor to be "wiggled" over the matching opening bracket. This
+facility can be extended in various ways:
+
+<ENTER> set vedwiggling
+<ENTER> wiggle
+    These both switch all automatic wiggling on and off.
+
+<ENTER> set vedwiggletimes integer
+    This command alters the speed of the wiggle. The initial value is
+    5, but on fast machines/terminals this may need to be increased.
+    It is often useful to set the Pop-11 variable vedwiggletimes in your
+    vedinit.p file.
+
+<ENTER> wiggle opening-bracket closing-bracket
+    e.g wiggle  []
+    Sets up Ved so that the cursor is wiggled over the nearest matching
+    opening-bracket every time closing-bracket is typed (in a file with
+    the same file extension as the current file). Repeating the command
+    switches wiggling off.
+
+<ENTER> wmp
+    Causes the cursor to wiggle over the bracket matching the character
+    under the cursor. Works in either direction. Knows about (), [], {},
+    and <>. wmp stands for "Wiggle matching parenthesis".
+
+Finally, the Ved key sequence <ESC> ) automatically inserts closing )
+characters at the end of a Lisp function (or expression).
+
+
+-----------------------------------------------------------------------
+5  More Facilities for Manipulating Lists
+-----------------------------------------------------------------------
+
+Some Lisp programmers find it useful to be able to move to, or mark, the
+beginnings and ends of lists. Accordingly, Ved provides the following
+set of <ENTER> commands:
+
+<ENTER> gbl
+    Go to the beginning of the list the cursor is currently within.
+
+<ENTER> gel
+    Go to the end of the list the cursor is currently within.
+
+<ENTER> gol
+    Go out of the current list. Useful for stepping backwards through a
+    piece of code.
+
+<ENTER> mp
+    Move the cursor to the matching parenthesis. Similar to <ENTER> wmp
+    (see above) but leaves the cursor at the matching bracket. Works in
+    either direction.
+
+<ENTER> mbl
+    Mark the beginning of the list the cursor is currently within. Will
+    break the line just before the opening list bracket if the list
+    doesn't start on a line by itself.
+
+<ENTER> mel
+    Mark the end of the list the cursor is currently within. Will break
+    the line just after the closing list bracket if the list doesn't end
+    on a line by itself.
+
+<ENTER> mcl
+    Mark the current list, using <ENTER> mbl and <ENTER> mel.
+
+
+Note: These commands all skip over intervening lists. They also ignore
+list brackets located between string-quotes (") and symbol-quotes (|).
+
+
+-----------------------------------------------------------------------
+6  Finding Function Definitions
+-----------------------------------------------------------------------
+
+There are two ways of using Ved to search for the definition of a
+function. The first is to use:
+
+    <ENTER> f function-name
+
+This searches the current file only. It looks for lines starting with an
+opening round bracket, followed by a token starting with the characters
+"DEF", followed by a token starting with function-name. So it can be
+used to find functions defined with defun, macros defined with defmacro,
+variables defined with defvar, defconstant or defparameter, type-
+specifiers defined with deftype, and new classes defined with defclass
+or defstruct.
+
+If you don't know where the functional value of a symbol is defined,
+use:
+
+    <ENTER> ed function-name
+
+This edits the file where the Lisp function ed thinks function-name is
+defined, and then uses <ENTER> f function-name to locate the actual
+code.
+
+In fact, ed only knows where user-defined functions were most recently
+compiled, and so is not guaranteed to work.
+
+
+-----------------------------------------------------------------------
+7  Processing Functions
+-----------------------------------------------------------------------
+
+Ved provides <ENTER> commands for processing the current function,
+listed below. Most of the command names end in "p", this is from the
+Pop-11 term procedure. See below for details of how Ved determines the
+current function.
+
+<ENTER> mcp
+    This marks the current function (see HELP * MARK).
+
+<ENTER> mbp
+    Mark beginning of current function.
+
+<ENTER> mep
+    Mark end of current function (assumes cursor at start of function).
+
+<ENTER> jcp
+    This justifies (i.e. tidies the indentation) of the current
+    function. It does not break lines. See the next section, Tidying
+    Functions for more details.
+
+<ENTER> lcp
+    Compile current function. Usually assigned to the key sequence
+    <ESC> c. For more details, see Compilation in Ved, below.
+
+<ENTER> dcp
+    Delete current function.
+
+<ENTER> gsp/string1/string2
+    Substitute all occurrences of string1 in current function for
+    string2. HELP * VEDSEARCH describes Ved's search and replace
+    facilities in detail.
+
+
+The boundaries of the current function are determined as follows. First,
+Ved searches backwards for a line with the characters (DEF (in upper or
+lower case) aligned at the left of the screen. That line is taken to be
+the start of the current function. Then Ved reads forward from the
+opening bracket, matching instances of ( ) " and |, until the closing
+bracket is found. If the Ved variable vedautoindent is set, Ved will
+automatically indent each line of text while looking for the closing
+bracket. To make this happen, give the command:
+
+    <ENTER> set vedautoindent
+
+Entering this a second time will turn automatic indentation off.
+
+
+-----------------------------------------------------------------------
+8  Tidying Functions
+-----------------------------------------------------------------------
+
+As stated above, functions can be tidied by giving the command
+
+    <ENTER> jcp
+
+An arbitrary marked portion of code can be tidied with the command
+
+    <ENTER> tidy
+
+The tidying routine does not break lines, it merely adjusts the
+indentation of the left margin within the marked range. A Ved variable,
+vedmaxindent, controls the degree of indentation. Its default value is
+4. For example:
+
+(defun len (list)
+    (if (endp list)
+        0
+        (1+ (len (cdr list)))))
+
+If vedmaxindent is altered, like this:
+
+    <ENTER> set vedmaxindent 2
+
+then Ved would format the same function as follows:
+
+(defun len (list)
+  (if (endp list)
+    0
+    (1+ (len (cdr list)))))
+
+With vedmaxindent set to 8, we get:
+
+(defun len (list)
+      (if (endp list)
+          0
+          (1+ (len (cdr list)))))
+
+
+-----------------------------------------------------------------------
+9  Compilation in Ved
+-----------------------------------------------------------------------
+
+There are several commands for effecting compilation of source code in a
+Ved file. They differ in how much of the file is compiled, and what
+happens afterwards. They are listed below:
+
+<ENTER> lmr
+    Compile marked portion of current file.
+    Usually assigned to key sequence <CTRL> d
+
+<ENTER> lcp
+    Compile current function
+    Usually assigned to key sequence <ESC> c
+
+<ENTER> l1
+    Compile current file
+
+<ENTER> l
+    Compile all program files being edited
+
+<ENTER> x1
+    Compile and write current file, then leave editor
+        (as if by <ENTER> pop)
+
+<ENTER> x
+    Compile and write all program files being edited, then
+    leave editor (as if by <ENTER> pop)
+
+
+Output (i.e. printing) arising from compilation is put in the current
+Ved `output' file. By default, for Lisp users, this is a file called
+output.lsp created in the current working directory. The output file can
+be changed by one of the following commands:
+
+<ENTER> output filename
+    Output is redirected to (the Ved file) filename
+
+<ENTER> output .
+    Output goes to current Ved file
+
+<ENTER> output ^
+    Output is simply printed on screen, not into any file
+
+<ENTER> output
+    Displays name of output file
+
+
+By default, error messages also go to the output file. The command
+<ENTER> errs toggles between this behaviour, and just printing errors on
+the screen. Debugger interactions also take place in the output file.
+
+Lisp commands can also entered on the status line of any file
+(irrespective of the filename extension). To do this, prefix the command
+by the default Lisp prompt. The results of such commands are also
+printed on the status line, prefixed by the symbol "=>". Error messages
+and trace output are only printed on the screen. For example:
+
+    <ENTER> == (+ 2 2)  => 4
+
+
+-----------------------------------------------------------------------
+10  Immediate Mode
+-----------------------------------------------------------------------
+
+Ved provides a facility, termed immediate mode, whereby an interactive
+top-level loop is run in a Ved file. This provides the benefits of
+normal non-Ved interaction (e.g. prompting, execution of commands when
+<RETURN> is typed) together with the benefits of an editor (e.g. a
+record of events, text editing).
+
+To enter Ved in immediate mode from the Lisp top-level, do
+
+    == im filename
+
+If you are already inside the editor, use
+
+    <ENTER> im filename
+
+The argument filename can be omitted; it defaults to either the last
+immediate mode filename, or the current output file if this is the first
+invocation of IM.
+
+As for any compilation in Ved, the file-type of the file being edited
+determines which compiler is invoked.
+
+See HELP * IM for more details.
+
+
+-----------------------------------------------------------------------
+11  Debugging Aids
+-----------------------------------------------------------------------
+
+The following commands may help in debugging Lisp programs:
+
+<ENTER> mx
+    Macro expand the current Lisp form (using macroexpand-1). If the
+    cursor is not positioned over an opening round bracket, <ENTER> gbl
+    is used to locate the beginning of the current form. The resulting
+    expansion is displayed in the output file. If the current form is
+    not a macro call, the message 'Not a macro' is printed on the Ved
+    status line.
+
+<ENTER> cmx
+    Like <ENTER> mx, except that it expands compiler macros (using
+    compiler-macroexpand-1).
+
+<ENTER> ed
+    Edits the function definition of the symbol directly under the
+    cursor (if the location of this is known to the system). Uses ed.
+
+
+
+--- C.all/lisp/help/lispved
+--- Copyright University of Sussex 1992. All rights reserved.

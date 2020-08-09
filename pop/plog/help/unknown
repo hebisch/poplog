@@ -1,0 +1,197 @@
+PLOGHELP UNKNOWN                           Robert Duncan, September 1988
+
+
+Alters the action taken when an undefined predicate is called.
+
+
+    :- library(unknown).
+
+    ?- unknown(Old, New).
+
+
+The predicate 'unknown/2', defined in LIBRARY UNKNOWN, alters the action
+taken by Prolog when a call is made to an undefined predicate.
+
+In the standard POPLOG Prolog system, calls to undefined predicates
+simply fail. This is not always the most useful behaviour, as it can
+hide the presence of bugs: a typical example would be a call to a
+predicate with an argument short.
+
+LIBRARY UNKNOWN allows you to select an alternative course of action.
+There are five options available, namely:
+
+    fail  error  autoload  debug  oldfail
+
+Note: an additional option, "mishap", is available as synonym for
+"error" for compatibility with older versions of the library.
+
+The goal
+
+    ?- unknown(Old, New).
+
+can be used either to report the name of the current action or to select
+an alternative. The argument -Old- is unified with the name of the
+current action. If the argument -New- is a variable, then it too is
+bound to the name of the current action, otherwise its value is used to
+change the action. Obviously the new action must be one of the options
+offered by the library.
+
+For example, to discover the current action, do:
+
+    ?- unknown(Old, _).
+    Old = fail ?
+    yes
+
+and to change the action (to "error", say), do:
+
+    ?- unknown(_, error).
+    yes
+
+
+The available options in detail are:
+
+(use <ENTER> g to access the required section)
+
+ -- Option FAIL
+ -- Option ERROR
+ -- Option AUTOLOAD
+ -- Option DEBUG
+ -- Option OLDFAIL
+
+
+-- Option FAIL --------------------------------------------------------
+
+This is exactly the same as the standard system action, causing undefined
+predicates simply to fail:
+
+    ?- unknown(_, fail).
+    yes
+
+    ?- foo(3, X).
+    no
+
+This is the default action, installed when the library is first loaded.
+
+
+-- Option ERROR -------------------------------------------------------
+
+This causes undefined predicates to raise an error, as in:
+
+    ?- unknown(_, error).
+    yes
+
+    ?- foo(3, X).
+
+    ;;; PROLOG ERROR - UNDEFINED PREDICATE
+    ;;; INVOLVING:  foo(3, _1)
+    ;;; DOING    :  undefined/0
+
+
+-- Option AUTOLOAD ----------------------------------------------------
+
+With this action installed, a call to an undefined predicate generates a
+sub-goal
+
+    library(Name)
+
+where -Name- is the name of the predicate being called. If this library
+call succeeds, then the original call is retried in the hope that the
+library has provided a definition of the predicate. If the library call
+fails, meaning that no library file can be found with the given name, an
+error occurs as with the "error" option.
+
+The autoload action prints a message before attempting to load the
+library. So, assuming that there is no library file called "foo.pl", we
+would see:
+
+    ?- unknown(_, autoload).
+    yes
+
+    ?- foo(3, X).
+    Attempting to autoload foo
+    Can't find library file: foo
+
+    ;;; PROLOG ERROR - UNDEFINED PREDICATE
+    ;;; INVOLVING:  foo(3, _1)
+    ;;; DOING    :  undefined/0
+
+On the other hand, referring to a library which does exist gives:
+
+    ?- record(animal, cat, R).
+    Attempting to autoload record
+    R = <procedure REFERENCE> ?
+    yes
+
+(see PLOGHELP * RECORD if you need an explanation of this example).
+
+WARNING: there is, unfortunately, a known bug with this option. If there
+is a library file which has the same name as the unknown predicate
+("foo" in the example above) but which does not define the actual
+predicate being called, then when the goal is retried it will generate
+another undefined predicate call, causing the autoload to be attempted
+again. This cycle will continue for ever, and can only be stopped by an
+interrupt.
+
+
+-- Option DEBUG -------------------------------------------------------
+
+This prints a warning on the current output channel when an undefined
+predicate is called, and then prompts the user for what action to
+take. Currently there are only two choices available: to let the
+goal succeed (but without binding any variables) or to fail. Success
+is indicated by pressing the <RETURN> (or "new-line") key; any other
+input is taken to indicate failure.
+
+Example:
+
+    ?- unknown(_, debug).
+    yes
+
+    ?- foo(3, X).
+    Call to undefined predicate: foo(3, _1)
+    Action? (<nl> = succeed)
+    X = _1 ?
+    yes
+
+    ?- foo(3, X).
+    Call to undefined predicate: foo(3, _1)
+    Action? (<nl> = succeed) ;
+    no
+
+
+-- Option OLDFAIL -----------------------------------------------------
+
+This option is included for backward compatability with pre Version 13.6
+POPLOG. It is similar to the default "fail" option, except that it also
+asserts a dummy definition for the failing predicate, designed to be
+easy to spot in a subsequent "listing". For example:
+
+    ?- unknown(_, oldfail).
+    yes
+
+    ?- foo(3, X).
+    no
+
+    ?- listing(foo/2).
+    foo(_1, _2) :-
+        fail,
+        'UNDEFINED-PREDICATE'.
+    yes
+
+Subsequent calls to this predicate will fail automatically, regardless
+of whether an alternative action has been selected with 'unknown/2'.
+LIBRARY * UNDEFS provides an automatic means for locating and abolishing
+these dummy definitions.
+
+
+-- RELATED DOCUMENTATION ----------------------------------------------
+
+PLOGHELP * LIBRARY
+    How to use the library mechanism
+
+PLOGHELP * PROLOG_ERROR
+    The standard Prolog error-handler, used by LIBRARY UNKNOWN
+
+
+--- C.all/plog/help/unknown
+--- Copyright University of Sussex 1992. All rights reserved. ----------

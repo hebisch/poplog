@@ -1,0 +1,114 @@
+PLOGHELP COMMANDS                               Simon Nichols, July 1990
+
+Commands provide a convenient method of accessing features of the Poplog
+environment from Prolog. A command is recognised by the Prolog compiler
+whenever a special command name occurs as the first word of a clause or
+top-level goal.
+
+Command names are ordinary atoms. The following commands are defined as
+standard:
+
+    ved                             for entering the editor
+
+    help ref teach                  for accessing documentation
+
+    im                              for entering immediate mode
+
+    showlib                         for accessing library files
+
+    source                          for editing a predicate definition
+
+    pop11                           for switching language to pop11
+
+    cd                              for changing directory
+
+    pwd                             for displaying the current directory
+
+    bye                             for exiting Prolog
+
+Most of these can take an optional argument, as follows:
+
+    ved im showlib                  a filename
+
+    help ref teach                  a documentation topic
+
+    source                          a predicate name
+
+    cd                              a directory pathname
+
+If a filename, documentation topic or predicate name argument is
+omitted, the argument given to the previous use of the command will be
+resupplied. If the directory name argument to cd is omitted, the working
+directory will be changed to the home (login) directory.
+
+An argument is simply a sequence of characters terminated by a newline.
+The argument must appear on the same line as the command name, separated
+from it by white space. Directory and filename paths should have
+whatever form is required by the host operating system (UNIX or VMS).
+
+Command names are only recognised specially when occurring as the first
+word in a clause or goal. Otherwise, they can be freely used as atoms in
+terms. Thus,
+
+    ?- ved
+
+will invoke the editor, whereas
+
+    ?- X = ved.
+
+will merely elicit the response
+
+    X = ved ?
+
+If you want to abolish a command for any reason, use the evaluable
+predicate prolog_abolish_command/1. For example, if you wanted to get
+rid of the help command, run the following goal:
+
+    ?- prolog_abolish_command(help).
+
+
+Defining New Commands
+---------------------
+Prolog commands are implemented by means of a Pop-11 property table
+prolog_command which maps each command name to the procedure which
+implements that command -- the command procedure. So, defining a new
+command involves the following operation:
+
+    <procedure> -> prolog_command(<word>);
+
+where <word> is a Pop-11 word (Prolog atom) representing the command
+name. For example, the command pwd could be defined as follows:
+
+    procedure(); printf(current_directory, '%P\n') endprocedure
+        -> prolog_command("pwd");
+
+The command procedure may be a procedure of one argument, in which case
+the remainder of the input line following the command name is passed as
+a Pop-11 string to the procedure. For example, the command cd could be
+defined as below:
+
+    procedure(dir); lvars dir; dir -> current_directory; endprocedure
+        -> prolog_command("cd");
+
+When the command
+
+    ?- cd foo
+
+is given from Prolog, the formal argument dir of the command procedure
+is bound to the Pop-11 string 'foo'. Note that if a command argument
+includes spaces, these are elided. Thus, the (nonsensical) command
+
+    ?- cd foo baz
+
+will result in the formal argument dir of the command procedure being
+bound to 'foobaz'.
+
+Since the entire input line after the command name becomes the command
+argument, it makes no sense to define a command procedure which expects
+more than one argument.
+
+See HELP * PROPERTIES for information about Pop-11 property tables.
+
+
+--- C.all/plog/help/commands
+--- Copyright University of Sussex 1993. All rights reserved.

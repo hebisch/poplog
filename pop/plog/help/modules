@@ -1,0 +1,323 @@
+PLOGHELP MODULES                                Simon Nichols, May 1990
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- INTRODUCTION
+ -- DEFINING MODULES
+ -- THE CURRENT MODULE
+ -- MODULE PATHNAMES
+ -- INTER-MODULE CALLS
+ -- META-PREDICATES
+ -- MODULES AND SECTIONS
+ -- RELATED DOCUMENTATION
+
+
+-- INTRODUCTION -------------------------------------------------------
+
+The POPLOG Prolog module facility allows you to develop Prolog programs
+consisting of modules with well-defined interfaces.
+
+The advantage of this is that a large program may be structured as a
+collection of smaller sub-programs, where each consists of logically or
+functionally related group of predicates.
+
+A module is a named partition of the Prolog database: each has its own
+record of predicate definitions. Definitions are only shared between
+modules where explicitly stated. This minimises the problem of name
+clashes (the possibility that two different predicates which
+accidentally share the same name will conflict with one another). It
+also permits the same name to be deliberately given to different
+predicates which perform analogous functions in different modules.
+
+Modules may be nested: in fact, modules are arranged in a tree
+structure, like the directories in a UNIX or VMS file system. The
+predicate module/1 gets you into the sub-module of the current module
+which is named by its argument. A new sub-module is created if
+necessary, but if a sub-module with this name already exists, that will
+be used. In other words, modules are dynamic entities and it is possible
+to add new predicates to an existing module. This is in contrast to many
+other module systems (though analogous to the POP-11 section mechanism).
+However, it is not surprising when one considers that the predicate
+module/1 has the interpretation "switch from the current database
+partition to the one specified".
+
+The root of the module tree is the unnamed top-level module: this is the
+default database which is used when the Prolog system is first invoked
+and when not inside any other module.
+
+A collection of predicates is defined in POPLOG Prolog to enable the
+definition and use of modules; these are described below.
+
+
+-- DEFINING MODULES ---------------------------------------------------
+
+A module is defined (or in other words, a database partition is entered,
+being created as necessary) by the predicate module/1:
+
+    :- module sets.
+
+By default, any Prolog procedures defined in a module are private to
+that module and cannot be accessed when another module is current,
+except by the use of an explicit module pathname (see below). This
+default is overridden by a module's interface specification, which is
+denoted by the predicates import/1, export/1 and global/1. Each of these
+predicates takes as argument a sequence of predicate specifications
+separated by commas. A predicate specification takes the form
+
+    <functor-name>/<arity>
+
+For example:
+
+    reverse/2
+    insert/2
+    lookup/3
+
+The predicate import/1 specifies the names of predicates defined in the
+parent module which are to be accessible in the current module. Example:
+
+    :- import insert/2.
+
+The predicate export/1 specifies the names of predicates defined in the
+current module which are to be available in the parent module. Example:
+
+    :- export intersection/3, union/3.
+
+The predicate global/1 specifies the names of predicates defined in the
+current module which are to be available in all modules. Example:
+
+    :- global reverse/2.
+
+Note that a global declaration must precede the use of the predicate
+being declared global.
+
+The end of a module definition is denoted by the predicate endmodule/0
+or endmodule/1:
+
+    :- endmodule sets.
+
+or just:
+
+    :- endmodule.
+
+The version which takes the module name as argument checks that it is
+indeed the name of the current module. An error results if it is not.
+
+The predicates endmodule/0 and endmodule/1 have the effect of leaving
+the current module (or database partition) and returning to the parent
+module, which may be the top-level module.
+
+
+-- THE CURRENT MODULE -------------------------------------------------
+
+To find out the name of the current module, use the predicate
+prolog_module/1, which unifies its argument with the name of the current
+module. For example:
+
+    ?- module test.
+    yes
+
+    ?- prolog_module(X)
+    X = test ?
+    yes
+
+    ?- prolog_module(test).
+    yes
+
+    ?- prolog_module(lists).
+    no
+
+In the top-level module, prolog_module/1 fails:
+
+    module.
+
+    ?- prolog_module(X).
+    no
+
+(module/0 takes you to the top-level module.)
+
+The predicate current_module/1 unifies its argument with each sub-module
+of the current module in turn. When called with a variable as argument,
+it instantiates its argument to be the first sub-module of the current
+module; each additional module name is generated on backtracking. See
+below for an example of the use of current_module/1.
+
+The naming conventions may seem confusing (you might think it would have
+been more reasonable to use the name "current_module" for the predicate
+called "prolog_module"); however, the behaviour of current_module/1 is
+analogous with that of current_atom/1, current_functor/2, current_op/3,
+and so forth.
+
+
+-- MODULE PATHNAMES ---------------------------------------------------
+
+So far we have been using the term "module name" without really defining
+it. Module names (like directory names in UNIX and VMS) may be either
+relative or absolute, and may contain a number of pathname components.
+
+An absolute pathname references a module starting at the top-level
+module. A relative pathname references a module staring from the current
+module. A pathname component is the name of a module relative to its
+parent and is an atom. A "simple pathname" is just a single pathname
+component. A "compound pathname" is a sequence of simple pathnames
+separated by the "$-" operator, and is thus a structure. A pathname
+which is prefixed by the "$-" operator is an absolute pathname. For
+example:
+
+    :- module $-sets.
+
+refers to the module "sets" whose parent is the top-level module.
+
+    :- module utilities$-sets.
+
+Refers to the module "sets" whose parent is the module "utilities" which
+is in turn a child of the current module.
+
+    :- module $-utilities$-sets.
+
+Refers to the module "sets" whose parent is the module "utilities" which
+is in turn a child of the top-level module.
+
+
+-- INTER-MODULE CALLS -------------------------------------------------
+
+By default all predicate invocations are intra-module calls: they call
+predicates defined in the current module, or predicates named in the
+interface specification of the current module and/or the defining module
+(the module in which the called predicates are defined). It is possible
+to call predicates which have not been named in an interface
+specification by prefixing the call with the module pathname of the
+defining module. Thus, the following calls the private predicate
+lookup/3 in the module "hashtable" which is a child of the top-level
+module:
+
+    $-hashtable$-lookup(foo, Table, X).
+
+The expression
+
+    <module-pathname><predicate-invocation>
+
+actually evaluates the <predicate-invocation> as if it took place in the
+module named by the <module-pathname>. Thus, to perform database
+manipulation (assert, retract, etc.) or listing in a module other than
+the current module, prefix the call with the appropriate module
+pathname. For example:
+
+    $-animals$-mammals$-assert(isa(garfield, cat)).
+
+asserts a new clause for the predicate isa/2 in the module
+$-animals$-mammals.
+
+    $-animals$-mammals$-listing(isa).
+
+lists all the clauses comprising the isa/2 predicate in the module
+$-animals$-mammals.
+
+    library$-listing.
+
+lists all clause of all predicates in the module library, a sub-module
+of the current module.
+
+    test$-P.
+
+calls the predicate to which P is instantiated in module test.
+
+As an example of both inter-module calls and the use of
+current_module/1, the predicate module_hierarchy/0 displays the entire
+module hierarchy:
+
+    :- global module_hierarchy/1.
+
+    module_hierarchy :-
+        $-module_hierarchy(0).
+
+    module_hierarchy(Indent) :-
+        current_module(Module),
+        tab(Indent),
+        write(Module), nl,
+        Indent1 is Indent + 4,
+        Module$-module_hierarchy(Indent1),
+        fail.
+    module_hierarchy(_).
+
+
+-- META-PREDICATES ----------------------------------------------------
+
+It was stated above that all predicate invocations are intra-module
+calls by default. This is in fact not quite true: a goal which is an
+argument to a meta-predicate such as call/1, not/1 or setof and its
+variants is evaluated relative to the module which is the current module
+at run-time. This is a consequence of the POPLOG Prolog notion of a
+module as a named partition of the Prolog database: only clauses have an
+attachment to modules, not atoms and functors (as is the case in some
+other module systems).
+
+The behaviour with respect to meta-predicates is in some ways rather
+unfortunate, but has been retained for compatibility with the earlier
+version of the module system (which used to be a library). However,
+please note: this will be changed in the next release of POPLOG Prolog.
+
+As an example of a rather subtle consequence of the evaluation of
+meta-predicate arguments relative to the run-time module, consider the
+following:
+
+    :- module $-test.
+    :- export nonnegative/1.
+
+    negative(X) :-
+        integer(X),
+        X < 0.
+
+    nonnegative(X) :-
+        integer(X),
+        \+ negative(X).
+
+    :- endmodule $-test.
+
+nonnegative/1 will always succeed when called outside of module $-test
+because the call to \+/1 will try and invoke negative/1 in the top-level
+module. Since there is no definition for negative/1 in the top-level
+module, the call to negative/1 will always fail and thus the call of
+\+/1 will always succeed. The solution in the example above is to change
+the definition of nonnegative/1 to invoke negative/1 in module $-test:
+
+    nonnegative(X) :-
+        integer(X),
+        \+ $-test$-negative(X).
+
+
+-- MODULES AND SECTIONS -----------------------------------------------
+
+POP-11 and mixed-language programmers might like to know that modules
+are synonymous with POP-11 sections (see HELP SECTIONS). As an
+illustration:
+
+    :- module $-test.
+    yes
+
+    :- prolog_language(pop11).
+    : current_section =>
+    ** <section $-test>
+
+This means that it is easy to develop mixed language programs which
+employ modules and sections.
+
+Note that if a mixed-language program file uses sections, it should use
+some other means to switch sections than the SECTION ... ENDSECTION
+brackets (such as the prolog predicates module/1 and endmodule/1), even
+if the current language is POP-11. This is because the SECTION bracket
+expects to find a matching ENDSECTION and things get confused if the
+language is changed in between.
+
+
+-- RELATED DOCUMENTATION ----------------------------------------------
+
+HELP * SECTIONS
+ Discussion of POP-11 sections
+
+REF * SECTIONS
+ Detailed information about sections
+
+
+--- C.all/plog/help/modules
+--- Copyright University of Sussex 1991. All rights reserved. ----------

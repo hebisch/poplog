@@ -1,0 +1,389 @@
+PLOGHELP SPY_ACTION                          Robert Duncan, January 1992
+
+    ?- spy_action(Action).
+    ?- spy_action(Port, Action).
+
+    ?- current_spy_action(Action).
+    ?- current_spy_action(Port, Action).
+
+Changing the behaviour of the spy debugger.
+
+
+    CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Introduction
+ -- Changing the action at all ports
+ -- Changing the action at specific ports
+ -- Examples of use
+ -- Examining the current spy-port actions
+ -- Leashing and unleashing spy-ports
+ -- Defining user actions
+ -- See also
+
+
+-- Introduction -------------------------------------------------------
+
+The spy debugger uses the four-port procedure-box model of Prolog
+execution to illustrate and control the execution of programs. Each time
+the execution of a spied predicate passes through one of the four
+spy-ports, the debugger takes some action to mark the occurrence: in the
+normal case, it prints an appropriate message and then prompts for a
+command to determine what to do next. This is described in more detail
+in PLOGHELP * SPY.
+
+The predicates spy_action/1 and spy_action/2 described in this file can
+be used to change the action of the debugger at the spy-ports.
+
+
+-- Changing the action at all ports -----------------------------------
+
+The goal
+
+    ?- spy_action(Action).
+
+is used to change the action of the debugger at all spy-ports. Action is
+an atom selecting one of four possible actions to take:
+
+    stop
+        the default action: the debugger prints a message including the
+        port name, the goal being tried and its invocation number; it
+        then stops and prompts for a command before proceeding. Certain
+        commands can change the execution path of the goal. Full details
+        are given in PLOGHELP * SPY. A port having the "stop" action
+        selected is said to be "leashed".
+
+    continue
+        the debugger prints the same message as for the "stop" action,
+        but doesn't stop to wait for commands. A port having the
+        "continue" action selected is said to be "unleashed". If all
+        ports are unleashed, the debugger acts as a tracer.
+
+    ignore
+        the debugger produces no output and doesn't stop: spy-ports are
+        simply ignored. Ignoring all ports is a simple way of
+        temporarily disabling debugging without having to use nospy/0,
+        which deletes all spy-points. Note that, even with all ports
+        ignored, execution of spied predicates is still done under the
+        control of the debugger, so the same overheads in speed and
+        space utilisation should be expected.
+
+    user
+        the debugger's action is defined by the dynamic predicate
+        spy_action_hook/3, described below.
+
+
+-- Changing the action at specific ports ------------------------------
+
+For finer control, the goal:
+
+    ?- spy_action(Port, Action).
+
+will change the debugger's actions only at the spy-port (or ports)
+identified by Port. This is typically an atom denoting a single port,
+i.e. one of
+
+    call
+    exit
+    redo
+    fail
+
+but it may be a list of port names (to abbreviate multiple calls) or the
+atom 'all' which is short for the list
+
+    [call,exit,redo,fail]
+
+The predicate spy_action/1 is defined simply as:
+
+    spy_action(Action) :-
+        spy_action(all, Action).
+
+
+-- Examples of use ----------------------------------------------------
+
+Consider the "naive reverse" program:
+
+    nrev([], []).
+    nrev([X|L1], L3) :-
+        nrev(L1, L2),
+        append(L2, [X], L3).
+
+    append([], L, L).
+    append([X|L1], L2, [X|L3]) :-
+        append(L1, L2, L3).
+
+    :- spy nrev.
+
+    ?- nrev([1,2], L).
+
+The normal output produced by this program begins with:
+
+    ** (1) Call : nrev([1, 2], _1)?
+
+which is the initial message printed by the debugger; the query (?)
+indicates that it is now waiting for a command. Pressing <RETURN> causes
+the debugger to continue; repeating this at each step produces the
+remainder of the trace:
+
+    ** (2) Call : nrev([2], _2)?
+    ** (3) Call : nrev([], _3)?
+    ** (3) Exit : nrev([], [])?
+    ** (2) Exit : nrev([2], [2])?
+    ** (1) Exit : nrev([1, 2], [2, 1])?
+    L = [2, 1] ?
+    yes
+
+To get the same trace without having to keep pressing <RETURN>, unleash
+all the ports and try the goal again:
+
+    :- spy_action(continue).
+
+    ?- nrev([1,2], L).
+    ** (1) Call : nrev([1, 2], _1)
+    ** (2) Call : nrev([2], _2)
+    ** (3) Call : nrev([], _3)
+    ** (3) Exit : nrev([], [])
+    ** (2) Exit : nrev([2], [2])
+    ** (1) Exit : nrev([1, 2], [2, 1])
+    L = [2, 1] ?
+    yes
+
+In this mode, because the debugger never prompts for a command, you
+cannot change the course of execution: the goal simply runs to
+completion.
+
+To speed up progress through the goal without sacrificing all control,
+try something like:
+
+    :- spy_action(continue), spy_action(call, stop).
+
+which unleashes all ports except the call port. We then have:
+
+    ?- nrev([1,2], L).
+    ** (1) Call : nrev([1, 2], _1)?     % The debugger stops here
+    ** (2) Call : nrev([2], _2)?        % ... here
+    ** (3) Call : nrev([], _3)?         % ... and here
+    ** (3) Exit : nrev([], [])          % but no more
+    ** (2) Exit : nrev([2], [2])
+    ** (1) Exit : nrev([1, 2], [2, 1])
+    L = [2, 1] ?
+    yes
+
+Once the debugger has reached a leashed port, you can alter the spy-port
+actions by using the "break" command to enter a new top-level and then
+use the spy_action predicates as normal; terminating the top-level
+returns you to the debugger. See PLOGHELP * SPY/Break.
+
+In a real debugging situation, a useful combination of actions is to
+have all ports ignored except for the fail port:
+
+    :- spy_action(ignore), spy_action(fail, continue).
+
+When a goal unexpectedly responds 'no', some sub-goal must be failing
+which wasn't meant to. This combination of spy-port actions displays
+only those goals which fail:
+
+    ?- nrev([1,2], L).
+    L = [1,2] ? ;                   % Backtrack
+    ** (3) Fail : nrev([], _1)
+    ** (2) Fail : nrev([2], _2)
+    ** (1) Fail : nrev([1, 2], _3)
+    no
+
+
+-- Examining the current spy-port actions -----------------------------
+
+The spy_action predicates can be used only for setting the actions at
+spy-ports: their arguments must be instantiated to legal port and action
+names. To examine the current settings, use the predicates
+current_spy_action/1 and current_spy_action/2.
+
+The goal:
+
+    ?- current_spy_action(Action).
+
+succeeds whenever Action is the action selected for all spy-ports. The
+goal
+
+    ?- current_spy_action(Port, Action).
+
+succeeds whenever Action is the action selected for the named Port (or
+ports).
+
+For example:
+
+    ?- current_spy_action(call, Action).
+    Action = ignore ?
+    yes
+
+    ?- current_spy_action(Port, stop).
+    no
+
+The predicate debugging/0 reports the current status of the spy-ports:
+
+    ?- debugging.
+    There are spypoints on the following procedures:
+        nrev/2
+    Spyport actions:
+        call: ignore
+        exit: ignore
+        redo: ignore
+        fail: continue
+    yes
+
+
+-- Leashing and unleashing spy-ports ----------------------------------
+
+The predicates leash/1 and unleash/1 can also be used to set the "stop"
+and "continue" actions at particular ports. They have definitions:
+
+    leash(Port) :-
+        spy_action(Port, stop).
+
+    unleash(Port) :-
+        spy_action(Port, continue).
+
+The predicate leash/0 leashes all ports which are currently unleashed
+and prints a status message; the predicate unleash/0 does the opposite,
+unleashing all leashed ports.
+
+
+-- Defining user actions ----------------------------------------------
+
+Specifying the "user" action at a spy-port allows you to define for
+yourself the debugger's action at that port. At a user port, the
+debugger executes the goal:
+
+    spy_action_hook(Port, Goal, I)
+
+where Port is the name of the spy-port, Goal is the goal being tried and
+I is its invocation number.
+
+The predicate spy_action_hook/3 is dynamic and can be easily redefined,
+but there are two points to note:
+
+    (1) the call to spy_action_hook/3 is satisfied at most once;
+
+    (2) the progress of the debugger is unaffected by the success or
+        failure of the call.
+
+This means that you cannot write a user action which changes the
+debugger's execution path (so you cannot, for example, reimplement the
+debugger's command interface). You can of course change the global state
+within your own program, or change the debugger's behaviour by switching
+spy-points on or off, or by changing the spy-port actions.
+
+One use of the user hook is to customise the debugger's trace output.
+For example, the following program uses indentation to display the depth
+of the call tree.
+
+    spy_action_hook(Port, Goal, _) :-
+        indent(Port, N),
+        tab(4*N),
+        write(Port),
+        tab,
+        print(Goal),
+        nl.
+
+    :- prolog_setq(indent, 0).
+
+    indent(Port, N) :-
+        prolog_val(indent, I),
+        (indentstep(Port, +) ->
+            N = I,
+            I1 is I+1
+        ;   I1 is I-1,
+            N = I1
+        ),
+        prolog_setq(indent, I1).
+
+    indentstep(call, +).
+    indentstep(exit, -).
+    indentstep(redo, +).
+    indentstep(fail, -).
+
+Example:
+
+    :- spy_action(user).
+    :- spy append/3.
+
+    ?- nrev([1,2],L).
+    call nrev([1, 2], _1)
+        call nrev([2], _2)
+            call nrev([], _3)
+            exit nrev([], [])
+            call append([], [2], _2)
+            exit append([], [2], [2])
+        exit nrev([2], [2])
+        call append([2], [1], _1)
+            call append([], [1], _4)
+            exit append([], [1], [1])
+        exit append([2], [1], [2, 1])
+    exit nrev([1, 2], [2, 1])
+    L = [2, 1] ? ;
+    redo nrev([1, 2], [2, 1])
+        redo append([2], [1], [2, 1])
+            redo append([], [1], [1])
+            fail append([], [1], _4)
+        fail append([2], [1], _1)
+        redo nrev([2], [2])
+            redo append([], [2], [2])
+            fail append([], [2], _2)
+            redo nrev([], [])
+            fail nrev([], _3)
+        fail nrev([2], _2)
+    fail nrev([1, 2], _1)
+    no
+
+Use of the spy_action_hook is not restricted to debugging and tracing:
+this final example illustrates a very simple (and slow!) profiler, which
+counts the number of ports visited by each spied predicate.
+
+    :- dynamic profile/4.
+
+    spy_action_hook(Port, Goal, _) :-
+        functor(Goal, F, N),
+        profile(F, N, Port).
+
+    profile(F, N, Port) :-
+        retract(profile(F, N, Port, Cnt)),
+        !,
+        Cnt1 is Cnt + 1,
+        assert(profile(F, N, Port, Cnt1)).
+    profile(F, N, Port) :-
+        assert(profile(F, N, Port, 1)).
+
+    start_profile :-
+        abolish(profile, 4),
+        spy_action(user).
+
+    end_profile :-
+        spy_action(stop),
+        setof(profile(F,N,Port,Cnt), profile(F,N,Port,Cnt), S),
+        summarise(S).
+
+    summarise([profile(F,N,Port,Cnt)|S]) :-
+        !,
+        write(Port), tab,
+        write(F), write('/'), write(N), tab,
+        write(Cnt), nl,
+        summarise(S).
+    summarise([]).
+
+    ?- start_profile, nrev([1,2], _), end_profile.
+    call append/3 3
+    exit append/3 3
+    call nrev/2 3
+    exit nrev/2 3
+
+
+-- See also -----------------------------------------------------------
+
+PLOGHELP * SPY
+    Using the spy debugger
+
+PLOGHELP * NOSPY
+    Removing spy-points
+
+
+--- C.all/plog/help/spy_action
+--- Copyright University of Sussex 1992. All rights reserved. ----------

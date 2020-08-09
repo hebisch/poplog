@@ -1,0 +1,177 @@
+HELP ARRAY                                   Robert Duncan, January 1990
+                                                   Revised November 1994
+
+Sequences with constant time access and update.
+
+
+    CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- The Array Module
+ -- The Array Type
+ -- Array Functions
+
+
+-- The Array Module ---------------------------------------------------
+
+signature Array
+signature ARRAY
+structure Array : Array
+    The  structure  -Array-   provides  an   implementation  of   simple
+    one-dimensional arrays. The structure is described by the  following
+    signature:
+
+        signature Array = sig
+
+            eqtype 'a array
+
+            exception Size
+            exception Subscript
+
+            val array       : int * '_a -> '_a array
+            val tabulate    : int * (int -> '_a) -> '_a array
+            val arrayoflist : '_a list -> '_a array
+            val length      : 'a array -> int
+            val sub         : 'a array * int -> 'a
+            val update      : 'a array * int * 'a -> unit
+
+        end
+
+        signature ARRAY = Array
+
+    The -Array-  module  is not  part  of  the Definition,  but  can  be
+    considered standard  insofar  as  it is  supported  by  all  current
+    Standard ML  compilers. See  HELP  * EXTENDED_ARRAY  for  additional
+    (non-standard) functions  on  arrays  and HELP  *  VECTOR  for  non-
+    updatable array-like objects.
+
+
+-- The Array Type -----------------------------------------------------
+
+eqtype 'a array
+    The type of arrays. An array is a sequence of elements all the  same
+    type which supports indexed access and update in constant time.  For
+    an array of length -n-, index values are integers in the range
+
+        0 <= i < n
+
+    The array  type  is  abstract in  the  sense  that it  has  no  data
+    constructors -- arrays can  be created and  manipulated only by  the
+    functions described  in this  file --  but it  does admit  equality.
+    Array values are one-dimensional only;  higher-order arrays must  be
+    simulated with arrays of arrays.
+
+    Arrays share with  references the property  of being updatable.  The
+    semantics of arrays  can be  properly described  with the  following
+    model implementation based on vectors (see HELP * VECTOR):
+
+        structure Array : Array = struct
+
+            datatype 'a array = ARRAY of 'a ref Vector.vector
+
+            (*  ... function definitions given below  *)
+
+        end;    (* structure Array *)
+
+    Updating a particular element of  an array means changing the  value
+    at the corresponding address (equivalent to updating a reference  in
+    the model) and such  a change is  visible everywhere. This  property
+    means that  the  types  of  the array  creation  functions  must  be
+    imperative in order to be type-safe,  just as the type of the  -ref-
+    constructor is imperative. This in turn means that type  constraints
+    may sometimes be needed at the  points at which these functions  are
+    applied.
+
+    Equality  on  arrays  is  implemented  analogously  to  equality  on
+    references: two arrays are equal if and only if they occupy the same
+    range of addresses in memory, such  that the updating of either  one
+    causes an equivalent  change in the  other. This definition  follows
+    directly from the model implementation. In addition, the array  type
+    constructor shares with -ref- the special property that the type
+
+        'ty array
+
+    is always an equality type  regardless of whether  'ty is itself  an
+    equality type.
+
+    The zero-length array is a unique object, so that the equation
+
+        array(0, x) = array(0, x)
+
+    is true for any -x-.
+
+
+-- Array Functions ----------------------------------------------------
+
+The descriptions of  functions given  below are  illustrated with  model
+definitions based on the abstract type defined above and using functions
+from the -Vector- module (see HELP  * VECTOR). The real definitions  are
+more space-efficient than  those given here,  but cannot be  represented
+directly in Standard ML.
+
+
+exception Size
+val array (n : int, x : '_a) : '_a array
+    Constructs a new array of size -n-, where every element of the array
+    is initialised with the  value -x-. Raises  the exception -Size-  if
+    -n- is negative (note  that this exception is  identical to that  in
+    the Vector module). Because this  function returns a new array,  its
+    result type is necessarily imperative as discussed above.
+
+        exception Size = Vector.Size
+        fun array(n, x) = ARRAY(Vector.tabulate(n, fn _ => ref x))
+
+
+val tabulate (n : int, init : int -> '_a) : '_a array
+    Constructs a new array  of size -n-, where  the i'th element of  the
+    array is initialised with the value -init(i)-. Raises the  exception
+    -Size- (described above) if -n-  is negative. Because this  function
+    returns a new array,  its result type  is necessarily imperative  as
+    discussed above.
+
+        fun tabulate(n, init) =
+                ARRAY(Vector.tabulate(n, fn i => ref(init(i))))
+
+
+val arrayoflist (l : '_a list) : '_a array
+    Constructs a new array of  size -length(l)-, where the i'th  element
+    of the array  is initialised  with the corresponding  item from  the
+    list. Because this function returns a new array, its result type  is
+    necessarily imperative as discussed above.
+
+        fun arrayoflist(l) = ARRAY(Vector.vector(map ref l))
+
+
+val length (a : 'a array) : int
+    Returns  the  number  of  elements  in  the  array  -a-.  This  is a
+    constant-time operation.
+
+        fun length(ARRAY(v)) = Vector.length(v)
+
+
+exception Subscript
+val sub (a : 'a array, i : int) : 'a
+val update (a : 'a array, i : int, x : 'a) : unit
+    The function -sub- returns  the i'th element of  the array -a-;  the
+    function -update- updates that  element in place  to have the  value
+    -x-.  Both  are  constant-time  operations.  In  either  case,   the
+    exception -Subscript- is raised for values of -i- outside the range
+
+        0 <= i < length(a)
+
+    The exception  -Subscript-  is identical  to  that in  the  -Vector-
+    module.
+
+        exception Subscript = Vector.Subscript
+        fun sub(ARRAY(v), i) = !(Vector.sub(v, i))
+        and update(ARRAY(v), i, x) = Vector.sub(v, i) := x
+
+    NB: -sub- is intended to be an infix operator of precedence 9. It is
+    recommended that  whenever  the  -Array-  structure  is  opened,  an
+    appropriate fixity directive should be appended, e.g:
+
+        open Array
+        infix 9 sub
+
+
+--- C.all/pml/help/array
+--- Copyright University of Sussex 1994. All rights reserved. ----------

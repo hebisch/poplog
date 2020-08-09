@@ -1,0 +1,138 @@
+PLOGHELP SYSTEM_PREDICATE                   Robert Duncan, February 1988
+
+
+    :- op(254, fx, system_predicate).
+
+    ?- system_predicate PredicateSpec.
+
+
+Declares all the predicates identified by PredicateSpec to be "system"
+predicates. PredicateSpec must be a conjunction of simple specifications
+of the form
+
+    Fn/Arity
+
+where Fn is an atom (the functor name of the predicate) and Arity an
+integer (its arity). For example, the directive:
+
+    :- system_predicate search/3, reduce/2.
+
+declares the two predicates search/3 and reduce/2 to be system
+predicates.
+
+To be effective, the declaration must come before the definitions of the
+specified predicates.
+
+
+-- What is a System Predicate? ----------------------------------------
+
+The definitions of system predicates are compiled specially so that the
+procedures generated from them are constants rather than variables. This
+means that calls to these procedures are likely to be faster than in the
+normal case. All the predicates built in to the Prolog system are
+compiled this way, hence the term "system predicate".
+
+A disadvantage of system predicates is that because their procedures are
+constants, they cannot easily be redefined. That is, they cannot be
+reconsulted, asserted or retracted, and when first defined, all the
+clauses in the definition must be contiguous. They can't be abolished in
+the normal way either (you have to use the special predicate
+'prolog_abolish/2' described in PLOGHELP * PROLOG_ABOLISH), nor can they
+be spied upon. Trying to change the definition of a system predicate
+causes an error, as in:
+
+    ?- [-user].
+    | X = X.        ;;; This is a redefinition of '=/2'
+
+    ;;; PROLOG ERROR - TRYING TO REDEFINE A SYSTEM PREDICATE
+    ;;; INVOLVING:  '=/2'
+    ;;; DOING    :  reconsult/1
+    ;;; [execution aborted]
+
+Because of these limitations, it is generally unwise to include
+declarations of system predicates in a program which is still undergoing
+development: any file which includes such a declaration can be loaded
+only once, and the predicates so declared can't be spied upon when
+things go wrong. It is better to complete the program with everything
+redefinable, and add any system_predicate declarations (with the aim of
+achieving some speed improvement) at the very end.
+
+
+-- Making Everything a System Predicate -------------------------------
+
+You can make all the definitions in a program or part of a program
+default to creating system predicates by a call to prolog_syspredicates/1.
+The directive
+
+    :- prolog_syspredicates(on).
+
+switches the default compilation mode to "system"; it can be set back
+to normal by the directive:
+
+    :- prolog_syspredicates(off).
+
+All predicates defined between these two directives will be compiled
+into constant procedures.
+
+You can examine the current mode setting by doing:
+
+    ?- prolog_syspredicates(Setting).
+    Setting = off ?
+
+If ever the default setting is "on" and you wish to override this and
+define a predicate which is not a system predicate, you can use the
+declaration:
+
+    :- user_predicate PredicateSpec.
+
+This ensures that all the predicates identified by PredicateSpec will
+be redefinable, regardless of the current compilation mode.
+
+
+-- Finding Out Whether Something is a System Predicate ----------------
+
+There are two ways to do this.
+
+The goal
+
+    ?- prolog_system_predicate(Fn, Arity).
+
+succeeds whenever the predicate Fn/Arity is a system predicate.
+
+The goal
+
+    ?- predicate_info(Fn/Arity, Info).
+
+unifies Info with a list of declaration attributes possessed by the
+predicate Fn/Arity (see PLOGHELP * PREDICATE_INFO). This list will
+include one or other of the atoms 'system_predicate' or 'user_predicate'
+depending on how the predicate has been declared. For example:
+
+    ?- predicate_info(functor/3, Info).
+    Info = [system_predicate, static, no_clauses] ?
+
+    ?- predicate_info(my_predicate/2, Info).
+    Info = [user_predicate, static, clauses] ?
+
+
+-- RELATED DOCUMENTATION ----------------------------------------------
+
+PLOGHELP * DYNAMIC, * NO_CLAUSES
+    Describe other declaration forms.
+
+PLOGHELP * EFFICIENCY
+    Hints on making Prolog programs more efficient.
+
+PLOGHELP * PREDICATE_INFO
+    Gives information about how a predicate has been declared.
+
+PLOGHELP * PROLOG_ABOLISH
+    Abolishes system predicates.
+
+PLOGHELP * SYSTEM
+    Describes those predicates which affect how the Prolog system
+    behaves.
+
+
+--- C.all/plog/help/system_predicate
+--- Copyright University of Sussex 1988. All rights reserved. ----------

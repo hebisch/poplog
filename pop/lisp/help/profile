@@ -1,0 +1,166 @@
+HELP PROFILE                                     John Williams, Mar 1992
+
+The PROFILE module  provides a  Lisp interface to  the Poplog  profiling
+tool defined  in LIB * PROFILE.P.  The  profiler works  by  interrupting
+execution of the profiled code  at regular intervals, and examining  the
+call-stack to see which function is currently being run. When  profiling
+ceases, a table  listing the most frequently  executed functions  is
+displayed.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Loading the PROFILE module
+  2   The profile special-form
+  3   Example
+  4   Getting a bar chart of the profiler results
+  5   Complete list of variables defined by the PROFILE module
+
+
+-----------------------------------------------------------------------
+1  Loading the PROFILE module
+-----------------------------------------------------------------------
+
+To load the PROFILE module, type
+
+    (require :profile)
+
+The functions  and variables  defined by  this module  are all  external
+symbols of the COMMON-LISP package.
+
+To examine the PROFILE module,  use the top-level command showlib,  i.e.
+type:
+
+    showlib profile
+
+
+-----------------------------------------------------------------------
+2  The profile special-form
+-----------------------------------------------------------------------
+
+Profiling is effected using the profile special-form:
+
+(profile {form}*)                                         [special-form]
+        Profiles the  execution  of {form}*.  When  execution  ceases, a
+        table  of  profiling  information  is  printed  to  the   stream
+        *profile-output* (documented below).
+
+
+-----------------------------------------------------------------------
+3  Example
+-----------------------------------------------------------------------
+
+First load the PROFILE module:
+
+    (require :profile)
+
+We define a test function that calls member and append:
+
+    (defun test ()
+        (declare (notinline append member))
+        (dotimes (i 10000)
+            (member 5 '(1 2 3 4 5))
+            (append '(1 2 3) '(4 5 6) '(7 8 9)))
+        (values))
+
+And then profile a call to the test function:
+
+    (profile (test))
+
+The output will be something like:
+
+    Number of interrupts: 113
+    CPU time: 1.39 seconds, GC time: 0.25 seconds
+
+    %Time  Interrupts
+     74.3     84    MEMBER
+     18.6     21    APPEND
+      5.3      6    COMPILED-FUNCTION-P
+      1.8      2    TEST
+
+
+-----------------------------------------------------------------------
+4  Getting a bar chart of the profiler results
+-----------------------------------------------------------------------
+
+The profiler will display its results as a bar chart in a Ved window
+if the variable *profile-graphical* is set true. For example:
+
+    (let ((*profile-graphical* t))
+        (profile (test)))
+
+produces a bar chart like this:
+
+ Number of interrupts: 116
+ CPU time: 1.43 seconds, GC time: 0.26 seconds
+
+                                                            MEMBER (71%)
+
+                     APPEND (22%)
+
+         COMPILED-FUNCTION-P (7%)
+
+    TEST (1%)
+
+
+-----------------------------------------------------------------------
+5  Complete list of variables defined by the PROFILE module
+-----------------------------------------------------------------------
+
+*profile-exclude*                                             [variable]
+        A list of names of functions to be ignored by the profiler.  For
+        example, if the  function foo  calls the function  baz, and  the
+        symbol baz is a member of *profile-exclude*, then the time taken
+        by the execution of baz will be attributed to the function  foo.
+        The initial value of *profile-exclude* is a list containing  the
+        Pop-11 procedure name "null" (a Pop-11 word).
+
+
+*profile-excluded-packages*                                   [variable]
+        A function whose name is a symbol whose home package is a member
+        of *profile-excluded-packages* will be  ignored by the  profiler
+        (i.e. the time spent executing that function will be  attributed
+        to its caller). *profile-excluded-packages* must contain package
+        objects, not package names. Its initial value is nil.
+
+
+*profile-gc-trace*                                            [variable]
+        If t (default  value nil), then  information about memory  usage
+        will be printed  each time  a garbage  collection occurs  during
+        profiling. See  also the  variable *gc-verbose*  defined in  the
+        * STOREUTILS module.
+
+
+*profile-graphical*                                           [variable]
+        If t  (default value  nil), profiler  output is  displayed  as a
+        horizontal bar chart in a Ved file named `profile output'.
+
+
+*profile-interval*                                            [variable]
+        The frequency (in  micro seconds)  with which  profiled code  is
+        interrupted. The default value is 10000; i.e. the profiled  code
+        is interrupted every 1/100th of a second.
+
+
+*profile-lisp-only*                                           [variable]
+        If t (the default value), then only Lisp functions are  profiled
+        (i.e.  interrupts   occuring   inside  Pop-11   procedures   are
+        attributed to the nearest Lisp function call). When  profiling a
+        mixed language program you might want to set *profile-lisp-only*
+        to nil.
+
+
+*profile-output*                                              [variable]
+        The stream to which profiling  information is sent. The  initial
+        value is a synonym stream to *trace-output*.
+
+
+*profile-show-max*                                            [variable]
+        The maximum number of function names displayed by the  profiler.
+        The default  value  is  10,  i.e.  the  10  most  time-consuming
+        functions will be displayed.
+
+
+
+--- C.all/lisp/help/profile
+--- Copyright University of Sussex 1992. All rights reserved.

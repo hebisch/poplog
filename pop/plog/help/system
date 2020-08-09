@@ -1,0 +1,360 @@
+PLOGHELP SYSTEM                            Jonathan Laventhol  July 1983
+                                Revised by Kathryn Seifert  October 1986
+
+Predicates which affect the way the Prolog system operates
+
+    prolog_memlim(<prologvar>|<integer>)
+    prolog_area_lim(<prologvar>|<integer>)
+    prolog_area_size(<prologvar>|<integer>)
+    prolog_callstack_lim(<prologvar>|<integer>)
+    prolog_memused(<prologvar>)
+    trimcore
+    prolog_gcratio(<prologvar>|<integer>)
+    prolog_gctrace(<prologvar>|on|off)
+    statistics
+    prolog_lock_code
+    prolog_unlock_code
+    prolog_no_clauses(<prologvar>|on|off)
+    prolog_syspredicates(<prologvar>|on|off)
+    prolog_system_predicate(<atom>, <integer>)
+    version
+    version(<string>)
+
+Keywords: system predicates, system, garbage collection,
+          memory allocation, compilation
+
+
+CONTENTS - (Use <ENTER> g to access sections)
+
+ -- INTRODUCTION
+ -- MEMORY ALLOCATION
+ -- ALTERING UPPER LIMIT ON MEMORY WITH 'PROLOG_MEMLIM'
+ -- ALTERING THE LIMIT OF PROLOG TRAIL AND CONTINUATION STACKS
+ -- ALTERING THE CALLSTACK LIMIT
+ -- FINDING OUT HOW MUCH MEMORY WAS USED
+ -- FORCING A GARBAGE COLLECTION TO OCCUR
+ -- CONTROLLING GARBAGE COLLECTION
+ -- BEING INFORMED ABOUT GARBAGE COLLECTIONS
+ -- FINDING OUT THE SYSTEM'S STATE AT LAST GARBAGE COLLECTION
+ -- STOPPING COLLECTION OF FIXED STRUCTURES
+ -- SAVING SPACE AND COMPILATION TIME
+ -- SAVING RUNNING TIME
+ -- IDENTIFYING SYSTEM PREDICATES
+ -- WHICH VERSION IS THIS?
+ -- RELATED DOCUMENTATION
+
+
+-- INTRODUCTION -------------------------------------------------------
+
+There are a number of Prolog predicates which affect the way the system
+operates and provide information about the system.  These predicates can
+be used to control compilation, memory allocation, and garbage
+collection.  There are also predicates to find out whether a predicate
+is part of the system and to find out what version of Prolog is being
+run.
+
+
+-- MEMORY ALLOCATION --------------------------------------------------
+
+Users are referred to the POP-11 help file HELP * POPMEMLIM for
+information about memory allocation.
+
+
+-- ALTERING UPPER LIMIT ON MEMORY WITH 'PROLOG_MEMLIM' ----------------
+
+There is an upper limit on the amount of memory that the system will
+expand to.  You can examine this figure, or alter it using the
+predicate 'prolog_memlim'.
+
+To discover the current limit on the memory, type:
+
+    ?- prolog_memlim(X).
+    X = 148800
+    ?
+    yes
+
+To alter the memory limit, give an integer amount to the predicate
+'prolog_memlim':
+
+    ?- prolog_memlim(400000).
+    yes
+
+
+-- ALTERING THE LIMIT OF PROLOG TRAIL AND CONTINUATION STACKS ---------
+
+The Prolog trail and continuation stacks have their own limit.  The
+predicate 'prolog_area_lim' can be used to examine or alter this limit.
+
+To discover the current limit, type:
+
+    ?- prolog_area_lim(X).
+    X = 16000
+    ?
+    yes
+
+To alter this limit, give an integer amount to the predicate
+'prolog_area_lim':
+
+    ?- prolog_area_lim(25000).
+    yes
+
+The predicate prolog_area_size/1 sets the absolute size of the Prolog
+memory area:
+
+    ?- prolog_area_size(25000).
+    yes
+
+    ?- prolog_area_size(X).
+    X = 25000 ?
+
+If the size is greater than the limit set previously by prolog_area_lim/1,
+the limit is increased accordingly. An error results if there is
+insufficient memory to allocate the requested space.
+
+
+-- ALTERING THE CALLSTACK LIMIT ---------------------------------------
+
+There is also a limit on the space used by the procedure calling stack.
+Heavily recursive procedures may need to expand this limit to avoid the
+error
+
+    ;;; PROLOG ERROR - RLE: RECURSION LIMIT (pop_callstack_lim) EXCEEDED
+
+The limit is controlled by the predicate prolog_callstack_lim/1. You can
+examine the current limit by doing
+
+    ?- prolog_callstack_lim(X).
+    X = 90000 ?
+    yes
+
+and you can change it by giving an integer as argument, as in:
+
+    ?- prolog_callstack_lim(120000).
+    yes
+
+The limit is interpreted as a number of machine words.
+
+
+-- FINDING OUT HOW MUCH MEMORY WAS USED -------------------------------
+
+You can see how much memory was used at the last garbage collection
+using the predicate 'prolog_memused':
+
+    ?- prolog_memused(X).
+    X = 4244575
+    ?
+    yes
+
+
+-- FORCING A GARBAGE COLLECTION TO OCCUR ------------------------------
+
+You can cause a garbage collection by using the predicate 'trimcore'.
+This predicate takes no arguments:
+
+    ?- trimcore.
+    yes
+
+
+-- CONTROLLING GARBAGE COLLECTION -------------------------------------
+
+The amount of memory in use is determined by the ratio of garbage
+collection time to total CPU time. You can find out what this ratio
+is, or alter it with the predicate 'prolog_gcratio'.
+
+To find out what this ratio is, type:
+
+    ?- prolog_gcratio(X).
+    X = 25
+    ?
+    yes
+
+
+To alter this ratio, give an integer setting to the predicate
+'prolog_gcratio':
+
+    ?- prolog_gcratio(30).
+    yes
+
+
+-- BEING INFORMED ABOUT GARBAGE COLLECTIONS ---------------------------
+
+You can have garbage collections announce themselves with the predicate
+prolog_gctrace/1.
+
+To switch the announcement statement on, type:
+
+    ?- prolog_gctrace(on).
+    yes
+
+After this, at each subsequent garbage collection (whether it happens
+automatically or is forced by using trimcore/0) you will see a message
+something like:
+
+;;; GC-auto(C) TIME: 0.27, MEM: used 19270 + free 11450 + stack 0 = 30720
+;;;            CALLSTACK: 248
+;;;            PROLOG: trail 2 + free 2005 + contn 41 = 2048
+
+This indicates that the collection took 0.27 seconds, and that at the
+end of it there were 19270 words of memory used and 11450 free, making a
+total of 30720. The 'stack' figure shows how many words were used by the
+POP-11 user stack (none in this example), and CALLSTACK shows the space
+occupied on the procedure calling stack. The line beginning PROLOG gives
+a breakdown of space usage in the Prolog memory area: here there were 2
+words used on the trail, 41 on the continuation stack and 2005 free
+making a total of 2048.
+
+To switch tracing off again, type:
+
+    ?- prolog_gctrace(off).
+    yes
+
+You can find out whether tracing is currently on or off by doing:
+
+    ?- prolog_gctrace(X).
+    X = off ?
+    yes
+
+Any other arguments given to 'prolog_gctrace' will fail.
+
+
+-- FINDING OUT THE SYSTEM'S STATE AT LAST GARBAGE COLLECTION ----------
+
+If you just want to see what the state of things were at the last garbage
+collection, you can get a summary using the predicate 'statistics'.
+This predicate takes no arguments.
+
+    ?- statistics.
+    CPU time used: 51.8 seconds. GC time: 0.15 seconds.
+    At last garbage collection: 9892 words used and 390108 words free.
+    yes
+
+
+-- STOPPING COLLECTION OF FIXED STRUCTURES ----------------------------
+
+You can reduce the amount of time spent in garbage collection by locking
+part of the code, with the predicate "prolog_lock_code".  When this goal
+is called, all of the structures in the heap will be kept, and will not
+be looked at by the garbage collector.  So after you have compiled all
+your predicates, and won't be changing them, you can stop the garbage
+collector from wasting time looking at them.  A garbage collection is
+forced, so as not to lock garbage into the heap.
+
+To lock the code, type:
+
+    ?- prolog_lock_code.
+    ;;; GC-user TIME: 0.75, MEM: used 9484 + free 94964 + stack 0 = 104448
+    ;;;            CALLSTACK: 292
+    ;;;            PROLOG: trail 7 + free 2008 + contn 33 = 2048
+    yes
+
+    ?- prolog_unlock_code.
+    yes
+
+
+-- SAVING SPACE AND COMPILATION TIME ----------------------------------
+
+You can reduce the space occupied by compiled predicates and save some
+compilation time by using the predicate 'prolog_no_clauses/1'. This
+alters things so that the predicates you define from then on will not
+have their textual form recorded. You can get more information about
+this by reading PLOGHELP * NO_CLAUSES.
+
+Discarding the textual form of your definitions means you will not be
+able to use the predicates 'listing' and 'clause' on them. Nor will you
+be able to retract them, and if you use "assert", then it will behave
+like reconsult, i.e. you will lose the previous clauses. But, your code
+will compile a bit faster. If the textual form of clauses is not being
+recorded, all the clauses for a given predicate must be contiguous, or
+only the last contiguous sequence of clauses will be kept.
+
+To switch the 'no_clauses' compilation mode on, type:
+
+    ?- prolog_no_clauses(on).
+
+and to switch it off again, type:
+
+    ?- prolog_no_clauses(off).
+
+You can examine the current setting by doing
+
+    ?- prolog_no_clauses(X).
+    X = off ?
+    yes
+
+The 'no_clauses' declaration described in PLOGHELP * NO_CLAUSES is a
+more flexible tool for achieving this same end, as it allows the text to
+be discarded from particular predicates without making a global change
+to the compilation mode.
+
+
+-- SAVING RUNNING TIME ------------------------------------------------
+
+You can make your predicates run faster by having them defined as
+"constant". This will mean you can't redefine them; you will also not be
+able to 'spy' them (see PLOGHELP * DEBUG). In addition, the predicates
+'assert' and 'retract' (see PLOGHELP * DATABASE) will not work if
+predicates are defined as "constant".  You will have to define your
+predicates in contiguous clauses, within the same file, otherwise you
+will get an error. They will behave exactly like system predicates.
+
+You can define particular predicates as constants by means of the
+declaration 'system_predicate' described in PLOGHELP * SYSTEM_PREDICATE.
+Alternatively, you can change the compilation mode globally so that all
+definitions are compiled as constants by using the predicate
+'prolog_syspredicates/1'. To invoke this facility, type:
+
+    ?- prolog_syspredicates(on).
+    yes
+
+To return things to normal, type:
+
+    ?- prolog_syspredicates(off).
+    yes
+
+You can find out the current state of things by doing:
+
+    ?- prolog_syspredicates(X).
+    X = off ?
+    yes
+
+
+-- IDENTIFYING SYSTEM PREDICATES --------------------------------------
+
+You can find out if something is a system predicate using the predicate
+'prolog_system_predicate'.  Calls of this predicate take the following
+form:
+
+    ?- prolog_system_predicate(<atom:P>, <integer:A>).
+
+Where P is the predicate of a Prolog structure, and A is its arity.
+
+Here are two examples of this predicate being used:
+
+    ?- prolog_system_predicate(member, 2).
+    no
+
+    ?- prolog_system_predicate(prolog_system_predicate, 2).
+    yes
+
+
+-- WHICH VERSION IS THIS? ---------------------------------------------
+
+The two predicates version/0 and version/1 are used to print out and
+update "version" information about the Prolog system currently being
+run. See PLOGHELP *VERSION for more information.
+
+
+-- RELATED DOCUMENTATION ----------------------------------------------
+
+PLOGHELP * EFFICIENCY
+    Hints on how to make Prolog programs more efficient.
+
+PLOGHELP * POPLOG
+    Features of POPLOG Prolog
+
+REF * PROLOG
+    Includes information about Prolog memory organisation.
+
+
+--- C.all/plog/help/system ---------------------------------------------
+--- Copyright University of Sussex 1990. All rights reserved. ----------

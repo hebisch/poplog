@@ -1,0 +1,230 @@
+PLOGHELP PROLOG_ERROR                      Robert Duncan, September 1988
+                                                   Revised February 1992
+
+The run-time error handler.
+
+    :- user_predicate prolog_error/2.
+    :- dynamic prolog_error/2.
+
+    ?- prolog_error(Message, Culprits).
+    ?- prolog_error_handling(Status).
+
+This file describes the Prolog run-time error handler prolog_error/2 and
+how to use it. If you have encountered a particular error which you
+don't understand, try looking instead at PLOGHELP * ERROR.
+
+
+    CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- How run-time error handling works
+ -- Default definition of prolog_error/2
+ -- Modifying prolog_error/2
+ -- Disabling prolog_error/2
+ -- Related documentation
+
+
+-- How run-time error handling works ----------------------------------
+
+Prolog run-time errors (called "exceptions" in some sources) are those
+which arise during the execution of a goal, as distinct from lexical,
+syntactic and other compiler-generated errors. They can be caused by any
+of the following events:
+
+    - system faults, such as running out of memory, I/O failures etc.;
+
+    - calls to built-in predicates with the wrong type of arguments;
+
+    - calls to undefined predicates;
+
+    - calls to the predicate error/2 (see PLOGHELP * ERROR).
+
+All of these, with the exception of some special system faults, invoke
+the same error-handling mechanism, whose default behaviour is to execute
+the goal
+
+    prolog_syserror(Message, Culprits)
+
+The argument Message is bound to an error message (an atom) and the
+argument Culprits is bound to a list of items which contributed to the
+error: exactly what the Culprits list consists of depends on the
+particular error concerned. The goal aborts the current execution,
+displaying the familiar 'PROLOG ERROR' message. You can test this
+directly with the following example:
+
+    ?- prolog_syserror('EXAMPLE', [help,prolog_error]).
+
+    ;;; PROLOG ERROR - EXAMPLE
+    ;;; INVOLVING:  help prolog_error
+    ;;; FILE     :  prolog_error   LINE NUMBER:  56
+    ;;; [execution aborted]
+
+The behaviour of the error handler can be modified by providing a
+definition for the user predicate prolog_error/2. When an error occurs,
+if there is a clause for prolog_error/2 which matches the error message
+and list of culprits, then that is called in place of the default error
+predicate. The resulting behaviour determines the outcome of the goal
+which caused the error.
+
+On the assumption that all errors are initiated by a call to the
+predicate error/2, the behaviour of the error handler could be
+summarised with the following definition:
+
+    error(Message, Culprits) :-
+        clause(prolog_error(Message, Culprits), _),
+        !,
+        prolog_error(Message, Culprits).
+    error(Message, Culprits) :-
+        prolog_syserror(Message, Culprits).
+
+
+-- Default definition of prolog_error/2 -------------------------------
+
+The standard definition of prolog_error/2 contains just the single
+clause:
+
+    prolog_error('UNDEFINED PREDICATE', [Goal]) :-
+        !,
+        fail.
+
+This is designed to catch errors arising from calls to undefined (or
+"unknown") predicates. A call to an undefined predicate behaves as if it
+were a call of the predicate:
+
+    undefined(Goal) :- error('UNDEFINED PREDICATE', [Goal]).
+
+i.e, the call raises an error with a message 'UNDEFINED PREDICATE' and a
+"culprits" list containing just the faulted goal. This is trapped by the
+default definition of prolog_error/2 with the effect of failing the
+goal.
+
+More sophisticated behaviour, but based on the same principle, can be
+obtained by loading the library *UNKNOWN which redefines prolog_error/2
+to look something like:
+
+    prolog_error('UNDEFINED PREDICATE', [Goal]) :-
+        !,
+        prolog_undefined_action(Action),
+        prolog_undefined_action(Goal, Action).
+
+(see SHOWLIB * UNKNOWN for the exact details). The behaviour of
+undefined predicates can then be changed dynamically simply by altering
+the definition of prolog_undefined_action/1.
+
+
+-- Modifying prolog_error/2 -------------------------------------------
+
+To create your own error handlers you should use asserta/1 to add
+clauses to the beginning of the definition of prolog_error/2. This
+ensures that your clauses will be tried first, but without disabling any
+error handlers already installed such as the default handler for
+undefined predicates.
+
+For example, suppose we assert the following clauses for prolog_error/2:
+
+    :-  asserta((
+            prolog_error('EXAMPLE', [1]) :- !, fail
+        )),
+        asserta((
+            prolog_error('EXAMPLE', [0]) :- !
+        )).
+
+and then define the following simple predicate
+
+    example(N) :- error('EXAMPLE', [N]), !, write('success!'), nl.
+    example(_) :- write('failure!'), nl.
+
+This predicate raises an error immediately, but it is an error which is
+trapped by the new clauses for prolog_error/2. Exactly what action is
+taken after the error depends on the value of N. Thus:
+
+    ?- example(0).
+    success!
+    yes
+
+    ?- example(1).
+    failure!
+    yes
+
+    ?- example(2).
+
+    ;;; PROLOG ERROR - EXAMPLE
+    ;;; INVOLVING:  2
+    ;;; DOING    :  example/1
+    ;;; [execution aborted]
+
+Note how if prolog_error/2 does not abort, its success or failure
+determines the success or failure of the goal which raised the error
+(the call to error/2 in this case). A successful call can even bind
+variables, as in:
+
+    ?- example(N).
+    success!
+    N = 0 ?
+    yes
+
+
+-- Disabling prolog_error/2 -------------------------------------------
+
+The mechanism described above can be turned off with the goal:
+
+    ?- prolog_error_handling(off).
+
+After this, all errors are passed directly to prolog_syserror/2 and
+cannot be trapped by users. To re-enable user error handling, do
+
+    ?- prolog_error_handling(on).
+
+You can find out whether error handling is currently enabled or disabled
+with the goal:
+
+    ?- prolog_error_handling(Status).
+
+where Status is unified with one of the atoms 'on' or 'off' as
+appropriate.
+
+Error handling is automatically enabled for every top-level evaluation
+but disabled whenever an error causes prolog_error/2 to be called: this
+is to prevent infinite recursion occurring if the call to prolog_error/2
+should regenerate the same error. Error handling is re-enabled once the
+prolog_error/2 goal has completed, whether in success or failure.
+
+Taking this into account, the earlier example definition of error/2
+could be more correctly written as follows:
+
+    error(Message, Culprits) :-
+        clause(prolog_error(Message, Culprits), _),
+        !,
+        (   prolog_error_handling(off),
+            prolog_error(Message, Culprits),
+            (   prolog_error_handling(on)
+            ;   prolog_error_handling(off),
+                fail
+            )
+        ;   prolog_error_handling(on),
+            fail
+        ).
+    error(Message, Culprits) :-
+        prolog_syserror(Message, Culprits).
+
+If you add a clause to prolog_error/2 which can do a potentially
+unbounded amount of work (such as consulting a file) you should consider
+re-enabling error handling explicitly to cope with any subsequent errors
+which might arise.
+
+
+-- Related documentation ----------------------------------------------
+
+PLOGHELP * DEBUG
+    Overview of debugging facilities
+
+PLOGHELP * ERROR
+    Description of the kinds of errors which may arise while using
+    Prolog
+
+PLOGHELP * UNKNOWN
+    Library for redefining the action taken on calls to undefined
+    predicates
+
+
+--- C.all/plog/help/prolog_error
+--- Copyright University of Sussex 1992. All rights reserved. ----------

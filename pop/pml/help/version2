@@ -1,0 +1,284 @@
+HELP PML VERSION 2.0                        Robert Duncan, December 1990
+
+Notes for users upgrading from Poplog ML Version 1.3.
+
+
+    CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- 1. Introduction
+ -- 2. Distribution and Installation of PML 2.0
+ -- 3. The Standard ML Language Definition
+ -- 4. Poplog Extensions to Standard ML
+
+
+-- 1. Introduction -----------------------------------------------------
+
+There have  been  considerable changes  to  Poplog Standard  ML  between
+versions 1.3 and 2.0. In summary, PML 2.0
+
+    - is distributed as  a standard  part of the  Poplog system,  rather
+      than as a separate add-on: this has implications for existing  1.3
+      users;
+
+    - conforms to  the  latest published  version  of the  SML  Language
+      Definition which  is not  completely compatible  with the  earlier
+      version used as the basis of PML 1.3;
+
+    - includes revisions to the Poplog extensions to SML.
+
+
+-- 2. Distribution and Installation of PML 2.0 -------------------------
+
+From Version  14  of  Poplog,  PML (Version  2.0)  is  distributed  as a
+standard language subsystem  in the same  way as Lisp  and Prolog.  This
+means that  the  location of  the  PML  root directory  has  changed  as
+follows:
+
+    UNIX PML 1.3:   $poplocal/local/pml/
+    UNIX PML 2.0:   $usepop/pop/pml/
+
+    VMS PML 1.3:    poplocal:[local.pml]
+    VMS PML 2.0:    usepop:[pop.pml]
+
+In common with the other Poplog languages, the directory in POPLOCAL  is
+now used for keeping local extensions or modifications to libraries  and
+documentation. Having a 1.3 system installed there will cause confusion,
+so existing PML users are advised to delete or relocate their systems.
+
+Since many programs will not run under 2.0 without some modification, it
+may be advisable to  maintain the 1.3 system  under a different name  to
+aid in the migration process.
+
+Unix users can relocate PML 1.3 using the "mkpml" shell script  provided
+with the system. Suppose that the root  directory is to be moved to  the
+location
+
+    $poplocal/local/pml1.3
+
+The sequence of commands to accomplish this is:
+
+    % mv $poplocal/local/pml $poplocal/local/pml1.3
+    % cd $poplocal/local/pml1.3
+    % ./mkpml -d `pwd` `pwd`
+    % mv pml.psv $poplocalbin/oldpml.psv
+
+This will rebuild the old  PML saved image such  that it can be  invoked
+with the command
+
+    % pop11 +oldpml
+
+For VMS users, the "mkpml.com" script supplied with the system does  not
+support the necessary arguments for relocating the system automatically.
+You should examine the  script and make the  necessary changes by  hand.
+Contact your supplier if there are problems.
+
+
+-- 3. The Standard ML Language Definition ------------------------------
+
+There have been considerable  changes to the  definition of Standard  ML
+between the proposed version  used as the basis  of PML Version 1.3  and
+the official published version  (referenced in HELP *  PML) used in  PML
+2.0. Some  of these  changes are  non-compatible. Those  most likely  to
+cause problems are summarised next  (refer to the definition itself  for
+full details).
+
+3.1 Equality types
+
+The built-in  equality  and inequality  functions  are no  longer  fully
+polymorphic. Every  type constructor  now possesses  a boolean  equality
+attribute which indicates whether or not  it admits equality; a type  is
+said to be an equality type if (loosely) all its type constructors admit
+equality. A special case is made  for reference types: a reference  type
+always admits  equality,  whatever  the  type of  the  argument  to  the
+reference  constructor.  This  reflects   the  nature  of  equality   on
+references, which is by address rather than by structure.
+
+Of the built-in type constructors, functions, streams and exceptions  do
+not admit equality; all  the others do (but  see the note on  references
+above). Of user-defined types, a datatype constructor admits equality if
+for every one of its value  constructors which expects an argument,  the
+argument type  is  an  equality  type; an  abstract  type  never  admits
+equality, while an abbreviated type inherits its equality attribute from
+its type expansion.
+
+To enforce  these  restrictions,  a  new kind  of  type  variable  -  an
+"equality type  variable"  - has  been  introduced. Such  variables  are
+indicated lexically by a leading double prime, as in:
+
+    ''a, ''b, ''c, ...
+
+Equality type variables can be  bound only to equality types.  Violation
+of this rule will lead to an error something like:
+
+    Type unification error - equality type needed
+
+The built-in equality and inequality functions now have types:
+
+    val op =  : ''a * ''a -> bool
+    val op <> : ''a * ''a -> bool
+
+
+3.2 Exceptions
+
+The revised semantics unifies the notions of exceptions and values.  The
+initial static basis contains an additional type constructor -exn-  (for
+"exception") which is  the type  of exception  "packets". An  identifier
+bound by an exception declaration is known as an "exception constructor"
+and is to the  type -exn- as  a value constructor  is to its  associated
+datatype: in particular, exception constructors are values which can  be
+used to construct and (through pattern matching) deconstruct data values
+just as  value constructors  do.  This allows  a simplification  of  the
+syntax for raising and handling exceptions: we now have just
+
+    exp ::=
+        exp "handle" match
+        "raise" exp
+
+The syntax for exception bindings has been changed too, to make it more
+analogous to that of value constructor bindings:
+
+    exnbind ::=
+        << "op" >> exncon << "of" ty >>
+        << "op" >> exncon "=" << "op" >> longexncon
+
+An unfortunate side-effect of this change is that exception constructors
+now share the same name-space as value constructors and variables.  This
+makes it  impossible  to maintain  the  previous practice  of  declaring
+exceptions with the same  names as the functions  which raise them.  The
+new convention is  to capitalise  exception names. All  of the  built-in
+exception names have had to change accordingly: these are now
+
+    Sum Diff Chr Interrupt
+
+etc. instead of
+
+    + - chr interrupt
+
+
+3.3 Modules
+
+The module system has  been considerably revised  and extended. Most  of
+the changes are extensions and  so should not affect existing  programs.
+One exception is  that the basic  syntax for functor  bindings has  been
+simplified to expect exactly one structure formal parameter, e.g.
+
+    functor F(X:S) = ...
+
+Bindings with more than one parameter such as
+
+    functor G(X:S, Y:T) = ...
+
+will no longer compile. However, there is now a derived form for functor
+bindings which  allows  the signature  of  the formal  parameter  to  be
+expanded in-line,  so  that arbitrary  specifications  can be  given  as
+formal parameters. The second example above could thus be rewritten as:
+
+    functor G(structure X:S and Y:T) = ...
+
+which is shorthand for:
+
+    functor G(? : sig structure X:S and Y:T end) = ...
+
+This also legalises declarations such as
+
+    functor H(type t; val f : t -> bool) = ...
+
+Sharing constraints are now classed  as specifications and are valid  in
+any signature. Type  sharing constraints have  to be distinguished  from
+structure sharing constraints by inclusion of the keyword "type":
+
+    sharing type <tycon1> = ... = <tyconn>
+
+
+-- 4. Poplog Extensions to Standard ML ---------------------------------
+
+Certain changes have been  forced by the revisions  to the SML  language
+definition discussed above: thus all  the built-in exceptions now  start
+with upper-case letters, and functions  which use the built-in  equality
+function "=" now work only on equality types.
+
+Aside from these changes, the set of structures built in to PML has been
+reorganised as follows:
+
+    StdValues
+        the function -equals- has been  deleted. The definitions of  the
+        operators -div- and -mod-  have been changed  to conform to  the
+        semantics required  by  the  SML language  definition:  the  new
+        definitions can deliver  different results to  the old  whenever
+        the dividend and divisor have different signs. (The old versions
+        are still provided as -quot- and -rem- in structure -Int-.)  See
+        HELP * STDVALUES.
+
+    BasicIO, ExtendedIO
+        now merged into a single structure -StdIO- which is pervasive by
+        default. The exception -io_failure-  has been renamed -Io-.  See
+        HELP * STDIO.
+
+    Useful
+        renamed -Combinators-. The function  -escape- has been  deleted,
+        but  there  is  now  a  similar  function  -error-  defined   in
+        -StdValues-. See HELP * COMBINATORS.
+
+    Numbers
+        divided into separate structures  -Int- and -Real-. See
+        HELP * INT, * REAL.
+
+    Strings
+        renamed -String-. See HELP * STRING.
+
+    Lists
+        renamed -List-. The following types have been changed:
+
+            val assoc    : ''a -> (''a * 'b) list -> 'b
+            val assocdef : 'b -> ''a -> (''a * 'b) list -> 'b
+            val foldl    : ('a * 'b -> 'a) -> 'a -> 'b list -> 'a
+            val foldr    : ('a * 'b -> 'b) -> 'b -> 'a list -> 'b
+            val member   : ''a -> ''a list -> bool
+
+        See HELP * LIST.
+
+    System
+        divided into four separate  structures: System, Memory,  Compile
+        and Printer. Several of the types have been changed to provide a
+        more  convenient  interface.  A   summary  of  the  old   System
+        identifiers goes as follows:
+
+            Old Name        New Name                Type
+            --------        --------                ----
+
+            exit            System.exit             unit -> 'a
+            readprompt      System.readprompt       string ref
+            restore         System.restore          string -> 'a
+            save            System.save             string -> bool
+            version         System.version          string
+
+            gc              Memory.gc               unit -> unit
+            gctrace         Memory.gctrace          bool ref
+            memlim          Memory.hilim            int ref
+            stacklim        Memory.stacklim         int ref
+
+            quiet           Compile.quiet           bool ref
+            searchpath      Compile.searchpath      string list ref
+            timer           Compile.timer           bool ref
+            use             Compile.use             string -> unit
+            warnings        Compile.warnings        bool ref
+
+            memory          DELETED
+            sigsearchpath   DELETED
+
+        See HELP * SYSTEM, * MEMORY, * COMPILE, * PRINTER.
+
+Several new  library structures  have been  provided and  existing  ones
+extended: see HELP * HELPFILES for a list of relevant documentation.
+
+The library  searching  mechanism used  by  the PML  compiler  has  been
+changed: see HELP * COMPILE.
+
+Mixed-language programmers should refer to the revised HELP * MLINPOP to
+see changes there.  Most significantly, the  "external" declaration  has
+been  extended,   but   is  now   only   a  top-level   (rather   than a
+structure-level) declaration.
+
+
+--- C.all/pml/help/version2
+--- Copyright University of Sussex 1990. All rights reserved. ----------

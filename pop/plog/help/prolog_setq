@@ -1,0 +1,92 @@
+PLOGHELP PROLOG_SETQ                         Robert Duncan, January 1988
+
+Reading and writing POP-11 variables from Prolog.
+
+There are two system predicates which give Prolog users direct access to
+POP-11 variables.
+
+The goal
+
+    ?- prolog_setq(PopVariable, Value).
+
+assigns the result of evaluating the term -Value- to the POP-11 variable
+-PopVariable-; the goal
+
+    ?- prolog_val(PopVariable, Value).
+
+will read such a variable and unify its current contents with the term
+-Value-. In each case, -PopVariable- must be instantiated to an atom as
+it couldn't otherwise denote a proper variable. Only permanent
+variables, i.e those declared as -vars- or -constant-, are accessible in
+this way, not lexical ones (-lvars-).
+
+Example:
+
+    ?- prolog_setq(poplinewidth, 68).
+    yes
+
+    ?- prolog_val(poplinewidth, N).
+    N = 68 ?
+    yes
+
+Both of these predicates will declare the variable automatically if it
+does not already exist. This means that Prolog users can easily create
+and manipulate their own variables for recording non-logical state
+information. For example, the following predicate makes use of a POP-11
+variable to generate a new integer each time it is called:
+
+    ;;; Declare and initialise the variable
+    :- prolog_setq(next_integer, 1).
+
+    ;;; Generate a unique integer
+    unique(N) :-
+        prolog_val(next_integer, N),
+        prolog_setq(next_integer, N+1).
+
+In a call to prolog_setq/2, if the term to be assigned contains
+uninstantiated Prolog variables, it will be "frozen" so that the
+variables can take no further part in unification. This is done by
+applying the procedure -prolog_generalise- to the term before it is
+assigned (see PLOGHELP * TERMSINPOP for a description of this). The term
+is "thawed" again (by the procedure -prolog_instance-) when it is
+returned as the result of a prolog_val/2, but of course any
+uninstantiated variables within it will then not be the same as they
+were when the term was assigned. Consider the simplest case:
+
+    ?- prolog_setq(tmp, quote(X)), prolog_val(tmp, Y).
+    X = _1
+    Y = _2 ?
+    yes
+
+Note how X and Y do not share. This behaviour is designed to preserve
+the global state from changes arising from backtracking, but it can be
+positively useful in its own right. For example, it can be used to
+implement a simple "copy" predicate:
+
+    ;;; Copy T1 into T2
+    copy(T1, T2) :-
+        prolog_setq(copy_term, quote(T1)),
+        prolog_val(copy_term, T2),
+        ;;; Clear -copy_term- to avoid hanging on to T1 unnecessarily
+        prolog_setq(copy_term, []).
+
+    ?- copy(loc(X, X = 3), New).
+    X = _1
+    New = loc(_2, _2 = 3) ?
+    yes
+
+
+-- RELATED DOCUMENTATION ----------------------------------------------
+
+PLOGHELP * MIXED_LANGUAGES
+    Other facilities available for mixed language programming.
+
+PLOGHELP * PROLOG_EVAL
+    Includes the rules for evaluating terms as POP-11 expressions.
+
+PLOGHELP * TERMSINPOP
+    How Prolog terms are represented in POP-11 and how to handle them
+    safely.
+
+--- C.all/plog/help/prolog_setq ----------------------------------------
+--- Copyright University of Sussex 1988. All rights reserved. ----------

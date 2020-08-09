@@ -1,0 +1,158 @@
+PLOGHELP PROCESSES                             Chris Mellish August 1983
+                                  revised by Kathryn Seifert August 1986
+
+How to create POP-11 processes which use Prolog procedures
+
+Keywords: POP-11, mixed language programming, processes, prolog barrier
+
+
+CONTENTS - (Use <ENTER> g to access sections)
+
+ -- PROLOG PROCESSES
+ -- EXAMPLE
+ -- RELATED DOCUMENTATION
+
+
+-- PROLOG PROCESSES ---------------------------------------------------
+
+The interaction between Prolog and the POPLOG process mechanism (see
+HELP * PROCESS and REF * PROCESS) is still only partially explored.  The
+POP-11 procedure 'prolog_barrier_apply' is very important  in creating
+POP-11 processes which use Prolog procedures (see
+PLOGHELP * PROLOG_BARRIER_APPLY).
+
+A call of 'prolog_barrier_apply' has the following format
+
+    prolog_barrier_apply(<procedure:P> -> <result>;
+
+The procedure P will be applied inside a prolog 'barrier' (see
+PLOGHELP * PROLOG_BARRIER_APPLY).
+
+The importance of 'prolog_barrier_apply' here is that the information
+that is kept about processes will only include vital information about
+the state of Prolog goals if the Prolog goals are invoked inside an
+invocation of 'prolog_barrier_apply'. It is thus suggested that
+'prolog_barrier_apply' is used at 'consproc' time whenever the process
+created will involve Prolog procedures.
+
+
+-- EXAMPLE ------------------------------------------------------------
+
+Here is an example of using Prolog programs and processes to produce
+"solution generators". A more complex example can be seen by
+SHOWLIB * PARSEDEMO.
+
+    :- prolog_language("prolog").
+
+    man(fred).
+    man(tom).
+    man(harry).
+
+    woman(mary).
+    woman(jane).
+    woman(hilary).
+
+    :- prolog_language("pop11").
+
+
+    ;;; The following procedure produces a "solution repeater" for
+    ;;; any single argument Prolog predicate
+    ;;;
+    define solution_repeat(predicate);
+        vars process, prolog_procedure, whattodo, var;
+        ;;; Get value of Prolog predicate as POP-11 procedure
+        prolog_valof(predicate,1) -> prolog_procedure;
+        ;;; will insert this variable as the argument to the
+        ;;; predicate
+        prolog_newvar() -> var;
+
+        ;;; This procedure will be run when the process is run.
+        ;;; It has two frozen arguments - a Prolog variable
+        ;;; which is the argument to the goal and the Prolog
+        ;;; procedure to be run on it.
+        procedure var prolog_procedure;
+           vars contn;
+           ;;; Make continuation for Prolog procedure
+           ;;; See PLOGHELP * TERMSINPOP for an explanation of
+           ;;; the procedure 'prolog_generalise'.
+           ;;; When the procedure succeeds, the process suspends,
+           ;;; leaving the value of the variable on the stack.
+           ;;; When the procedure is resumed, the SUSPEND call
+           ;;; returns, which causes the Prolog procedure to
+           ;;; backtrack.
+           procedure result;
+                suspend(prolog_generalise(result),1)
+           endprocedure(%var%) -> contn;
+           ;;; Now call the Prolog procedure
+           ;;; It won't return until it fails
+           prolog_procedure(var,contn);
+           ;;; If no more solutions, return TERMIN
+           ksuspend(termin,1)
+        endprocedure(%var,prolog_procedure%) -> whattodo;
+
+        ;;; Now make a process from it. Don't forget to use
+        ;;; PROLOG_BARRIER_APPLY
+
+        consproc(0,prolog_barrier_apply(%whattodo%)) -> process;
+
+        ;;; Return a closure of RUNPROC, which can simple be APPLYed
+
+        runproc(%0,process%)
+    enddefine;
+
+
+    ;;; Now let's create some solution repeaters
+
+    vars nextman, nextwoman;
+
+    solution_repeat("man") -> nextman;
+    solution_repeat("woman") -> nextwoman;
+
+    ;;; Running a single repeater
+    vars x;
+    [] -> x;
+    until x == termin do
+        nextman() -> x;
+        x=>
+    enduntil;
+    ** fred
+    ** tom
+    ** harry
+    ** ^Z
+
+    ;;; Start man repeater off again
+    solution_repeat("man") -> nextman;
+
+    ;;; Interleaving repeaters
+    repeat 2 times
+        nextman()=>
+        nextwoman()=>
+    endrepeat;
+    ** fred
+    ** mary
+    ** tom
+    ** jane
+
+
+-- RELATED DOCUMENTATION ----------------------------------------------
+
+HELP * PROCESS
+ POP-11's process facility
+
+PLOGHELP * MIXED_LANGUAGES
+ Overview of interface between Prolog and other languages
+
+PLOGHELP * PLOGTOPOP
+ How to call POP-11 from Prolog
+
+PLOGHELP * POPTOPLOG
+ How to call Prolog from POP-11
+
+PLOGHELP * PROLOG_BARRIER_APPLY
+ POP-11 procedure which applies a procedure inside a Prolog 'barrier'
+
+PLOGHELP * TERMSINPOP
+ Facilities for manipulating Prolog terms and variables in POP-11
+
+REF * PROCESS
+ Detailed description of POP-11 processes

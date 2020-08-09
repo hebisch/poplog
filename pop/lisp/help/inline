@@ -1,0 +1,184 @@
+HELP INLINE                                      John Williams, Apr 1988
+                                        Revised John Williams, July 1995
+
+This file describes the effect of the inline and notinline compiler
+declarations.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+  2   Interaction with the Optimize Declaration
+  3   Interaction with Compiler Macros
+  4   Built-in Functions that are Compiled Inline by Default
+  5   Built-in Functions that are Compiled Inline if So Declared
+  6   Built-in Functions that have Compiler Macro Definitions
+  7   See Also
+
+
+-----------------------------------------------------------------------
+1  Introduction
+-----------------------------------------------------------------------
+
+Poplog Common Lisp interprets the inline declaration in two different
+ways:
+
+    If the name of a user-defined function is declared inline, then
+    the compiled code for a call to that function-name will directly
+    reference the compile time value of the function-name (i.e. no
+    indirection through the function-name occurs at run time).
+
+  # For some built-in functions and macros, an inline declaration
+    effectively turns them into special-forms: the compiler invokes
+    special code-planting routines each time a call to that function
+    or macro is encountered.
+
+
+The notinline declaration reverses the effect of the inline declaration,
+in either case.
+
+
+-----------------------------------------------------------------------
+2  Interaction with the Optimize Declaration
+-----------------------------------------------------------------------
+
+Inline declarations are ignored while the optimize quantity speed is set
+to 0.
+
+Notinline declarations are ignored while the optimize quantity speed is
+set to 3.
+
+(In other words: when speed is set to 3, any function that can be
+compiled inline, will be).
+
+
+-----------------------------------------------------------------------
+3  Interaction with Compiler Macros
+-----------------------------------------------------------------------
+
+If a function has a compiler macro definition, then declaring the name
+of that function notinline prevents that compiler macro definition being
+used.
+
+
+-----------------------------------------------------------------------
+4  Built-in Functions that are Compiled Inline by Default
+-----------------------------------------------------------------------
+
+(In the table below, the word nargs is an abbreviation for
+ number of arguments).
+
+
+  Function(s)                 Notes
+
+
+  *  +  -  /                  If nargs <= *inline-reduce-limit*
+  =  /=                       If nargs = 2
+  <  <=  =>  >                If nargs = 2 or nargs = 3
+
+  boole                       If first argument is a constant integer
+  logand logeqv               If nargs <= *inline-reduce-limit*
+  logior logxor               ditto
+
+  char<                       If nargs = 2 or 3
+  char<=                      ditto
+  char=                       ditto
+  char>                       ditto
+  char>=                      ditto
+
+  append                      If nargs <= *inline-reduce-limit*
+  nconc                       ditto
+  list                        ditto
+  list*                       ditto
+
+  apply                       Always
+  funcall                     Always
+  complement                  Always
+  constantly                  If its argument is a constant
+  values                      Always
+
+  concatenate                 If first arg is a constant sequence type
+  eql                         If either argument is a constant fixnum, symbol, or single-float
+  equal                       ditto
+
+  pop                         If its argument is a symbol
+  typep                       If last argument is a constant built-in type specifier
+  vector                      Always
+
+
+The code generated for calls to these functions does just as much
+run-time type checking as the non-inline functions do; but is more
+efficient in other ways (e.g. the need to allocate storage for &rest
+argument lists or multiple values is obviated).
+
+
+-----------------------------------------------------------------------
+5  Built-in Functions that are Compiled Inline if So Declared
+-----------------------------------------------------------------------
+
+The following functions will be compiled inline if so declared:
+
+  aref, schar, svref
+  car, cdr, caar, cadr, cdar, cddr
+  char-code, char-int, code-char
+  first, rest
+  get
+  rplaca, rplacd
+  second, third, fourth, fifth, sixth, seventh, eighth, ninth, tenth
+
+
+The inline code generated for these functions does no run-time type or
+bounds checking, and hence executes much faster.
+
+Any structure access/update function created by defstruct may be
+declared inline, with the same effect.
+
+The effect of this non-checking code on inappropriate arguments is
+both UNDEFINED and UNSUPPORTED.
+
+
+-----------------------------------------------------------------------
+6  Built-in Functions that have Compiler Macro Definitions
+-----------------------------------------------------------------------
+
+The following functions and macros have compiler macro definitions:
+
+  1+
+  1-
+  adjoin
+  assoc
+  endp
+  mapcar
+  member
+  multiple-value-bind
+  multiple-value-list
+  multiple-value-setq
+  not
+  nth-value
+  null
+  psetq
+  rassoc
+  write
+  write-string
+  zerop
+
+
+To see what the compiler macro expander function produces, please either
+experiment with compiler-macro-expand, or consult SRC * CMACROS.LSP.
+
+See also HELP * SEQUENCE-COMPILER-MACROS for details of a module which
+defines compiler macros for some sequence manipulation functions.
+
+
+-----------------------------------------------------------------------
+7  See Also
+-----------------------------------------------------------------------
+
+ HELP * DECLARE
+ HELP * FUNCTIONS
+ HELP * OPTIMIZE
+
+
+
+--- C.all/lisp/help/inline
+--- Copyright University of Sussex 1988. All rights reserved.

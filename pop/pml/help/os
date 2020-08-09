@@ -1,0 +1,274 @@
+HELP OS                                          Robert Duncan, May 1991
+
+Interface to the host operating system.
+
+
+    CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- The OS Module
+ -- Exceptions
+ -- Operating System Version
+ -- The Current Process State
+ -- Process Control
+ -- Unix-only Functions
+ -- VMS-only Functions
+
+
+-- The OS Module ------------------------------------------------------
+
+signature OS
+structure OS : OS
+    The autoloadable  library module  -OS- defines  a set  of  functions
+    which provide access to features of the host operating system. It is
+    described by the following signature:
+
+        signature OS = sig
+
+            (* Exceptions *)
+
+            exception Error of string * string * string
+            exception NotImplemented of string
+
+            (* O/S Version *)
+
+            val version     : unit -> string
+            val isunix      : unit -> bool
+            val isvms       : unit -> bool
+
+            (* The Current Process State *)
+
+            val pid         : unit -> int
+            val username    : unit -> string
+            val pwd         : unit -> string
+            val cd          : string -> unit
+            val arglist0    : unit -> string list
+            val arglist     : unit -> string list
+            val translate   : string -> string Option.option
+            val date        : unit -> string
+
+            (* Process Control *)
+
+            val obey        : string -> int
+            val wait        : unit -> (int * int) Option.option
+            val kill        : int -> bool
+
+            (* UNIX only *)
+
+            val envlist     : unit -> string list
+            val fork        : unit -> int Option.option
+            val execve      : string -> string list -> string list -> 'a
+
+            (* VMS only *)
+
+            val spawn       : string -> string -> string -> bool
+                                -> int Option.option
+            val attach      : int -> bool
+
+        end     (* signature OS *)
+
+    POPLOG ML runs under both the Unix and VMS operating systems. As far
+    as possible, these functions have been made compatible between  both
+    systems. However, certain functions are  restricted to one or  other
+    system: attempting to run one of  these functions on a system  other
+    than that for which it was intended will generate the exception
+
+        NotImplemented(<function>)
+
+    where <function> is the name of the function concerned.
+
+
+-- Exceptions ---------------------------------------------------------
+
+exception NotImplemented (name : string)
+    As  described   above,  this   exception  is   raised  whenever   an
+    unimplemented function is called.
+
+
+exception Error (name : string, msg : string, argument : string)
+    Raised  whenever  an  operating  system  error  occurs  during   the
+    execution of  any of  these functions.  -name- is  the name  of  the
+    function which failed; -msg- is a message describing the reason  for
+    the error and -argument-  is the argument  supplied to the  function
+    call (where  appropriate).  For example,  trying  to change  to  the
+    directory "nonexistent" using the  -cd- function might generate  the
+    exception:
+
+        Error("cd", "no such file or directory", "nonexistent")
+
+
+-- Operating System Version -------------------------------------------
+
+val version () : string
+    Returns a  string  giving an  approximate  description of  the  host
+    operating system.
+
+
+val isunix () : bool
+    Returns -true- if the host is a Unix system.
+
+
+val isvms () : bool
+    Returns -true- if the host is a VMS system.
+
+
+-- The Current Process State ------------------------------------------
+
+val pid () : int
+    Returns the Process ID of the current process.
+
+
+val username () : string
+    Returns the name of the current user.
+
+
+val pwd () : string
+    Returns  the  full  pathname  of  the  process'  current   (default)
+    directory.
+
+
+val cd (dir : string) : unit
+    Changes the process'  current (default) directory  to -dir-.  Raises
+    the exception
+
+        Error("cd", <msg>, dir)
+
+    if the directory can't be changed for any reason.
+
+
+val arglist0 () : string list
+    Returns the command by which the current process was invoked.
+
+
+val arglist () : string list
+    Returns the usable  command-line arguments of  the current  process:
+    this will always be some tail of the list returned by -arglist0- but
+    with the first element (the command name) removed, together with any
+    leading arguments already processed by Poplog.
+
+
+val translate (name : string) : string Option.option
+    Translates the environment variable (logical name) -name- returning
+
+        Option.SOME(<value>)
+
+    if -name- is bound to -value- in the current environment, or
+
+        Option.NONE
+
+    if -name- is unbound.
+
+
+val date () : string
+    Returns the current date and time in operating system format.
+
+
+-- Process Control ----------------------------------------------------
+
+val obey (cmd : string) : int
+    Runs -cmd- as a shell or DCL command and returns the exit status.
+
+
+val wait () : (int * int) Option.option
+    Waits for the next child process to terminate. Returns
+
+        Option.SOME(<pid>, <status>)
+
+    if the child process identified by -pid- terminated with given exit
+    -status-, or
+
+        Option.NONE
+
+    if the wait was interrupted. Raises the exception
+
+        Error("wait", <msg>, "")
+
+    if there were no children.
+
+
+val kill (pid : int) : bool
+    Attempts to send a kill (terminate) signal to the process identified
+    by -pid-. Returns -true- or -false- according to whether the  signal
+    could or could not be sent.
+
+
+-- Unix-only Functions ------------------------------------------------
+
+val envlist () : string list
+    Returns a  list of  all the  variables in  the process'  environment
+    where each entry in the list has the form
+
+        <name>=<value>
+
+
+val fork () : int Option.option
+    Interface to the fork(2) system call. Returns
+
+        Option.SOME(<pid>)
+
+    to the parent process, where -pid- is the Process ID of the newly
+    created child process, and
+
+        Option.NONE
+
+    to the child. Raises the exception
+
+        Error("fork", <msg>, "")
+
+    if the fork fails for any reason.
+
+
+val execve (cmd : string) (args : string list) (env : string list) : 'a
+    Interface to the execve(2) system call. -cmd- is the pathname of the
+    file to be executed; -args- is a list of arguments (where the  first
+    argument is  conventionally  the  command name)  and  -env-  is  the
+    environment for  the  sub-process  in  the  format  as  returned  by
+    -envlist-. This function  should never return,  hence the  arbitrary
+    result type; the exception
+
+        Error("execve", <msg>, cmd)
+
+    is raised if the execve fails for any reason.
+
+
+-- VMS-only Functions -------------------------------------------------
+
+val spawn (cmd:string) (input : string) (output : string) (wait : bool)
+        : int Option.option
+    Interface to the library  routine "lib$spawn": spawns a  sub-process
+    with a command interpreter.
+
+    If -cmd- is the null string,  command input is read from the  source
+    named by -input-: if this is  also null, commands are read from  the
+    input of the parent process.
+
+    If -cmd-  is not  the  null string,  it is  first  obeyed as  a  DCL
+    command. The process  then terminates  if -input- is  null, or  else
+    continues reading commands from -input-.
+
+    In either case, output is written to the file named by -output- or
+    to the parent's output if -output- is null.
+
+    The flag -wait- determines whether or not the parent should wait for
+    the sub-process to terminate:  if -true-, the  call to -spawn-  will
+    not return until the sub-process has terminated and the result  will
+    be
+
+        Option.NONE
+
+    If -wait- is -false-, then  the call to -spawn- returns  immediately
+    with the result
+
+        Option.SOME(<pid>)
+
+    where <pid> is the Process ID of the sub-process.
+
+
+val attach (pid : int) : bool
+    Suspends the current process and  revives the process identified  by
+    -pid-. Returns -false- if there is no such process or if the process
+    cannot be revived, or -true- whenever the current process is  itself
+    revived.
+
+
+--- C.all/pml/help/os
+--- Copyright University of Sussex 1991. All rights reserved. ----------

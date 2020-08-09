@@ -1,0 +1,602 @@
+HELP MLINPOP                                    Simon Nichols, June 1988
+                                          Revised Rob Duncan, April 1990
+                                                   Revised November 1994
+
+Mixed-language programming in ML and Pop-11.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+
+  2   Health Warning
+
+  3   Pop-11 Representation of ML Data
+
+  4   Functions
+
+  5   Importing ML Values into Pop-11
+
+  6   Special Procedures and Values
+
+  7   Exceptions
+
+  8   Declaring ML Identifiers in Pop-11
+
+
+-----------------------------------------------------------------------
+1  Introduction
+-----------------------------------------------------------------------
+
+This file describes the facilities available for writing mixed-language
+programs in ML and Pop-11. Currently, the ML/Pop-11 interface is the
+only mixed-language interface directly supported by PML. It is hoped
+that other languages (Prolog, for example) will be supported in the
+future. However, any such additions will be based on the facilities
+described here, so this can be considered as the core external interface
+and a thorough understanding of it will be useful for any mixed-language
+programming involving ML.
+
+
+-----------------------------------------------------------------------
+2  Health Warning
+-----------------------------------------------------------------------
+
+Mixed-language programming in ML can be dangerous. ML supports a static
+(compile-time) type-checking discipline; Pop-11 by contrast employs
+dynamic (run-time) checks. Programming exclusively in either language is
+"safe" in that any errors which do occur are sensibly handled by the
+appropriate type-checking mechanism. However, because ML programs are
+statically checked, the code generated from them can omit many of the
+run-time checks relied upon by Pop-11: calling a function from Pop-11
+which was compiled in ML can bypass both sets of checks and generate
+errors which will not be sensibly handled. Such errors could (in an
+extreme case) crash your Poplog system.
+
+Be warned, and pay attention to the typing rules discussed below.
+
+
+-----------------------------------------------------------------------
+3  Pop-11 Representation of ML Data
+-----------------------------------------------------------------------
+
+To be able to transfer data between languages, it's important to know
+how ML values are represented in Pop-11. There are three broad
+categories of possible data representation, classified according to the
+method of access from Pop-11:
+
+    simple
+        the ML type has an exact (and guaranteed) representation in
+        Pop-11; standard Pop-11 procedures can be used to inspect,
+        create and decompose such data
+
+    special
+        the representation is typically straightforward, but not
+        guaranteed to remain unchanged in future versions of the ML
+        compiler; special Pop-11 procedures are provided for the safe
+        manipulation of such types
+
+    private
+        the representation is sufficiently opaque as to be effectively
+        unrecognisable to Pop-11; functions for manipulating such types
+        must be written in ML and imported into Pop-11
+
+The following table summarises the representations for all ML types:
+
+                -----------------------------------------
+                | ML Type    |  Pop-11 Type  |  Class   |
+                |------------+---------------+----------|
+                | int        |  integral     |  simple  |
+                | real       |  ddecimal     |  simple  |
+                | string     |  string       |  simple  |
+                | bool       |  boolean      |  simple  |
+                | list       |  list         |  simple  |
+                | function   |  procedure    |  simple  |
+                |            |               |          |
+                | unit       |  any          |  special |
+                | tuple      |  pair/vector  |  special |
+                | ref        |  ref/ident    |  special |
+                | vector     |  vector       |  special |
+                | array      |  vectorclass  |  special |
+                | instream   |  recordclass  |  special |
+                | outstream  |  recordclass  |  special |
+                | exn        |  recordclass  |  special |
+                |            |               |          |
+                | record     |  -            |  private |
+                | datatype   |  -            |  private |
+                -----------------------------------------
+
+Values of simple types may be freely exchanged between ML and Pop-11
+without conversion, but the following points should be born in mind:
+
+    (1) ML integers may be Pop-11 integers or bigintegers, so you
+        shouldn't in general use fast integer operations on them.
+
+    (2) ML reals are double decimals. You should normally have
+        *popdprecision set <true> when computing real numbers to be
+        given to an ML program.
+
+    (3) ML lists are non-dynamic. Never pass a dynamic list to an ML
+        program: use *expandlist first if you're not sure.
+
+Functions are discussed in more detail later.
+
+Values of special types should be created and accessed only using the
+collection of special values and procedures described in a later
+section. Don't try to second-guess the compiler and make assumptions
+about how data is represented: even if you're right, it may change in a
+future version.
+
+The private types are the record types and user-defined datatypes. There
+is currently no way to safely manipulate ML record and datatype values
+from Pop-11 except via functions defined in ML and imported into Pop-11
+(using ml_valof described below). The reason for this is that the ML
+compiler has a degree of flexibility in deciding exactly how values of
+such types should be represented. The strategies used are complex, and
+liable to change in future versions of PML. Hence the representations
+have to be kept secret from Pop-11.
+
+As a concrete example, take the ML datatype
+
+    datatype 'a tree =
+        NULL
+    |   NODE of {left: 'a tree, value: 'a, right: 'a tree};
+
+for which we might define functions such as
+
+    fun isNULL NULL = true
+    |   isNULL _    = false
+
+    and consNODE l v r = NODE(l, v, r)
+
+    and NODE_left (NODE{left, ...}) = left
+    |   NODE_left NULL = raise NodeAccess
+
+    etc.
+
+which could than be made available to Pop-11. For large datatypes, the
+range of functions to define and import can get tediously lengthy: it is
+intended that there should be some new Pop-11 syntax word (analogous to
+recordclass) which will simplify the process in a future release of PML.
+
+There is one potentially useful function which cannot be written: the
+function istree which distinguishes a tree from a value of any other
+type. Not only can such a function not be written in ML, it can't be
+written at all: the ML compiler is free to use the identical
+representation for trees as it uses for any other type, making it
+impossible to distinguish a tree at run-time. A consequence of this is
+that you must structure your programs so that the types of values passed
+to Pop-11 procedures are always known.
+
+
+-----------------------------------------------------------------------
+4  Functions
+-----------------------------------------------------------------------
+
+The basic correspondence between ML functions and Pop-11 procedures is
+quite straightforward: an ML function of type
+
+    ty_1 -> ... -> ty_n -> ty       (* curried style *)
+
+or
+
+    (ty_1 * ... * ty_n) -> ty       (* tupled style *)
+
+is implemented as a Pop-11 procedure
+
+    procedure(arg_1, ..., arg_n) -> res
+
+There is a complication when n is greater than 1. This basic procedure
+-- the so-called "unwrapped" version -- can only be applied when all the
+arguments are known at compile-time. So the ML compiler generates a
+second ("wrapped") version which can be applied more generally and which
+can be passed as an argument to other functions, etc. For example,
+consider the following curried function in ML:
+
+    fun contains []      _ = false
+    |   contains (x::xs) y = x = y orelse contains xs y
+
+This would be compiled into the two procedures:
+
+    define unwrapped_contains(xs, y);
+        lvars xs, y;
+        if null(xs) then
+            false;
+        else
+            hd(xs) = y or unwrapped_contains(tl(xs), y);
+        endif;
+    enddefine;
+
+    define wrapped_contains(xs);
+        lvars xs;
+        procedure(y);
+            lvars y;
+            unwrapped_contains(xs, y);
+        endprocedure;
+    enddefine;
+
+It's the unwrapped version which has the obvious Pop-11 definition, and
+which can be called whenever both arguments are available immediately.
+The wrapped version collects its arguments in two steps, transferring to
+the unwrapped procedure only when both have been obtained. This is used
+for closure building, as in:
+
+    val isdigit = contains (explode "0123456789");
+
+The unwrapped version of an ML function is usually the most useful when
+called from Pop-11, but this version should NEVER be passed back to ML:
+if you're passing a functional parameter to an ML function, always pass
+the wrapped version. Both wrapped and unwrapped versions of functions
+can be obtained with ml_valof described below.
+
+The same principle holds for tupled functions: the alternative
+definition
+
+    fun contains([],    _) = false
+    |   contains(x::xs, y) = x = y orelse contains(xs, y)
+
+would generate the same unwrapped version as before (so the one Pop-11
+procedure will match both ML definitions) but a different wrapped
+version which expects its arguments in a tuple:
+
+    define wrapped_contains(args);
+        lvars args;
+        unwrapped_contains(
+            ml_subscrtuple(1, args),
+            ml_subscrtuple(2, args));
+    enddefine;
+
+Remember that every function in ML must take at least one argument and
+return exactly one result. Pop-11 procedures which take no arguments or
+return no results have to be massaged to accept or return unit values
+when passed into ML. Multiple results are not supported at all: use a
+tuple or other structure instead.
+
+
+-----------------------------------------------------------------------
+5  Importing ML Values into Pop-11
+-----------------------------------------------------------------------
+
+Regardless of type, the value of an ML identifier can be imported into a
+Pop-11 program using the procedure ml_valof (described next). What you
+can safely do with such a value depends of course on the representation
+class of its type, as described above.
+
+
+ml_valof(mlid) -> item                                       [procedure]
+ml_valof(mlid, bool) -> item
+        Returns  the  value   of  an  ML   identifier  in  the   current
+        environment. mlid may be a short  identifier (a word) or a  long
+        identifier encoded as a string, e.g.
+
+            ml_valof("+") =>
+            ** <procedure +>
+
+            ml_valof('System.version') =>
+            ** <ident [Standard ML (Version 2.0)]>
+
+        The identifier  must have  been declared  in ML  as a  variable,
+        value constructor  or  exception,  since the  value  of  a  type
+        constructor or module  name has no  meaning to Pop-11.  Function
+        values with arity greater than 1 are returned unwrapped,  unless
+        bool is given as <true>. If the given identifier is not defined,
+        the word "undef" is returned.
+
+        The  ``current   environment''   normally   means   the   global
+        (top-level)  environment.   However,  inside   an   ml_structure
+        construct (see below)  it is possible  to get at  the values  of
+        locally-defined  names  by  calling  ml_valof  at  compile  time
+        (inside  an  lconstant  declaration,  or  between  #_<  ...  >_#
+        brackets).
+
+
+ml_wrapped_valof(mlid) -> item                               [procedure]
+        Like ml_valof above,  but for functions  whose arity is  greater
+        than 1,  returns  the  "wrapped"  rather  than  the  "unwrapped"
+        version. Equivalent to
+
+            ml_valof(mlid, true)
+
+
+
+-----------------------------------------------------------------------
+6  Special Procedures and Values
+-----------------------------------------------------------------------
+
+For creating and decomposing values of special types.
+
+
+ml_unit                                                       [constant]
+        Unique value used to represent the value of type unit.
+
+
+ml_constuple(item_1, ..., item_n, n) -> tuple                [procedure]
+        Constructs a tuple of length n from items on the stack.
+
+
+ml_desttuple(tuple) -> n -> item_n ... -> item_1             [procedure]
+        Destructs a  tuple,  returning all  its  elements on  the  stack
+        together with its length (the inverse of ml_constuple).
+
+
+ml_subscrtuple(n, tuple) -> item                             [procedure]
+item -> ml_subscrtuple(n, tuple)
+        Returns or updates the n-th element of a tuple.
+
+
+ml_consref(item) -> ref                                      [procedure]
+        Constructs an ML reference to the given item.
+
+
+ml_cont(ref) -> item                                         [procedure]
+item -> ml_cont(ref)
+        Returns or updates the contents of  an ML reference (like !  and
+        := in ML).
+
+
+ml_consvector(item_1, ..., item_n, n) -> vector              [procedure]
+        Constructs an ML vector of length n from items on the stack.
+
+
+ml_destvector(vector) -> n -> item_n -> ... -> item_1        [procedure]
+        Destructs an ML vector, returning all its elements on the  stack
+        together with its length (the inverse of ml_consvector).
+
+
+ml_subscrvector(n, vector) -> item                           [procedure]
+item -> ml_subscrvector(n, vector)
+        Returns or updates  the n-th  element of  an ML  vector.  NB: to
+        conform to normal Pop-11 practice,  the index value n must be in
+        the range
+
+            1 <= n <= length(vector)
+
+        This is despite the fact that vectors in ML are indexed from 0.
+
+
+ml_consarray(item_1, ..., item_n, n) -> array                [procedure]
+        Constructs an ML array of length n from items on the stack.
+
+
+ml_destarray(array) -> n -> item_n -> ... -> item_1          [procedure]
+        Destructs an ML array, returning  all its elements on the  stack
+        together with its length (the inverse of ml_consarray).
+
+
+ml_subscrarray(n, array) -> item                             [procedure]
+item -> ml_subscrarray(n, array)
+        Returns or  updates the  n-th element  of an  ML array.  NB:  to
+        conform to normal Pop-11 practice,  the index value n must be in
+        the range
+
+            1 <= n <= length(vector)
+
+        This is despite the fact that arrays in ML are indexed from 0.
+
+
+ml_instream(source) -> instream                              [procedure]
+        Constructs an ML input  stream from source which  may be a  file
+        name (string or word) a character repeater procedure or an input
+        device.
+
+
+ml_instream_producer(instream) -> charrep                    [procedure]
+        Constructs a  character repeater  procedure from  instream.  The
+        characters returned  by the  repeater  are exactly  those  which
+        would be returned by the ML input function applied to  instream.
+        The repeater also has an  updater, which will accept  characters
+        or strings to be put back onto the input stream.
+
+
+ml_outstream(sink) -> outstream                              [procedure]
+        Constructs an ML  output stream from sink  which may  be a  file
+        name (string  or  word) a  character  consumer procedure  or  an
+        output device.
+
+
+ml_outstream_consumer(outstream) -> charcon                  [procedure]
+        Constructs  a  character  consumer  procedure  from   outstream.
+        Characters output on charcon  will be properly interleaved  with
+        any characters output on outstream using the ML output function;
+        <termin> can be used to close the output stream.
+
+
+
+-----------------------------------------------------------------------
+7  Exceptions
+-----------------------------------------------------------------------
+
+Exception values have their own recordclass structure called a packet.
+You can't create packet records directly, but you can get hold of ML
+exception constructors by using ml_valof, as in:
+
+    constant InterruptExn = ml_valof("Interrupt");
+
+    InterruptExn =>
+    ** <packet Interrupt>
+
+Where the exception constructor requires an argument, you must apply the
+value to an argument of the appropriate type in order to construct a
+valid packet:
+
+    constant procedure IoExn = ml_valof("Io");
+
+    IoExn =>
+    ** <procedure conspacket>
+
+    IoExn('No message') =>
+    ** <packet Io("No message")>
+
+Exception packets can be raised and handled with the following
+procedures:
+
+
+ml_raise(packet)                                             [procedure]
+        Raises an exception packet. When  called from a Pop-11  context,
+        this will normally mishap with a message
+
+            MISHAP - UNCAUGHT EXCEPTION
+
+        From ML however, the exception  will be properly raised and  may
+        be handled  in  the  conventional way  (or  by  using  ml_handle
+        described next).
+
+
+ml_handle(p, excon, handler_p)                               [procedure]
+        Applies the  procedure p  inside an  exception handler  for  the
+        exception constructor excon. p should  be a procedure taking  no
+        arguments; if it returns normally, any result it returns is  the
+        result of  the call  to  ml_handle. If  an exception  packet  is
+        raised during  the evaluation  of  p whose  constructor  matches
+        excon, the procedure handler_p is  called and its result is  the
+        result of the whole evaluation.  If the pdnargs of handler_p  is
+        greater than zero, any value carried by the exception packet  is
+        pushed on the stack before handler_p is called.
+
+
+
+-----------------------------------------------------------------------
+8  Declaring ML Identifiers in Pop-11
+-----------------------------------------------------------------------
+
+The most powerful part of the mixed-language interface allows new
+identifiers to be added into the ML environment directly from Pop-11,
+where the values of the identifiers are computed from arbitrary Pop-11
+code. The method uses new syntax words
+
+    ml_val ml_type ml_exception ml_structure
+
+which mirror the corresponding declaration forms in ML.
+
+These syntax words are only available at execute level (i.e., not inside
+procedures).
+
+
+ml_val                                                          [syntax]
+        Declares a new ML variable:
+
+            ml_val var : type = expression
+
+        This adds a new variable var  into the current environment  with
+        the given type, and a value computed as the result of the Pop-11
+        expression.
+
+        Examples:
+
+            ml_val x : int = 3;
+
+            ml_val l : int list = [% repeat 10 times 3 endrepeat %];
+
+        The expression must  return exactly one  result. A very  limited
+        amount of type-checking is done to see whether the structure  of
+        the value matches the declared type, but this will catch  only a
+        very few errors.  After that, the  ML compiler will  take it  on
+        trust that the type is correct. You should be very careful  that
+        the value is properly constructed according to the typing  rules
+        discussed above.
+
+        For functions, the value should  be the unwrapped form which  is
+        the more  natural  to write  in  Pop-11. The  ML  compiler  will
+        automatically construct a wrapped form if needed. This relies on
+        the pdnargs of  the function  value to work  correctly, so  make
+        sure this is properly set.
+
+        Example:
+
+            ml_val stringin : string -> instream =
+            procedure(s) with_props stringin;
+                lvars s;
+                ml_instream(stringin(s));
+            endprocedure;
+
+
+ml_type                                                         [syntax]
+        Declares a new abstract type in ML:
+
+            ml_type tyvar-seq tycon
+
+        This  adds  a  new  type  constructor  tycon  into  the  current
+        environment with arity given by the length of the type  variable
+        sequence. The type  is abstract: it  has no value  constructors,
+        and there are no values or functions predefined for it. To be of
+        any use, an  appropriate set of  functions on the  type must  be
+        defined in Pop-11 and exported using ml_val.
+
+        Example:
+
+            ml_type symbol;
+
+            ml_val symbol : string -> symbol = consword;
+
+            ml_val string : symbol -> string = word_string;
+
+        This defines a new ML type symbol with functions for  converting
+        between symbols and  strings. Symbols are  simply Pop-11  words:
+        this is implicit in the definitions of the conversion functions,
+        but is obviously  unknown to  the ML compiler.  This means  that
+        anything declared  from Pop-11  to be  of type  symbol can't  be
+        checked by the compiler, and must be taken on trust.
+
+
+ml_eqtype                                                       [syntax]
+        Like ml_type, but the new  type constructor is assumed to  admit
+        equality. This  will be  implemented in  terms of  the  standard
+        Pop-11 equality procedure "=".
+
+
+ml_exception                                                    [syntax]
+        Declares a new ML exception constructor:
+
+            ml_exception excon
+
+        or
+
+            ml_exception excon of type
+
+        The effect of this is identical to declaring an exception in ML.
+        It is provided only for convenience.
+
+
+ml_structure                                                    [syntax]
+        Declares a new ML structure:
+
+            ml_structure strid : sigexp = struct
+                body
+            ml_endstructure
+
+        This defines a new structure with name strid and signature given
+        by sigexp (the  signature constraint is  optional). The body  of
+        the structure  is  a Pop-11  statement  sequence: this  will  be
+        executed as  normal,  except  that any  occurrences  of  ml_val,
+        ml_type, etc. are interpreted such  that the names they  declare
+        are added  into the  new structure  environment instead  of  the
+        global (top-level)  environment. The  complete set  of names  so
+        declared must match the given signature.
+
+        Example:
+
+            ml_structure Symbol : Symbol = struct
+                ml_type symbol;
+                ml_val symbol : string -> symbol = consword;
+                ml_val string : symbol -> string = word_string;
+            ml_endstructure;
+
+        This assumes a prior definition of the signature Symbol in ML:
+
+            signature Symbol = sig
+                type symbol
+                val symbol : string -> symbol
+                val string : symbol -> string
+            end
+
+        Structures may be nested. There's also a simple renaming form:
+
+            ml_structure strid : sigexp = strid'
+
+        which allows  existing  structures  (declared either  in  ML  or
+        Pop-11) to be included as subcomponents.
+
+
+
+--- C.all/pml/help/mlinpop
+--- Copyright University of Sussex 1994. All rights reserved.

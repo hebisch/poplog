@@ -1,0 +1,157 @@
+HELP EXTENDED_ARRAY                         Robert Duncan, November 1990
+
+Additional functions on arrays.
+
+
+    CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- The ExtendedArray Module
+ -- Array Functions
+
+
+-- The ExtendedArray Module -------------------------------------------
+
+signature ExtendedArray
+structure ExtendedArray : ExtendedArray
+    The structure  -ExtendedArray-  is an  autoloadable  library  module
+    defining some additional functions on the abstract type -array- (see
+    HELP *  ARRAY). These  functions are  kept separate  from the  basic
+    array functions because  they are  non-standard, i.e.  they are  not
+    necessarily supported by any other Standard ML compiler.
+
+    The  -ExtendedArray-  structure  is   described  by  the   following
+    signature: the  array type  and all  the basic  array functions  are
+    included in the signature for convenience.
+
+        signature ExtendedArray = sig
+
+            (* Include everything from the basic Array signature *)
+
+            include Array
+
+            (* Additional functions *)
+
+            val from_list   : '_a list -> '_a array
+            val to_list     : 'a array -> 'a list
+            val from_vector : '_a Vector.vector -> '_a array
+            val to_vector   : 'a array -> 'a Vector.vector
+
+            val map         : ('a -> '_b) -> 'a array -> '_b array
+            val app         : ('a -> unit) -> 'a array -> unit
+            val iterate     : ('a * int -> '_b) -> 'a array -> '_b array
+
+            val nc_map      : ('a -> 'a) -> 'a array -> 'a array
+            val nc_iterate  : ('a * int -> 'a) -> 'a array -> 'a array
+
+            val copy        : '_a array -> '_a array
+            val fill        : 'a array -> 'a -> unit
+
+            val ==          : 'a array * 'a array -> bool
+
+        end
+
+
+-- Array Functions ----------------------------------------------------
+
+Each function described  below is  illustrated with  a model  definition
+based on  the  primitive operations  provided  by the  standard  -Array-
+module. The definitions are assumed to be evaluated within the scope  of
+the declaration:
+
+    open Array
+    infix 9 sub
+
+
+val from_list (l : '_a list) : '_a array
+val to_list (a : 'a array) : 'a list
+    Conversion between arrays and lists.
+
+        val from_list =
+                arrayoflist
+        fun to_list a =
+            let fun loop i =
+                    if i = length(a) then [] else a sub i :: loop(i+1)
+            in  loop 0
+            end
+
+
+val from_vector (v : '_a Vector.vector) : '_a array
+val to_vector (a : 'a array) : 'a Vector.vector
+    Conversion between arrays and vectors.
+
+        fun from_vector v =
+                tabulate(Vector.length(v), fn i => Vector.sub(v, i))
+        fun to_vector a =
+                Vector.tabulate(length(a), fn i => a sub i)
+
+
+val map (f : 'a -> '_b) (a : 'a array) : '_b array
+    Constructs a new array of size -length(a)- where the i'th element of
+    the new array is the result of  applying -f- to the i'th element  of
+    -a-.
+
+        fun map f a = tabulate(length(a), fn i => f(a sub i))
+
+
+val app (f : 'a -> unit) (a : 'a array) : unit
+    Applies the (side-effecting)  function -f-  to each  element of  the
+    array -a- in index order.
+
+        fun app (f : 'a -> unit) a =
+            let fun loop i =
+                    if i = length(a) then () else (f(a sub i); loop(i+1))
+            in  loop 0
+            end
+
+
+val iterate (f : 'a * int -> '_b) (a : 'a array) : '_b array
+    Constructs a new array of size -length(a)- where the i'th element of
+    the new array is the result of  applying -f- to the i'th element  of
+    -a- and the index -i-.
+
+        fun iterate f a = tabulate(length(a), fn i => f(a sub i, i))
+
+
+val nc_map (f : 'a -> 'a) (a : 'a array) : 'a array
+    Like -map-, but the result is copied back to the original array -a-.
+
+        fun nc_map f a =
+                (app update (iterate (fn(x,i) => (a, i, f x)) a); a)
+
+    NB: in the  real implementation  of this  function, no  intermediate
+    copy of the array is made ("nc_" stands for "non-copying").
+
+
+val nc_iterate (f : 'a * int -> 'a) (a : 'a array) : 'a array
+    Like -iterate-, but the result is copied back to the original  array
+    -a-.
+
+        fun nc_iterate f a =
+                (app update (iterate (fn(x,i) => (a, i, f(x,i))) a); a)
+
+    NB: in the  real implementation  of this  function, no  intermediate
+    copy of the array is made ("nc_" stands for "non-copying").
+
+
+val copy (a : '_a array) : '_a array
+    Returns a copy of the array -a-.
+
+        val copy = map (fn x => x)
+
+
+val fill (a : 'a array) (x : 'a) : unit
+    Sets every element in the array -a- to have the value -x-.
+
+        fun fill a x = (nc_map (fn _ => x) a; ())
+
+
+infix 4 ==
+val (a1 : 'a array) == (a2 : 'a array) : bool
+    Equality on arrays. This is retained for historical reasons only and
+    is simply defined as
+
+        val op == : 'a array * 'a array -> bool = op =
+
+
+--- C.all/pml/help/extended_array
+--- Copyright University of Sussex 1994. All rights reserved. ----------

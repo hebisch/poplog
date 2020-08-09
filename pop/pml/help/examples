@@ -1,0 +1,1106 @@
+HELP EXAMPLES                                  Robert Duncan, March 1990
+
+
+Some simple examples of programming in ML.
+
+
+    CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- An Introduction to the PML Top Level
+ -- The Basic Types of ML
+ -- Functions
+ -- Overloaded Functions
+ -- Pattern Matching
+ -- Defining New Types
+ -- The Exception Mechanism
+ -- Further Reading
+
+
+-- An Introduction to the PML Top Level -------------------------------
+
+PML is an interactive system. It prompts for input initially with a
+single dash:
+
+    -
+
+but if input spreads over more than one line a secondary prompt:
+
+    =
+
+is used on lines after the first.
+
+Everything typed to the prompt is a declaration. For example, the name
+"x" can be declared to have the integer value 3 by typing:
+
+    val x = 3;
+
+Note the keyword "val" indicating that this is a value declaration
+(rather than a type or exception declaration - see below) and the
+terminating semicolon. For each such declaration, PML will respond with
+a list of the bindings it has made: the response from the above input
+would be:
+
+    val x = 3 : int
+
+This confirms the nature of the declaration ("val"), and indicates the
+name bound, its value and its type.
+
+In the examples which follow, the output produced by PML will be shown
+immediately after the example input, just as it would appear in a real
+session. To make things a little clearer, however, each line of output
+will be flagged with a ">" in the left margin. Thus:
+
+    val x = 3;              (* <-- your input  *)
+  > val x = 3 : int         (* <-- PML's reply *)
+
+You can confirm that the output shown is correct by marking and loading
+the example input using the "load marked range" facility provided by VED
+(and described in HELP * MLVED).
+
+Once a name has been bound to a value (such as "x" above) it can then be
+used to stand for that value in subsequent declarations. So we could
+declare the value "y" as being twice that of "x" by doing
+
+    val y = 2 * x;
+  > val y = 6 : int
+
+Often it is convenient not to have to give explicit names to values
+computed at top-level, and a shorthand form of declaration is provided
+for that: an expression typed in on its own, E say, with no introductory
+"val", is interpreted by PML as being short for the declaration
+
+    val it = E;
+
+or a binding to the name "it". So the input
+
+    (x + y) * (x + y);
+
+is exactly equivalent to
+
+    val it = (x + y) * (x + y);
+
+producing the output
+
+  > val it = 81 : int
+
+A consequence of this is that the name "it" is always bound to the
+result of the last expression evaluated:
+
+    4;
+  > val it = 4 : int
+
+    it * it;
+  > val it = 16 : int
+
+    it * it;
+  > val it = 256 : int
+
+
+-- The Basic Types of ML ----------------------------------------------
+
+Every expression in ML has a type. If the type of some expression E is
+"ty" say, then we write
+
+    E : ty
+
+The colon symbol (:) is pronounced "has type" (thus: "E has type ty").
+
+We have seen some examples of this already in the output from the
+declarations above, as PML displays the type of every value it computes.
+The type "int" (short for "integer" of course) is one of the basic (or
+primitive) types of ML and is built in to the language. The complete set
+of basic types is as follows:
+
+    int
+        Integer numbers. Examples are:
+
+            1  ~1  256  ~300000
+
+        The prefix "~" indicates a negative number. Integers in PML can
+        be of any magnitude.
+
+    real
+        Real numbers. Examples are:
+
+            1.0  ~1.0  0.3333  1E5  2.35E~4
+
+        Real numbers are always distinct from integers as they must
+        include either a decimal point or the exponent symbol "E" (or
+        both). The two types can't be mixed directly in expressions
+        either; the built-in functions "real" and "floor" must be used
+        to convert between them. E.g.
+
+            floor(22.0 / 7.0);
+          > val it = 3 : int
+
+            real it;
+          > val it = 3.0 : real
+
+    string
+        Character strings. There is no simple character type in ML;
+        single character strings are used instead. Examples:
+
+            ""  "a"  "More matter, with less art"  "2 + 2 = 4"
+
+        Operators on strings include "size", which returns the length of
+        a string, and "^", which joins two strings:
+
+            val message = "Hello world\n";
+          > val message = "Hello world\n" : string
+
+            size(message ^ message ^ message);
+          > val it = 36 : int
+
+    bool
+        Booleans (truth values). There are only two values in this type:
+
+            true  false
+
+        Built-in predicates such as "=" (equality) and "<" (less-than
+        ordering) return values of this type, and there is a conditional
+        expression form which can choose between alternative values
+        based on a boolean test. For example:
+
+            if x = y then "yes" else "no";
+          > val it = "no" : string
+
+    unit
+        The unit type. This type contains only a single value (hence its
+        name) written as "()":
+
+            ();
+          > val it = () : unit
+
+        This type is analogous to the "void" types which exist in other
+        languages; its principal use is to provide a value in those cases
+        where no value is really required. For example, the built-in
+        function "output", which prints on an output stream, is called
+        purely for its side-effect and so returns "()" as a result:
+
+            output(std_out, message);
+          Hello world
+          > val it = () : unit
+
+These are all constant (or "nullary") types, but ML also provides a set
+of built-in "type constructors" for building complex types from more
+basic ones.
+
+The first example of these is the "list" type constructor. A list, as a
+value, is some arbitrary-length sequence of values of a given type. The
+"list" type constructor thus takes a single type as an argument (the
+type "alpha", say) and constructs a new type which is the type of lists
+of values of type "alpha".
+
+For every type "alpha" in ML, there is a type of lists of alphas. There
+are an infinite number of such types, but here are some particular
+examples:
+
+    string list         (lists of strings)
+    unit list           (lists of units)
+    int list list       (lists of lists of integers)
+
+List values of known length can be written with a special syntax using
+brackets ("[" and "]") and commas:
+
+    ["More", "matter", "with", "less", "art"] : string list
+    [(), (), (), ()] : unit list
+    [[1, 2], [3, 4], [5, 6, 7]] : int list list
+
+Lists can also be constructed dynamically using the operator "::"
+(pronounced "cons", short for "construct") which adds an item to the
+front of a list. For example:
+
+    val numlist = [3, 4, 5];
+  > val numlist = [3, 4, 5] : int list
+
+    1 :: 2 :: numlist;
+  > val it = [1, 2, 3, 4, 5] : int list
+
+In fact, if we were to start always with an empty list, written as "[]"
+(or sometimes called "nil"), then we could construct every list using
+"::", as in:
+
+    "More" :: "matter" :: "with" :: "less" :: "art " :: [];
+  > val it = ["More", "matter", "with", "less", "art "] : string list
+
+    1 :: 2 :: 3 :: 4 :: 5 :: nil;
+  > val it = [1, 2, 3, 4, 5] : int list
+
+Just as the type constructor "list" constructs new types from more basic
+ones, the so-called "value constructors" "nil" and "::" construct
+complex lists from more basic values. This relationship between type
+constructors and value constructors becomes more apparent with
+user-defined types discussed below.
+
+The type of the empty list is of interest:
+
+    [];
+  > val it = [] : 'a list
+
+The identifier "'a" (pronounced "alpha") is a type variable which can
+stand for any ML type. Because there are an infinite number of types
+constructed with "list" but only one empty list, all the "list" types
+must share the same empty list. The type of the empty list is thus a
+general type which can be instantiated to any particular list type.
+
+For non-empty lists, every item in the list must be of the same type.
+There is no legal type which could be attached to an expression such as
+
+    [1, "elephant"] : ???
+
+Any expression which mixes types in the same list will cause a type
+error:
+
+    val bad_list = [1, "elephant"];
+
+  > In file examples, line 254:
+  Error: in expression
+      [1, "elephant"]
+  Not all the list members have the same type:
+      1 : int
+      "elephant" : string
+
+The error message makes it clear that you can't include an integer and a
+string in the same list. Trying to do so is no less of an error than --
+for example -- trying to add them together:
+
+    val bad_sum = 1 + "elephant";
+
+  > In file examples, line 267:
+  Error: in expression
+      1 + "elephant"
+  Cannot apply function
+      op + : int * int -> int
+  to argument
+      (1, "elephant") : int * string
+
+To construct aggregates whose components are of different types, ML
+provides the "tuple" type constructor, written as an infix "*". This
+constructor takes two or more types as arguments. For example:
+
+    int * real                          (a 2-tuple)
+    int * real * string                 (a 3-tuple)
+    int * real * string * bool          (a 4-tuple)
+
+The syntax for writing tuple-typed values uses parentheses ("(" and ")")
+and commas:
+
+    (1, 1.0) : int * real
+    (1, 1.0, "a") : int * real * string
+    (1, 1.0, "a", true) : int * real * string * bool
+
+There is no mechanism by which tuples can be constructed dynamically
+(i.e. there are no value constructors for tuples): lists can be dynamic
+only because they contain objects of a single type; tuples may contain
+different types but must be of fixed length.
+
+Other type constructors built in to ML are:
+
+    ref
+        short for "reference". This type adds the concept of updatable
+        structures to the language, but won't be considered further in
+        this file;
+
+    labelled record
+        an extension of the tuple type which allows fields in a
+        structure to be labelled with identifiers. This type is
+        described in the section on user-defined types below;
+
+    function
+        this will be discussed in detail in the next section.
+
+More information about basic types is given in the file HELP * STDTYPES.
+
+The type of a value is normally deduced by the compiler (as in all the
+above examples) without the need for explicit declarations. An exception
+to this arises in the case of functions which are "overloaded" (this
+concept is explained later). Where a type declaration is needed, it can
+be attached to any expression or binding in the manner we have seen
+already. For example:
+
+    val pair : bool * int = (true, 0) and n : int = 1;
+  > val pair = (true, 0) : bool * int
+  > val n = 1 : int
+
+Such type declarations (or "constraints" as they are usually called) can
+be useful too for documentation purposes, particularly where expressions
+involve complex, user-defined types. Well-placed type constraints can
+add useful information for the reader of a program.
+
+
+-- Functions ----------------------------------------------------------
+
+Functions in ML are simply values, with the same status as values of
+other types. The most general type of a function is
+
+    'a -> 'b
+
+(pronounced "alpha arrow beta"): this represents a function which takes
+an argument of some type alpha and returns a result of some (possibly
+different) type beta. Particular functions will have the type variables
+"'a" and "'b" instantiated in different ways. Thus:
+
+    real;
+  > val it = fn : int -> real
+
+    floor;
+  > val it = fn : real -> int
+
+Because functional values have no meaningful printed representation,
+they are always displayed by PML just as the word "fn".
+
+There are no value constructors for function types, so a special syntax
+must be used to create new functional values. Here is an example of a
+function which doubles its argument: the function has a single formal
+parameter "x" and computes a result which is 2 times the value of "x".
+
+    fn x => 2 * x;
+  > val it = fn : int -> int
+
+    it 4;
+  > val it = 8 : int
+
+We could give this a name using a standard value declaration:
+
+    val double = fn x => 2 * x;
+  > val double = fn : int -> int
+
+    double 4;
+  > val it = 8 : int
+
+Named functions can be made recursive by use of the keyword "rec":
+
+    val rec fac = fn n => if n = 0 then 1 else n * fac(n-1);
+  > val fac = fn : int -> int
+
+    fac 6;
+  > val it = 720 : int
+
+We can see from this last example (and from some earlier ones) how
+function application can be represented simply by the juxtaposition of
+function and argument. Parentheses aren't necessary except to change the
+order of evaluation: function application binds more tightly than any
+other expression construct in ML and so will always be evaluated first
+unless parentheses are used to change this. Compare:
+
+    double 4 + 4;
+  > val it = 12 : int
+
+    double (4 + 4);
+  > val it = 16 : int
+
+An important point to note about functions is that every function takes
+only a single argument: this is apparent from the function type, which
+specifies only one argument and one result. Functions which are to
+operate on more than one value may be written in either of two ways.
+
+Firstly, the two (or more) values needed may be provided to the function
+as a tuple. Here, for example, is the maximum function on integer pairs:
+
+    val max : int * int -> int = fn (n, m) => if n >= m then n else m;
+  > val max = fn : int * int -> int
+
+    max(0, 1);
+  > val it = 1 : int
+
+This concept can cause confusion to those used to programming in other
+languages, as "max" here looks very much like a two-argument function
+would if declared in, say, POP-11 or Pascal. However, the following
+example emphasises that "max" does indeed take a single argument, a
+tuple, by constructing the tuple separately. This example also
+demonstrates the use of a "let" expression which localises a declaration
+to an expression; the binding of "arg" is not visible at top-level.
+
+    let val arg = (0, 1) in max arg end;
+  > val it = 1 : int
+
+Many of the built-in functions we have seen already (such as "+", "*",
+"^") are actually defined in this way. Their applications are normally
+written differently however, as they are all declared to be infix
+operators which means that they can be written between the two
+components of their arguments. Such operators can only be written in the
+usual way if the keyword "op" is used to "turn off" their infix status.
+For example:
+
+    op ^;
+  > val it = fn : string * string -> string
+
+    op *(4, 2);
+  > val it = 8 : int
+
+We could declare "max" as infix too if we wished:
+
+    infix max;
+  > infix 0 max
+
+    0 max 1;
+  > val it = 1 : int
+
+An alternative solution for functions which require multiple arguments
+is to use functions which return new functions as results. Here's a
+function which adds an item to the end of a list ("rev" is a built-in
+function which reverses the order of items in a list):
+
+    val add_to_end = fn item => fn list => rev (item :: (rev list));
+  > val add_to_end = fn : 'a -> 'a list -> 'a list
+
+Note the type: the argument to "add_to_end" is an alpha-value and the
+result is a function from alpha-lists to alpha-lists (the function arrow
+"->" associates to the right). Using the function requires two
+applications:
+
+    add_to_end 4 [1, 2, 3];
+  > val it = [1, 2, 3, 4] : int list
+
+but the advantage of this is that we can apply it just once, and then
+save the resulting function for use later.
+
+    val add_4_to_end = add_to_end 4;
+  > val add_4_to_end = fn : int list -> int list
+
+    add_4_to_end [1, 2, 3];
+  > val it = [1, 2, 3, 4] : int list
+
+    add_4_to_end it;
+  > val it = [1, 2, 3, 4, 4] : int list
+
+These example declarations are somewhat unwieldy. Fortunately, ML
+provides a more concise syntax for function declarations, introduced by
+the keyword "fun". We would normally define "add_to_end" as follows:
+
+    fun add_to_end item list = rev (item :: (rev list));
+  > val add_to_end = fn : 'a -> 'a list -> 'a list
+
+The effect is exactly the same as with the previous definition, but the
+declaration is shorter and clearer and the function created will be more
+efficient to run. Also, functions declared with "fun" are implicitly
+recursive, so there is no need for the "rec" keyword.
+
+As a further example of a simple function declaration, we will define
+the function "ints" which, when applied to an integer argument "n",
+constructs a list of all the integers from 1 to "n". The definition
+makes use of another "let" expression to define a local function
+"fromto" which generates the list of integers from "lo" to "hi".
+
+    fun ints n =
+    let fun fromto lo hi = if lo > hi then [] else lo :: fromto(lo+1) hi
+    in  fromto 1 n
+    end;
+  > val ints = fn : int -> int list
+
+    ints 10;
+  > val it = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] : int list
+
+
+-- Overloaded Functions -----------------------------------------------
+
+A complexity in the ML type system arises when the same function name is
+used to stand for functions of different types. This concept is called
+"overloading". Many of the built-in maths functions have this property.
+For example:
+
+    2 + 3;
+  > val it = 5 : int
+
+    2.0 + 3.0;
+  > val it = 5.0 : real
+
+Here the name "+" is used for both the integer and real addition
+functions. The relational operators are like this too:
+
+    "a" < "b";
+  > val it = true : bool
+
+    1 < 2;
+  > val it = true : bool
+
+Such "overloaded" names must always be used at a particular type, and
+type constraints are sometimes necessary to indicate which type is
+intended. For example, an alternative definition of "double" might be:
+
+    fun double x = x + x;
+
+but this will fail with the message:
+
+  > In file examples, line 521:
+  Error: cannot determine a type for overloaded identifier
+      val + : 'A * 'A -> 'A
+
+as there is no indication of whether the parameter "x" is meant to be
+integer or real. A type constraint is necessary:
+
+    fun double x : int = x + x;
+  > val double = fn : int -> int
+
+This concept is quite distinct from that of "polymorphism", where the
+*same* function may be used on objects of different types. List
+concatenation (written "@") is an example:
+
+    fun dup x = x @ x;
+  > val dup = fn : 'a list -> 'a list
+
+    dup [2];
+  > val it = [2, 2] : int list
+
+    dup [2.0];
+  > val it = [2.0, 2.0] : real list
+
+Polymorphism is the rule and overloading the exception in ML.
+
+
+-- Pattern Matching ---------------------------------------------------
+
+Function declarations may be written with more than one clause, where
+alternative clauses are separated by the keyword "|". An equivalent
+declaration of the factorial function would be:
+
+    fun fac 0 = 1
+    |   fac n = n * fac(n-1);
+  > val fac = fn : int -> int
+
+    fac 6;
+  > val it = 720 : int
+
+In any particular application of the function only one of the
+alternative clauses can be used; the process by which a particular
+alternative is chosen is called "pattern matching". The formal
+parameters in each clause (0 and "n" in this case) are called
+"patterns". Patterns mirror the structure of values, and their role is
+to decompose values into their constituent parts. We say that a pattern
+"matches" a value if the pattern has the same structure as the value;
+whenever a pattern matches a value, the value can be decomposed
+according to the pattern.
+
+For example, the pattern 0 matches the integer value 0 only; the pattern
+"n" however, being a variable, matches *any* value (although in the
+context of the definition of "fac", the value must be an integer). A
+pattern such as (0, n) would match any 2-tuple whose first component was
+0.
+
+Variables which occur in patterns (such as "n" in "fac") are so-called
+"binding occurrences": the match, if it succeeds, binds the variables in
+the pattern to the corresponding components of the argument value, and
+the bindings remain visible throughout the right hand side of the chosen
+clause. Thus matching "n" against, say, 3, would bind "n" to the value
+3, as would matching (0, n) against (0, 3).
+
+Applying "fac" to the value 0 we get:
+
+    fac 0;
+  > val it = 1 : int
+
+The argument 0 matches the pattern in the first clause of "fac", and so
+that clause is chosen. The right hand side of the clause, 1, is returned
+straight away. Conversely, the application:
+
+    fac 3;
+  > val it = 6 : int
+
+matches the second rule of "fac", which, by the binding rules described
+above, expands the right hand side of the clause to
+
+    3 * fac(3-1);
+
+By following through the recursive call (and a further two calls) the
+answer
+
+    3 * 2 * 1 * 1 = 6
+
+is computed.
+
+It's not only constants, variables and tuples which can be used to build
+patterns: the value constructors of types can be used too. This means
+that we can pattern-match on lists (but not on functions, which have no
+value constructors).
+
+In a context where we have defined:
+
+    a : 'a
+    x : 'a list
+
+then we can construct the value
+
+    (a :: x) : 'a list
+
+Conversely, we can use the *pattern* (a :: x) to do the opposite task:
+to decompose any non-empty list into two parts "a" and "x", "a" being
+the first item in the list (the "head" of the list) and "x" being the
+rest of the list once the first item has been removed (the "tail" of the
+list).
+
+The function "length" uses pattern matching on lists to measure the
+length of a list: the length of the empty list is obviously zero, while
+the length of any non-empty list must be 1 greater than the length of
+its tail.
+
+    fun length []     = 0
+    |   length (a::x) = 1 + length x;
+  > val length = fn : 'a list -> int
+
+    length [];
+  > val it = 0 : int
+
+    length numlist;
+  > val it = 3 : int
+
+It's important that for every function definition, at least one clause
+should match for every possible value to which the function might be
+applied. If this were not the case, the function would be undefined for
+some values and a run-time error could arise. The ML compiler will give
+a warning about any declaration which is not complete in this sense. For
+example, this definition of "sumlists" which adds together two integer
+lists component-wise is incomplete:
+
+    fun sumlists [] [] : int list    = []
+    |   sumlists (n :: ns) (m :: ms) = (n + m) :: sumlists ns ms;
+
+  > In file examples, line 654:
+  Warning: possible Match exception in function
+      sumlists
+
+  > val sumlists = fn : int list -> int list -> int list
+
+The definition leaves an expression such as
+
+    sumlists [1] [];
+
+undefined.
+
+Additional constructs are available in patterns which make possible some
+sophisticated effects. The next function, "removedups", removes
+duplicate items from a sorted list; the restriction to sorted lists
+allows us to assume that duplicate items will always be adjacent to one
+another in the list. Two new pattern constructs are used:
+
+    the wildcard pattern, written "_", matches any value, but creates no
+        new bindings so that the matched value is effectively discarded;
+
+    the layered pattern, written "var as pattern", both binds the
+        matching value to the variable "var", but also matches it against
+        the subsidiary "pattern" which may decompose it further. With
+        this construct, both the whole value and its component parts can
+        be made accessible.
+
+    fun removedups (a :: (l as b :: _)) =
+        if a = b then
+            removedups l
+        else
+            a :: removedups l
+    |   removedups l = l;
+  > val removedups = fn : ''a list -> ''a list
+
+    removedups [1, 1, 2, 3, 4, 4, 5, 6, 6, 6, 7];
+  > val it = [1, 2, 3, 4, 5, 6, 7] : int list
+
+
+-- Defining New Types -------------------------------------------------
+
+The type system of ML is extendible: the keyword "datatype" introduces
+declarations of new types. This single declaration form encompasses all
+the sorts of user defined types found in languages such as Pascal -
+enumerated types, records and unions. Here, for example, is an
+enumerated type representing the days of the week:
+
+    datatype day = Sun | Mon | Tue | Wed | Thu | Fri | Sat;
+  > datatype day
+  > con Sun : day
+  > con Mon : day
+  > con Tue : day
+  > con Wed : day
+  > con Thu : day
+  > con Fri : day
+  > con Sat : day
+
+This declaration creates a new type "day" together with a set of seven
+"value constructors", each of which is a value of the new type; these
+are in fact the *only* values of the new type. The value constructors
+may be used in both patterns and expressions:
+
+    fun weekend Sat = true
+    |   weekend Sun = true
+    |   weekend _   = false;
+  > val weekend = fn : day -> bool
+
+    weekend Wed;
+  > val it = false : bool
+
+    weekend Sun;
+  > val it = true : bool
+
+Value constructors share the same name space as variables, so it's not
+always clear when looking at a pattern which identifiers are
+constructors to be matched and which are variables to be bound. To
+minimise this confusion, there is a convention among some ML programmers
+to always start the names of value constructors with upper-case letters,
+and those of variables with lower-case. This is the convention followed
+in this file, and it's recommended for programmers new to the language.
+
+Value constructors may be declared to take arguments, in which case they
+become functions from their argument types to the newly created datatype.
+This supports the creation of new "record" types such as complex
+numbers:
+
+    datatype complex = Complex of (real * real);
+  > datatype complex
+  > con Complex : real * real -> complex
+
+The keyword "of" introduces the argument type of the constructor; the
+resulting function "Complex" converts 2-tuples of real numbers into
+complex numbers. The "Complex" constructor can be used for pattern
+matching also:
+
+    fun realpart (Complex(r, _)) = r
+    and imagpart (Complex(_, i)) = i;
+  > val realpart = fn : complex -> real
+  > val imagpart = fn : complex -> real
+
+    realpart (Complex(1.0, 0.0));
+  > val it = 1.0 : real
+
+    imagpart (Complex(~1.5, 0.5));
+  > val it = 0.5 : real
+
+For more sophisticated structures, we might choose to use a "labelled
+record" as the argument to a value constructor. This is similar to a
+tuple, in that it has a fixed number of fields of mixed type, but each
+field is labelled with an identifier; the labels are made explicit both
+in the type itself and in every value of the type. With large structures
+this can make programs much clearer, and there is a special pattern
+matching construct available for selecting particular labelled fields.
+Labelled records are written inside braces, "{" ... "}"; all the labels
+in a record must be distinct, but as a consequence the fields may be
+written in any order.
+
+This next datatype uses a labelled record to describe a book:
+
+    datatype book = Book of {
+        title  : string,
+        author : string,
+        date   : int
+    };
+  > datatype book
+  > con Book : {author : string, date : int, title : string} -> book
+
+    val good_book = Book {
+        title  = "The Definition of Standard ML",
+        author = "Milner et.al.",
+        date   = 1990
+    };
+  > val good_book = Book({author = "Milner et.al.", date = 1990, title =
+        "The Definition of Standard ML"}) : book
+
+Note how the colon symbol ":" is used in the type specification to
+separate field names and their types while the equality symbol "=" is
+used in expressions to associate values with fields. Fields are sorted
+internally into a standard order, so the output doesn't always match the
+input exactly.
+
+Unwanted fields of the record can be ignored in pattern matches by use
+of the "record wildcard" pattern, written "..." (this is another keyword
+of the language):
+
+    fun written_by name (Book {author, ...}) = author = name;
+  > val written_by = fn : string -> book -> bool
+
+    written_by "Milner et.al." good_book;
+  > val it = true : bool
+
+    written_by "Henry James" good_book;
+  > val it = false : bool
+
+As a further demonstration of the flexibility of datatype declarations,
+here is a declaration of the type of simple binary trees. We can define
+a simple binary tree as EITHER an empty (Null) tree OR a Node consisting
+of two binary trees:
+
+    datatype tree =
+        Null
+    |   Node of (tree * tree);
+  > datatype tree
+  > con Null : tree
+  > con Node : tree * tree -> tree
+
+An example tree might be:
+
+    val tree = Node(Node(Null, Null), Null);
+  > val tree = Node(Node(Null, Null), Null) : tree
+
+The function "height" measures the height of a tree:
+
+    fun height Null = 0
+    |   height (Node(left, right)) =
+        let val hl = height left and hr = height right
+        in  (if hl > hr then hl else hr) + 1
+        end;
+  > val height = fn : tree -> int
+
+    height tree;
+  > 2 : int
+
+It is also possible to create parameterised type constructors. For
+example, a more useful binary tree would include some kind of
+information, perhaps at each interior node. We can parameterise the
+definition of trees as follows:
+
+    datatype 'a tree =
+        Null
+    |   Node of ('a tree * 'a * 'a tree);
+  > datatype 'a tree
+  > con Null : 'a tree
+  > con Node : 'a tree * 'a * 'a tree -> 'a tree
+
+Now the "Node" constructor takes a 3-tuple as an argument: a pair of
+trees plus some information of type "alpha". We can instantiate "alpha"
+in any way we choose:
+
+    Node(Null, 0, Null);
+  > Node(Null, 0, Null) : int tree
+
+    Node(Node(Null, "a", Null), "d", Null);
+  > Node(Node(Null, "a", Null), "d", Null) : string tree
+
+but, as ever, we cannot mix integers and strings in the same tree.
+
+Some of the built-in types of ML are no more than datatypes. Lists, for
+example:
+
+    (* NB: don't compile this declaration *)
+    datatype 'a list = nil | op :: of ('a * 'a list);
+
+The "datatype" declaration creates new, unique types which match only
+themselves; even if a declaration is repeated word for word, the two
+types thus created are distinct. That's why it's a bad idea to compile
+the "list" declaration above - it would create a completely new type,
+hiding the built-in list type. An alternative declaration form, the
+"type" declaration, creates what is called a "type synonym" or a "type
+abbreviation", which defines a new name for some existing type. This
+offers no more type security, as types with the new name will match
+correctly with the original type, but it can be extremely useful in
+allowing more descriptive names to be given to types for documentation
+purposes.
+
+Thus in geometry, we might declare:
+
+    type point = real * real;
+  > eqtype point = real * real
+
+    type line = point * point;
+  > eqtype line = point * point
+
+(The word "eqtype" output here indicates that these new types admit
+equality. This issue is not taken further here: the two identifiers can
+be thought of as type constructors just like any other.)
+
+There are no value constructors associated with such types: the values
+of type "point" are precisely those values of type "real * real".
+Because of this equivalence, the ML compiler can never deduce for itself
+that any particular pair of real numbers is meant to represent a
+"point". Values must be explicitly constrained with the new types to
+show any effect. For example,
+
+    val origin : point = (0.0, 0.0);
+  > val origin = (0.0, 0.0) : point
+
+    val x_axis : line = (origin, (1.0, 0.0))
+    and y_axis : line = (origin, (0.0, 1.0));
+  > val x_axis = ((0.0, 0.0), (1.0, 0.0)) : line
+  > val y_axis = ((0.0, 0.0), (0.0, 1.0)) : line
+
+    fun gradient (((x1, y1), (x2, y2)) : line) : real = (y2-y1)/(x2-x1);
+  > val gradient = fn : line -> real
+
+    gradient x_axis;
+  > 0.0 : real
+
+It's worth stressing again that although a function such as "gradient"
+has been typed to take an argument of type "line", it will in fact work
+on any type whose underlying structure is
+
+    (real * real) * (real * real)
+
+For example, we might choose to represent a circle as two points (its
+centre, plus an arbitrary point on the circumference):
+
+    type circle = point * point;
+  > eqtype circle = point * point
+
+    val unit_circle : circle = (origin, (1.0, 0.0));
+  > val unit_circle = ((0.0, 0.0), (1.0, 0.0)) : circle
+
+We can now say (without getting a type error):
+
+    gradient unit_circle;
+
+the result of which is probably meaningless. This would be impossible
+had we defined points, lines and circles as datatypes in a manner
+analogous to the definition of complex numbers above.
+
+A third form of type declaration provided by ML, the "abstype"
+declaration, allows the creation of abstract data types, but this will
+not be covered here.
+
+
+-- The Exception Mechanism --------------------------------------------
+
+ML run-time errors (those not caught by the type checker) manifest
+themselves as exceptions. It's possible to provoke one of these with a
+bad usage of a built in operator such as "div":
+
+    1 div 0;
+
+  > ;;; Uncaught exception: Div
+
+or, more realistically, by using the "gradient" function defined above:
+
+    gradient y_axis;
+
+  > ;;; Uncaught exception: Overflow
+
+The name of the exception is printed to give some clue as to what has
+gone wrong: the "Div" exception indicates an attempt to divide by the
+integer zero; "Overflow" indicates a real overflow or (as in this case)
+division by real zero. There is no definite way of tying up exception
+names with the functions that caused them: "Overflow" for example may be
+raised by any real arithmetic operator or function which generates a
+result too large for the floating-point number representation. More
+often than not however, exceptions are caused by a bad combination of
+arguments given to a function, and in this case, there is a convention
+that an exception should be raised which has the same name as the
+function except for an initial upper-case letter. So the function "sqrt"
+raises the exception "Sqrt" if applied to a negative number:
+
+    sqrt ~1.0;
+
+  > ;;; Uncaught exception: Sqrt
+
+Even this rule breaks down for symbolic names. If you don't know what's
+gone wrong, try the HELP command on the exception name: HELP * Overflow
+for example, will give some useful information.
+
+The default effect of an exception is (as above) to abort the current
+evaluation, print a message and return to the top-level prompt. This
+need not be the case however, as exceptions may be caught by means of
+the "handle" construct:
+
+    1 div 0 handle Div => 999;
+  > val it = 999 : int
+
+The exception raised by the bad "div" expression is trapped by the
+exception handler
+
+    Div => 999
+
+This is just like an anonymous function whose argument is an exception.
+When an exception occurs, its name is matched against the pattern in the
+handler. If the names match, the value of the handler is returned as the
+result of the whole expression, otherwise the exception passes through
+the handler, stopping either at the next handler or at top-level. This
+next example tries catching the wrong exception, without success:
+
+    gradient y_axis handle Div => 999.0;
+
+  > ;;; Uncaught exception: Overflow
+
+The "Overflow" exception raised by the application of "gradient" passes
+through the "Div" handler and up to top-level. Note how the handler has
+been changed to return 999.0 (a real) instead of 999 (an integer): this
+is because we have
+
+    (gradient y_axis) : real
+
+and the result returned by an exception handler must have the same type
+as that of the expression being handled.
+
+New exceptions can be declared with the "exception" keyword and then
+"raised" to signal error conditions in user functions. Here the function
+"subscript" picks an indexed item from a list, but raises an exception
+if the list is not long enough:
+
+    exception Subscript
+
+    fun subscript 1 (item :: _) = item
+    |   subscript n (_ :: list) = subscript (n-1) list
+    |   subscript n []          = raise Subscript;
+
+  > exception Subscript
+  > val subscript = fn : int -> 'a list -> 'a
+
+    val days = [Sun, Mon, Tue, Wed, Thu, Fri, Sat];
+  > val days = [Sun, Mon, Tue, Wed, Thu, Fri, Sat] : day list
+
+    subscript 5 days;
+  > val it = Thu : day
+
+    subscript 8 days;
+
+  > ;;; Uncaught exception: Subscript
+
+    subscript 8 days handle Subscript => Sun;
+  > val it = Sun : day
+
+Exceptions can also communicate information between the point at which
+they are raised and the point at which they are handled. In this case
+the exception has to be declared with an argument type; when it is
+raised, it is raised with a value of that type, and the handler for it
+can elaborate the pattern match to choose a course of action depending
+on the value:
+
+    exception ErrCond of string
+
+    fun try x =
+        if x < 10 then raise ErrCond("too low")
+        else if x > 19 then raise ErrCond("too high")
+        else x * x
+
+    and keep_trying x =
+        try x
+        handle
+            ErrCond("too low")  => keep_trying (x+1)
+        |   ErrCond("too high") => keep_trying (x-1);
+
+  > exception ErrCond of string
+  > val try = fn : int -> int
+  > val keep_trying = fn : int -> int
+
+    keep_trying 15;
+  > val it = 225 : int
+
+    keep_trying 1;
+  > val it = 100 : int
+
+    keep_trying 20;
+  > val it = 361 : int
+
+Exceptions are themselves values. There is a type "exn" to which all
+exception values belong; exception names are like constructors for this
+type, and are more properly referred to as "exception constructors". For
+example:
+
+    Subscript;
+  > val it = Subscript : exn
+
+    ErrCond;
+  > val it = fn : string -> exn
+
+As with value constructors, exceptions are usually declared to start
+with upper-case letters.
+
+A special built-in exception "Interrupt" is raised by interrupt signals
+generated from the keyboard. This can be handled in the same way as any
+other exception, allowing ML programs to keep control after interrupts.
+
+
+-- Further Reading ----------------------------------------------------
+
+There are many more advanced constructs available in ML which are not
+discussed at all here. The file HELP * PML gives some references to
+publications which describe the language more fully. There are also
+further examples of ML programs within the PML system. HELP * LIST gives
+equivalent ML definitions for each of the functions defined in the
+built-in structure -List-. Also, try looking at some of the ML library
+files provided with PML: the variable -Compile.searchpath- contains the
+names of the directories used for libraries on your system.
+
+
+--- C.all/pml/help/examples
+--- Copyright University of Sussex 1991. All rights reserved. ----------

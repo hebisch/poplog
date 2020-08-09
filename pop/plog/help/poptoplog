@@ -1,0 +1,186 @@
+PLOGHELP POPTOPLOG                              Chris Mellish  July 1983
+                                 Revised by Kathryn Seifert  August 1986
+                                      Revised by Robert Duncan  May 1987
+
+Calling Prolog from POP-11.
+
+Keywords: POP-11, Prolog, mixed language programming, languages,
+          compile, continuations
+
+
+CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- THE SYNTAX WORDS ":-" AND "?-"
+ -- THE PROCEDURE PROLOG_INVOKE
+ -- CONTINUATION PASSING
+ -- AN EXAMPLE OF CONTINUATION PASSING
+ -- COMPILING PROLOG CODE
+ -- RELATED DOCUMENTATION
+
+
+-- THE SYNTAX WORDS ":-" AND "?-" -------------------------------------
+
+For simple use, Prolog defines two POP-11 syntax words ":-" and "?-"
+which will read a Prolog term from PROGLIST and execute it as a goal.
+The advantage is that the goals can be typed exactly as they would be
+from Prolog itself; for example, you could type from POP:
+
+    :- library(useful).
+    ?- member(X, [1, 2, 3, 4]).
+
+The difference between the two syntax words is that ":-" will execute
+the goal silently, producing no output even to indicate whether the goal
+succeeded or failed, whereas "?-" will execute the goal in Prolog's
+top-level mode, printing variable bindings and offering alternative
+solutions.
+
+
+-- THE PROCEDURE PROLOG_INVOKE ----------------------------------------
+
+The drawback of the syntax words described above is that they can be
+invoked only for their immediate, visible effect - there is no way of
+communicating any results (i.e. variable bindings) back to a POP-11
+program. To get more sophisticated effects it's necessary first to
+understand how Prolog terms are represented in POP-11 and to know the
+rules for handling these terms safely. This is described in PLOGHELP *
+TERMSINPOP, and that file should be read before proceeding.
+
+The procedure PROLOG_INVOKE takes the POP-11 representation of a Prolog
+term as an argument, executes it as a Prolog goal, and returns TRUE or
+FALSE according to whether the goal succeeded or failed. Only the first
+solution, if any, is found: no backtracking is possible.
+(See PLOGHELP * PROLOG_INVOKE)
+
+Because the term given as argument to PROLOG_INVOKE has to be built
+explicitly by the calling POP-11 program, it's possible to embed named
+Prolog variables into it; if the goal succeeds, these variables remain
+instantiated after the procedure returns so that their values can be
+examined.
+
+For example, the following POP-11 code invokes the Prolog term
+
+    sentence([john, hit, mary], X)
+
+as a goal, and prints the value of X if the goal succeeds:
+
+    define sentence(string) -> X;
+        lvars string, X, goal;
+        prolog_newvar() -> X;
+        prolog_maketerm(string, X, "sentence", 2) -> goal;
+        if prolog_invoke(goal) then     ;;; the goal succeeded
+            prolog_full_deref(X) -> X;
+        else                            ;;; the goal failed
+            false -> X;
+        endif;
+    enddefine;
+
+    vars X;
+    if sentence([john hit mary]) ->> X then
+        prolog_write(X); nl(1);
+    else
+        npr('no');
+    endif;
+
+Details of procedures such as PROLOG_FULL_DEREF, PROLOG_WRITE etc. are
+given in PLOGHELP * TERMSINPOP.
+
+
+-- CONTINUATION PASSING -----------------------------------------------
+
+For the most flexible use of Prolog from POP-11, it is best to use the
+"continuation passing" interface.  With this method, Prolog procedures
+can be invoked from POP-11 as procedures which take an extra
+"continuation" argument. (Briefly, this argument is a procedure to be
+invoked whenever the Prolog procedure achieves a successful exit, but
+for a proper explanation read DOC * CONTINUATION.) It's also possible to
+write procedures in POP-11 which take continuations and then call these
+procedures directly from Prolog - see PLOGHELP * PLOGTOPOP for details.
+
+The continuation-passing version of a Prolog procedure can be obtained
+with a call to PROLOG_VALOF:
+
+    prolog_valof(<word:F>, <integer:A>) -> <procedure:P>
+
+where F and A are the functor and arity of the desired predicate and P
+is the POP-11 procedure returned as a result.
+(See PLOGHELP * PROLOG_VALOF)
+
+
+-- AN EXAMPLE OF CONTINUATION PASSING ---------------------------------
+
+The use of continuations can be demonstrated by this simple example. The
+following POP-11 procedure is supposed to test whether its argument,
+something that might be typed in an English sentence, refers to a
+number.  Two cases are considered:  the first possibility is that the
+item is an integer;  the second is that it is a member of a known list
+of "number words".  This second test is made by using the Prolog
+predicate MEMBER/2, defined in library USEFUL (see PLOGHELP * USEFUL).
+
+    :- library(useful).
+
+    vars procedure memb = prolog_valof("member", 2);
+
+    define refers_to_num(x, contn);
+        lvars x, procedure contn;
+        prolog_deref(x) -> x;
+        if isinteger(x) then
+            contn();
+        else
+            memb(x, [one two three four], contn);
+        endif;
+    enddefine;
+
+The procedure REFERS_TO_NUM could now be called from POP-11 if supplied
+with an appropriate continuation procedure as its second argument;
+alternatively, it could be made into a Prolog procedure using the
+updater of the procedure PROLOG_VALOF:
+
+    refers_to_num -> prolog_valof("plog_refers_to_num", 1);
+
+The Prolog predicate PLOG_REFERS_TO_NUM/1 could now be called normally
+from Prolog.
+
+A more complex example can be seen by looking at the code in
+SHOWLIB * PARSEDEMO.
+
+
+-- COMPILING PROLOG CODE ----------------------------------------------
+
+An alternative way of accessing Prolog from POP is to compile a Prolog
+program file with the procedure PROLOG_COMPILE (see
+PLOGHELP * PROLOG_COMPILE). This operates much like the standard POP-11
+compiler COMPILE: it accepts a file name (as a word or string), a
+character repeater or a device as argument and will 'reconsult' the
+Prolog code read from that source. Directives in the code (i.e. terms
+with principal functor :-/1 or ?-/1) are executed immediately, just as
+in a normal RECONSULT (see PLOGHELP * RECONSULT, * DIRECTIVES).
+
+This procedure mishaps if the Prolog system is not loaded.
+
+
+-- RELATED DOCUMENTATION ----------------------------------------------
+
+DOC * CONTINUATION
+    How continuation passing procedures in POP-11 relate to Prolog.
+
+PLOGHELP * PROLOG_LANGUAGE
+    Predicates and library package for switching between Prolog and
+    POP-11.
+
+PLOGHELP * MIXED_LANGUAGES
+    Overview of methods of interfacing Prolog and other languages.
+
+PLOGHELP * PLOGTOPOP
+    How to call POP-11 from Prolog.
+
+PLOGHELP * PROLOG_VALOF
+    POP-11 procedure which returns current value of a Prolog predicate.
+
+PLOGHELP * TERMSINPOP
+    Facilities for manipulating Prolog terms and variables in POP-11.
+
+TEACH * PROLOGINPOP
+    Examples of POP-11 equivalents of Prolog clauses.
+
+--- C.all/plog/help/poptoplog ------------------------------------------
+--- Copyright University of Sussex 1987. All rights reserved. ----------

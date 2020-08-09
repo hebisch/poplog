@@ -1,0 +1,378 @@
+HELP STRING                                    R. J. Duncan, August 1989
+
+Functions on strings.
+
+
+    CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Introduction
+ -- The String Module
+ -- Substring Functions
+ -- String Search Functions
+ -- Character Testing Predicates
+ -- Character Transformation Functions
+ -- Miscellaneous Functions
+
+
+-- Introduction -------------------------------------------------------
+
+The structure -String- is a built-in structure of PML which defines a
+collection of useful functions on strings.
+
+The type -string- is one of the basic types of ML, defined in the
+structure -StdTypes-. There is no separate character type, individual
+characters being represented as strings of size 1.
+
+The functions
+
+    ord : string -> int
+    chr : int -> string
+
+provide a mapping between single-character strings and ASCII character
+codes; the function
+
+    size : string -> int
+
+returns the number of characters in a string. For more on these
+functions see HELP * STDVALUES.
+
+In Poplog ML, characters within strings are assumed to be indexed from
+zero. This means that for any string of size -n-, the first character in
+the string has index 0, and the last has index (n-1). All the functions
+in structure -String- which work on character indexes respect this
+convention.
+
+
+-- The String Module --------------------------------------------------
+
+signature String
+structure String : String
+    The -String- module is described by the following signature:
+
+        signature String = sig
+
+            (* Substring Functions *)
+
+            exception Substring
+            exception Prefix
+            exception Suffix
+            exception Index
+
+            val substring       : int -> int -> string -> string
+            val prefix          : int -> string -> string
+            val suffix          : int -> string -> string
+            val index           : int -> string -> string
+            val issubstring     : string -> string -> bool
+            val isprefix        : string -> string -> bool
+            val issuffix        : string -> string -> bool
+
+            (* String Search Functions *)
+
+            exception Locate
+            exception Locater
+            exception Skip
+            exception Skipr
+
+            val locate          : string -> string -> int
+            val locater         : string -> string -> int
+            val skip            : string -> string -> int
+            val skipr           : string -> string -> int
+
+            (* Character Testing Predicates *)
+
+            val isalphabetic    : string -> bool
+            val islowercase     : string -> bool
+            val isuppercase     : string -> bool
+            val isnumeric       : string -> bool
+            val isspace         : string -> bool
+            val iscontrol       : string -> bool
+
+            (* Character Transformation Functions *)
+
+            val lowercase       : string -> string
+            val uppercase       : string -> string
+            val control         : string -> string
+            val detab           : string -> string
+            val mapstring       : (string -> string) -> string -> string
+
+            (* Miscellaneous Functions *)
+
+            exception Stringof
+            exception Stringint
+
+            val stringof        : int -> string -> string
+            val stringint       : string -> int
+
+        end;
+
+
+-- Substring Functions ------------------------------------------------
+
+exception Substring
+val substring (i : int) (j : int) (s : string) : string
+    Returns a substring of -s- of length (j-i) starting from character
+    -i- and finishing at character (j-1). Raises the exception
+    -Substring- if -i- and -j- are outside the range
+
+        0 <= i <= j <= size s
+
+    Example:
+
+        substring 4 9 "--- Title ---";
+        "Title" : string
+
+
+exception Prefix
+val prefix (n : int) (s : string) : string
+    Returns the prefix of length -n- of the string -s-. Raises the
+    exception -Prefix- if -n- is less than zero or greater than the size
+    of -s-. The function -prefix- could be defined as:
+
+        fun prefix n s = substring 0 n s;
+
+    Example:
+
+        prefix 3 "--- Title ---";
+        "---" : string
+
+
+exception Suffix
+val suffix (i : int) (s : string) : string
+    Returns the suffix of the string -s- starting from the character
+    -i-. Raises the exception -Suffix- if -i- is less than zero or
+    greater than the size of -s-. The function -suffix- could be defined
+    as:
+
+        fun suffix i s = substring i (size s) s;
+
+    Example:
+
+        suffix 10 "--- Title ---";
+        "---" : string
+
+
+exception Index : unit
+val index (i : int) (s : string) : string
+    Returns the i'th character from the string -s- as a single character
+    string. Raises the exception -Index- if -i- is less than zero or
+    greater than or equal to the size of -s-. The function -index- could
+    be defined as:
+
+        fun index i s = substring i (i+1) s;
+
+    Example:
+
+        index 4 "--- Title ---";
+        "T" : string
+
+
+val issubstring (s1 : string) (s2 : string) : bool
+    Returns -true- if -s1- is a substring of -s2-, i.e. if there exist
+    some indices -i- and -j- such that
+
+        s1 = substring i j s2
+
+
+val isprefix (s1 : string) (s2 : string) : bool
+    Returns -true- if -s1- is a prefix of -s2-, i.e. if there exists
+    some -n- such that
+
+        s1 = prefix n s2
+
+
+val issuffix : string -> string -> bool
+    Returns -true- if -s1- is a suffix of -s2-, i.e. if there exists
+    some index -i- such that
+
+        s1 = suffix i s2
+
+
+-- String Search Functions --------------------------------------------
+
+exception Locate
+val locate (s1 : string) (s2 : string) : int
+    Locates the first (left-most) occurrence of -s1- in -s2-, i.e.,
+    returns the smallest index -i- such that
+
+        isprefix s1 (suffix i s2)
+
+    Raises the exception -Locate- if -s1- is not a substring of -s2-.
+
+    Example:
+
+        locate " " "--- Title ---";
+        3 : int
+
+
+exception Locater
+val locater (s1 : string) (s2 : string) : int
+    Locates the last (right-most) occurrence of -s1- in -s2-, i.e.,
+    returns the largest index -i- such that
+
+        isprefix s1 (suffix i s2)
+
+    Raises the exception -Locater- if -s1- is not a substring of -s2-.
+
+    Example:
+
+        locater " " "--- Title ---";
+        9 : int
+
+
+exception Skip
+val skip (s1 : string) (s2 : string) : int
+    Skips all leading occurrences of the string -s1- in -s2-, i.e.,
+    returns the smallest index -i- such that
+
+        i mod (size s1) = 0
+
+    and
+
+        not(isprefix s1 (suffix i s2))
+
+    Raises the exception -Skip- if -s1- is the empty string.
+
+    Example:
+
+        skip "-" "--- Title ---";
+        3 : int
+
+
+exception Skipr
+val skipr (s1 : string) (s2 : string) : int
+    Skips all trailing occurrences of the string -s1- in -s2-, i.e.,
+    returns the largest -n- such that
+
+        (size s2 - n) mod (size s1) = 0
+
+    and
+
+        not(issuffix s1 (prefix n s2))
+
+    Raises the exception -Skipr- if -s1- is the empty string.
+
+    Example:
+
+        skipr "-" "--- Title ---";
+        10 : int
+
+
+-- Character Testing Predicates ---------------------------------------
+
+These predicates classify strings according to the type of characters
+they contain. All return -true- if and only if EVERY character in the
+string is of the same type, and so will all return -true- on the empty
+string.
+
+
+val isalphabetic (s : string) : bool
+    Returns -true- if every character in the string -s- is a letter
+    ("A", ..., "Z", "a", ..., "z").
+
+
+val islowercase (s : string) : bool
+    Returns -true- if every character in the string -s- is a lowercase
+    letter ("a", ..., "z").
+
+
+val isuppercase (s : string) : bool
+    Returns -true- if every character in the string -s- is an uppercase
+    letter ("A", ..., "Z").
+
+
+val isnumeric (s : string) : bool
+    Returns -true- if every character in the string -s- is a digit
+    ("0", ..., "9").
+
+
+val isspace (s : string) : bool
+    Returns -true- if every character in the string -s- is a whitespace
+    character (" ", "\t", "\n", "\^M", "\^L").
+
+
+val iscontrol (s : string) : bool
+    Returns -true- if every character in the string -s- is a non-
+    printing (control) character (less than "\032" or greater than
+    "\126").
+
+
+-- Character Transformation Functions ---------------------------------
+
+val lowercase (s : string) : string
+    Maps every uppercase letter in the string -s- to its lowercase
+    equivalent. Other characters are left unchanged.
+
+    Example:
+
+        lowercase "--- Title ---";
+        "--- title ---" : string
+
+
+val uppercase (s : string) : string
+    Maps every lowercase letter in the string -s- to its uppercase
+    equivalent.  Other characters are left unchanged.
+
+    Example:
+
+        uppercase "--- Title ---";
+        "--- TITLE ---" : string
+
+
+val control (s : string) : string
+    Maps every character in the range "\064" - "\095" in the string -s-
+    into the corresponding control character "\000" - "\031" (thus "@"
+    becomes "\^@", "A" becomes "\^A" etc). Other characters are left
+    unchanged.
+
+    Example:
+
+        control "C";
+        "\^C" : string
+
+
+val detab (s : string) : string
+    Replaces every tab character ("\t") in the string -s- with a space
+    character (" "). Other characters are left unchanged. NB: this does
+    not expand tabs, but replaces them one for one.
+
+
+val mapstring (f : string -> string) (s : string) : string
+    Transforms each character of the string -s- according to the
+    function -f-. The result returned by -f- may be of any size.
+    -mapstring- could be defined as:
+
+        fun mapstring f = implode o map f o explode;
+
+    Example (removing spaces from a string):
+
+        mapstring (fn s => if isspace s then "" else s) "--- Title ---";
+        "---Title---" : string
+
+
+-- Miscellaneous Functions --------------------------------------------
+
+exception Stringof
+val stringof (n : int) (c : string) : string
+    Returns a string of length -n- where each character in the string is
+    equal to the first character of the string -c-. Raises the exception
+    -Stringof- if -n- is less than zero or -c- is the empty string.
+
+    Example:
+
+        stringof 10 "_";
+        "__________" : string
+
+
+exception Stringint
+val stringint (s : string) : int
+    Converts the string of digits -s- to an integer. Raises the
+    exception -Stringint- if any character in -s- is not a digit.
+
+    Example:
+
+        stringint "154";
+        154 : int
+
+
+--- C.all/pml/help/string
+--- Copyright University of Sussex 1991. All rights reserved. ----------

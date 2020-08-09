@@ -1,0 +1,210 @@
+HELP HISTORY                                     John Williams, Jan 1988
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+  2   *history-max*
+  3   Special History Commands
+  4   Referring to History Events
+  5   Examining the History
+  6   Editing and Re-Doing Commands
+  7   Command Expansion
+  8   Extending the HISTORY Module
+
+
+-----------------------------------------------------------------------
+1  Introduction
+-----------------------------------------------------------------------
+
+This file documents the HISTORY module, which provides a simple history
+facility for recording commands entered to the Lisp top-level loop. It
+is loosely based on the Unix C-shell history mechanism.
+
+To load the HISTORY module, do
+
+    (require :history)
+
+This modifies the Lisp top-level loop so that for each form evaluated, a
+history event is created. This event comprises the form itself (termed
+the command), and a list of the values it produced (termed the results).
+Events are labelled by a unique numeric integer value (its index).
+
+Note: The functions and variables defined by the HISTORY module are
+      all external symbols of the Poplog package.
+
+
+-----------------------------------------------------------------------
+2  *history-max*
+-----------------------------------------------------------------------
+
+The maximum number of events stored at any one time is controlled by the
+variable *history-max*. Its initial value is 20. There is no limit if
+the value is nil. Setting *history-max* to 0 disables the history
+
+
+-----------------------------------------------------------------------
+3  Special History Commands
+-----------------------------------------------------------------------
+
+The HISTORY module defines four special top-level commands:
+
+    :history        Displays a backtrace of recorded history events
+    :show index     Displays event referenced by index
+    :fix  index     Allows editing of event referenced by index
+    :redo index     Re-evaluates command referenced by index
+
+If index is omitted, the most recent event is processed.
+
+
+-----------------------------------------------------------------------
+4  Referring to History Events
+-----------------------------------------------------------------------
+
+Events may be referenced in four different ways:
+
+ 1. An integer, n, > 0
+    Refers to the event numbered n.
+
+ 2. An integer, n, < 0
+    Refers to the n'th most recent event, i.e. -1 means the last event.
+
+ 3. A string, s
+    Searches back to the most recent event whose leftmost symbol starts
+    with s. (case-sensitive).
+
+ 4. Any other object, x
+    Searches back to the most recent event whose leftmost atom is eq to
+    x.
+
+
+-----------------------------------------------------------------------
+5  Examining the History
+-----------------------------------------------------------------------
+
+To illustrate, consider the following three events:
+
+        == (set '*print-array* nil)
+        NIL
+        == (setq vec #(a b c))
+        #<ARRAY T (3)>
+        == (elt vec 0)
+        A
+
+Now examine the history:
+
+        == :history
+        1: (SET '*PRINT-ARRAY* ())
+        2: (SETQ VEC #<ARRAY T (3)>)
+        3: (ELT VEC 0)
+
+Examine the first event. There are three ways this could be done:
+
+    :show 1
+    :show -3
+    :show set
+
+However,
+
+    :show "SET"
+
+would refer to command 2, not command 1.
+
+This is what :show actually looks like:
+
+    == :show 1
+    1: (SET '*PRINT-ARRAY* ())
+    => NIL
+
+The first line of output is the command, the second (starting with =>)
+is its results.
+
+Forms are added to the history before they are evaluated, so that
+commands are accessible during break points should they cause an error.
+
+
+-----------------------------------------------------------------------
+6  Editing and Re-Doing Commands
+-----------------------------------------------------------------------
+
+To re-evaluate a given history command, use :redo. For example:
+
+    == :redo set
+    1: (SET '*PRINT-ARRAY* ())
+    NIL
+
+Notice that the specified command is displayed prior to execution.
+
+The command :fix may be used to edit commands before re-doing them:
+
+    == :fix set
+    "(SET '*PRINT-ARRAY* ())"
+    Old: ()
+    New: T
+    "(SET '*PRINT-ARRAY* T)"
+    Eval? (y/n) y
+    T
+    == vec
+    #(A B C)
+
+Commands are treated as text strings (i.e. they are converted to strings
+via the function prin1-to-string). The user is prompted for a sub-string
+to be replaced (Old:), and string to replace it with (New:). The strings
+are read using the function read-line; typing <EOF> will result in the
+:fix being abandoned. After substitution, the user is given the option
+of re-evaluating the edited command. If this is not taken, the user has
+the option of replacing another sub-string of the command, or abandoning
+the :fix operation.
+
+
+-----------------------------------------------------------------------
+7  Command Expansion
+-----------------------------------------------------------------------
+
+The macro character ! may be used to substitute history commands into
+expressions read by the Lisp reader. For example:
+
+    == (defun fac (x) (if (zerop x) 1 (* (fac (1- x)) x)))
+    FAC
+    == (fac 50)
+    30414093201713378043612608166064768844377641568960512000000000000
+    == (integer-length !fac)
+    215
+    == :history
+    1: (DEFUN FAC (X) (IF (ZEROP X) 1 (* (FAC (1- X)) X)))
+    2: (FAC 50)
+    3: (INTEGER-LENGTH (FAC 50))
+
+Note: this facility is not available if the character ! has already been
+defined as a read macro.
+
+
+-----------------------------------------------------------------------
+8  Extending the HISTORY Module
+-----------------------------------------------------------------------
+
+Programmers wishing to create their own history-based tools may find the
+following function useful.
+
+
+(history-data index)                                          [function]
+        Returns three values associated with the history event specified
+        by index: the command,  a list of its  results, and its  numeric
+        index. If index does not label any particular event, each  value
+        returned is nil.
+
+        history-data is used in the HISTORY module to implement the !
+        reader macro:
+
+            (set-macro-character
+                #\!
+                #'(lambda (stream char)
+                    (values (history-data (read stream t t t))))))
+
+
+Note that history-data is an external symbol of the Poplog package.
+
+
+
+--- C.all/lisp/help/history
+--- Copyright University of Sussex 1988. All rights reserved.

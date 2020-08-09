@@ -1,0 +1,1678 @@
+REF CLOS                                         John Williams, May 1995
+
+        COPYRIGHT University of Sussex 1995. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<    THE COMMON LISP OBJECT   >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<            SYSTEM           >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+
+This  file  briefly  describes  the  functions,  macros  and   variables
+documented in Chapter 29  of the standard Common  Lisp guide, which  is:
+Common Lisp: The Language,  2nd Edition (Guy  L. Steele, Digital  Press,
+1990).
+
+Please note that the text below is directly adapted from the said work
+(which Digital Press have kindly placed in the public domain).
+
+
+---------------------------------------------
+1  Listing of Variables, Functions and Macros
+---------------------------------------------
+
+(add-method generic-function method)                  [generic function]
+(add-method (generic-function standard-generic-function)        [method]
+            (method method))
+
+        The generic  function  add-method adds  a  method to  a  generic
+        function. It  destructively modifies  the generic  function  and
+        returns the modified generic function as its result.
+
+        The lambda-list of  the method function  must be congruent  with
+        the  lambda-list  of  the  generic  function,  or  an  error  is
+        signaled.
+
+        If the  given  method agrees  with  an existing  method  of  the
+        generic-function on parameter  specializers and qualifiers,  the
+        existing method is replaced.
+
+        If the  method object  is  a method  object of  another  generic
+        function, an error is signaled.
+
+
+(call-method method next-method-list)                            [macro]
+
+        The macro call-method is used in method combination. This  macro
+        hides the implementation-dependent  details of  how methods  are
+        called. It can be used only within an effective method form, for
+        the name call-method is defined only within the lexical scope of
+        such a form.
+
+        The macro call-method invokes the specified method, supplying it
+        with arguments and with definitions for call-next-method and for
+        next-method-p.  The  arguments  are  the  arguments  that   were
+        supplied to the effective method form containing the  invocation
+        of  call-method.   The  definitions   of  call-next-method   and
+        next-method-p rely on the  list of method  objects given as  the
+        second argument to call-method.
+
+        The call-next-method function  available to the  method that  is
+        the first subform will call the first method in the list that is
+        the second subform. The  call-next-method function available  in
+        that method, in turn,  will call the second  method in the  list
+        that is the second  subform, and so on,  until the list of  next
+        methods is exhausted.
+
+        The method  argument is  a method  object; the  next-method-list
+        argument is a list of method objects.
+
+        A list whose first element  is the symbol make-method and  whose
+        second element is a  Lisp form can be  used instead of a  method
+        object as the first subform of  call-method or as an element  of
+        the second  subform  of  call-method. Such  a  list  specifies a
+        method object whose method function has a body that is the given
+        form.
+
+        The result of call-method is the value or values returned by the
+        method invocation.
+
+
+(call-next-method &rest args)                                 [function]
+
+        The function call-next-method can be  used within the body  of a
+        method defined  by  a  method-defining form  to  call  the  next
+        method.
+
+        The  function  call-next-method  returns  the  value  or  values
+        returned by the method it calls. If there is no next method, the
+        generic function no-next-method is called.
+
+        The type of method combination used determines which methods can
+        invoke call-next-method.  The standard  method combination  type
+        allows call-next-method to  be used within  primary methods  and
+        :around methods.
+
+        The standard  method combination  type defines  the next  method
+        according to the following rules:
+
+        # If call-next-method  is used  in an :around  method, the  next
+        method is  the next  most  specific :around  method, if  one  is
+        applicable.
+
+        # If there are no :around methods at all or if  call-next-method
+        is called by  the least specific  :around method, other  methods
+        are called as follows:
+
+        # All  the :before  methods are  called, in  most-specific-first
+        order. The function call-next-method  cannot be used in  :before
+        methods.
+
+        # The most specific primary method is called. Inside the body of
+        a primary method, call-next-method may  be used to pass  control
+        to the next most specific  primary method. The generic  function
+        no-next-method is called if  call-next-method is used and  there
+        are no more primary methods.
+
+        # All the :after methods are called in most-specific-last order.
+        The function call-next-method cannot be used in :after methods.
+
+        When call-next-method is called with no arguments, it passes the
+        current method's original arguments to the next method.  Neither
+        argument defaulting,  nor using  setq, nor  rebinding  variables
+        with the  same names  as parameters  of the  method affects  the
+        values call-next-method passes to the method it calls.
+
+        When call-next-method is called with arguments, the next  method
+        is called  with those  arguments.  When providing  arguments  to
+        call-next-method, the  following rule  must be  satisfied or  an
+        error is signaled: The ordered  set of methods applicable  for a
+        changed set of arguments for  call-next-method must be the  same
+        as the  ordered  set  of applicable  methods  for  the  original
+        arguments to the  generic function.
+
+        The  function  call-next-method  returns  the  value  or  values
+        returned by the method it calls.
+
+        The definition  of  the function  call-next-method  has  lexical
+        scope (for  it is  defined  only within  the  body of  a  method
+        defined by a method-defining form) and indefinite extent.
+
+        For generic functions using a type of method combination defined
+        by the short form of define-method-combination, call-next-method
+        can be used in :around methods only.
+
+        The function next-method-p can  be used to  test whether or  not
+        there is a next method.
+
+        If call-next-method is used in  methods that do not support  it,
+        an error is signaled.
+
+
+(change-class instance new-class)                     [generic function]
+(change-class (instance standard-object)                        [method]
+              (new-class standard-class))
+(change-class (instance t)                                      [method]
+              (new-class symbol))
+
+        The generic  function  change-class  changes  the  class  of  an
+        instance to a new class.  It destructively modifies and  returns
+        the instance.
+
+        If in the  old class there  is any  slot of the  same name  as a
+        local slot in the new class, the value of that slot is retained.
+        This means that if the slot  has a value, the value returned  by
+        slot-value after change-class  is invoked  is eql  to the  value
+        returned  by   slot-value   before  change-class   is   invoked.
+        Similarly, if  the slot  was unbound,  it remains  unbound.  The
+        other slots are initialized as described in Steele 1990  section
+        28.1.11.
+
+        The instance argument is a Lisp object.
+
+        The new-class argument is a class object or a symbol that  names
+        a class.
+
+        If the second of the preceding methods is selected, that  method
+        invokes change-class on instance and (find-class new-class).
+
+        After completing  all other  actions, change-class  invokes  the
+        generic   function   update-instance-for-different-class.    The
+        generic function update-instance-for-different-class can be used
+        to assign values to slots in the transformed instance.
+
+
+(class-name class)                                    [generic function]
+(class-name (class class))                                      [method]
+
+        The generic function class-name takes a class object and returns
+        its name. The name of an anonymous class is nil.
+
+        The generic function (setf class-name) takes a class object  and
+        sets its  name.
+
+
+(class-of object)                                             [function]
+
+        The function  class-of  returns the  class  of which  the  given
+        object is  an instance.
+
+
+(compute-applicable-methods generic-function arguments)       [function]
+
+        Given a generic function  and a set  of arguments, the  function
+        compute-applicable-methods returns the set  of methods that  are
+        applicable for those arguments. The methods are sorted according
+        to precedence order.
+
+
+(defclass class-name                                             [macro]
+    ({superclass-name}*)
+    ({slot-specifier}*)
+    [[?class-option]])
+
+    class-name ::= symbol
+    superclass-name ::= symbol
+    slot-specifier ::= slot-name | (slot-name [[?slot-option]])
+    slot-name ::= symbol
+    slot-option ::= {:reader reader-function-name}*
+                    | {:writer writer-function-name}*
+                    | {:accessor reader-function-name}*
+                    | {:allocation allocation-type}*
+                    | {:initarg initarg-name}*
+                    | {:initform form}*
+                    | {:type type-specifier}*
+                    | {:documentation string}*
+
+    reader-function-name ::= symbol
+    writer-function-name ::= function-name
+    function-name ::= {symbol | (setf symbol)}
+    initarg-name ::= symbol
+    allocation-type ::= :instance | :class
+    class-option ::= (:default-initargs initarg-list)
+                    | (:documentation string)
+                    | (:metaclass class-name)
+    initarg-list ::= {initarg-name default-initial-value-form}*
+
+        The macro defclass defines a new named class. It returns the new
+        class object as its result.
+
+        The class-name  argument is  a non-nil  symbol. It  becomes  the
+        proper name of the  new class. If a  class with the same  proper
+        name  already  exists   and  that  class   is  an  instance   of
+        standard-class, and if the defclass  form for the definition  of
+        the new class  specifies a  class of  class standard-class,  the
+        definition of the existing class is replaced.
+
+        Each superclass-name argument is a non-nil symbol that specifies
+        a direct superclass of the new class. The new class will inherit
+        slots and methods  from each  of its  direct superclasses,  from
+        their direct superclasses, and so  on.
+
+        Each slot-specifier argument is the name  of the slot or a  list
+        consisting of  the  slot name  followed  by zero  or  more  slot
+        options.  The   slot-name  argument   is   a  symbol   that   is
+        syntactically valid for use as a variable name. If there are any
+        duplicate slot names, an error is signaled.
+
+        The following slot options are available:
+
+        # The :reader slot option  specifies that an unqualified  method
+        is   to   be   defined    on   the   generic   function    named
+        reader-function-name to read  the value of  the given slot.  The
+        reader-function-name argument is a  non-nil symbol. The  :reader
+        slot option may be specified more than once for a given slot.
+
+        # The :writer slot option  specifies that an unqualified  method
+        is   to   be   defined    on   the   generic   function    named
+        writer-function-name  to  write  the  value  of  the  slot.  The
+        writer-function-name argument  is a  function-name. The  :writer
+        slot option may be specified more than once for a given slot.
+
+        # The :accessor slot option specifies that an unqualified method
+        is   to   be   defined    on   the   generic   function    named
+        reader-function-name to read  the value  of the  given slot  and
+        that an  unqualified method  is  to be  defined on  the  generic
+        function named (setf reader-function-name) to be used with  setf
+        to modify  the  value  of  the  slot.  The  reader-function-name
+        argument is a non-nil symbol.  The :accessor slot option may  be
+        specified more than once for a given slot.
+
+        # The :allocation slot option  is used to specify where  storage
+        is to be allocated for the given slot. Storage for a slot may be
+        located in  each instance  or in  the class  object itself,  for
+        example. The value of the allocation-type argument can be either
+        the keyword  :instance or  the keyword  :class. The  :allocation
+        slot option may be specified at  most once for a given slot.  If
+        the :allocation slot option is not specified, the effect is  the
+        same as specifying :allocation :instance.
+
+        # If allocation-type  is :instance,  a local slot  of the  given
+        name is allocated in each instance of the class.
+
+        # If allocation-type is :class, a shared slot of the given  name
+        is allocated. The value of the  slot is shared by all  instances
+        of the  class. If  a class  C defines  such a  shared slot,  any
+        subclass C of C will share this single slot unless the  defclass
+        form for  C specifies  a slot  of the  same name  or there  is a
+        superclass of C that precedes C in the class precedence list  of
+        C and that defines a slot of the same name.
+
+        # The :initform slot option is used to provide a default initial
+        value form to  be used in  the initialization of  the slot.  The
+        :initform slot option may be specified at most once for a  given
+        slot. This form is evaluated every time it is used to initialize
+        the  slot.  The  lexical  environment  in  which  this  form  is
+        evaluated is the lexical environment in which the defclass  form
+        was evaluated. Note that the lexical environment refers both  to
+        variables  and  to  functions.  For  local  slots,  the  dynamic
+        environment is the  dynamic environment  in which  make-instance
+        was called; for  shared slots,  the dynamic  environment is  the
+        dynamic environment in  which the defclass  form was  evaluated.
+
+        # The :initarg slot  option declares an initialization  argument
+        named  initarg-name  and  specifies  that  this   initialization
+        argument initializes  the  given  slot.  If  the  initialization
+        argument has a  value in  the call  to initialize-instance,  the
+        value will  be  stored  into  the given  slot,  and  the  slot's
+        :initform slot option, if any, is not evaluated. If none of  the
+        initialization arguments specified for a given slot has a value,
+        the slot is initialized according to the :initform slot  option,
+        if specified. The  :initarg slot  option can  be specified  more
+        than once for a given slot. The initarg-name argument can be any
+        symbol.
+
+        # The :type slot option specifies that the contents of the  slot
+        will always  be  of  the specified  data  type.  It  effectively
+        declares the result  type of  the reader  generic function  when
+        applied to an object of this class. The result of attempting  to
+        store in a slot a  value that does not  satisfy the type of  the
+        slot is undefined.  The :type  slot option may  be specified  at
+        most once for  a given slot.
+
+        # The :documentation slot option provides a documentation string
+        for the slot.
+
+        Each class option  is an option  that refers to  the class  as a
+        whole or to  all class  slots. The following  class options  are
+        available:
+
+        # The :default-initargs class  option is followed  by a list  of
+        alternating initialization  argument names  and default  initial
+        value forms. If any of  these initialization arguments does  not
+        appear  in  the   initialization  argument   list  supplied   to
+        make-instance, the corresponding default  initial value form  is
+        evaluated, and the initialization  argument name and the  form's
+        value are added to the  end of the initialization argument  list
+        before the instance is created.  The default initial value  form
+        is evaluated each time  it is used.  The lexical environment  in
+        which this form is evaluated is the lexical environment in which
+        the defclass form was evaluated. The dynamic environment is  the
+        dynamic environment  in which  make-instance was  called. If  an
+        initialization  argument  name  appears  more  than  once   in a
+        :default-initargs  class  option,  an  error  is  signaled.  The
+        :default-initargs class option may be specified at most once.
+
+        # The :documentation class option causes a documentation  string
+        to be attached  to the  class name. The  documentation type  for
+        this string is type.  The form (documentation class-name  'type)
+        may  be  used   to  retrieve  the   documentation  string.   The
+        :documentation class option may be specified at most once.
+
+        # The :metaclass class option is used to specify that  instances
+        of the class  being defined  are to have  a different  metaclass
+        than  the   default   provided   by  the   system   (the   class
+        standard-class). The  class-name argument  is  the name  of  the
+        desired metaclass. The :metaclass class option may be  specified
+        at most once.
+
+        If a class  with the same  proper name already  exists and  that
+        class is an instance of standard-class, and if the defclass form
+        for the definition of the new  class specifies a class of  class
+        standard-class, the existing class  is redefined, and  instances
+        of it (and its subclasses) are updated to the new definition  at
+        the time that they are next accessed.
+
+        Note the following rules of defclass for standard classes:
+
+        # It is not required that the superclasses of a class be defined
+        before the defclass form for that class is evaluated.
+
+        # All the  superclasses of  a class  must be  defined before  an
+        instance of the class can be made.
+
+        # A class must be defined before  it can be used as a  parameter
+        specializer in a defmethod form.
+
+        Some  slot  options   are  inherited   by  a   class  from   its
+        superclasses, and some can be shadowed or altered by providing a
+        local   slot    description.    No    class    options    except
+        :default-initargs are inherited.
+
+        It is valid to specify  more than one reader, writer,  accessor,
+        or initialization argument for a slot. No other slot option  may
+        appear more than once in a single slot description, or an  error
+        is signaled.
+
+        If no reader, writer, or accessor  is specified for a slot,  the
+        slot can be accessed only by the function slot-value.
+
+
+(defgeneric function-name lambda-list                            [macro]
+            [[?option | {method-description}*]])
+
+    function-name ::= {symbol | (setf symbol)}
+    lambda-list ::= ({var}*
+                    [&optional {var | (var)}*]
+                    [&rest var]
+                    [&key {keyword-parameter}* [&allow-other-keys]])
+    keyword-parameter ::= var | ({var | (keyword var)})
+    option ::= (:argument-precedence-order {parameter-name}+)
+                    | (declare {declaration}+)
+                    | (:documentation string)
+                    | (:method-combination symbol {arg}*)
+                    | (:generic-function-class class-name)
+                    | (:method-class class-name)
+    method-description ::= (:method {method-qualifier}*
+                            specialized-lambda-list
+                    [[ {declaration}* | documentation ]]
+                    {form}*)
+    method-qualifier ::= non-nil-atom
+    specialized-lambda-list ::=
+         ({var | (var parameter-specializer-name)}*
+          [&optional {var | (var [initform [supplied-p-parameter]])}*]
+          [&rest var]
+          [&key {specialized-keyword-parameter}* [&allow-other-keys]]
+          [&aux {var | (var [initform])}*])
+    specialized-keyword-parameter ::=
+       var | ({var | (keyword var)} [initform [supplied-p-parameter]])
+    parameter-specializer-name ::= symbol | (eql eql-specializer-form)
+
+        The macro defgeneric is used to define a generic function or  to
+        specify options  and  declarations  that pertain  to  a  generic
+        function as a whole.
+
+        If (fboundp function-name)  is nil,  a new  generic function  is
+        created.  If  (fdefinition  function-specifier)  is  a   generic
+        function, that generic function  is modified.  If  function-name
+        names a non-generic  function, a  macro, or a  special form,  an
+        error is signaled.
+
+
+        Each  method-description  defines  a   method  on  the   generic
+        function. The lambda-list of each method must be congruent  with
+        the lambda-list  specified by  the lambda-list  option. If  this
+        condition does  not  hold, an  error  is signaled.  See  section
+        28.1.6.4 for a definition of congruence in this context.
+
+        The macro defgeneric returns the generic function object as  its
+        result.
+
+        The function-name argument is a non-nil symbol or a list of  the
+        form (setf symbol).
+
+        The lambda-list  argument is  an ordinary  function  lambda-list
+        with the following exceptions:
+
+        # The use of &aux is not allowed.
+
+        # Optional and  keyword arguments may  not have default  initial
+        value forms nor use supplied-p parameters. The generic  function
+        passes to the method all the  argument values passed to it,  and
+        only those; default values are not supported. Note that optional
+        and keyword arguments in  method definitions, however, can  have
+        default initial value forms and can use supplied-p parameters.
+
+        The following options  are provided.  A given  option may  occur
+        only once, or an error is signaled.
+
+        # The :argument-precedence-order option  is used to specify  the
+        order in which the required arguments  in a call to the  generic
+        function are tested for specificity when selecting a  particular
+        method. Each required argument, as specified in the  lambda-list
+        argument, must be included exactly  once as a parameter-name  so
+        that the full and unambiguous  precedence order is supplied.  If
+        this condition is not met, an error is signaled.
+
+        # The  declare  option  is used  to  specify  declarations  that
+        pertain to the generic  function. The following standard  Common
+        Lisp declaration is allowed:
+
+        # An  optimize declaration  specifies whether  method  selection
+        should be optimized for speed or space, but it has no effect  on
+        methods. To  control  how a  method  is optimized,  an  optimize
+        declaration must be  placed directly  in the  defmethod form  or
+        method description. The optimization  qualities speed and  space
+        are  the  only   qualities  this  standard   requires,  but   an
+        implementation can  extend  the  Common Lisp  Object  System  to
+        recognize other qualities. A simple implementation that has only
+        one  method  selection  technique   and  ignores  the   optimize
+        declaration is valid.
+
+        The special, ftype, function, inline, notinline, and declaration
+        declarations are not  permitted. Individual implementations  can
+        extend the declare option to support additional declarations. If
+        an implementation notices a declaration that it does not support
+        and that has not been  proclaimed as a non-standard  declaration
+        name in a declaration proclamation, it should issue a warning.
+
+        # The :documentation argument associates a documentation  string
+        with the  generic  function.
+
+        # The :generic-function-class option may be used to specify that
+        the generic  function is  to  have a  different class  than  the
+        default    provided     by     the     system     (the     class
+        standard-generic-function). The class-name argument is the  name
+        of a  class that  can be  the class  of a  generic function.  If
+        function-name specifies an existing generic function that  has a
+        different value for the :generic-function-class argument and the
+        new  generic  function  class   is  compatible  with  the   old,
+        change-class is  called  to  change the  class  of  the  generic
+        function; otherwise an error is signaled.
+
+        # The :method-class option is  used to specify that all  methods
+        on this generic function are to have a different class from  the
+        default provided by the system (the class standard-method).  The
+        class-name argument is the  name of a class  that is capable  of
+        being the class of a method.
+
+        # The :method-combination  option is followed  by a symbol  that
+        names a type of method combination. The arguments (if any)  that
+        follow that symbol  depend on  the type  of method  combination.
+        Note that the standard method combination type does not  support
+        any arguments. However, all types of method combination  defined
+        by  the  short  form  of  define-method-combination  accept   an
+        optional     argument     named     order,     defaulting     to
+        :most-specific-first,  where  a  value  of   :most-specific-last
+        reverses the order of the primary methods without affecting  the
+        order of the auxiliary methods.
+
+        The method-description  arguments define  methods that  will  be
+        associated with the generic  function. The method-qualifier  and
+        specialized-lambda-list arguments  in a  method description  are
+        the same as for defmethod.
+
+        The form  arguments specify  the method  body. The  body of  the
+        method is enclosed in an  implicit block. If function-name  is a
+        symbol, this block bears the same name as the generic  function.
+        If function-name is a list of  the form (setf symbol), the  name
+        of the block is symbol.
+
+        The effect of the defgeneric macro is as if the following  three
+        steps  were  performed:  first,  methods  defined  by   previous
+        defgeneric forms are removed; second, ensure-generic-function is
+        called; and finally, methods specified by the current defgeneric
+        form are added to the generic function.
+
+        If no method descriptions are  specified and a generic  function
+        of the same name does not already exist, a generic function with
+        no methods is created.
+
+        The lambda-list argument  of defgeneric specifies  the shape  of
+        lambda-lists for  the  methods  on this  generic  function.  All
+        methods on the resulting generic function must have lambda-lists
+        that are  congruent with  this shape.  If a  defgeneric form  is
+        evaluated and  some  methods  for  that  generic  function  have
+        lambda-lists that  are  not congruent  with  that given  in  the
+        defgeneric form, an  error is signaled.
+
+
+(define-method-combination name [[?short-form-option]])          [macro]
+(define-method-combination name lambda-list                      [macro]
+                          ({method-group-specifier}*)
+                          [(:arguments . lambda-list)]
+                          [(:generic-function generic-fn-symbol)]
+                          [[{declaration}* | doc-string]]
+                          {form}*)
+
+    short-form-option ::= :documentation string
+                        | :identity-with-one-argument boolean
+                        | :operator operator
+    method-group-specifier
+        ::= (variable {{qualifier-pattern}+ | predicate}
+             [[?long-form-option]])
+    long-form-option ::= :description format-string
+                       | :order order
+                       | :required boolean
+
+        The macro define-method-combination is used to define new  types
+        of method combination.
+
+        There are two forms of define-method-combination. The short form
+        is a simple facility for the cases that are expected to be  most
+        commonly needed.  The  long  form  is  more  powerful  but  more
+        verbose.  It  resembles  defmacro  in   that  the  body  is   an
+        expression, usually using backquote, that computes a Lisp  form.
+        Thus arbitrary control structures  can be implemented. The  long
+        form also allows arbitrary processing of method qualifiers.
+
+        In both  the  short  and  long  forms,  name  is  a  symbol.  By
+        convention, non-keyword, non-nil symbols are usually used.
+
+        The short-form syntax of define-method-combination is recognized
+        when the second subform is a  non-nil symbol or is not  present.
+        When the short form is used, name is defined as a type of method
+        combination that  produces a  Lisp form  ( operator  method-call
+        method-call ... ). The operator is a symbol that can be the name
+        of a  function, macro,  or  special form.  The operator  can  be
+        specified by a keyword option; it defaults to name.
+
+        Keyword options for the short form are the following:
+
+        #  The   :documentation  option   is   used  to   document   the
+        method-combination type.
+
+        # The :identity-with-one-argument option enables an optimization
+        when boolean is true (the default is false). If there is exactly
+        one applicable method and  it is a  primary method, that  method
+        serves as the effective method and operator is not called.  This
+        optimization avoids the  need to create  a new effective  method
+        and avoids  the overhead  of  a function  call. This  option  is
+        designed to be used  with operators such as  progn, and, +,  and
+        max.
+
+        # The :operator option specifies  the name of the operator.  The
+        operator argument  is  a  symbol  that  can  be  the  name  of a
+        function, macro,  or  special  form.  By  convention,  name  and
+        operator are often the same symbol. This is the default, but  it
+        is not required.
+
+        None of the subforms is evaluated.
+
+        These types of method combination require exactly one  qualifier
+        per method. An error is signaled if there are applicable methods
+        with no qualifiers or with qualifiers that are not supported  by
+        the method combination type.
+
+        A method combination  procedure defined in  this way  recognizes
+        two roles  for methods.  A  method whose  one qualifier  is  the
+        symbol naming this type of method combination is defined to be a
+        primary method. At least one  primary method must be  applicable
+        or an  error is  signaled.  A method  with  :around as  its  one
+        qualifier is an  auxiliary method  that behaves the  same as  an
+        :around method  in  standard method  combination.  The  function
+        call-next-method can be used only in :around methods; it  cannot
+        be used in  primary methods  defined by  the short  form of  the
+        define-method-combination macro.
+
+        A method combination  procedure defined in  this way accepts  an
+        optional   argument    named    order,   which    defaults    to
+        :most-specific-first. A  value of  :most-specific-last  reverses
+        the order of the primary methods without affecting the order  of
+        the auxiliary methods.
+
+        The short form automatically includes error checking and support
+        for :around methods.
+
+        The long-form syntax of define-method-combination is  recognized
+        when the second subform is a list.
+
+        The lambda-list argument is an ordinary lambda-list. It receives
+        any arguments provided after the name of the method  combination
+        type in the :method-combination option to defgeneric.
+
+        A list  of  method  group  specifiers  follows.  Each  specifier
+        selects a subset of the applicable methods to play a  particular
+        role, either by matching their qualifiers against some  patterns
+        or by testing  their qualifiers with  a predicate. These  method
+        group specifiers define all method  qualifiers that can be  used
+        with this type  of method combination.  If an applicable  method
+        does not  fall into  any method  group, the  system signals  the
+        error that  the  method  is  invalid  for  the  kind  of  method
+        combination in use.
+
+        Each  method  group  specifier  names  a  variable.  During  the
+        execution of the forms in the body of define-method-combination,
+        this variable is bound  to a list of  the methods in the  method
+        group. The  methods in  this list  occur in  most-specific-first
+        order.
+
+        A qualifier pattern is a list or the symbol *. A method  matches
+        a qualifier pattern if the method's list of qualifiers is  equal
+        to  the  qualifier  pattern  (except  that  the  symbol  *  in a
+        qualifier pattern matches  anything). Thus  a qualifier  pattern
+        can be one of  the following: the empty  list (), which  matches
+        unqualified methods; the symbol *, which matches all  methods; a
+        true list,  which  matches  methods  with  the  same  number  of
+        qualifiers as the length of the list when each qualifier matches
+        the corresponding list element;  or a dotted  list that ends  in
+        the  symbol  *   (the  *  matches   any  number  of   additional
+        qualifiers).
+
+        Each applicable method is tested against the qualifier  patterns
+        and predicates in  left-to-right order. As  soon as a  qualifier
+        pattern matches or a predicate returns true, the method  becomes
+        a member of the corresponding method group and no further  tests
+        are made. Thus if a  method could be a  member of more than  one
+        method group, it joins  only the first such  group. If a  method
+        group has more than  one qualifier pattern,  a method need  only
+        satisfy one of  the qualifier  patterns to  be a  member of  the
+        group.
+
+        The name of a predicate function can appear instead of qualifier
+        patterns in a  method group specifier.  The predicate is  called
+        for each method that has not been assigned to an earlier  method
+        group; it is  called with one  argument, the method's  qualifier
+        list. The predicate should return true if the method is to  be a
+        member of the  method group.  A predicate  can be  distinguished
+        from a qualifier pattern because it  is a symbol other than  nil
+        or *.
+
+        If there is an applicable method whose qualifiers are not  valid
+        for    the    method    combination    type,    the     function
+        invalid-method-error is called.
+
+        Method group specifiers can  have keyword options following  the
+        qualifier  patterns  or  predicate.   Keyword  options  can   be
+        distinguished from  additional qualifier  patterns because  they
+        are neither lists nor the symbol *. The keyword options are:
+
+        # The :description option  is used to  provide a description  of
+        the role of methods in the method group. Programming environment
+        tools use:
+
+            (apply #'format stream format-string
+                     (method-qualifiers method))
+
+        to print this description, which is expected to be concise. This
+        keyword option allows the description  of a method qualifier  to
+        be defined in the  same module that defines  the meaning of  the
+        method qualifier. In most cases, format-string will not  contain
+        any format directives, but they are available for generality. If
+        :description  is  not  specified,   a  default  description   is
+        generated based on the variable name and the qualifier  patterns
+        and on  whether  this  method  group  includes  the  unqualified
+        methods. The argument format-string is not evaluated.
+
+        # The :order option  specifies the order  of methods. The  order
+        argument is  a form  that evaluates  to :most-specific-first  or
+        :most-specific-last. If  it evaluates  to  any other  value,  an
+        error is signaled. This keyword option is a convenience and does
+        not add any  expressive power.  If :order is  not specified,  it
+        defaults to :most-specific-first.
+
+        # The :required option specifies whether at least one method  in
+        this method  group  is  required. If  the  boolean  argument  is
+        non-nil and the method  group is empty  (that is, no  applicable
+        methods match the qualifier patterns or satisfy the  predicate),
+        an error is signaled. This  keyword option is a convenience  and
+        does  not  add  any  expressive  power.  If  :required  is   not
+        specified, it  defaults  to nil.  The  boolean argument  is  not
+        evaluated.
+
+        The use of method group specifiers provides a convenient  syntax
+        to select methods, to divide them among the possible roles,  and
+        to perform  the  necessary error  checking.  It is  possible  to
+        perform further filtering of methods in the body forms by  using
+        normal   list-processing    operations   and    the    functions
+        method-qualifiers and invalid-method-error. It is permissible to
+        use setq on the variables  named in the method group  specifiers
+        and to bind additional variables. It is also possible to  bypass
+        the method group  specifier mechanism and  do everything in  the
+        body forms.  This is  accomplished by  writing a  single  method
+        group with * as its only qualifier pattern; the variable is then
+        bound  to  a  list  of   all  of  the  applicable  methods,   in
+        most-specific-first order.
+
+        The body forms compute and  return the Lisp form that  specifies
+        how the methods are combined, that is, the effective method. The
+        effective method uses the  macro call-method. The definition  of
+        this macro  has  lexical  scope  and is  available  only  in  an
+        effective method form. Given a method object in one of the lists
+        produced by  the method  group  specifiers and  a list  of  next
+        methods, the macro  call-method will invoke  the method so  that
+        call-next-method will have available the next methods.
+
+        When an  effective method  has no  effect other  than to  call a
+        single method, some implementations employ an optimization  that
+        uses the single  method directly as  the effective method,  thus
+        avoiding the  need  to  create  a  new  effective  method.  This
+        optimization is active when  the effective method form  consists
+        entirely of an invocation of  the call-method macro whose  first
+        subform is a method object and whose second subform is nil. Each
+        define-method-combination body is responsible for stripping  off
+        redundant invocations of  progn, and, multiple-value-prog1,  and
+        the like, if this optimization is desired.
+
+        The list  (:arguments  .  lambda-list)  can  appear  before  any
+        declaration or documentation  string. This form  is useful  when
+        the method combination type  performs some specific behavior  as
+        part of the combined  method and that  behavior needs access  to
+        the arguments to the  generic function. Each parameter  variable
+        defined by lambda-list is bound to  a form that can be  inserted
+        into the effective  method. When this  form is evaluated  during
+        execution  of   the  effective   method,   its  value   is   the
+        corresponding argument to the  generic function. If  lambda-list
+        is  not  congruent  to   the  generic  function's   lambda-list,
+        additional ignored parameters  are automatically inserted  until
+        it is  congruent.  Thus it  is  permissible for  lambda-list  to
+        receive  fewer  arguments  than  the  number  that  the  generic
+        function expects.
+
+        Erroneous conditions  detected by  the body  should be  reported
+        with  method-combination-error  or  invalid-method-error;  these
+        functions add any necessary contextual information to the  error
+        message and will signal the appropriate error.
+
+        The body forms are evaluated inside the bindings created by  the
+        lambda-list and  method group  specifiers. Declarations  at  the
+        head of the body are positioned directly inside bindings created
+        by the lambda-list and outside the bindings of the method  group
+        variables. Thus method group variables cannot be declared.
+
+        Within the body forms,  generic-function-symbol is bound to  the
+        generic function object.
+
+        If  a   doc-string  argument   is  present,   it  provides   the
+        documentation for the method combination type.
+
+        The functions method-combination-error and  invalid-method-error
+        can be called from  the body forms or  from functions called  by
+        the body forms. The actions of these two functions can depend on
+        implementation-dependent dynamic  variables automatically  bound
+        before the generic function compute-effective-method is called.
+
+        The value returned by the define-method-combination macro is the
+        new method combination object.
+
+
+(defmethod function-name {method-qualifier}*                     [macro]
+           specialized-lambda-list
+           [[ {declaration}* | doc-string]]
+           {form}*)
+
+    function-name ::= {symbol | (setf symbol)}
+    method-qualifier ::= non-nil-atom
+    parameter-specializer-name ::= symbol | (eql eql-specializer-form)
+
+        The macro defmethod defines a method on a generic function.
+
+        If (fboundp function-name) is nil, a generic function is created
+        with default  values for  the  argument precedence  order  (each
+        argument is more specific than the arguments to its right in the
+        argument list),  for  the  generic  function  class  (the  class
+        standard-generic-function), for  the  method  class  (the  class
+        standard-method), and  for  the  method  combination  type  (the
+        standard  method  combination  type).  The  lambda-list  of  the
+        generic function is congruent with the lambda-list of the method
+        being defined; if the defmethod form mentions keyword arguments,
+        the lambda-list of the generic  function will mention &key  (but
+        no keyword  arguments).  If function-name  names  a  non-generic
+        function, a macro, or a special form, an error is signaled.
+
+        If a generic function is currently named by function-name, where
+        function-name is a symbol or a  list of the form (setf  symbol),
+        the lambda-list  of  the  method  must  be  congruent  with  the
+        lambda-list of the generic function. If this condition does  not
+        hold,  an  error  is   signaled.
+
+        The function-name argument is a non-nil symbol or a list of  the
+        form (setf symbol). It names  the generic function on which  the
+        method is defined.
+
+        Each method-qualifier  argument is  an object  that is  used  by
+        method combination  to  identify  the  given  method.  A  method
+        qualifier is a  non-nil atom.  The method  combination type  may
+        further restrict what  a method qualifier  may be. The  standard
+        method  combination  type  allows  for  unqualified  methods  or
+        methods whose sole qualifier is the keyword :before, the keyword
+        :after, or the keyword :around.
+
+        A  specialized-lambda-list   is   like  an   ordinary   function
+        lambda-list except that the name of a required parameter can  be
+        replaced  by  a  specialized  parameter,  a  list  of  the  form
+        (variable-name   parameter-specializer-name).   Only    required
+        parameters may be specialized. A parameter specializer name is a
+        symbol that  names a  class or  (eql eql-specializer-form).  The
+        parameter specializer name (eql eql-specializer-form)  indicates
+        that the corresponding argument must  be eql to the object  that
+        is the  value  of  eql-specializer-form for  the  method  to  be
+        applicable. If no parameter specializer name is specified  for a
+        given required parameter, the parameter specializer defaults  to
+        the class named t.
+
+        The form  arguments specify  the method  body. The  body of  the
+        method is enclosed in an  implicit block. If function-name  is a
+        symbol, this block bears the same name as the generic  function.
+        If function-name is a list of  the form (setf symbol), the  name
+        of the block is symbol.
+
+        The result of defmethod is the method object.
+
+        The class of the method object that is created is that given  by
+        the method class  option of  the generic function  on which  the
+        method is defined.
+
+        If the generic function  already has a  method that agrees  with
+        the  method  being   defined  on   parameter  specializers   and
+        qualifiers, defmethod replaces the existing method with the  one
+        now being  defined.
+
+
+(documentation x &optional doc-type)                  [generic function]
+(documentation (method standard-method) &optional doc-type)     [method]
+(documentation (generic-function standard-generic-function)     [method]
+                &optional doc-type)
+(documentation (class standard-class) &optional doc-type)       [method]
+(documentation (method-combination method-combination)          [method]
+                &optional doc-type)
+(documentation (symbol symbol) &optional doc-type)              [method]
+(documentation (list list) &optional doc-type)                  [method]
+
+        The ordinary  function documentation  is replaced  by a  generic
+        function.  The  generic   function  documentation  returns   the
+        documentation string associated with the  given object if it  is
+        available; otherwise documentation returns nil.
+
+        The first argument of documentation is a symbol, a function-name
+        list of the form (setf symbol), a method object, a class object,
+        a generic  function object,  a method  combination object,  or a
+        slot description  object. Whether  a second  argument should  be
+        supplied depends on the type of the first argument.
+
+        # If the first  argument is a method  object, a class  object, a
+        generic function object, a method combination object, or a  slot
+        description object, the second argument must not be supplied, or
+        an error is signaled.
+
+        # If the first argument is a symbol or a list of the form  (setf
+        symbol), the second argument must be supplied.
+
+        # The forms
+
+            (documentation symbol 'function)
+
+        and
+
+            (documentation '(setf symbol) 'function)
+
+        return  the  documentation  string  of  the  function,   generic
+        function, special form, or macro named by the symbol or list.
+
+        #  The  form  (documentation   symbol  'variable)  returns   the
+        documentation string of the  special variable or constant  named
+        by the symbol.
+
+        #  The  form  (documentation  symbol  'structure)  returns   the
+        documentation string  of the  defstruct structure  named by  the
+        symbol.
+
+        #  The   form   (documentation   symbol   'type)   returns   the
+        documentation string of the class object named by the symbol, if
+        there is such a class. If there is no such class, it returns the
+        documentation string of the type specifier named by the symbol.
+
+        #  The   form   (documentation   symbol   'setf)   returns   the
+        documentation  string  of  the  defsetf  or   define-setf-method
+        definition associated with the symbol.
+
+        # The  form (documentation  symbol 'method-combination)  returns
+        the documentation string of the method combination type named by
+        the symbol.
+
+        The documentation  string associated  with the  given object  is
+        returned unless none is  available, in which case  documentation
+        returns nil.
+
+        The generic function (setf documentation) is used to update  the
+        documentation.
+
+
+(ensure-generic-function function-name                        [function]
+                         &key :lambda-list :argument-precedence-order
+                              :declare :documentation
+                              :generic-function-class
+                              :method-combination :method-class
+                              :environment)
+
+    function-name ::= {symbol | (setf symbol)}
+
+        The  function  ensure-generic-function   is  used  to   define a
+        globally named generic function with no methods or to specify or
+        modify options and declarations that pertain to a globally named
+        generic function as a whole.
+
+        If (fboundp function-name)  is nil,  a new  generic function  is
+        created.  If  (fdefinition   function-name)  is  a   non-generic
+        function, a macro, or a special form, an error is signaled.
+
+        If  function-name  specifies  a  generic  function  that   has a
+        different value for any of the following arguments, the  generic
+        function    is    modified    to    have    the    new    value:
+        :argument-precedence-order,   :declare,   :documentation,    and
+        :method-combination.
+
+        If  function-name  specifies  a  generic  function  that   has a
+        different value for the :lambda-list argument, and the new value
+        is congruent with  the lambda-lists of  all existing methods  or
+        there are no methods, the  value is changed; otherwise an  error
+        is signaled.
+
+        If  function-name  specifies  a  generic  function  that   has a
+        different value for the :generic-function-class argument and  if
+        the new  generic  function class  is  compatible with  the  old,
+        change-class is  called  to  change the  class  of  the  generic
+        function; otherwise an error is signaled.
+
+        If  function-name  specifies  a  generic  function  that   has a
+        different :method-class  value, the  value  is changed  but  any
+        existing methods are not changed.
+
+        The function-name argument  is a symbol  or a list  of the  form
+        (setf symbol).
+
+        The keyword  arguments correspond  to  the option  arguments  of
+        defgeneric,    except     that     the     :method-class     and
+        :generic-function-class arguments can be  class objects as  well
+        as names.
+
+        The :environment  argument  is  the  same  as  the  &environment
+        argument to macro expansion functions.  It is typically used  to
+        distinguish between compile-time and run-time environments.
+
+        The :method-combination argument is a method combination object.
+
+        The generic function object is returned.
+
+
+(find-class symbol &optional errorp environment)              [function]
+
+        The function find-class  returns the class  object named by  the
+        given symbol in the given environment.
+
+        If there  is  no such  class  and  the errorp  argument  is  not
+        supplied or is non-nil, find-class signals an error. If there is
+        no such class and the errorp argument is nil, find-class returns
+        nil. The default value of errorp is t.
+
+        The  optional   environment  argument   is  the   same  as   the
+        &environment  argument  to  macro  expansion  functions.  It  is
+        typically used to distinguish between compile-time and  run-time
+        environments.
+
+
+(find-method generic-function method-qualifiers       [generic function]
+             specializers &optional errorp)
+(find-method (generic-function standard-generic-function)       [method]
+              method-qualifiers
+              specializers
+              &optional errorp)
+
+        The generic function  find-method takes a  generic function  and
+        returns the method object that  agrees on method qualifiers  and
+        parameter   specializers   with   the   method-qualifiers    and
+        specializers arguments.
+
+        The  method-qualifiers  argument  is   a  list  of  the   method
+        qualifiers for the method. The order of the method qualifiers is
+        significant.
+
+        The  specializers   argument  is   a  list   of  the   parameter
+        specializers for the method. It must correspond in length to the
+        number of  required arguments  of the  generic function,  or  an
+        error is signaled. This means that to obtain the default  method
+        on a given generic function, a list whose elements are the class
+        named t must be given.
+
+        If there  is no  such  method and  the  errorp argument  is  not
+        supplied or is non-nil, find-method  signals an error. If  there
+        is no such method  and the errorp  argument is nil,  find-method
+        returns nil. The default value of errorp is t.
+
+        The result of find-method  is the method  object with the  given
+        method qualifiers and parameter specializers.
+
+
+(function-keywords method)                            [generic function]
+(function-keywords (method standard-method))                    [method]
+        The generic  function function-keywords  is used  to return  the
+        keyword parameter specifiers for a given method.
+
+        The generic  function  function-keywords returns  two  values: a
+        list of the explicitly named keywords and a boolean that  states
+        whether &allow-other-keys  had  been  specified  in  the  method
+        definition.
+
+
+(generic-function lambda-list                                    [macro]
+                  [[?option | {method-description}*]])
+
+    option ::= (:argument-precedence-order {parameter-name}+)
+             | (declare {declaration}+)
+             | (:documentation string)
+             | (:method-combination symbol {arg}*)
+             | (:generic-function-class class-name)
+             | (:method-class class-name)
+    method-description ::= (:method {method-qualifier}*
+                                    specialized-lambda-list
+                                    {declaration | documentation}*
+                                    {form}*)
+
+        The  generic-function   macro  creates   an  anonymous   generic
+        function. The  generic  function  is created  with  the  set  of
+        methods specified by its method descriptions.
+
+        The  option,   method-qualifier,   and   specialized-lambda-list
+        arguments are the same as for defgeneric.
+
+        The generic function object is returned as the result.
+
+        If no method  descriptions are specified,  an anonymous  generic
+        function with no methods is created.
+
+
+(initialize-instance instance &rest initargs)         [generic function]
+(initialize-instance (instance standard-object) &rest initargs) [method]
+
+        The  generic   function   initialize-instance   is   called   by
+        make-instance  to  initialize  a  newly  created  instance.  The
+        generic function  initialize-instance  is called  with  the  new
+        instance and the defaulted initialization arguments.
+
+        The  system-supplied  primary   method  on   initialize-instance
+        initializes the slots of the  instance with values according  to
+        the initialization  arguments and  the  :initform forms  of  the
+        slots.  It   does  this   by   calling  the   generic   function
+        shared-initialize with the following arguments: the  instance, t
+        (this indicates  that  all  slots for  which  no  initialization
+        arguments are provided should be initialized according to  their
+        :initform forms) and the defaulted initialization arguments.
+
+        The instance argument is the object to be initialized.
+
+        The initargs  argument  consists of  alternating  initialization
+        argument names and values.
+
+        The modified instance is returned as the result.
+
+        Programmers  can  define  methods  for  initialize-instance   to
+        specify actions to be taken when an instance is initialized.  If
+        only :after  methods are  defined, they  will be  run after  the
+        system-supplied primary method for initialization and  therefore
+        will   not   interfere    with   the    default   behavior    of
+        initialize-instance.
+
+
+(invalid-method-error method format-string &rest args)        [function]
+
+        The function  invalid-method-error is  used to  signal an  error
+        when there  is an  applicable method  whose qualifiers  are  not
+        valid for  the method  combination type.  The error  message  is
+        constructed by using a  format string and  any arguments to  it.
+        Because an implementation may need to add additional  contextual
+        information to the error message, invalid-method-error should be
+        called only within  the dynamic extent  of a method  combination
+        function.
+
+        The function invalid-method-error is called automatically when a
+        method fails to satisfy every qualifier pattern and predicate in
+        a define-method-combination form. A method combination  function
+        that    imposes    additional    restrictions    should     call
+        invalid-method-error explicitly  if it  encounters a  method  it
+        cannot accept.
+
+        The method argument is the invalid method object.
+
+        The format-string argument is a control string that can be given
+        to format, and args are any arguments required by that string.
+
+        Whether invalid-method-error returns to its caller or exits  via
+        throw is implementation-dependent.
+
+
+(make-instance class &rest initargs)                  [generic function]
+(make-instance (class standard-class) &rest initargs)           [method]
+(make-instance (class symbol) &rest initargs)                   [method]
+
+        The generic function make-instance creates a new instance of the
+        given class.
+
+        The class argument is  a class object or  a symbol that  names a
+        class. The  remaining  arguments  form  a  list  of  alternating
+        initialization argument names and values.
+
+        If the second of the preceding methods is selected, that  method
+        invokes make-instance on  the arguments  (find-class class)  and
+        initargs.
+
+
+(make-instances-obsolete class)                       [generic function]
+(make-instances-obsolete (class standard-class))                [method]
+(make-instances-obsolete (class symbol))                        [method]
+
+        The  generic   function   make-instances-obsolete   is   invoked
+        automatically by  the  system when  defclass  has been  used  to
+        redefine an existing standard class  and the set of local  slots
+        accessible in an instance  is changed or the  order of slots  in
+        storage is changed.  It can  also be explicitly  invoked by  the
+        user.
+
+        The  function   make-instances-obsolete   has  the   effect   of
+        initiating the process of updating  the instances of the  class.
+        During  updating,  the  generic  function   update-instance-for-
+        -redefined-class will be invoked.
+
+        The class argument is a class object symbol that names the class
+        whose instances are to be made obsolete.
+
+        If the second of the preceding methods is selected, that  method
+        invokes make-instances-obsolete on (find-class class).
+
+        The modified class  is returned. The  result of  make-instances-
+        -obsolete is eq to the class  argument supplied to the first  of
+        the preceding methods.
+
+
+(method-combination-error format-string &rest args)           [function]
+
+        The function method-combination-error is used to signal an error
+        in method combination. The error message is constructed by using
+        a  format  string   and  any   arguments  to   it.  Because   an
+        implementation may need to add additional contextual information
+        to the error message, method-combination-error should be  called
+        only within the dynamic extent of a method combination function.
+
+        The format-string argument is a control string that can be given
+        to format, and args are any arguments required by that string.
+
+        Whether method-combination-error returns to its caller or  exits
+        via throw is implementation-dependent.
+
+
+(method-qualifiers method)                            [generic function]
+(method-qualifiers (method standard-method))                    [method]
+
+        The generic  function method-qualifiers  returns a  list of  the
+        qualifiers of the given method.
+
+
+(next-method-p)                                               [function]
+
+        The locally defined  function next-method-p can  be used  within
+        the body  of  a method  defined  by a  method-defining  form  to
+        determine whether a next method exists.
+
+        The function next-method-p returns true or false.
+
+        Like call-next-method,  the function  next-method-p has  lexical
+        scope (for  it is  defined  only within  the  body of  a  method
+        defined by a method-defining form) and indefinite extent.
+
+
+(no-applicable-method generic-function                [generic function]
+                      &rest fn-arguments)
+(no-applicable-method (generic-function t)                      [method]
+                      &rest fn-arguments)
+
+        The  generic  function  no-applicable-method  is  called  when a
+        generic  function  of  the  class  standard-generic-function  is
+        invoked and no  method on that  generic function is  applicable.
+        The default method signals an error.
+
+        The generic function no-applicable-method is not intended to  be
+        called by programmers. Programmers may write methods for it.
+
+        The generic-function  argument  of no-applicable-method  is  the
+        generic function object on which no applicable method was found.
+
+        The fn-arguments argument  is a list  of the arguments  to
+        that generic function.
+
+
+(no-next-method generic-function method &rest args)   [generic function]
+(no-next-method (generic-function standard-generic-function)    [method]
+                (method standard-method) &rest args)
+
+        The   generic    function    no-next-method   is    called    by
+        call-next-method   when   there   is   no   next   method.   The
+        system-supplied method on no-next-method signals an error.
+
+        The generic function no-next-method is not intended to be called
+        by programmers. Programmers may write methods for it.
+
+        The generic-function argument is the generic function object  to
+        which the method that is the second argument belongs.
+
+        The method  argument is  the method  that contains  the call  to
+        call-next-method for which there is no next method.
+
+        The  args   argument   is   a   list   of   the   arguments   to
+        call-next-method.
+
+
+(print-object object stream)                          [generic function]
+(print-object (object standard-object) stream)                  [method]
+
+        The   generic   function   print-object   writes   the   printed
+        representation  of  an   object  to  a   stream.  The   function
+        print-object is called  by the  print system; it  should not  be
+        called by the user.
+
+        Each  implementation  must  provide   a  method  on  the   class
+        standard-object and methods  on enough  other classes  so as  to
+        ensure   that   there   is   always   an   applicable    method.
+        Implementations are free to add methods for other classes. Users
+        can write methods for print-object for their own classes if they
+        do not wish to inherit an implementation-supplied method.
+
+        The first argument is any Lisp object. The second argument  is a
+        stream; it cannot be t or nil.
+
+        The  function  print-object  returns  its  first  argument,  the
+        object.
+
+
+(reinitialize-instance instance &rest initargs)       [generic function]
+(reinitialize-instance (instance standard-object)               [method]
+                        &rest initargs)
+
+        The generic function reinitialize-instance can be used to change
+        the values of local slots according to initialization arguments.
+
+        The system-supplied  primary  method  for  reinitialize-instance
+        checks the validity of  initialization arguments and signals  an
+        error if  an initialization  argument is  supplied that  is  not
+        declared valid.  The  method  then calls  the  generic  function
+        shared-initialize with  the following  arguments: the  instance,
+        nil (which means  no slots  should be  initialized according  to
+        their :initform  forms)  and  the  initialization  arguments  it
+        received.
+
+        The instance argument is the object to be initialized.
+
+        The initargs  argument  consists of  alternating  initialization
+        argument names and values.
+
+        The modified instance is returned as the result.
+
+        Initialization  arguments  are  declared  valid  by  using   the
+        :initarg  option  to  defclass,  or  by  defining  methods   for
+        reinitialize-instance or shared-initialize. The keyword name  of
+        each keyword  parameter  specifier  in the  lambda-list  of  any
+        method defined on reinitialize-instance or shared-initialize  is
+        declared a valid  initialization argument name  for all  classes
+        for which that method is applicable.
+
+
+(remove-method generic-function method)               [generic function]
+(remove-method (generic-function standard-generic-function)     [method]
+               method)
+
+        The generic  function  remove-method  removes  a  method  from a
+        generic  function.  It  destructively  modifies  the   specified
+        generic function and  returns the modified  generic function  as
+        its result.
+
+        The generic-function argument is a generic function object.
+
+        The  method   argument  is   a  method   object.  The   function
+        remove-method does not signal an error if the method is not  one
+        of the methods on the generic function.
+
+
+(shared-initialize instance slot-names                [generic function]
+                   &rest initargs)
+(shared-initialize (instance standard-object)                   [method]
+                    slot-names &rest initargs)
+
+        The generic function shared-initialize is used to fill the slots
+        of an  instance  using initialization  arguments  and  :initform
+        forms. It  is  called  when  an instance  is  created,  when  an
+        instance is  re-initialized,  when  an instance  is  updated  to
+        conform to a redefined class, and when an instance is updated to
+        conform   to   a   different   class.   The   generic   function
+        shared-initialize  is  called  by  the  system-supplied  primary
+        method for  initialize-instance, reinitialize-instance,  update-
+        -instance-for-redefined-class and update-instance-for-different-
+        -class.
+
+        The  generic  function  shared-initialize  takes  the  following
+        arguments: the instance to be initialized, a specification  of a
+        set of  names of  slots  accessible in  that instance,  and  any
+        number of  initialization  arguments. The  arguments  after  the
+        first  two  must  form  an  initialization  argument  list.  The
+        system-supplied primary method on shared-initialize  initializes
+        the slots with values according to the initialization  arguments
+        and specified  :initform forms.  The second  argument  indicates
+        which slots should be  initialized according to their  :initform
+        forms if  no initialization  arguments  are provided  for  those
+        slots.
+
+        The  system-supplied   primary   method  behaves   as   follows,
+        regardless of whether the slots are local or shared:
+
+        # If an initialization  argument in the initialization  argument
+        list specifies a value for that slot, that value is stored  into
+        the slot, even if  a value has already  been stored in the  slot
+        before the method is run.
+
+        # Any  slots indicated  by the  second argument  that are  still
+        unbound  at  this  point  are  initialized  according  to  their
+        :initform forms. For any such  slot that has an :initform  form,
+        that form  is  evaluated  in  the  lexical  environment  of  its
+        defining defclass form and the  result is stored into the  slot.
+        For example, if a :before method stores a value in the slot, the
+        :initform form will not be used to supply a value for the slot.
+
+        The instance argument is the object to be initialized.
+
+        The slot-names  argument  specifies the  slots  that are  to  be
+        initialized  according   to   their  :initform   forms   if   no
+        initialization arguments apply. It is  supplied in one of  three
+        forms as follows:
+
+        # It can be  a list of  slot names, which  specifies the set  of
+        those slot names.
+
+        # It can be nil, which specifies the empty set of slot names.
+
+        # It can be the symbol t, which specifies the set of all of  the
+        slots.
+
+        The initargs  argument  consists of  alternating  initialization
+        argument names and values.
+
+        The modified instance is returned as the result.
+
+
+(slot-boundp instance slot-name)                              [function]
+
+        The function slot-boundp  tests whether  a specific  slot in  an
+        instance is bound.
+
+        If  no  slot  of  the   given  name  exists  in  the   instance,
+        slot-missing is called as follows:
+
+            (slot-missing (class-of instance)
+                          instance
+                          slot-name
+                          'slot-boundp)
+
+
+(slot-exists-p object slot-name)                              [function]
+
+        The function slot-exists-p  tests whether  the specified  object
+        has a slot of the given name.
+
+
+(slot-makunbound instance slot-name)                          [function]
+
+        The function slot-makunbound restores a  slot in an instance  to
+        the unbound state.
+
+        The instance is returned as the result.
+
+        If  no  slot  of  the   given  name  exists  in  the   instance,
+        slot-missing is called as follows:
+
+            (slot-missing (class-of instance)
+                          instance
+                          slot-name
+                          'slot-makunbound)
+
+
+(slot-missing class object slot-name operation        [generic function]
+                &optional new-value)
+(slot-missing (class t) object slot-name operation              [method]
+                &optional new-value)
+
+        The generic function slot-missing is invoked when an attempt  is
+        made  to  access  a  slot  in  an  object  whose  metaclass   is
+        standard-class and the name of the  slot provided is not a  name
+        of a slot in that class. The default method signals an error.
+
+        The generic function slot-missing is  not intended to be  called
+        by programmers. Programmers may write methods for it.
+
+        The required  arguments to  slot-missing are  the class  of  the
+        object that is being accessed, the object, the slot name,  and a
+        symbol that indicates the operation that caused slot-missing  to
+        be invoked. The optional argument  to slot-missing is used  when
+        the operation is attempting to set the value of the slot.
+
+        If a  method  written  for slot-missing  returns  values,  these
+        values get  returned  as the  values  of the  original  function
+        invocation.
+
+        The  generic  function   slot-missing  may   be  called   during
+        evaluation of  slot-value, (setf  slot-value), slot-boundp,  and
+        slot-makunbound. For each of these operations the  corresponding
+        symbol  for  the   operation  argument   is  slot-value,   setf,
+        slot-boundp, and slot-makunbound, respectively.
+
+
+(slot-unbound class instance slot-name)               [generic-function]
+(slot-unbound (class t) instance slot-name)                     [method]
+
+        The generic function slot-unbound is called when an unbound slot
+        is read in  an instance whose  metaclass is standard-class.  The
+        default method signals an error.
+
+        The generic function slot-unbound is  not intended to be  called
+        by programmers.  Programmers  may  write  methods  for  it.  The
+        function  slot-unbound   is   called  only   by   the   function
+        slot-value-using-class and thus indirectly by slot-value.
+
+        The arguments  to slot-unbound  are the  class of  the  instance
+        whose slot was accessed,  the instance itself,  and the name  of
+        the slot.
+
+        If a  method  written  for slot-unbound  returns  values,  these
+        values get  returned  as the  values  of the  original  function
+        invocation.
+
+        An unbound slot may occur if no :initform form was specified for
+        the  slot  and  the  slot  value   has  not  been  set,  or   if
+        slot-makunbound has been called on the slot.
+
+
+(slot-value object slot-name)                                 [function]
+
+        The function slot-value returns the value contained in the  slot
+        slot-name of the  given object. If  there is no  slot with  that
+        name,  slot-missing  is   called.  If  the   slot  is   unbound,
+        slot-unbound is called.
+
+        The macro setf can be used  with slot-value to change the  value
+        of a slot.
+
+        If an attempt is made  to read a slot and  no slot of the  given
+        name exists in the instance, slot-missing is called as follows:
+
+            (slot-missing (class-of instance)
+                          instance
+                          slot-name
+                          'slot-value)
+
+        If an attempt is made to write  a slot and no slot of the  given
+        name exists in the instance, slot-missing is called as follows:
+
+            (slot-missing (class-of instance)
+                          instance
+                          slot-name
+                          'setf
+                          new-value)
+
+
+(update-instance-for-different-class                  [generic function]
+                    previous current &rest initargs)
+(update-instance-for-different-class
+                    (previous standard-object)                  [method]
+                    (current standard-object) &rest initargs)
+
+        The generic function update-instance-for-different-class is  not
+        intended to  be called  by  programmers. Programmers  may  write
+        methods for it.  This function  is called only  by the  function
+        change-class.
+
+        The   system-supplied   primary   method   on   update-instance-
+        -for-different-class  checks  the  validity  of   initialization
+        arguments and signals an error if an initialization argument  is
+        supplied  that  is   not  declared  valid.   This  method   then
+        initializes slots with  values according  to the  initialization
+        arguments and  initializes the  newly  added slots  with  values
+        according to their :initform forms. It does this by calling  the
+        generic function shared-initialize with the following arguments:
+        the instance, a list of names of the newly added slots, and  the
+        initialization arguments  it  received. Newly  added  slots  are
+        those local slots for which no  slot of the same name exists  in
+        the previous class.
+
+        Methods for update-instance-for-different-class  can be  defined
+        to specify actions to be taken  when an instance is updated.  If
+        only :after methods for update-instance-for-different-class  are
+        defined, they  will be  run  after the  system-supplied  primary
+        method for initialization and therefore will not interfere  with
+        the default behavior of update-instance-for-different-class.
+
+        The   arguments   to   update-instance-for-different-class   are
+        computed by  change-class. When  change-class is  invoked on  an
+        instance, a copy  of that  instance is  made; change-class  then
+        destructively alters the original  instance. The first  argument
+        to update-instance-for-different-class, previous, is that  copy;
+        it holds  the old  slot values  temporarily. This  argument  has
+        dynamic extent within change-class; if  it is referenced in  any
+        way  once   update-instance-for-different-class   returns,   the
+        results    are    undefined.    The    second    argument     to
+        update-instance-for-different-class,  current,  is  the  altered
+        original instance.
+
+        The intended use of  previous is to extract  old slot values  by
+        using slot-value or with-slots or  by invoking a reader  generic
+        function, or  to  run  other methods  that  were  applicable  to
+        instances of the original class.
+
+        The initargs  argument  consists of  alternating  initialization
+        argument names and values.
+
+        The value  returned  by  update-instance-for-different-class  is
+        ignored by change-class.
+
+
+(update-instance-for-redefined-class                  [generic function]
+                instance added-slots
+                discarded-slots property-list
+                 &rest initargs)
+(update-instance-for-redefined-class                            [method]
+                (instance standard-object) added-slots
+                discarded-slots property-list
+                &rest initargs)
+
+        The generic function update-instance-for-redefined-class is  not
+        intended to  be called  by  programmers. Programmers  may  write
+        methods  for  it.  The  generic  function   update-instance-for-
+        -redefined-class  is  called  by  the  mechanism  activated   by
+        make-instances-obsolete.
+
+        The  system-supplied  primary  method  on   update-instance-for-
+        -different-class checks the validity of initialization arguments
+        and signals an error if  an initialization argument is  supplied
+        that is not declared valid.  This method then initializes  slots
+        with  values  according  to  the  initialization  arguments  and
+        initializes the newly added slots with values according to their
+        :initform forms. It  does this by  calling the generic  function
+        shared-initialize with the following arguments: the  instance, a
+        list of names of the  newly added slots, and the  initialization
+        arguments it received. Newly added  slots are those local  slots
+        for which no slot of the same name exists in the old version  of
+        the class.
+
+        When make-instances-obsolete is invoked or when a class has been
+        redefined and an instance is  being updated, a property list  is
+        created that  captures the  slot  names and  values of  all  the
+        discarded slots  with  values  in  the  original  instance.  The
+        structure of the instance is transformed so that it conforms  to
+        the    current    class    definition.    The    arguments    to
+        update-instance-for-redefined-class   are    this    transformed
+        instance, a list  of the  names of the  new slots  added to  the
+        instance, a list of  the names of the  old slots discarded  from
+        the instance, and  the property list  containing the slot  names
+        and values  for  slots  that  were  discarded  and  had  values.
+        Included in this  list of  discarded slots are  slots that  were
+        local in the old class and are shared in the new class.
+
+        The initargs  argument  consists of  alternating  initialization
+        argument names and values.
+
+        The value  returned  by  update-instance-for-redefined-class  is
+        ignored.
+
+
+(with-accessors ({slot-entry}*) instance-form                    [macro]
+                {declaration}*
+                {form}*)
+
+        The macro with-accessors creates a lexical environment in  which
+        specified slots are lexically available through their  accessors
+        as if they were variables. The macro with-accessors invokes  the
+        appropriate accessors to access  the specified slots. Both  setf
+        and setq can be used to set the value of the slot.
+
+        The result  returned is  that obtained  by executing  the  forms
+        specified by the body argument.
+
+
+(with-slots ({slot-entry}*) instance-form                        [macro]
+            {declaration}*
+            {form}*)
+
+    slot-entry ::= slot-name | (variable-name slot-name)
+
+        The macro with-slots creates a lexical context for referring  to
+        specified slots  as though  they were  variables. Within  such a
+        context the value of the slot can be specified by using its slot
+        name, as if it  were a lexically bound  variable. Both setf  and
+        setq can be used to set the value of the slot.
+
+        The macro with-slots translates an  appearance of the slot  name
+        as a variable into a call to slot-value.
+
+        The result  returned is  that obtained  by executing  the  forms
+        specified by the body argument.
+
+
+
+--- C.all/lisp/ref/clos
+--- Copyright University of Sussex 1995. All rights reserved.

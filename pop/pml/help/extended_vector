@@ -1,0 +1,96 @@
+HELP EXTENDED_VECTOR                        Robert Duncan, November 1990
+
+Additional functions on vectors.
+
+
+    CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- The ExtendedVector Module
+ -- Vector Functions
+
+
+-- The ExtendedVector Module ------------------------------------------
+
+signature ExtendedVector
+structure ExtendedVector : ExtendedVector
+    The structure  -ExtendedVector- is  an autoloadable  library  module
+    defining some  additional functions  on the  abstract type  -vector-
+    (see HELP  * VECTOR).  These functions  are kept  separate from  the
+    basic vector functions because they are non-standard, i.e. they  are
+    not necessarily supported by any other Standard ML compiler.
+
+    The  -ExtendedVector-  structure  is  described  by  the   following
+    signature: the vector type  and all the  basic vector functions  are
+    included in the signature for convenience.
+
+        signature ExtendedVector = sig
+
+            (* Include everything from the basic Vector signature *)
+
+            include Vector
+
+            (* Additional functions *)
+
+            val from_list   : 'a list -> 'a vector
+            val to_list     : 'a vector -> 'a list
+
+            val map         : ('a -> 'b) -> 'a vector -> 'b vector
+            val app         : ('a -> unit) -> 'a vector -> unit
+            val iterate     : ('a * int -> 'b) -> 'a vector -> 'b vector
+
+        end
+
+
+-- Vector Functions ---------------------------------------------------
+
+Each function described  below is  illustrated with  a model  definition
+based on  the primitive  operations provided  by the  standard  -Vector-
+module. The definitions are assumed to be evaluated within the scope  of
+the declaration:
+
+    open Vector
+    infix 9 sub
+
+
+val from_list (l : 'a list) : 'a vector
+val to_list (v : 'a vector) : 'a list
+    Conversion between vectors and lists.
+
+        val from_list =
+                vector
+        fun to_list v =
+            let fun loop i =
+                    if i = length(v) then [] else v sub i :: loop(i+1)
+            in  loop 0
+            end
+
+
+val map (f : 'a -> 'b) (v : 'a vector) : 'b vector
+    Constructs a new vector of  size -length(v)- where the i'th  element
+    of the new vector is the result of applying -f- to the i'th  element
+    of -v-.
+
+        fun map f v = tabulate(length(v), fn i => f(v sub i))
+
+
+val app (f : 'a -> unit) (v : 'a vector) : unit
+    Applies the (side-effecting)  function -f-  to each  element of  the
+    vector -v- in index order.
+
+        fun app (f : 'a -> unit) v =
+            let fun loop i =
+                    if i = length(v) then () else (f(v sub i); loop(i+1))
+            in  loop 0
+            end
+
+
+val iterate (f : 'a * int -> 'b) (v : 'a vector) : 'b vector
+    Constructs a new vector of  size -length(v)- where the i'th  element
+    of the new vector is the result of applying -f- to the i'th  element
+    of -v- and the index -i-.
+
+        fun iterate f v = tabulate(length(v), fn i => f(v sub i, i))
+
+
+--- C.all/pml/help/extended_vector
+--- Copyright University of Sussex 1991. All rights reserved. ----------

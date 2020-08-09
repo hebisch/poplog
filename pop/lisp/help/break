@@ -1,0 +1,405 @@
+HELP BREAK                                       John Williams, May 1987
+                                                       Updated July 1995
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+  2   Summary of Debugger Commands
+  3   Examining the Call Stack
+  4   Examining Individual Stack Frames
+  5   Re-Displaying the Last Error Message
+  6   Exiting the Debugger
+  7   An Example
+  8   Interface between the Debugger and the Condition System
+  9   See Also
+
+
+-----------------------------------------------------------------------
+1  Introduction
+-----------------------------------------------------------------------
+
+This file documents the Poplog Common Lisp Debugger.
+
+The Debugger may be entered in various ways: explicitly calling the
+function invoke-debugger on some condition; indirectly from the function
+break; after an error or warning; or following a keyboard interrupt.
+
+For further details of the situations in which an error or warning will
+lead to the Debugger being invoked, see HELP * MISHAP.
+
+The Lisp Debugger processes user input like a normal top-level loop,
+except that certain top-level forms (keywords) are interpreted as
+special debugger commands. Also, the prompt issued by the terminal read
+routine is changed.
+
+Here is the the output from a call to break:
+
+    == (break)
+
+    Break:  (Simple-Condition)
+     :h     Help
+     :c     Return from break
+
+    <0>
+
+The Debugger heralds its presence by printing "Break:" followed by the
+reason for its invocation (in parentheses). If it was entered due to an
+error, warning, or keyboard interrupt, then "(Error)", "(Warning)", or
+"(Interrupt)" will be printed. Otherwise (as in this example) the type
+of the condition on which the Debugger was invoked is printed.
+
+The next line is a reminder that typing :h causes a summary of the
+Debugger commmands to be displayed.
+
+Following the first two lines, a summary of the currently available
+restarts is printed (one per line). In this case, only one restart is
+available, which if invoked by typing :c, causes the call to break to
+return with the value nil.
+
+The sequence <0> is the read prompt, signifying that the Debugger is now
+ready to responmd to commands. The digit 0 indicates the level of the
+breakpoint. If the Debugger were to be invoked recursively, perhaps as a
+result of another error or keyboard interrupt, the prompt issued by the
+recursive call to the Debugger would be <1> (and so on).
+
+
+-----------------------------------------------------------------------
+2  Summary of Debugger Commands
+-----------------------------------------------------------------------
+
+Commands that display information:
+
+ :h             Help, prints this
+ :m             Re-display last error message
+ :dc            Describe the condition on which the Debugger was entered
+ :ic            Inspect the condition on which the Debugger was entered
+ :l             List available restarts
+ :b             Display call stack backtrace
+ :hide item     Omit certain classes of functions from backtrace
+ :unhide item   Reverse effect of :hide
+
+
+Commands for selecting & inspecting individual stack frames:
+
+ :b             Display call stack backtrace
+ :s  frame      Select frame
+ :d  frame      Select and describe frame
+ :i  frame      Select and inspect frame
+
+
+Commands for exiting the Debugger:
+
+ :a             Abort, reset Lisp system
+ :q             Quit to and resume previous break or top-level
+ :!             Fork a Unix shell (DCL on VMS platform)
+ :c             Invoke the restart named continue (if such exists)
+ :c  n          Invoke the restart numbered n
+ :r  args       Re-execute selected frame with args
+ :v  values     Return values from selected frame
+
+
+Commands that invoke the Ved editor:
+
+ :e             Edit top level form currently being evaluated
+ :ed frame      Edit source code for frame
+
+
+-----------------------------------------------------------------------
+3  Examining the Call Stack
+-----------------------------------------------------------------------
+
+To find out what functions were active when the break occurred, give the
+command:
+
+ :b
+
+This is a typical display produced by :b
+
+    *0:  SEARCH
+     2:  MEMBER
+     3:  MYFUN
+     4:  MYPROG
+
+The * indicates the currently selected stack frame (which can be altered
+by the :s, :d, and :i commands described below).
+
+If the output from :b threatens to overflow the screen, you will be
+asked whether more output should be displayed.
+
+Some frames may be omitted from the display (frame number 1 in the
+example above) - these belong either to functions defined in the system
+package, or Pop-11 procedures. The :hide and :unhide commands affect
+which frames are displayed:
+
+ :hide  package-name
+ :unhide  package-name
+
+These commands ensure that functions attached to internal symbols in the
+specified package-name will be invisible/visible in future backtraces.
+Supplying the package name pop11 causes Pop-11 procedures to be
+(un)hidden.
+
+It is also possible to omit specific functions from call stack
+backtraces, with the commands:
+
+ :unhide :function  frame
+ :hide   :function  frame
+
+The argument frame may be either a stack frame number, or a function
+name.
+
+To disable all hiding, do:
+
+ :unhide :all
+
+All stack frames will now be included in call stack backtraces.
+
+
+-----------------------------------------------------------------------
+4  Examining Individual Stack Frames
+-----------------------------------------------------------------------
+
+To examine a particular stack frame, give one of the following commands:
+
+ :s  frame
+ :d  frame
+ :i  frame
+
+The desired frame may be specified by number, or by name (in which case
+the most recently constructed frame of that name is selected).
+
+The :s command simply selects the specified frame to be the current
+focus of attention. :d does likewise, but prints a description too (i.e.
+the name of the function, values of its local variables etc). The
+command :i is like :d but additionally invokes inspect on the selected
+frame, so that argument values may be examined and alterted.
+
+A sample stack frame display:
+
+    Stackframe 1
+     Owner:
+      {0}  #<FUNCTION JOIN 2 2 1>
+     Lexical variables:
+      [1]  A:  C
+      [2]  B:  (D E F)
+
+
+Important Note:
+Information about variable bindings is available only if the function
+was compiled with the declaration (optimize debug) in force.
+
+The source code for a user-defined function may be edited by giving the
+command:
+
+ :ed frame
+
+
+-----------------------------------------------------------------------
+5  Re-Displaying the Last Error Message
+-----------------------------------------------------------------------
+
+It may sometimes be useful to re-display the error message that caused
+the current break. The command :m is provided for this purpose.
+
+
+-----------------------------------------------------------------------
+6  Exiting the Debugger
+-----------------------------------------------------------------------
+
+There are various ways to leave the Debugger:
+
+ :a
+
+This calls setlisp, starting a brand new interactive top-level loop.
+(Note if Lisp is being run as a background job, the command :a will
+terminate the Lisp process).
+
+ :q
+ <EOF>
+
+This unwinds to, and then resumes, the previous break or top-level loop.
+At top-level, is similar to :a. If the break occurred while compiling
+from a disk file, the compiler will move onto the next top-level form in
+the file.
+
+ :c
+
+This invokes the nearest restart named continue, should one exist. The
+functions cerror, warn, and break all establish restarts named continue.
+The default keyboard interrupt handler (the value of the variable
+poplog:*interrupt*) does too.
+
+
+The next two commands enable control to be shifted to a frame other than
+the immediate caller of break:
+
+ :r args
+
+This re-applies the function associated with the currently selected
+stack frame to a new set of arguments. args should be a single Lisp
+expression; hence to supply more than one argument, use values. For
+example:
+
+    :r (values 'b '(a b c))
+
+To return from the selected frame, passing control back to its caller,
+use:
+
+ :v results
+
+Again, use values to specify multiple results.
+
+
+Important Note:
+For :r and :v to work correctly, the function being exited from must
+have been compiled with the declaration (optimize debug) in force.
+
+
+-----------------------------------------------------------------------
+7  An Example
+-----------------------------------------------------------------------
+
+This example illustrates how a buggy discrimination net can be fixed
+using some of the debugging facilities described above.
+
+    (defun discrim (tree)
+        (declare (optimize debug))
+        (if (atom tree)
+            tree
+            (if (yes-or-no-p (first tree))
+                (discrim (second tree))
+                (discrim (third tree)))))
+
+    (setq animals
+        '("Can it fly"
+          ("Does it have fea~hers"
+           ("Is it black" blackbird thrush)
+           ("Does it sting" bee butterfly))
+          ("Can it swim"
+           ("Has it got fur" seal fish)
+           ("Does it eat meat" cat rabbit))))
+
+
+The function discrim is ok, but the net animals has a misplaced ~ in one
+of the questions. We try running discrim:
+
+    (discrim animals)
+    Can it fly (yes/no) yes
+
+    ;;; MISHAP - Ill-formed directive parameter
+    ;;; INVOLVING:  "H" "Does it have fea~hers"
+    ;;; FILE     :  /rsuna/home/johnw/cond/break
+    ;;; LINE     :  248
+    ;;; DOING    :  (DISCRIM ANIMALS)
+
+An error is signaled, then a break point is entered:
+
+    Break:  (Error)
+     :H     Help
+
+First, find out what function signaled the error, by examining a
+backtrace of the function call stack. Give the command :b
+
+    <0> :b
+     *0:  ERROR
+      8:  "~?"
+      15:  FORMAT
+      17:  YES-OR-NO-P
+      18:  DISCRIM
+      19:  DISCRIM
+
+format signaled the error, but it may be more profitable examining the
+call to discrim, with the command :i
+
+    <0> :i 18
+    Stackframe 18
+     Owner:
+      {0}  #<FUNCTION DISCRIM 1 1 NIL>
+     Lexical bindings:
+      [1]  TREE:  ("Does it have fea~hers"
+                   ("Is it black" BLACKBIRD THRUSH)
+                   ("Does it sting" BEE BUTTERFLY))
+
+The problem is discovered: the argument to discrim contains a string
+with a misplaced ~. Decide to fix it:
+
+    inspect> 1
+    A list of length 3
+      [0]  "Does it have fea~hers"
+      [1]  ("Is it black" BLACKBIRD THRUSH)
+      [2]  ("Does it sting" BEE BUTTERFLY)
+      [3]  End:  NIL
+
+Replace the buggy string:
+
+    inspect> s 0 "Does it have feathers"
+    A list of length 3
+      [0]  "Does it have feathers"
+      [1]  ("Is it black" BLACKBIRD THRUSH)
+      [2]  ("Does it sting" BEE BUTTERFLY)
+      [3]  End:  NIL
+
+Save the modified argument to discrim in a temporary variable, foo:
+
+    inspect> a foo
+    Saved current object in FOO
+
+Quit the Inspector:
+
+    inspect> q
+
+Restart the call to discrim, applying it to foo:
+
+    <0> :r foo
+
+And now discrim works correctly:
+
+    Does it have feathers (yes/no) no
+    Does it sting (yes/no) no
+    BUTTERFLY
+
+
+-----------------------------------------------------------------------
+8  Interface between the Debugger and the Condition System
+-----------------------------------------------------------------------
+
+The condition object on which the Debugger has been invoked is kept in
+the variable poplog:*debugger-condition*. You can examine this condition
+with the command
+
+ :dc
+
+which invokes describe on the condition, or with the command
+
+ :ic
+
+which invokes inspect on the condition.
+
+
+To list the restarts associated with poplog:*debugger-condition*, give
+the command
+
+ :l
+
+This prints a numbered list of all available restarts.
+
+
+To invoke a particular restart, give the command
+
+ :c n
+
+where n is the number associated with the desired restart.
+
+
+-----------------------------------------------------------------------
+9  See Also
+-----------------------------------------------------------------------
+
+  HELP * DEBUG
+  HELP * INSPECT
+  HELP * MISHAP
+  HELP * TRACE
+
+
+--- C.all/lisp/help/break
+--- Copyright University of Sussex 1989. All rights reserved.

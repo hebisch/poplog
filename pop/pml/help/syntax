@@ -1,0 +1,405 @@
+HELP SYNTAX
+
+The syntax of PML.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Acknowledgements
+ -- Conventions of the Grammar
+ -- Lexical Items
+ -- Types (ty)
+ -- Patterns (pat)
+ -- Expressions (exp)
+ -- Declarations (dec)
+ -- Structure Declarations (strdec)
+ -- Specifications (spec)
+ -- Signature Declarations (sigdec)
+ -- Functor Declarations (fundec)
+ -- External Declarations (extdec)
+ -- Pervasive Declarations (perdec)
+ -- Top Level Declarations (topdec)
+ -- Programs (program)
+
+
+-- Acknowledgements ---------------------------------------------------
+
+The majority of this file is taken from the official definition of
+Standard ML referenced in HELP * PML.
+
+
+-- Conventions of the Grammar -----------------------------------------
+
+Terminal and non-terminal symbols are written as lower-case alphabetic
+names, e.g.
+
+    tyvar ty tyvar_seq
+
+Reserved words are written inside double quotes, e.g
+
+    "type" "{" "}"
+
+Optional phrases are written inside double angle brackets, e.g.
+
+    << "," tyrow >>
+
+Repetition of a phrase is indicated by a double underscore, e.g.
+
+    ty-1 "*" __ "*" ty-n
+
+Alternative rules for each non-terminal symbol are arranged in order of
+decreasing precedence, i.e. where ambiguity arises, the earlier rule
+should be chosen first.
+
+The syntax of types binds more tightly than that of expressions and
+patterns.
+
+Right-recursive constructs extend as far to the right as possible, e.g.
+
+    "fn" match
+
+
+-- Lexical Items ------------------------------------------------------
+
+The following lexical classes are described in HELP * LEXICAL:
+
+    var con exncon tyvar tycon lab strid sigid funid        (id)
+    longvar longcon longexncon longtycon longstrid          (longid)
+    scon                                                    (scon)
+
+
+-- Types (ty) ---------------------------------------------------------
+
+    tyvar_seq ::=
+        tyvar
+        empty
+        "(" tyvar-1 "," __ "," tyvar-n ")"                  (n >= 2)
+
+    ty_seq ::=
+        ty
+        empty
+        "(" ty-1 "," __ "," ty-n ")"                        (n >= 2)
+
+    tyrow ::=
+        lab ":" ty << "," tyrow >>
+
+    ty ::=
+        tyvar
+        "{" << tyrow >> "}"
+        ty_seq longtycon
+        ty-1 "*" __ "*" ty-n                                (n >= 2)
+        ty "->" ty
+        "(" ty ")"
+
+
+-- Patterns (pat) -----------------------------------------------------
+
+    patrow ::=
+        "..."
+        lab "=" pat << "," patrow >>
+        var << ":" ty >> << "as" pat >> << "," patrow >>
+
+    atpat ::=
+        "_"
+        scon
+        << "op" >> var
+        << "op" >> longcon
+        << "op" >> longexncon
+        "{" << patrow >> "}"
+        "(" ")"
+        "(" pat-1 "," __ "," pat-n ")"                      (n >= 2)
+        "[" pat-1 "," __ "," pat-n "]"                      (n >= 0)
+        "(" pat ")"
+
+    pat ::=
+        atpat
+        << "op" >> longcon atpat
+        << "op" >> longexncon atpat
+        pat con pat
+        pat exncon pat
+        pat ":" ty
+        << "op" >> var << ":" ty >> "as" pat
+
+
+-- Expressions (exp) --------------------------------------------------
+
+    exprow ::=
+        lab "=" exp << "," exprow >>
+
+    atexp ::=
+        scon
+        << "op" >> longvar
+        << "op" >> longcon
+        << "op" >> longexncon
+        "{" << exprow >> "}"
+        "#" lab
+        "(" ")"
+        "(" exp-1 "," __ "," exp-n ")"                      (n >= 2)
+        "[" exp-1 "," __ "," exp-n "]"                      (n >= 0)
+        "(" exp-1 ";" __ ";" exp-n ")"                      (n >= 2)
+        "let" dec "in" exp-1 ";" __ ";" exp-n "end"         (n >= 1)
+        "(" exp ")"
+
+    appexp ::=
+        atexp
+        appexp atexp
+
+    infexp ::=
+        appexp
+        infexp id infexp
+
+    mrule ::=
+        pat "=>" exp
+
+    match ::=
+        mrule << "|" match >>
+
+    exp ::=
+        infexp
+        exp ":" ty                                          (L)
+        exp "andalso" exp
+        exp "orelse" exp
+        exp "handle" match
+        "raise" exp
+        "if" exp "then" exp "else" exp
+        "while" exp "do" exp
+        "case" exp "of" match
+        "fn" match
+
+
+-- Declarations (dec) -------------------------------------------------
+
+    valbind ::=
+        pat "=" exp << "and" valbind >>
+        "rec" valbind
+
+    clause ::=                                              (Note 1)
+        << "op" >> var atpat-1 __ atpat-m << ":" ty >> "=" exp
+                                                            (m >= 1)
+
+    fvalbind ::=                                            (Note 2)
+        clause-1 "|" __ "|" clause-n << "and" fvalbind >>   (n >= 1)
+
+    typbind ::=
+        tyvar_seq tycon "=" ty << "and" typbind >>
+
+    conbind ::=
+        << "op" >> con << "of" ty >> << "|" conbind >>
+
+    datbind ::=
+        tyvar_seq tycon "=" conbind << "and" datbind >>
+
+    exnbind ::=
+        << "op" >> exncon << "of" ty >> << "and" exnbind >>
+        << "op" >> exncon "=" << "op" >> longexncon << "and" exnbind >>
+
+    directive ::=                                           (Note 3)
+        "infix" << d >> id-1 __ id-n                        (n >= 1)
+        "infixr" << d >> id-1 __ id-n                       (n >= 1)
+        "nonfix" id-1 __ id-n                               (n >= 1)
+
+    dec ::=
+        "val" valbind
+        "fun" fvalbind
+        "type" typbind
+        "datatype" datbind << "withtype" typbind >>
+        "abstype" datbind << "withtype" typbind >> "with" dec "end"
+        "exception" exnbind
+        "local" dec "in" dec "end"
+        "open" longstrid-1 __ longstrid-n                   (n >= 1)
+        empty
+        dec << ";" >> dec
+        directive
+
+Notes:
+
+1) where -var- has infix status, either "op" must be present or the
+clause may be written in infix form, i.e. at the start of a clause,
+
+    "op" var (atpat-1, atpat-2) __
+
+may be written
+
+    (atpat-1 var atpat-2) __
+
+and the parentheses may be dropped if "=" or ":" follows immediately.
+
+2) all clauses 1 __ n must have the same -var- and the same number of
+formal parameters (m)
+
+3) "d" is a single digit number 0 - 9.
+
+
+-- Structure Declarations (strdec) ------------------------------------
+
+    funactuals ::=
+        strexp
+        strdec
+
+    strexp ::=
+        "struct" strdec "end"
+        longstrid
+        funid "(" funactuals ")"
+        "let" strdec "in" strexp "end"
+
+    strbind ::=
+        strid << ":" sigexp >> "=" strexp << "and" strbind >>
+
+    strdec ::=
+        dec
+        "structure" strbind
+        "abstraction" strbind                               (Note)
+        "local" strdec "in" strdec "end"
+        empty
+        strdec << ";" >> strdec
+
+Note:
+
+the "abstraction" form is a non-standard feature, and is treated by PML
+as a synonym for "structure"
+
+
+-- Specifications (spec) ----------------------------------------------
+
+    valdesc ::=
+        var ":" ty << "and" valdesc >>
+
+    typdesc ::=
+        tyvar_seq tycon << "and" typdesc >>
+
+    condesc ::=
+        con << "of" ty >> << "|" condesc >>
+
+    datdesc ::=
+        tyvar_seq tycon "=" condesc << "and" datdesc >>
+
+    exndesc ::=
+        exncon << "of" ty >> << "and" exndesc >>
+
+    strdesc ::=
+        strid ":" sigexp << "and" strdesc >>
+
+    shareq ::=
+        longstrid-1 "=" __ "=" longstrid-n                  (n >= 2)
+        "type" longtycon-1 "=" __ "=" longtycon-n           (n >= 2)
+        shareq "and" shareq
+
+    spec ::=
+        "val" valdesc
+        "type" typdesc
+        "eqtype" typdesc
+        "datatype" datdesc
+        "exception" exndesc
+        "structure" strdesc
+        "sharing" shareq
+        "local" spec "in" spec "end"
+        "open" longstrid-1 __ longstrid-n                   (n >= 1)
+        "include" sigid-1 __ sigid-n                        (n >= 1)
+        empty
+        spec << ";" >> spec
+
+
+-- Signature Declarations (sigdec) ------------------------------------
+
+    sigexp ::=
+        "sig" spec "end"
+        sigid
+
+    sigbind ::=
+        sigid "=" sigexp << "and" sigbind >>
+
+    sigdec ::=
+        "signature" sigbind << sigdec >>
+
+
+-- Functor Declarations (fundec) --------------------------------------
+
+    funformals ::=
+        strid ":" sigexp
+        spec
+
+    funbind ::=
+        funid "(" funformals ")" << ":" sigexp >> "=" strexp
+            << "and" funbind" >>
+
+    fundec ::=
+        "functor" funbind << fundec >>
+
+
+-- External Declarations (extdec) -------------------------------------
+
+    extvalbind ::=
+        << op >> var ":" ty << "=" pop11_exp >> ";"
+
+    exttypbind ::=
+        tyvar_seq tycon
+
+    extexnbind ::=
+        << op >> exncon << "of" ty >>
+
+    extstrbind ::=
+        strid << ":" sigexp >> "=" "struct" pop11_stmnt_seq "end"
+        strid << ":" sigexp >> "=" longstrid
+
+    extbind ::=
+        "val" extvalbind
+        "type" exttypbind
+        "eqtype" exttypbind
+        "exception" extexnbind
+        "structure" extstrbind
+
+    extdec ::=
+        "external" extbind << extdec >>
+
+See HELP * EXTERNAL
+
+
+-- Pervasive Declarations (perdec) ------------------------------------
+
+    perdec ::=
+        "pervasive" longstrid-1 __ longstrid-n << perdec >> (n >= 1)
+
+See HELP * PERVASIVE
+
+
+-- Top Level Declarations (topdec) ------------------------------------
+
+    topdec ::=
+        perdec
+        extdec
+        fundec
+        sigdec
+        strdec
+        exp
+
+Notes:
+
+1) pervasive declarations (perdec) and external declarations (extdec)
+are Poplog extensions to SML
+
+2) no top-level declaration may contain, as an initial segment, a
+shorter top-level declaration followed by a semicolon
+
+
+-- Programs (program) -------------------------------------------------
+
+    command ::=
+        id << arg-1 __ arg-n >> << ";" >>                   (n >= 0)
+
+    program ::=
+        command program
+        topdec ";" program
+        empty
+
+
+Note:
+
+commands are a Poplog extension to SML. A command consists of a command
+name (an identifier) followed by a (possibly empty) list of arguments.
+Arguments are not lexical items, but arbitrary character sequences
+separated by white space. A command is terminated either by a semicolon
+or by a newline. See HELP * COMMANDS for more information.
+
+
+--- C.all/pml/help/syntax
+--- Copyright University of Sussex 1994. All rights reserved. ----------

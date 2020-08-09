@@ -1,0 +1,192 @@
+HELP PROLOG                                    John Williams, April 1992
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+  2   Notating Prolog Goals
+  3   Functions for Creating Prolog Data Structures
+  4   Invoking Prolog Goals
+  5   Switching between Lisp and Prolog
+  6   See Also
+
+
+-----------------------------------------------------------------------
+1  Introduction
+-----------------------------------------------------------------------
+
+This file documents the Lisp interface to Poplog Prolog. The Prolog
+subsystem is modelled on the Prolog system described in "Programming in
+Prolog" by Clocksin and Mellish (published by Springer Verlag, 1981),
+which is itself very similar to both DEC System-10 Prolog and PDP-11
+Prolog.
+
+To load the PROLOG module, type:
+
+    (require :prolog)
+
+This may take some time, as the Prolog sources must be loaded. Consider
+using savelisp to prepare a Lisp saved image that includes the Prolog
+module. A command file $popcom/mklispplog (VMS: popcom:mklispplog.com)
+is is provided with Poplog for this purpose.
+
+
+-----------------------------------------------------------------------
+2  Notating Prolog Goals
+-----------------------------------------------------------------------
+
+The Lisp/Prolog interface defines the following read macros for creating
+Prolog data structures:
+
+    {functor arg1 arg2 ... argN}    notates a goal in prefix form
+
+    $word                           notates a prolog atom
+
+    ?var                            notates a prolog variable
+
+For example:
+
+    {$append ?x ?y '(a b c d e)}
+
+is expanded by the Lisp reader to:
+
+    (LET* ((#:PV2 (MAKE-PLOG-VAR)) (#:PV1 (MAKE-PLOG-VAR)))
+        (MAKE-PLOG-GOAL
+            (MAKE-PLOG-TERM
+                (MAKE-PLOG-ATOM 'APPEND) #:PV1 #:PV2 '(A B C D E))
+            (LIST 'Y #:PV2 'X #:PV1)))
+
+When run, this code creates a Prolog goal, a data structure comprising a
+Prolog term and an association list mapping Lisp symbols to Prolog
+variables.
+
+Note that the forms inside the {} brackets are evaluated as normal Lisp
+forms (hence the use of $ to notate the functor).
+
+The read macros {, $, and ? invoke the functions read-plog-goal,
+read-plog-atom, and read-plog-var respectively.
+
+
+-----------------------------------------------------------------------
+3  Functions for Creating Prolog Data Structures
+-----------------------------------------------------------------------
+
+The following functions are provided for creating Prolog data structures
+explicitly, without using the read macros described above.
+
+
+(make-plog-var)                                               [function]
+        Creates and returns a new uninstantiated Prolog variable.
+
+
+(make-plog-atom symbol)                                       [function]
+        Converts a Lisp symbol into a Prolog atom (i.e. a Pop-11  word).
+        Uses  the  same   case-conversion  rules   as  the   Lisp/Pop-11
+        interface, i.e.  all  uppercase  symbols are  converted  to  all
+        lowercase words; mixed-case symbols are converted to  mixed-case
+        words.
+
+
+(make-plog-term functor &rest arguments)                      [function]
+        Creates and returns  a Prolog  term with the  given functor  and
+        arguments. functor should be a Prolog atom, not a Lisp symbol.
+
+
+(make-plog-goal term alist)                                   [function]
+        Creates   and   returns   a    Prolog   goal   structure.    See
+        HELP * PLOG_GOALS.
+
+
+See REF * PROLOG for a full description of Poplog Prolog data
+representation.
+
+
+-----------------------------------------------------------------------
+4  Invoking Prolog Goals
+-----------------------------------------------------------------------
+
+Prolog goals can be invoked as boolean functions, by using:
+
+    (plog-goal-call goal)
+
+For example:
+
+    (plog-goal-call {$atomic *features*})
+    NIL
+
+    (plog-goal-call {$atomic 1})
+    T
+
+
+The special-form do-plog can be used to iterate over all the solutions
+to a Prolog goal. The syntax of do-plog is
+
+    (do-plog goal {(var*)} . {declarations | form*})
+
+The forms in the body of the do-plog construct are executed each time
+the goal succeeds, with the specified Lisp variables bound to the values
+of the Prolog variables associated with them by the alist component og
+the goal. The body of the loop is implicitly enclosed by a block named
+nil, so that return can be used to terminate the iteration.
+
+An example:
+
+    (plog-goal-call {$library $useful})     ;;; Includes append/3
+
+    (do-plog {$append ?x ?y '(a b c)} (x y)
+        (pprint x)
+        (pprint y)
+        (terpri))
+
+    NIL
+    (A B C)
+
+    (A)
+    (B C)
+
+    (A B)
+    (C)
+
+    (A B C)
+    NIL
+    T
+
+The result of the do-plog form is either t, if the goal succeeded at
+least once, or nil if it failed immediately.
+
+An abbreviated form of do-plog may be employed:
+
+    (do-plog goal)
+
+which is equivalent to
+
+    (plog-goal-call goal)
+
+
+-----------------------------------------------------------------------
+5  Switching between Lisp and Prolog
+-----------------------------------------------------------------------
+
+A function (prolog) is provided for switching input from Lisp top-level
+to Prolog. To get back to Lisp, use the Prolog macro LISP.
+
+
+-----------------------------------------------------------------------
+6  See Also
+-----------------------------------------------------------------------
+
+HELP * PLOG_GOALS
+    (a Pop-11 file) explains the Prolog goal mechanism
+
+PLOGHELP * LISPINPLOG
+    (a Prolog file) explains how to access Lisp from Prolog
+
+REF * PROLOG
+    Explains how Poplog Prolog is implemented
+
+HELP * SAVELISP
+    How to build saved images
+
+
+--- C.all/lisp/help/prolog
+--- Copyright University of Sussex 1992. All rights reserved.

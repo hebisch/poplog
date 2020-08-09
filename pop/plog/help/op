@@ -1,0 +1,263 @@
+PLOGHELP OP                                  Jonathan Laventhol Jun 1983
+                                       Revised: Kathryn Seifert Aug 1986
+                                         Revised: Simon Nichols May 1987
+                                         Revised: Adrian Howard Jul 1992
+
+Operators and how to declare them.
+
+    ?- op(<integer:P|off>, <fx|fy|xfx|xfy|yfx|yfy:T>, <atom:A|list:L>).
+
+Keywords: operators, precedence, type, fix, associativity
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- INTRODUCTION
+ -- DECLARING OPERATORS
+ -- PRECEDENCE
+ -- ... REMOVING OPERATORS
+ -- TYPE
+ -- EXAMPLES
+ -- CHANGING BACK TO STANDARD OPERATOR DECLARATIONS
+ -- RELATED DOCUMENTATION
+
+
+-- INTRODUCTION -------------------------------------------------------
+
+Operators in Prolog are a notational convenience for reading and writing
+certain compound terms, i.e. those whose principal functor has
+previously been declared as an operator using the evaluable predicate
+op/3. For example, the term:
+
+    2 + 1
+
+is a compound term whose functor is named '+' of arity 2, with arguments
+1 and 2.
+
+
+-- DECLARING OPERATORS ------------------------------------------------
+
+A call of op/3 takes the following form:
+
+    ?- op(<integer:P|off>, <fx|fy|xfx|xfy|yfx|yfy:T>, <atom:A|list:L>).
+
+and declares an atom A or a list of atoms L as operators with precedence
+P and type T (these terms are explained below). When a list of atoms L
+is given as the third argument to 'op', all of the atoms in the list
+will be declared as operators with the same associativity and type.
+Thus,
+
+    ?- op(Prec, Type, Atom).
+
+declares Atom as an operator of given precedence and type, and
+
+    ?- op(Prec, Type, [Atom|Atoms]).
+
+declares Atom and each member of Atoms as operators with the same
+precedence and type.
+
+Using 'op', any standard system operator declaration can be changed by
+the user. See PLOGHELP * OPERATORS  for a list of the standard operator
+declarations which are made when POPLOG Prolog is loaded.
+
+
+-- PRECEDENCE ---------------------------------------------------------
+
+The precedence of an operator is indicated by an integer from 1 to 1999.
+It is used to disambiguate expressions where the structure of the term
+is not made explicit through the use of brackets.  The lower the
+numerical value of the precedence, the greater the "binding power" of
+the operator. Given any term, the general rule is that the operator with
+the highest precedence, i.e. the operator which binds least tightly, is
+the principal functor (this can, of course, be changed by the
+appropriate use of brackets). In other words, the expression with the
+operator which binds most tightly is evaluated first.  Thus, since the
+multiplication operator '*' has a numerically lower precedence value
+(21) than the addition operator '+' (31), the expression
+
+    1 + 4 * 3
+
+is interpreted as
+
+    1 + (4 * 3)
+
+
+-- ... REMOVING OPERATORS ---------------------------------------------
+
+If instead of an integer the atom "off" is given then the specified
+operator is removed instead of being declared. For example:
+
+    :- op(off, xfx, and).
+
+Will remove a previously declared operator and/2.
+
+
+-- TYPE ---------------------------------------------------------------
+
+The type of an operator encodes two pieces of information: it determines
+the "fix" (or position) of an operator and its associativity.
+
+An operator may appear in one of three positions:
+
+    1. INFIX -- the operator appears between its two arguments.
+    2. PREFIX -- the operator precedes its single argument.
+    3. POSTFIX -- the operator appears after its single argument.
+
+Infix operators are BINARY - they take two arguments - and prefix and
+postfix operators are UNARY - they take a single argument.
+
+If, in an expression, the argument to an operator with precedence P is a
+subexpression whose principal functor is an operator which also has a
+precedence of P, there is an ambiguity which must be resolved using the
+associativities of the operators.
+
+The possible values for indicating the type (fix and associativity) in
+an operator declaration are the following atoms:
+
+        Prefix operators:
+            fx
+            fy
+
+        Postfix operators:
+            xf
+            yf
+
+        Infix operators:
+            xfx
+            xfy     (right associative)
+            yfx     (left associative)
+
+
+The 'f' stands for the functor (i.e. the operator) and the 'x's and 'y's
+for its arguments; the choice of whether to indicate an argument by an
+'x' or by a 'y' determines the associativity of the operator.
+
+An 'x' stands for a subexpression which can contain an operator whose
+precedence is numerically less than the precedence of the operator 'f',
+i.e. its principal functor must be of lower precedence, unless the
+subexpression is explicitly bracketed. A 'y' stands for a subexpression
+which can contain an operator with a precedence less than or the same as
+the precedence of the operator 'f'.
+
+A binary operator can be declared to be one of left associative, right
+associative or non-associative. For a given operator, such as '++', this
+choice determines how an expression such as:
+
+    a ++ b ++ c
+
+is interpreted.
+
+After the declaration
+
+    :- op(100, xfy, ++).    % declare '++' to be right associative
+
+the following two expressions are equivalent:
+
+    a ++ b ++ c
+    a ++ (b ++ c)
+
+Conversely, after the declaration
+
+    :- op(100, yfx, --).    % declare '--' to be left associative
+
+the following two expressions are equivalent:
+
+    a -- b -- c
+    (a -- b) -- c
+
+Finally, given the declaration
+
+    :- op(100, xfx, **).    % declare '**' to be non-associative
+
+the following expression is ILLEGAL:
+
+    a ** b ** c
+
+and requires bracketing.
+
+Similar considerations apply to prefix and postfix operators. After the
+declaration
+
+    :- op(100, fy, not).    % declare 'not' as a prefix operator
+
+the following expressions are equivalent:
+
+    not not P
+    not(not P)
+
+However, if 'not' were declared with type 'fx', only the second of the
+above expressions would be legal.
+
+
+-- EXAMPLES -----------------------------------------------------------
+
+The division operator '/' is normally declared as a left associative
+infix operator (yfx) :
+
+    :- op(21, yfx, /).
+
+Thus, the following expressions are equivalent:
+
+    ?- X is 6 / 2 / 3.
+    X = 1 ?
+    yes
+
+    ?- X is (6 / 2) / 3.
+    X = 1 ?
+    yes
+
+However, we can redefine '/' as a right associative operator:
+
+    :- op(21, xfy, /).
+
+Now the following expressions are equivalent:
+
+    ?- X is 6 / 2 / 3.
+    X = 9 ?
+    yes
+
+    ?- X is 6 / (2 / 3).
+    X = 9 ?
+    yes
+
+
+The multiplication operator '*' is normally declared as an infix
+operator with precedence 21, and the addition operator '+' is normally
+declared as an infix operator with precedence 31.  Thus, the following
+expressions are equivalent:
+
+    ?- X is 9 * 2 + 7.
+    X = 25 ?
+    yes
+
+    ?- X is (9 * 2) + 7.
+    X = 25 ?
+    yes
+
+
+-- CHANGING BACK TO STANDARD OPERATOR DECLARATIONS --------------------
+
+If you have made some changes to the declarations of built-in Prolog
+operators and you wish to change them back to their standard
+declarations, use library DEFAULT_OPS. See PLOGHELP * DEFAULT_OPS for
+more details.
+
+
+-- RELATED DOCUMENTATION ----------------------------------------------
+
+PLOGHELP * CURRENT_OP
+    How to get the precedence, fix and atom of the current operator
+
+PLOGHELP * DEC10
+    Library file to change operator precedences to those of DEC10 Prolog
+
+PLOGHELP * DEFAULT_OPS
+    How to restore operator precedences to their default values
+
+PLOGHELP * OPERATORS
+    Operator declarations made when the Prolog system is loaded
+
+
+
+--- C.all/plog/help/op -------------------------------------------------
+--- Copyright University of Sussex 1987. All rights reserved. ----------

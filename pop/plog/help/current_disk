@@ -1,0 +1,124 @@
+PLOGHELP CURRENT_DISK                      Jonathan Laventhol March 1984
+                              Revised by Kathryn Seifert  September 1986
+
+Library package for finding out about disk files
+
+Keywords: disk files, operating system
+
+
+CONTENTS - (Use <ENTER> g to access sections)
+
+ -- INTRODUCTION
+ -- AN EXAMPLE INVOLVING 'CURRENT_DISK/1'
+ -- AN EXAMPLE INVOLVING 'CURRENT_DISK/3'
+ -- EXAMPLE OF USE
+ -- RELATED DOCUMENTATION
+
+
+-- INTRODUCTION -------------------------------------------------------
+
+The CURRENT_DISK library package provides two predicates for finding out
+information about disk files.  To load the library file, type:
+
+    ?- library(current_disk).
+
+You will now have the two predicates 'current_disk/1' and
+'current_disk/2' available.
+
+
+-- AN EXAMPLE INVOLVING 'CURRENT_DISK/1' ------------------------------
+
+    ?- current_disk(Name).
+    Name = are
+    ? ;
+    Name = arithmetic
+    ? ;
+    Name = arrow
+    ?
+    yes
+
+The variable Name is unified with an atom for each file in the current
+directory.  The format of the name will be dependant on the operating
+system you are using; the example above was done under UNIX.
+
+
+-- AN EXAMPLE INVOLVING 'CURRENT_DISK/3' ------------------------------
+
+Note: The printout in this section was done with the predicate 'portray'
+(see PLOGHELP * PORTRAY) defined as:
+    portray(X) :- writeq(X).
+This makes quotes appear around atoms in the solutions where necessary)
+
+    ?- current_disk('~kaths/pdoc', Nameparts, Statparts).
+    Nameparts = ['/cog1/psunb/kaths/pdoc', '', '', '/cog1/psunb/kaths',
+                  pdoc, '', '']
+    Statparts = [512, 525117464, 0, 177, 16877]
+    ?
+    yes
+
+    ?- current_disk('[pop]*.p', Nameparts, Statparts).
+    Nameparts = ['_dra2:[pop]grum.p.2', '', '_dra2:', '[pop]', grum, p, 2]
+    Statparts = [158, '26-JAN-1984 14:35', 83, 41, 40960] ? ;
+
+    Nameparts = ['_dra2:[pop]temp.p.1', '', '_dra2:', '[pop]', temp, p, 1]
+    Statparts = [108, '28-FEB-1984 16:16', 83, 41, 40960] ? ;
+
+    no
+
+The first argument to 'current_disk/3' is an atom representing a file
+specification, possibly with wildcards.  The format of this argument is
+dependant on the operating system; the first example above is for the
+UNIX operating system; the second example is for the VMS operating
+system (directory [pop], any name, filetype 'p').  The variable
+Nameparts will be unified with a list representing the parts of the
+filename.  The parts are atoms in the following format:
+
+        [Fullname, Host, Device, Directory, Name, Type, Version]
+
+the exact format is operating system dependant.  Note that some of the
+atoms may be empty. Fullname will be an atom representing
+the file (probably the most useful of the entries).
+
+The variable Statparts gets unified with a list of five elements giving
+statistics about the file in the following format:
+
+        [Size, Date, Group, Owner, Protection]
+            Size is in bytes.
+            Date is an atom.  Format dependant on OS.
+            Group and Owner are the user's group and user numbers.
+            Protection is number representing protection.
+                                            Dependant on OS.
+
+If for some reason the statistics cannot be accessed (perhaps you don't
+have appropriate privileges) then Statparts will be a list of five
+question marks.
+
+
+-- EXAMPLE OF USE -----------------------------------------------------
+
+You can make predicates to print the current directory:
+
+    dire :-
+        (current_disk(X),
+        write(X), nl,
+        fail);
+        true.
+
+Or give you a list of the files, sorted by size:
+
+    dirlist(Spec, X) :-
+            fast_bagof(foo(Size, Name),
+                       current_disk(Spec, [Name|_], [Size|_]), L),
+            keysort(L, X).
+                /* see PLOGHELP * KEYSORT, PLOGHELP * BAGOF */
+
+    ?- dirlist('[pop]*.p', X).
+        X = [foo(108, '_dra2:[pop]temp.p.1'),
+        foo(158, '_dra2:[pop]jcl.p.2')] ? ;
+        no
+
+
+-- RELATED DOCUMENTATION ----------------------------------------------
+
+PLOGHELP * LIBRARIES
+ Overview of Prolog library programs

@@ -1,0 +1,127 @@
+PLOGHELP LISPINPLOG                    Robert James Duncan,  23 Dec 1986
+
+How to access Common Lisp from within Prolog.
+
+Keywords: mixed languages, Prolog, Lisp
+
+The Prolog library LISPINPLOG provides a means for accessing Common Lisp
+functions from within Prolog.  The predicates provided are very simple
+but they make available much of the Lisp machinery.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Lisp Symbols
+ -- Applying Lisp Functions
+ -- Evaluating Lisp Expressions
+ -- More About Lisp Symbols
+ -- Switching between Prolog and Lisp
+ -- Related Documentation
+
+
+-- Lisp Symbols -------------------------------------------------------
+
+Prolog usually uses POP-11 words for its atoms but Lisp has its own data
+structure for its symbols.  However, Prolog treats anything which isn't
+a prologterm or pair as atomic (PLOGHELP * ATOMIC) so all we need is a
+means of referring to Lisp symbols and Prolog will treat them in just
+the same way as it treats other atoms.  Lisp symbols can be notated in
+Prolog by prefacing them with the @ symbol.  This is a Prolog macro
+(PLOGHELP * MACRO).
+
+Most Lisp symbols consist of upper-case characters. Some examples:
+
+    ?- X is dataword('FOO').
+    X = word
+
+    ?- X is dataword(@FOO).
+    X = symbol
+
+    ?- X is dataword('@FOO').
+    X = word
+
+The last example shows how to notate Prolog atoms starting with @ (e.g.
+those used as sorting predicates).
+
+
+-- Applying Lisp Functions --------------------------------------------
+
+lisp_apply(Func, Arglist, Result)
+lisp_mv_apply(Func, Arglist, Resultlist)
+
+Both of these predicates apply the functional value of the Lisp symbol
+Func to the arguments in the list Arglist.  The arguments are NOT
+evaluated.  It is a feature of Common Lisp that a function may return
+more than one value.  This is catered for by the predicate lisp_mv_apply
+which collects all of the results of the function in a list.
+
+E.g.
+
+    ?- lisp_apply(@FLOOR, [13, 4], Quotient).
+    Quotient = 3
+
+    ?- lisp_mv_apply(@FLOOR, [13, 4], [Quotient, Remainder]).
+    Quotient = 3
+    Remainder = 1
+
+
+-- Evaluating Lisp Expressions ----------------------------------------
+
+lisp_eval(Expr, Result)
+lisp_mv_eval(Expr, Resultlist)
+
+Both of these predicates evaluate the Lisp expression Expr and return
+their value in Result.  Multiple values can be collected into a list
+with lisp_mv_eval.  A Lisp symbol evaluates to its value so lisp_eval
+provides a way of accessing the value of a symbol.  It is also possible
+define Lisp functions using lisp_eval.
+
+E.g.
+
+    ?- lisp_eval(@PI, R).
+    R = 3.141593
+
+    ?- lisp_eval([@DEFUN, @TWICE, [@X], [@+ ,@X, @X]], R).
+    R = @TWICE
+
+    ?- lisp_apply(@TWICE, [2], N).
+    N = 4
+
+
+-- More About Lisp Symbols --------------------------------------------
+
+lisp_symbol(Word, Symbol)
+
+In some cases, it may be necessary to construct symbols at run-time,
+rather than notating them with the @ macro. The predicate lisp_symbol
+takes a normal Prolog atom Word and constructs the corresponding Lisp
+symbol, which it then unifies with Symbol. Alternatively, if you have a
+Lisp symbol and you want to get the corresponding Prolog atom, this
+predicate will unify Word with it.
+
+E.g.
+
+    ?- lisp_symbol('FLOOR', S).
+    S = @FLOOR
+
+    ?- lisp_symbol(W, @FLOOR).
+    W = FLOOR
+
+
+Not all Lisp symbols can be notated using the @ macro (those Lisp
+variables starting and ending with *, for instance).
+
+
+-- Switching between Prolog and Lisp -----------------------------------
+
+A Prolog command, LISP, is provided for switching input from the
+Prolog top-level compiler to Lisp. To return to Prolog from Lisp, use
+the Lisp function PROLOG.
+
+
+-- Related Documentation ----------------------------------------------
+
+PLOGHELP * MIXED_LANGUAGES
+    Overview of interface between Prolog and other languages
+
+--- C.all/plog/help/lispinplog -----------------------------------------
+--- Copyright University of Sussex 1990. All rights reserved. ----------

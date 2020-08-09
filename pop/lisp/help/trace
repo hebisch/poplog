@@ -1,0 +1,251 @@
+HELP TRACE                                       John Williams, May 1987
+                                                       Revised July 1995
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+  2   Tracing Built-In Functions
+  3   Tracing Macros
+  4   Tracing Special-Forms
+  5   Tracing Methods
+  6   *trace-print-level* and *trace-print-length*
+  7   The :Break Option
+  8   See Also
+
+
+-----------------------------------------------------------------------
+1  Introduction
+-----------------------------------------------------------------------
+
+The macro trace modifies functions so that they display their arguments
+and results each time they are executed. The macro untrace returns
+functions to their original untraced state.
+
+For example:
+
+    (defun join (x y)
+        (if (null x)
+            y
+            (cons (car x) (join (cdr x) y))))
+
+    (join '(a b c) '(d e f))
+    (A B C D E F)
+
+    (trace join)
+    (JOIN)
+
+    (join '(a b c) '(d e f))
+    > JOIN (A B C) (D E F)
+    !> JOIN (B C) (D E F)
+    !!> JOIN (C) (D E F)
+    !!!> JOIN NIL (D E F)
+    !!!< JOIN (D E F)
+    !!< JOIN (C D E F)
+    !< JOIN (B C D E F)
+    < JOIN (A B C D E ...)
+    (A B C D E F)
+
+    (untrace join)
+    (JOIN)
+
+    (join '(p q) '(r s))
+    (P Q R S)
+
+Notice how the number of !'s indicates how deeply nested the function
+call is.
+
+If a traced function is redefined, the new definition will also be
+traced.
+
+
+-----------------------------------------------------------------------
+2  Tracing Built-In Functions
+-----------------------------------------------------------------------
+
+It is possible to trace built-in functions like car and cdr. However,
+tracing will only take effect if the code calling these functions is
+recompiled.
+
+The same is true for functions that have been declared inline. Tracing a
+function implicitly declares it notinline. However, when you untrace a
+function that was initially declared inline, it will not be returned to
+this status.
+
+
+-----------------------------------------------------------------------
+3  Tracing Macros
+-----------------------------------------------------------------------
+
+Tracing a macro effectively traces the macro expansion function, which
+is useful if you want to see what a macro call expands into
+(alternatively, use macroexpand explicitly).
+
+For example:
+
+    (trace case)
+    (case n
+        (1  'one)
+        (2  'two)
+        (3  'three)
+        (otherwise 'lots))
+
+    > CASE (CASE N (1 'ONE) (2 'TWO) (3 'THREE) ...) NIL
+    < CASE (IF (EQL N '1)
+               (PROGN 'ONE)
+               (IF (EQL N '2)
+                   (PROGN 'TWO)
+                   (IF (EQL N '3) (PROGN 'THREE) (PROGN 'LOTS))))
+
+
+It is currently not possibe to trace the execution of compiler macros.
+
+
+-----------------------------------------------------------------------
+4  Tracing Special-Forms
+-----------------------------------------------------------------------
+
+It is not possible to trace the execution of special-forms. A warning is
+issued if the name of a special-form is given as argument to trace or
+untrace.
+
+
+-----------------------------------------------------------------------
+5  Tracing Methods
+-----------------------------------------------------------------------
+
+It is also possible to trace the execution of a particular method,
+by using the following Poplog-specific extension to the trace syntax:
+
+    (trace {method-description}*)
+
+    method-description :== (:method generic-function-name
+                                    method-qualifiers
+                                    specializers)
+
+The method-qualifiers and specializers arguments have the same
+significance as for the function find-method (described in REF * CLOS).
+
+Here is an example:
+
+    (defclass person ()
+        ((name :initarg :name)
+         (age :initarg :age)))
+    #<STANDARD-CLASS PERSON>
+
+    (defmethod birthday ((p person)) (incf (slot-value p 'age)))
+    #<STANDARD-METHOD BIRTHDAY (PERSON)>
+
+    (trace (:method birthday nil (person)))
+    (#<STANDARD-METHOD BIRTHDAY (PERSON)>)
+
+    (birthday (make-instance 'person :name 'john :age 36))
+    > #<STANDARD-METHOD BIRTHDAY (PERSON)> #<PERSON #(JOHN 36)>
+    < #<STANDARD-METHOD BIRTHDAY (PERSON)> 37
+    37
+
+
+To untrace a method, use untrace with the same method-description.
+
+If method-qualifiers is the keyword :all, then all methods attached to
+the given generic-function-name will be traced. In this case the
+specializers may be omitted.
+
+
+-----------------------------------------------------------------------
+6  *trace-print-level* and *trace-print-length*
+-----------------------------------------------------------------------
+
+When trace prints the arguments and results of a function call, the
+values of the variables *trace-print-level* and *trace-print-length* are
+assigned to *print-level* and *print-length* respectively. This enables
+the user to specifically control the printing of trace arguments and
+results. *trace-print-level* and *trace-print-length* both have the
+value 5 initially.
+
+This feature can be disabled by setting the value of *trace-print-level*
+and/or *trace-print-length* to the keyword :ignore.
+
+
+-----------------------------------------------------------------------
+7  The :Break Option
+-----------------------------------------------------------------------
+
+As an extension to the standard Common Lisp trace facility, it is
+possible to set break points on function entry and exit. When the traced
+function is entered, the special variable *trace-args* is bound to a
+list of its arguments. The contents of this list can be changed during
+the "Trace-Entry" break, thus changing the arguments to which the
+function is applied. A list of the results returned by the traced
+function is available during the "Trace-Exit" break in the special
+variable *trace-results*. Again, this list may be altered, in order to
+make the function return different results.
+
+The syntax for setting entry/exit break points on a traced function is:
+
+        (trace (:break function-name [t | nil]))
+
+Use t when setting the break points, and nil to remove them.
+
+An example:
+
+    (defun revlist (l &aux r)
+        (dolist (i l r)
+            (push i r)))
+
+    (setq list '(a b c d e))
+    (A B C D E)
+
+    (revlist list)
+    (E D C B A)
+
+    (trace (revlist :break t))
+    (REVLIST)
+
+    (revlist lst)       ;;; Spot the deliberate mistake!
+    > REVLIST #<UNDEF LST>
+
+    Break:  (Trace Entry)
+     :H     Help
+     :C     Return from break
+
+    <0> *trace-args*
+    (#<UNDEF LST>)
+    <0> (setf (car *trace-args*) list)
+    (A B C D E)
+    <0> *trace-args*
+    ((A B C D E))
+    <0> :c
+    ;;; Return from break
+    < REVLIST (E D C B A)
+
+    Break:  (Trace Exit)
+     :H     Help
+     :C     Return from break
+
+    <0> *trace-results*
+    ((E D C B A))
+    <0> :c
+    ;;; Return from break
+    NIL
+    (E D C B A)
+
+
+To remove the break points from the example function revlist, do:
+
+    (trace (revlist :break nil))
+
+To completely untrace revlist, use:
+
+    (untrace revlist)
+
+
+-----------------------------------------------------------------------
+8  See Also
+-----------------------------------------------------------------------
+
+  HELP * DEBUG      For an overview of debugging in Poplog Common Lisp.
+  HELP * BREAK      For details of the BREAK package.
+
+
+--- C.all/lisp/help/trace
+--- Copyright University of Sussex 1992. All rights reserved.

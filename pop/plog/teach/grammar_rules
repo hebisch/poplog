@@ -1,0 +1,284 @@
+TEACH GRAMMAR_RULES                         Allan Ramsay, October 1985
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Introduction
+ -- Grammar rules
+ -- Syntactic sugar
+ -- From trees to clauses
+ -- Exercises
+
+-- Introduction ------------------------------------------------------
+
+This file is concerned with how one might generate executable PROLOG
+clauses from PROLOG grammar rules. The description of what a grammar
+rule is and how it can be used is simply intended to remind people who
+have already come accross them already of some of the details. The main
+function of this file is to explain how to turn a grammar rule into a
+clause.
+
+-- Grammar rules ------------------------------------------------------
+
+PROLOG grammar rules are a way of using the built-in facilities of
+PROLOG (namely the use of backtracking as the standard control strategy,
+and the presence of the unifier for binding variable values) for
+implementing a backtracking top-down parser. Grammars specified in the
+formalism of PROLOG grammar rules can be parsed fairly efficiently by
+converting the rules of the grammar into ordinary looking PROLOG
+clauses, and using these to achieve the top-level goal that some piece
+of text constitutes a sentence (or whatever other structure you are
+interested in). The formalism is described in detail in "Direct clause
+grammars compared with ATN's", Pereira and Warren, Artificial
+Intelligence 13, and there is also a good description of it in
+"Programming in PROLOG", Clocksin & Mellish, Chapter 9. The main point
+of this formalism is that a rule such as
+
+    sentence --> noun_phrase, verb_phrase
+
+can be interpreted as saying that a piece of text can be seen as an
+instance of a "sentence" if the first part can be seen as a
+"noun_phrase" and the remainder as a "verb_phrase". We could translate
+this interpretation of the rule into a couple of PROLOG clauses as
+follows:
+
+    sentence(S0, S1) :-
+        noun_phrase(S0, S),
+        verb_phrase(S, S1).
+    parse(S) :-
+        sentence(S, []).
+
+The first clause says that S0 (the original list of words) can be seen
+as a sentence if there is an initial segment which can be seen as a
+noun_phrase; that the remainder of the list after this initial segment
+should be known as S; that there is an initial segment of S which can be
+seen as verb_phrase; and that the remainder of S after THIS segment has
+been found should be passed back to the call of SENTENCE so that it can
+say how much text was left after it had done its job. The top level
+parser, PARSE, simply says that it wants its input to be accepted as a
+sentence with nothing left.
+
+In general, a grammar rule of the form
+
+    x --> y1, y2, y3, ... yn-1, yn.
+
+needs to be translated into a PROLOG clause of the form
+
+    x(T0, Tn) :-
+        y1(T0, T1),
+        y2(T1, T2),
+        y3(T2, T3),
+        ...
+        yn-1(Tn-2, Tn-1),
+        yn(Tn-1, Tn).
+
+In other words the elements of the right hand side of the rule get
+turned into sub-goals which, given a piece of text, try to show that it
+is of the required form. If it is, the sub-goals pass on the text which
+was left after they had dealt with their initial segment to the next
+sub-goal to do its best with. The first sub-goal is given the text which
+was fed into the call of the main goal, the last sub-goal returns the
+text which remains after they have all finished.
+
+Each sub-goal Yi should either have a collection of similar rules
+describing how to see if a piece of text is of the appropriate type, or
+should take the first word off the text and check that it is of the
+appropriate lexical category.
+
+Pereira and Warren discuss an extended version of the grammar rule
+formalism in their paper in AI 13. My aim here is not to go into the
+issues of natural language processing here, but to solve the problem of
+turning rules of the above form into the corresponding clauses.
+
+-- Syntactic sugar ----------------------------------------------------
+
+Structures in PROLOG may be thought of as trees. The structure denoted
+by the PROLOG expression
+
+    properties(X, isa(X, bicycle), belongs_to(X, allan))
+
+corresponds to the tree
+
+                        properties
+            -----------------------------------------
+            |               |                       |
+            |               |                       |
+            X              isa                  belongs_to
+                        -----------           --------------
+                        |          |          |            |
+                        |          |          |            |
+                        X       bicycle       X          allan
+
+i.e. for an expression consisting of a name, an opening bracket, a
+sequence of expressions separated by commas, and a closing bracket, we
+can make a tree with the name as the top node and trees corresponding to
+each expressions inside the brackets as descendants.
+
+There is an alternative way of writing expressions, where the name
+appears after the first sub-expression, with the rest of the
+sub-expressions appearing after the name, again with commas to separate
+them. This is often convenient for writing arithmetic and relational
+expressions. If we want to write an expression in this form, we have to
+ask PROLOG to accept that we are going to use the name we want in this
+"infix" format. We could, for instance, ask the following question:
+
+    ?- op(100, xfx, has_properties).
+
+This tells PROLOG that we would like in the future to use HAS-PROPERTIES
+as an infix operator. The arguments 100 and XFX tell PROLOG how we want
+it to act if we write an expression which contains HAS_PROPERTIES and
+some other infix operator (a case where this information might be
+required is if we write an expression containing the two infix operators
++ and *. Does N + M * T mean (N+M)*T or N+(M*T) ? See HELP *OP for a
+description of how the first and second arguments of OP are used for
+specifying what should happen in such cases).
+
+Thus we could now write
+
+    X has_properties isa(X, bicycle), belongs_to(X, allan).
+
+which is exactly equivalent to
+
+    has_properties(X, isa(X, bicycle), belongs_to(X, allan))
+
+and hence corresponds to the tree
+
+                      has_properties
+            -----------------------------------------
+            |               |                       |
+            |               |                       |
+            X              isa                  belongs_to
+                        -----------           --------------
+                        |          |          |            |
+                        |          |          |            |
+                        X       bicycle       X          allan
+
+In exactly the same way, the grammar rule separator --> can be defined
+as an infix operator, so that a rule like
+
+    lhs --> rhs1, rhs2, rhs3.
+
+corresponds to a tree of the form
+
+                    -->
+            --------------------------
+            |        |       |       |
+            |        |       |       |
+          lhs       rhs1    rhs2    rhs3
+
+-- From trees to clauses ----------------------------------------------
+
+What we now need is a means of turning trees into clauses. In order to
+do this we need to be able to match an arbitrary tree, getting out its
+top node and its subtrees. PROLOG does not provide facilities for doing
+this directly. Instead, there is an operator which allows us to match a
+tree and a list. This operator permits the match to succeed if the top
+node of the tree can be matched against the head of the list and the
+subtrees of the given tree can be matched one for one against the
+elements of the list. The following examples should indicate the effect
+of this operator (which is written as =.. and apparently pronounced, for
+reasons which are thoroughly obscure, as "univ").
+
+    f(X, a, g(9)) =.. [Top | Sub_trees]
+
+would lead to Top being matched with f, and Sub_trees being matched with
+the list [X, a, g(9)].
+
+    f(X, Y, Z) =.. [_ , 3, 4, 5]
+
+would lead to X, Y and Z being matched with 3, 4 and 5 respectively.
+
+    C =.. [f, 3, 4, 5]
+
+would lead to a structure of corresponding to f(3,4,5) being CREATED and
+matched with C.
+
+Given this operator, we can write the following PROLOG program for
+turning structures corresponding to grammar rules into clauses.
+
+    rule_to_clause(R) :-
+        R =.. [-->, Lhs | Rhs],
+                /*  Make sure what you've been given is indeed a grammar
+                    rule, extract the left hand side (a single item) and
+                    the right hand side (a collection of items). */
+        Lhs1 =.. [Lhs, S0, S1],
+                /*  Make up a new structure corresponding to the lhs,
+                    but with the variables S0 and S1 added */
+        new_rhs(S0, S1, Rhs, Rhs1),
+                /*  Ask for a new rhs with appropriate variables added
+                    in. NEW_RHS has to be told what variable were added
+                    to the lhs */
+        Rule =.. [:-, Lhs1, Rhs1],
+                /*  Make up a structure corresponding to the required
+                    clause (remember: clauses are "just structures") */
+        assert(Rule).
+                /* And add this clause to the database */
+
+    /*  NEW_RHS has two cases - (i) when there is exactly one item left
+        to be dealt with, (ii) when there are several items left. */
+
+    new_rhs(S1, S, [R], [R1]) :-
+        R1 =.. [R, S1, S].
+                /*  Simply make up a new structure with the variables
+                    added. Return a list containing this new object */
+
+    new_rhs(S1, S, [R | Rhs], [R1 | Rhs1]) :-
+        R1 =.. [R, S1, S2],
+                /*  Make up a new structure with two variables. The
+                    tricky bit is that this second of these variables,
+                    S2, has not previously been mentioned. So R1
+                    contains a brand new variable */
+        new_rhs(S2, S, Rhs, Rhs1).
+                /*  The recursive call now carries down two variables -
+                    S, which it inherited when it was called itself,
+                    and S2 which it made up. */
+
+The intricate bit of the above program is the use of S2 in the second
+clause for NEW_RHS. This enables us to create a link between the
+sub-goals of the clause we are building, so that the second argument of
+each sub-goal but the last is the same as the first argument of the
+sub-goal that follows it; and the second argument of the last sub-goal
+is the same as the second argument of the head.
+
+-- Exercises ----------------------------------------------------------
+
+(1) Use the above program to convert
+
+    sentence --> noun_phrase, verb_phrase.
+    noun_phrase --> determiner, noun.
+    verb_phrase --> verb, noun_phrase.
+
+into a set of applicable clauses. Add the additional clauses
+
+    determiner([the | Rest], Rest).
+    noun([girl | Rest], Rest).
+    noun([bike | Rest], Rest).
+    verb([fixed | Rest], Rest).
+
+and spy what happens when you call
+
+    ?- sentence([the, girl, fixed, the, bike], Remainder).
+
+(2) Convince yourself that you understand why the dictionary entries
+have the form
+
+    category([word, Rest], Rest).
+
+Write a predicate LEXITEM which will assert the appropriate rule when
+called as
+
+    lexitem(girl, noun).
+
+(3) Adapt MAKE_RULE so that it will create appropriate clauses for the
+general form of direct clause grammar, where the rules may already have
+extra variables, e.g.
+
+    S(Trans) --> NP(Number), VP(Number, Trans).
+
+(This is quite hard).
+
+(4) Write a version of MAKE_RULE which will construct clauses to apply
+the grammar rules bottom up. (This is quite hard).
+
+--- C.all/plog/teach/grammar_rules
+--- Copyright University of Sussex 1990. All rights reserved. ----------

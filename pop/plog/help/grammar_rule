@@ -1,0 +1,176 @@
+PLOGHELP GRAMMAR_RULE                      Jonathan Laventhol March 1984
+                                 Revised by Kathryn Seifert  August 1986
+
+Prolog facilities for expressing definite clause grammars
+
+Keywords: grammar, natural language, symbols, operators, syntax, parsing
+
+
+CONTENTS - (Use <ENTER> g to access sections)
+
+ -- INTRODUCTION
+ -- DEFINING GRAMMAR RULES
+ -- FINDING WHETHER SENTENCES ARE SYNTACTICALLY WELL FORMED
+ -- UNDERLYING REPRESENTATION OF TERMS USING THE '-->'
+ -- MORE ARGUMENTS TO CONSTRUCT PARSE-TREES
+ -- RELATED DOCUMENTATION
+
+
+-- INTRODUCTION -------------------------------------------------------
+
+Prolog provides facilities for easily expressing definite clause
+grammars.  "Definite clause grammars" are phrase structure grammars in
+which the grammar rules can be expressed in logic and sentences parsed
+using a theorem prover.  Such grammar rules can be written in Prolog
+using the infix operator '-->'. These rules take the form:
+
+    A --> B.
+
+This is read as "a possible form for A is B".
+
+
+-- DEFINING GRAMMAR RULES ---------------------------------------------
+
+If we wished to specify that a possible form of a sentence is a
+noun-phrase followed by an verb-phrase, we can define the predicate
+'sentence' in the following way:
+
+    sentence --> noun_phrase, verb_phrase.
+
+We could then specify that a noun-phrase is made up of a determiner
+followed by a noun, and that a verb-phrase is can be made up either by a
+verb or by a verb followed by a noun_phrase.  We can define the
+predicates 'noun_phrase' and 'verb_phrase':
+
+    noun_phrase --> determiner, noun.
+    verb_phrase --> verb.
+    verb_phrase --> verb, noun_phrase.
+
+Using this notation, we can also specify what words belong to different
+categories:
+
+    determiner --> [the].
+    verb --> [likes].
+    noun --> [woman].
+
+
+-- FINDING WHETHER SENTENCES ARE SYNTACTICALLY WELL FORMED ------------
+
+Using the built-in predicate 'phrase/2' (see PLOGHELP * PHRASE), we can
+now find out whether a list of words representing a sentence conforms to
+a particular grammar rule.  For example, if we want to find out whether
+
+    "the woman likes the woman"
+
+is a syntactically well formed sentence according to the grammar we have
+defined, we can type:
+
+    ?- phrase(sentence, [the, woman, likes, the, woman]).
+    yes
+
+Or to find out if something is a syntactically well formed verb phrase:
+
+    ?- phrase(verb_phrase, [likes, the, woman]).
+    yes
+
+    ?- phrase(verb_phrase, [woman, likes]).
+    no
+
+
+-- UNDERLYING REPRESENTATION OF TERMS USING THE '-->' -----------------
+
+Terms using the '-->' notation are automatically converted to normal
+Prolog clauses when they are read during compilation.  You can do the
+conversion explicitly with the predicate expand_term/2 (see
+PLOGHELP * EXPAND_TERM):
+
+    ?- expand_term((sentence --> noun_phrase, verb_phrase), X).
+    X = sentence(_1, _2) :- noun_phrase(_1, _3) , verb_phrase(_3, _2)
+    ?
+    yes
+
+    ?- expand_term((determiner --> [the]), X).
+    X = determiner([the | _1], _1) :- true
+    ?
+    yes
+
+
+-- MORE ARGUMENTS TO CONSTRUCT PARSE-TREES ----------------------------
+
+More arguments can be added to terms defined using the '-->'.  These
+predicates can be used to carry out extra tests (e.g. to test whether a
+word or phrase is singular or plural); another use for extra predicates
+is constructing a parse-tree of the sentence or phrase being analysed. A
+simple example showing how such a parse-tree can be constructed is given
+below:
+
+    sentence(sentence(NP, VP)) --> np(NP), vp(VP).
+    np(np(Det, N)) --> det(Det), noun(N).
+    vp(vp(V)) --> verb(V).
+    vp(vp(V, NP)) --> verb(V), np(NP).
+
+In the above set of grammar rules, extra 'tree-building' arguments are
+added.  These rules specify that to build a parse tree of a sentence,
+parse trees for a noun-phrase (np) and a verb-phrase (vp) must be found
+first;  in order for a parse tree for a noun-phrase to be found, parse
+trees for a determiner (det) and noun must be found, and so on.
+
+Special brackets, {}, can be used to add tests or extra pieces of code
+into the grammar rules.  Code put inside the curly brackets are not
+expanded by the mechanism which translates the grammar rules into normal
+Prolog code.  Thus, we can define which words belong to which categories
+in the following manner:
+
+    det(det(X)) --> [X], {member(X, [a, an, the])}.
+    noun(noun(X)) --> [X], {member(X, [woman, food])}.
+    verb(verb(X)) --> [X], {member(X, [eats, likes, works])}.
+
+We can again use 'phrase/2' to find out whether lists representing
+sentences are syntactically well-formed according to this grammar and to
+produce a parse-tree showing the structure of these sentences (the
+Prolog output has been edited to clarify the structure of the parse-tree
+produced):
+
+    ?- phrase(sentence(X), [the, woman, likes, the, food]).
+    X = sentence(np(
+                    det(the),
+                    noun(woman)
+                    ),
+                 vp(
+                    verb(likes),
+                    np(
+                        det(the),
+                        noun(food)
+                       )
+                    )
+                 )
+    ?
+    yes
+
+
+-- RELATED DOCUMENTATION ----------------------------------------------
+
+PLOGHELP * ARROW
+ The '-->' operator used to specify grammar rules
+
+PLOGHELP * EXPAND_TERM
+ Predicate to translate grammar rules into normal Prolog clauses
+
+PLOGHELP * GRAMMARS
+ Overview of HELP files dealing with grammars and natural language
+
+PLOGHELP * LERNGRAM
+ Library program for learning concepts about English sentences
+
+PLOGHELP * PARSEDEMO
+ Library program for a simple natural language parser
+
+PLOGHELP * PHRASE
+ Predicate for invoking goals involving grammar rules
+
+TEACH * GRAMMAR_RULES
+ Tutorial introduction to Prolog grammar rules
+
+
+--- C.all/plog/help/grammar_rule ---------------------------------------
+--- Copyright University of Sussex 1988. All rights reserved. ----------

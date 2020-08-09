@@ -1,0 +1,108 @@
+HELP EXTERNAL                                   Aled Morris, August 1986
+
+This file documents the Lisp interface to the Poplog external load
+facility, which enables Poplog to access functions written in non-Poplog
+languages, such as Pascal, Fortran or C. The external load facilities
+are described fully in REF * EXTERNAL (a Pop-11 documentation file).
+
+To load the EXTERNAL module, type:
+
+    (require :external)
+
+The following functions will be added to the Poplog package:
+
+
+(external-load-files files symbol-list &key :label :nbytes)   [function]
+        This function loads externally defined procedures into Lisp. The
+        argument files should  be a  string naming an  object file  or a
+        list of object  file names. The  argument symbol-list  specifies
+        the names of the external procedures to be loaded. Each  element
+        in symbol-list must be either:
+
+          # a list whose car  is the name (as  a string) of an  external
+            routine, and whose cadr is a symbol. The named external
+            routine is assigned to the symbol-value of this symbol.
+
+          # a  two  element  vector  containing  special  load  control
+            information -- see REF * EXTERNAL for more details.
+
+        The keyword argument :label specifies a `label' for the external
+        load,  which  can  be  used  subsequently  as  an  argument   to
+        external-unload-files. If this argument is not supplied, a label
+        is generated automatically. The result of external-load-files is
+        this label.
+
+        The keyword  argument :nbytes  specifies  the amount  of  memory
+        which should be  made available  to the  external procedure  for
+        dynamic allocation. See REF * EXTERNAL for more details.
+
+
+(external-unload-files &optional label)                       [function]
+        This function `unloads' external object files. If no argument is
+        given, the most  recent external load  is undone. Otherwise  all
+        loads back  to  and including  the  one labelled  by  label  are
+        reversed.
+
+
+(external-show)                                               [function]
+        external-show prints  a display  of  the current  external  load
+        situation.
+
+
+(external-call external-procedure &rest arguments)            [function]
+        Applies external-procedure to arguments. The foreign function is
+        assumed to produce a single, integer, result, which is returned.
+        Beware of  the restrictions  on the  kind of  data that  can  be
+        passed to external procedures, as outlined in REF * EXTERNAL.
+
+
+(external-call-float external-procedure &rest arguments)      [function]
+        This function is similar to external-call: it applies the  given
+        external-procedure to arguments, but assumes that the result  of
+        the external procedure call will be a double precision  floating
+        point number, which it returns.
+
+
+(external-procedure-p object)                                 [function]
+        This predicate returns t if object is an external procedure, nil
+        otherwise.
+
+
+(live-external-procedure-p external-procedure)                [function]
+        External  procedures   which   have   been   unloaded   can   be
+        distinguished from  those  which  are  still  alive  using  this
+        predicate. It is an error to attempt to run an unloaded external
+        procedure.
+
+
+An Example
+----------
+
+The following example demonstrates how to externally load routines from
+the standard C Maths library:
+
+    (require :external)
+    T
+
+    (external-load-files "-lm" '(("_sin" c-sin) ("_cos" c-cos)))
+    "EXTERNAL-LOAD-13"
+
+    c-sin
+    #<external_procedure "_sin">
+
+    (external-procedure-p c-cos)
+    T
+
+    (external-call-float c-sin (/ pi 2))
+    1.0d0
+
+    (external-call-float c-cos pi)
+    -1.0d0
+
+
+Note: On VMS systems, the specification of the C Maths library will
+      probably not be "-lm"
+
+
+--- C.all/lisp/help/external
+--- Copyright University of Sussex 1987. All rights reserved.

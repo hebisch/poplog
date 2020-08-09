@@ -1,0 +1,225 @@
+PLOGHELP ERROR                               Simon Nichols, October 1990
+
+A description of the kinds of errors which may arise while using Prolog.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Introduction
+ -- Syntax Errors
+ -- Run-time Errors
+ -- Interrupts
+ -- Raising an Error
+ -- Handling Errors
+ -- Related Documentation
+
+
+-- Introduction -------------------------------------------------------
+
+There are two classes of error message which can arise while compiling
+or running a Prolog program: syntax errors and general run-time errors.
+Syntax errors occur when reading a clause, usually at compile time.
+Broadly speaking, other errors occur during the execution of a Prolog
+program.
+
+
+-- Syntax Errors ------------------------------------------------------
+
+If a clause, directive or general term read-in by the Prolog system does
+not comply with the syntax of POPLOG Prolog (see PLOGHELP * SYNTAX), the
+system prints a syntax error message, either on the terminal or in the
+output buffer if Prolog is being used from within VED. This will be the
+case whether clauses are being read by the Prolog compiler as part of a
+consult or reconsult (see PLOGHELP * CONSULT, * RECONSULT) or by a user
+program by means of a call to the evaluable predicate read/1 (or
+vread/2: see PLOGHELP * READ). As an example, given the incorrectly
+formed clause:
+
+    append([X|List1], List2, [X|List3) :- append(List1, List2, List3).
+
+Prolog will respond with the following message:
+
+;;; PROLOG SYNTAX ERROR - OPERATOR OR ']' EXPECTED IN LIST
+;;; FOUND  : )
+;;; READING: append ( [ X | List1 ] , List2 , [ X | List3 <<HERE>> )
+
+As you can see, three pieces of information are printed: a message
+describing the problem, the token at which the error was detected (the
+closing parenthesis in the above example) and the sequence of tokens
+which comprise the offending clause (or in general, term) including a
+mark "<<HERE>>" which indicates where the error occurred.
+
+Having reported the syntax error, the Prolog system attempts to skip
+past the erroneous term and resume reading (unless the term is in a file
+being loaded from VED: see below). It does this with a rather simple
+heuristic: if reading from the terminal, it skips to the end of the line
+and resumes reading with the next line of input. If reading from a file,
+it attempts to find the end of the offending term by discarding tokens
+up to a clause terminator, the atom '.'. This may sometimes lead the
+Prolog system to re-start reading from the middle of a term, which will
+in all probability produce a further syntax error.
+
+If a file is loaded from inside VED (for example, using <ENTER> l or
+<ENTER> l1) the Prolog system behaves differently: it will stop after
+the first syntax error, thereby leaving the cursor near the point at
+which the error occurred. This is not the case for files consulted or
+reconsulted from immediate mode (see HELP * IM), since this is treated
+the same as the Prolog top level.
+
+
+-- Run-time Errors ----------------------------------------------------
+
+General run-time errors may have a wide variety of causes: calling an
+evaluable predicate with arguments of the wrong type (e.g. trying to
+perform arithmetic on symbolic atoms), attempting to assert a clause for
+a system predicate, and so on. They can also be generated from user
+programs by use of the evaluable predicate error/2 (see below). The
+error messages have a similar form to syntax error messages, except that
+instead of the tokens comprising the erroneous clause being printed, the
+names of predicates active when the error occurred are displayed. For
+example, the goal:
+
+    ?- functor(Term, foo, N).
+
+will result in the error message:
+
+;;; PROLOG ERROR - INSUFFICIENT INSTANTIATION OF GOAL
+;;; INVOLVING:  functor(_1, foo, _2)
+;;; DOING    :  functor/3 functor/3
+
+As with a syntax error, three pieces of information are displayed: a
+description of the error, the term(s) which were involved in the error
+(usually the immediate goal which resulted in the error or the arguments
+to that goal) and the name of the predicate which was executing when the
+error occurred together with the name of the predicate which called that
+(if any) and so on back up the calling chain: this is called a
+"backtrace", because it traces the sequence of calls back up the calling
+chain. Note that the most recently executing predicate (i.e. the one in
+which the error occurred) is the first predicate printed after the
+"DOING" part of the message.
+
+The example above shows an error raised by evaluable predicates when
+they are called with their arguments insufficiently instantiated. The
+predicate functor/3 (see PLOGHELP * FUNCTOR) requires both its second
+and third arguments to be instantiated when its first argument is
+uninstantiated, and in the above call the third argument is a variable.
+You may have noticed that the backtrace shows functor/3 twice: the first
+occurrence is the POP-11 procedure which actually does the work; the
+second is the Prolog predicate which invokes it. Both are called
+functor/3.
+
+Because of optimisations performed by the POPLOG Prolog compiler, the
+backtrace will often not show a complete calling chain. In general, only
+predicates with an outstanding choice point will still be active (i.e.
+have stack frames on the call stack), so only these will appear in the
+backtrace. In addition, non-Prolog procedures (such as low-level POPLOG
+system procedures) will not usually be printed. This may not be what you
+want if you are writing mixed language programs involving Prolog. This
+behaviour can be altered by assigning an integer value to the POP-11
+variable -popsyscall- (see HELP * POPSYSCALL and REF * POPSYSCALL):
+
+    ?- prolog_setq(popsyscall, 1).
+
+or from POP-11
+
+    : 1 -> popsyscall;
+
+See PLOGHELP * MIXED_LANGUAGES for an introduction to mixed language
+programming using Prolog.
+
+Some errors may not print the "INVOLVING" part of the message: messages
+resulting from running out of memory are like this.
+
+After printing out the error message, Prolog behaves as if you had
+interrupted it by typing the operating system interrupt character: see
+the next section.
+
+
+-- Interrupts ---------------------------------------------------------
+
+When you type the operating system interrupt character (usually CTRL-C),
+Prolog immediately terminates the currently executing goal and prints
+the message:
+
+;;; [execution aborted]
+
+If you are interacting with the Prolog top level interpreter, either
+from the terminal or in a VED immediate mode window, you will be
+returned to the Prolog top level, thus:
+
+Setprolog
+?-
+
+You will then be able to type in another goal. If, one the other hand,
+you are using LMR (load marked range) from VED, the standard VED
+interrupt routine is ultimately invoked and you will stay in VED, with
+error messages being sent to the output buffer (by default the file
+named "output.pl"). See PLOGHELP * VED for information on interacting
+with Prolog from within VED.
+
+
+-- Raising an Error ---------------------------------------------------
+
+You can raise an error from within a Prolog program by the use of the
+evaluable predicate error/2, which has the general form:
+
+    ?- error(Message, ListOfCulprits).
+
+where Message is an atom and ListOfCulprits is list of terms. The effect
+is exactly the same as an error raised by the Prolog system: the current
+computation is aborted and an error message as described above is
+displayed. As an example, the predicate sum_sqr/3 calculates the sum of
+the squares of two numbers:
+
+    sum_sqr(X,Y,Z) :-
+        (integer(X); float(X)),
+        (integer(Y); float(Y)),
+        !,
+        Z is X * X + Y * Y.
+    sum_sqr(X,Y,_) :-
+        error('Numbers needed', [X, Y]).
+
+When called by the following goal:
+
+    ?- sum_sqr(2,X,Y).
+
+it raises the error:
+
+;;; PROLOG ERROR - Numbers needed
+;;; INVOLVING:  2 _1
+;;; DOING    :  pop_setpop_compiler
+
+Note that there are no outstanding choice points for sum_sqr/2, which is
+why the backtrace only mentions a procedure called -pop_setpop_compiler-
+(the compiler invoked by POPLOG when it starts up).
+
+
+-- Handling Errors ----------------------------------------------------
+
+Run-time errors, whether generated by the Prolog system or from your
+program by means of error/2, may be handled (i.e. trapped) by asserting
+clauses for the Prolog error handler prolog_error/2.
+
+See PLOGHELP * PROLOG_ERROR for a description of the error handler and
+how to trap errors.
+
+It is possible to raise untrappable errors by calling the evaluable
+predicate prolog_syserror/2, which has the same format as error/2, i.e.
+
+    ?- prolog_syserror(Message, ListOfCulprits).
+
+The only difference from error/2 is that such errors bypass the Prolog
+error handler.
+
+
+-- Related Documentation ----------------------------------------------
+
+PLOGHELP * DEBUG
+    Overview of the debugging facilities provided by POPLOG Prolog
+
+PLOGHELP * PROLOG_ERROR
+    Description of the Prolog run-time error-handler
+
+
+--- C.all/plog/help/error
+--- Copyright University of Sussex 1990. All rights reserved. ----------

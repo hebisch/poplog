@@ -1,0 +1,81 @@
+PLOGHELP CATCH                                  Simon Nichols, June 1991
+
+    ?- library(catch).
+
+    ?- catch(Goal, CatchTag, Recovery).
+
+    ?- throw(ThrowTag).
+
+
+The catch/3 and throw/2 predicates offer a complementary exception
+handling mechanism to that provided by the standard error handling
+predicate, prolog_error/2 (see PLOGHELP * PROLOG_ERROR). They are based
+on the description given in the draft ISO specification for Standard
+Prolog.
+
+The exception handling facilities provided by catch/3 and throw/1 are
+only available after loading LIBRARY CATCH, as follows:
+
+    ?- library(catch).
+
+At the moment, all errors raised by the Prolog system (either
+compilation or run-time errors) result in the invocation of
+prolog_syserror/2 unless a suitable error handler is provided by
+asserting an appropriate clause for prolog_error/2. The catch/3 and
+throw/1 predicates can be used to raise (signal) and handle exception
+conditions by user programs only. This will change in the future. In the
+next version of Poplog Prolog they will be built-in predicates, and will
+also be integrated with the error handling facilities described in
+PLOGHELP * PROLOG_ERROR.
+
+The catch/3 and throw/2 predicates provide a means of abandoning the
+current flow of control -- by invoking throw/1 -- and returning
+immediately to a well defined point, represented by an invocation of the
+catch/3 predicate.
+
+The Goal and Recovery arguments to catch/3 are terms which represent
+goals. The tag arguments to catch/3 (CatchTag) and throw/1 (ThrowTag)
+can be any terms. The predicate catch/3 calls Goal. During the
+evaluation of Goal, if a call to throw/1 occurs such that ThrowTag
+unifies with CatchTag then Recovery is called. Thereafter execution
+continues as if the call to catch/3 had been replaced by the call to
+Recovery. If no call to throw/1 takes place, catch/3 behaves like
+call/1, i.e.,
+
+    catch(Goal, CatchTag, Recovery).
+
+behaves like
+
+    call(Goal).
+
+See PLOGHELP * CALL. In other words, if Goal succeeds then the call to
+catch/3 succeeds; if Goal fails then so does the call to catch/3. If the
+call of Goal exits abnormally by calling throw/1, and the catch and
+throw tags unify, the success or failure of the call to catch/3 depends
+on the success or failure of the goal Recovery.
+
+Invocations of catch/3 are "nested" in that a call of throw/1 throws
+control up to the nearest invocation of catch/3. If the tags do not
+match, control is then thrown up to the next invocation of catch/3, and
+so forth, until either an invocation of catch/3 is found with a tag
+which unifies with the tag given as an argument to the original
+invocation of throw, or there are no more active invocations of catch/3.
+In this case an error results: for example, the call
+
+    ?- throw(example).
+
+at top level will result in the following error:
+
+    ;;; PROLOG ERROR - throw: NO MATCHING catch
+    ;;; INVOLVING:  example
+    ;;; DOING    :  throw/1
+
+Note that catch/3 is re-satisfiable: i.e., if Goal generates multiple
+solutions then so will catch(Goal, CatchTag, Recovery).
+
+For an example of the use of catch/3 and throw/1, see the one in
+PLOGHELP * ON_INTERRUPT.
+
+
+--- C.all/plog/help/catch
+--- Copyright University of Sussex 1991. All rights reserved. ----------

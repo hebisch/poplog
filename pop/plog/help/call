@@ -1,0 +1,89 @@
+PLOGHELP CALL                                  Simon Nichols, April 1992
+
+A family of predicates for calling terms as goals.
+
+    ?- call(_G).
+    ?- call(_P, ____Arg1, ..., ____ArgN).
+
+If _G is instantiated to a term which would be acceptable as a goal in
+the body of a clause, i.e., an atom or compound term, the goal call(_G)
+is executed exactly as if that term appeared textually in its place,
+except that any cut (!) occurring in _G only cuts alternatives in the
+execution of _G (in other words, it does not affect the clause which
+contains the goal call(_G)).
+
+If _G is not instantiated to an atom or compound term, call/1 raises an
+error. In particular, if _G is unbound an instantiation fault is raised.
+
+The predicate call/1 is used by a program which needs to construct a
+goal as it runs and then execute that goal.
+
+Poplog Prolog allows the variable _G to be used on its own as a goal,
+i.e., _G and call(_G) are equivalent.
+
+For compatibility with DEC-10 Prolog, incore/1 is accepted as a synonym
+for call/1.
+
+As an example, the following are all equivalent:
+
+    ?- write(hello).
+    ?- Goal = write(hello), call(Goal).
+    ?- Goal = write(hello), Goal.
+    ?- Goal = write(hello), incore(Goal).
+
+There are potential efficiency penalties to using call/1. These result
+from the need to build a term out of a predicate and its arguments
+before it can be called as a goal. Consider the predicate maplist/3:
+
+    % maplist(+Pred, +Xs, ?Ys)
+    % is true when Pred(X, Y) is true for each X in Xs and Y in Ys.
+
+    maplist(P, [], []).
+    maplist(P, [X|Xs], [Y|Ys]) :-
+        P =.. L0,
+        append(L0, [X,Y], L),
+        G =.. L,
+        call(G),
+        maplist(P, Xs, Ys).
+
+This is a very useful predicate, but is expensive (in time and memory
+use) due to the calls to =../2 ("univ") and append/3. The call to
+append/3 might appear to be unnecessary. However, P might not be an atom
+(bound to the functor name of a two argument predicate) but a term,
+representing a "closure", i.e., a predicate with some "frozen"
+arguments. In that case, X and Y would have to be added to the end of
+any frozen arguments from the closure.
+
+For this reason, Poplog Prolog provides a whole family of call
+predicates, the call/N family (for any arity N > 0). In general, call/N
+applies it first argument, either a predicate or closure, to its
+remaining N-1 arguments. Moreover, it does so efficiently, without any
+additional data structures being created, and quickly. In fact, the
+overhead involved in using call/N is almost negligible. This makes the
+definition and use of higher-order predicates such as maplist/3
+perfectly practical in a production environment.
+
+Using call/3, maplist/3 may be defined as:
+
+    maplist(P, [], []).
+    maplist(P, [X|Xs], [Y|Ys]) :-
+        call(P, X, Y),
+        maplist(P, Xs, Ys).
+
+Indeed, it is so defined in library(higher_order).
+See PLOGHELP * HIGHER_ORDER.
+
+In principle, call/3 could be defined using call/1 as follows:
+
+    call(P, X, Y) :-
+        P =.. L,
+        append(L, [X, Y], L1),
+        G =.. L1,
+        call(G).
+
+Though this has the same meaning as the built-in call/3, the built-in
+version is far more efficient.
+
+
+--- C.all/plog/help/call
+--- Copyright University of Sussex 1992. All rights reserved. ----------

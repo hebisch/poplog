@@ -1,0 +1,304 @@
+HELP PML                                       Robert Duncan, March 1990
+                                                   Revised November 1994
+
+An introduction to the Poplog Standard ML subsystem.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+
+  2   Running PML
+
+  3   Initialisation
+
+  4   Command Line Arguments
+
+  5   PML and Pop-11
+
+  6   Further Documentation
+
+  7   References and Further Reading
+
+
+-----------------------------------------------------------------------
+1  Introduction
+-----------------------------------------------------------------------
+
+Poplog ML  (PML)  is  an  implementation  of  the  programming  language
+Standard ML (SML): a statically-scoped, strict functional language  with
+a polymorphic, static type system, a type-secure exception mechanism and
+a powerful module  facility for the  support of large-scale  programming
+projects. Both  the static  and dynamic  semantics of  SML are  formally
+defined: see  references [1,2]  below.  Poplog ML  attempts  a  faithful
+implementation of the formal semantics: known deficiences are documented
+in HELP * BUGS; extensions are described in HELP * FEATURES.
+
+Note:
+most of  the  documentation  files cross-referenced  here  are  directly
+available only when running the PML subsystem. To read the files outside
+of PML, use the <ENTER> pml command. For example:
+
+    <ENTER> pml help bugs
+
+    <ENTER> pml help features
+
+
+-----------------------------------------------------------------------
+2  Running PML
+-----------------------------------------------------------------------
+
+PML is supplied  as a Poplog  saved-image. To  run it, give  +pml as  an
+argument to the pop11 command invoked from the shell or DCL, as follows:
+
+    $ pop11 +pml
+
+Most sites should have a  command abbreviation installed for this  which
+will allow you to type just:
+
+    $ pml
+
+instead. In either case,  PML will print a  version banner, followed  by
+the word Setml and the primary prompt "-", something like:
+
+    Sussex Poplog (Version 15.03 Thu Jun 20 16:20:20 BST 1996)
+    Copyright (c) 1982-1996 University of Sussex. All rights reserved.
+    Standard ML (Version 2.1)
+
+    Setml
+    -
+
+Setml is printed  whenever the PML  system is reset --  on start-up,  or
+after an error or an interrupt. The primary prompt indicates that PML is
+waiting for new  input: you can  then type either  a standard  top-level
+declaration for evaluation, or a  PML command. A secondary prompt,  "=",
+will appear whenever the input typed so far is incomplete.
+
+Commands are not a part of Standard  ML: they are an addition to PML  to
+allow access to features  of the Poplog system.  Useful commands to  try
+are:
+
+    - help topic
+        Displays documentation on the given topic
+
+    - load file
+        Compiles a file
+
+    - ved file
+        Invokes the editor on a file
+
+    - bye
+        Exits PML
+
+The full set of commands is described in HELP * COMMANDS.
+
+
+-----------------------------------------------------------------------
+3  Initialisation
+-----------------------------------------------------------------------
+
+You can tailor the PML environment to your own taste by creating a  file
+called "init.ml" containing  code which  you would  like executed  every
+time you run PML. This could involve precompiling useful library  files,
+opening structures,  changing compiler  control variables  or any  other
+top-level declarations. PML will try to compile the "init.ml" file  each
+time it starts up: the file  is sought first in your *poplib  directory,
+and then failing that, in the current directory.
+
+This initialisation behaviour is the same as that of other parts of  the
+Poplog system and is  described more fully  in HELP * INITIAL. PML  also
+compiles the "init.p" files  described in that  file for general  Poplog
+initialisation, and  an  "init.ml"  file in  the  popsys  directory  for
+site-wide bug fixes or patches.
+
+
+-----------------------------------------------------------------------
+4  Command Line Arguments
+-----------------------------------------------------------------------
+
+The PML image  respects all the  standard Poplog command-line  arguments
+described fully in the introduction to REF * SYSTEM. Of these, the  most
+useful to ML users are:
+
+    %x
+        initialises the X interface (where applicable). Currently  there
+        is no support for  driving X directly from  ML, but the  X-based
+        version of the editor (XVed) does become available.
+
+    %nort
+        suppresses  run-time  actions:  recommended  when  making  saved
+        images.
+
+    ved file
+    im file
+    help topic
+        invoke the corresponding Ved (or XVed) commands.
+
+Example:
+
+    $ pml %x ved mylib.ml
+        Starts  up  PML  and  immediately  invokes  XVed  on  the   file
+        "mylib.ml".
+
+In addition, there are  a number of  command-line arguments specific  to
+PML, which work identically for  both Unix and VMS.  Currently-supported
+arguments are:
+
+    -load file
+    -l file
+        loads the named file. This is just like giving a load command to
+        the top-level prompt, except that the file is compiled in  quiet
+        mode. You can give several load arguments to PML, and the  files
+        will be compiled in order.
+
+    -eval exp
+    -e exp
+        evaluates the  given expression.  This is  just like  typing  an
+        expression to the  top-level prompt, except  that the result  is
+        not printed. It will still,  however, be available as the  value
+        it in  the  top-level environment.  You  can give  several  eval
+        arguments to PML, and the expressions will be evaluated in order
+        at the point at which they are encountered.
+
+    -ved file
+    -v file
+        starts up the editor Ved on the named file. The file name can be
+        omitted, in which case a default name is used. See HELP * MLVED.
+
+    -im file
+    -i file
+        starts up in Ved ``immediate mode'' in the named file. The  file
+        name can be omitted, in which  case a default name is used.  See
+        HELP * MLVED/'Immediate mode'.
+
+    -nostdin
+    -ns
+        suppresses  compilation  from  the  standard  input.  With  this
+        option, the arguments  ved and  im are ignored,  and any  errors
+        resulting  from   load  or   eval  arguments   cause   immediate
+        termination.
+
+    -noinit
+    -ni
+        suppresses compilation of the "init.ml" and "init.p" files.
+
+    -nobanner
+    -nb
+        suppresses printing of the banner.
+
+    --
+        stops command-line argument processing: any arguments  following
+        this are left unread.
+
+Examples:
+
+    $ pml -l mylib
+        Loads the file  "mylib.ml" from the  current directory and  then
+        goes into the usual interactive top-level. Identifiers  declared
+        in  the  "mylib"  file  will  be  available  in  the   top-level
+        environment.
+
+    $ pml -ns -l mylib -e "startup()"
+        Loads the file "mylib.ml" as  above, but then runs the  function
+        "startup" (which must have been  defined in that file). The  -ns
+        option suppresses any compilation from the standard input, so if
+        the startup function ever returns the PML process will terminate
+        immediately.
+
+    $ pml -i
+        Starts up PML in immediate mode in the file "output.ml".
+
+These extra arguments can be used in conjunction with the Poplog special
+arguments (i.e. those starting "%")  provided that the Poplog  arguments
+are given first. For example:
+
+    $ pml %x -i
+        Starts up PML and then XVed in immediate mode.
+
+    $ pml %nort -l mylib
+        Loads the  file  "mylib.ml"  as before,  but  with  no  run-time
+        actions performed -- useful if the file makes a saved image.
+
+
+-----------------------------------------------------------------------
+5  PML and Pop-11
+-----------------------------------------------------------------------
+
+From inside PML you can get to the Pop-11 top-level with the command
+
+    - pop11
+
+To return, use the macro
+
+    : pml
+
+Experienced users who wish  to build their  own saved images  containing
+PML can compile the subsystem from scratch by loading LIB * PML:
+
+    : lib pml
+
+The  procedures  described  in  REF * SUBSYSTEM  can  then  be  used  to
+initialise and start up the PML  top-level. To compile PML programs  use
+the procedure ml_compile:
+
+
+ml_compile(source)                                      [vars procedure]
+        Compiles an ML program from source which may be a filename (word
+        or string),  a character  repeater,  an input  device or  an  ML
+        instream.
+
+
+For help in writing mixed-language programs in Pop-11 and ML see:
+    HELP * MLINPOP
+
+
+-----------------------------------------------------------------------
+6  Further Documentation
+-----------------------------------------------------------------------
+
+HELP * HELPFILES
+    A summary of all the PML help files
+
+HELP * EXAMPLES
+    Some simple examples of programming in SML
+
+HELP * MLVED
+    Ved commands tailored for PML
+
+
+-----------------------------------------------------------------------
+7  References and Further Reading
+-----------------------------------------------------------------------
+
+[1] Robin Milner, Mads Tofte & Robert Harper
+    The Definition of Standard ML
+    MIT Press, 1990
+
+[2] Robin Milner & Mads Tofte
+    Commentary on Standard ML
+    MIT Press, 1991
+
+[3] Jeffrey D. Ullman
+    Elements of ML Programming
+    Prentice-Hall, 1993
+
+[4] Lawrence C. Paulson
+    ML for the Working Programmer
+    Cambridge University Press, 1991
+
+[5] Chris Reade
+    Elements of Functional Programming
+    Addison-Wesley, 1989
+
+[6] Ake Wikstrom
+    Functional Programming Using Standard ML
+    Prentice-Hall, 1987
+
+[7] Robert Harper
+    Introduction to Standard ML
+    University of Edinburgh technical report, LFCS-86-14, November 1986
+    (revised Nick Rothwell & Kevin Mitchell, 1989)
+
+
+--- C.all/pml/help/pml
+--- Copyright University of Sussex 1994. All rights reserved.

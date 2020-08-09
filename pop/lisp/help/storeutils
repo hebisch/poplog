@@ -1,0 +1,167 @@
+HELP STOREUTILS                                  John Williams, Mar 1988
+
+The file documents the Lisp interface to Poplog Storage Management
+facilities. These are described fully in REF * SYSTEM.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Loading the STOREUTILS Module
+  2   Store Size Parameters
+  3   Garbage Collection
+  4   Locking the Heap
+
+
+-----------------------------------------------------------------------
+1  Loading the STOREUTILS Module
+-----------------------------------------------------------------------
+
+To load the STOREUTILS module, type:
+
+    (require :storeutils)
+
+The functions and variables defined by this module are all external
+symbols of the poplog package.
+
+To examine the STOREUTILS module, use the top-level command showlib,
+i.e. type:
+
+    showlib storeutils
+
+
+-----------------------------------------------------------------------
+2  Store Size Parameters
+-----------------------------------------------------------------------
+
+*max-store-size*                                              [variable]
+        This variable  specifies  the (approximate)  maximum  number  of
+        words to which the system should expand the combined memory area
+        for  the  heap  and  user  stack.  When  reached,  (or  on  some
+        occasions,  slightly  exceeded),  the  system  will  not  expand
+        further, and the error
+
+        ROM: MEMORY LIMIT (popmemlim) EXCEEDED (using XXXX space)
+
+        results, where XXXX  is "heap", "stack"  or "fixed" to  indicate
+        whether the memory allocation request that caused the mishap was
+        for  an   ordinary  heap   structure,  the   user  stack,   or a
+        fixed-address heap structure.
+
+        Assigning nil to *max-store-size* is equivalent to setting it to
+        the value of *most-positive-fixnum*.
+
+        See also the Pop-11 variable popmemlim, in REF * SYSTEM.
+
+
+*min-store-size*                                              [variable]
+        This variable specifies the minimum number of words at which the
+        system should maintain the combined heap/user stack memory area.
+        When below this limit and more memory is needed, the system will
+        immediately expand up to this value (if it can); thereafter,  it
+        will never contract below this limit.
+
+        See also the Pop-11 variable popminmemlim, in REF * SYSTEM.
+
+
+*current-store-size*                                          [variable]
+        The number of  words of  memory in  use after  the last  garbage
+        collection.
+
+
+-----------------------------------------------------------------------
+3  Garbage Collection
+-----------------------------------------------------------------------
+
+*gc-copy*                                                     [variable]
+        If this variable is true (the default), then garbage collections
+        use  a  "copying"  algorithm,  which  temporarily  requires  the
+        allocation of extra memory in which to copy all non-locked  heap
+        structures; otherwise (or  if the required  extra memory is  not
+        available),  a  "non-copying"  algorithm  is  used.  Since   the
+        non-copying algorithm is  generally 25%  - 50%  slower than  the
+        copying one, there is unlikely ever to be any reason for setting
+        this variable to nil.
+
+
+*gc-hook*                                                     [variable]
+        This variable, if  not nil,  should contain a  function of  zero
+        arguments. This  function will  be invoked  after every  garbage
+        collection. Its results are discarded.
+
+
+*gc-ratio*                                                    [variable]
+        Controls the weighting of garbage collection time in determining
+        memory allocation for  the system.  The decision  as to  whether
+        expand or contract memory  is made by  considering the ratio  of
+        total CPU time to total  garbage collection CPU time  multiplied
+        by *gc-ratio*, and  then expanding or  contracting by an  amount
+        proportional to  this ratio.  The  maximum permitted  value  for
+        *gc-ratio* is 64, default value is 25.
+
+
+*gc-time*                                                     [variable]
+        Contains the  total  cpu  time  spent  doing  automatic  garbage
+        collection, in 1/100ths second. Does not record time spent doing
+        user-invoked garbage collection.
+
+
+*gc-verbose*                                                  [variable]
+        If this variable  is true then  a message is  output after  each
+        garbage collection,  giving  the gc  time  and the  heap  memory
+        allocation, in the form:
+
+            GC-<code>(X) TIME: t MEM: u used + f free + s stack = m
+
+        where code is a 4-letter code indicating why the gc  happened, t
+        is the time for the gc in 1/100ths sec, u is the number of words
+        used in the heap, f the number  free, s the number taken by  the
+        userstack, and  m  the total  (note  that these  values  include
+        structures locked in with lock-heap).  X is a letter  indicating
+        which garbage  collection  method was  used  (C =  copying,  N =
+        non-copying).
+
+
+(gc &key :copy :hook :verbose)                                [function]
+        Forces  the  system  to  do  a  garbage  collection.  The   &key
+        parameters :copy, :hook,  and :verbose  can be  used to  specify
+        local  values   of   the   flags   *gc-copy*,   *gc-hook*,   and
+        *gc-verbose*, respectively. gc returns zero values.
+
+
+(gc-object object)                                            [function]
+        Attempts to free  the store  allocated to object.  Returns t  if
+        succesful, nil otherwise. Only implemented for lists at present.
+
+
+-----------------------------------------------------------------------
+4  Locking the Heap
+-----------------------------------------------------------------------
+
+(lock-heap &optional do-gc)                                  [function]
+        Locks the heap at the  current end-point. All structures in  the
+        heap  before  this  point  will  automatically  be  treated   as
+        non-garbage (considerably reducing the amount of work needed  to
+        be done on them during a garbage collection). Structures created
+        after the call  to lock-heap  will be  treated normally.  Unless
+        do-gc is nil, (it defaults to  t), a garbage collection will  be
+        performed  before  locking  the  heap.  lock-heap  returns  zero
+        values.
+
+
+(unlock-heap &optional do-gc)                                 [function]
+        Reverses  the  effect  of  lock-heap,  so  that  all  structures
+        previously locked  will participate  fully in  the next  garbage
+        collection (which, unless do-gc is nil, will occur immediately).
+        unlock-heap returns zero values. do-gc defaults to t.
+
+
+*load-lock*                                                   [variable]
+        Used as the default for the  :lock argument to load. So, if  set
+        true, (its initial value is nil), the heap will be locked  after
+        every load operation.  This can help  reduce garbage  collection
+        time.
+
+
+
+--- C.all/lisp/help/storeutils
+--- Copyright University of Sussex 1992. All rights reserved.

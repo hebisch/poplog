@@ -1,0 +1,151 @@
+HELP PROCESS                                 John Williams, January 1988
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+  2   Process Handling Functions
+  3   An Example
+
+
+-----------------------------------------------------------------------
+1  Introduction
+-----------------------------------------------------------------------
+
+The PROCESS  module provides  a  Lisp interface  to the  Poplog  process
+mechanism. A process  in Poplog  is a  data structure  that records  the
+state  of  execution  of  a  piece  of  Poplog  program.  A  process  is
+constructed  from  a  function  and  some  arguments;  it  may  be  run,
+suspended,  resumed  or  killed.  The  Poplog  process  facilities   are
+described fully in the Pop-11 documentation file REF * PROCESS.
+
+To load the PROCESS module, type
+
+    (require :process)
+
+Process objects have the type  pop11::process. All processes created  by
+Lisp are labelled with a unique integer, which is displayed on  printing
+a process  object,  and also  is  returned  as the  result  of  applying
+process-p to a process.
+
+
+-----------------------------------------------------------------------
+2  Process Handling Functions
+-----------------------------------------------------------------------
+
+ (Note: In the descriptions below, any argument form termed process
+  must either be a process, or the value t, in which case the value
+  of *process* will be used)
+
+
+*process*                                                     [variable]
+        This variable holds the currently  active process; or nil if  no
+        processes are active. Users may not assign to it.
+
+
+(make-process function &rest args)                            [function]
+        Constructs a process that when run will apply function to  args.
+        args need  not  be  all  the arguments  to  function  -  further
+        arguments can be passed to function by run-process (see below).
+
+
+(make-process-to function)                                    [function]
+        Constructs a  process  that records  the  state of  the  current
+        procedure calling sequence, from the call of make-process-to  up
+        to and  including the  most recent  call of  function. When  the
+        process  is   run,   it  first   returns   from  the   call   of
+        make-process-to, with nil as result.
+
+
+(run-process process &rest values)                            [function]
+        Runs process. If run-process is called while another process  is
+        running, then  process  is run  as  a sub-process:  the  calling
+        process is not swapped out. If process has not yet been run, the
+        values are passed as arguments to the function that process will
+        invoke. Otherwise  values  become the  results  of the  call  of
+        suspend-process by which process was last suspended.
+
+        Note: If a return-from or throw is executed that crosses  an
+        invocation of run-process, then the process being run is killed.
+        Also, the wrong  number of  results may  be passed  back to  the
+        enclosing block or catch.
+
+
+(suspend-process process &rest values)                        [function]
+        Suspends process, returning values from the call of  run-process
+        or (k)resume-process which activated process.
+
+
+(ksuspend-process process &rest values)                       [function]
+        Like suspend-process; in addition, process is killed.
+
+
+(resume-process process new-process &rest values)             [function]
+        Suspends process,  and  activates new-process.  The  values  are
+        interpreted in the same manner as for run-process.
+
+
+(kresume-process process new-process &rest values)            [function]
+        Like resume-process; in addition, process is killed.
+
+
+(copy-process process)                                        [function]
+        Returns a copy of process.
+
+
+(process-p object)                                            [function]
+        If object  is  a process,  returns  an integer  identifying  the
+        process  (or  t  if  the   process  wasn't  created  by   either
+        make-process or make-process-to). Returns nil if object is not a
+        process.
+
+
+(live-process-p process)                                      [function]
+        Returns process if process is currently active, t if process  is
+        runnable but currently inactive, and nil if process is dead.
+
+
+-----------------------------------------------------------------------
+3  An Example
+-----------------------------------------------------------------------
+
+;;; Define a function fringe-equal, to determine whether the fringes of
+;;; two arbitrarily nested list structures are equal. To solve this
+;;; problem without processes, both trees must be "flattened" in
+;;; advance, which is expensive if they differ in some of the first
+;;; accessible leaves. The method used here involves creating a process
+;;; for each tree that recursively descends through the tree structure,
+;;; suspending itself and returning each leaf as it is found.
+
+(require :process)
+
+(defun nextleaf (tree)
+    (if (listp tree)
+        (mapc #'nextleaf tree)
+        (suspend-process t tree)))
+
+(defun leaves (tree)
+    (nextleaf tree)
+    (ksuspend-process t nil))
+
+(defun fringe-equal (t1 t2)
+    (do* ((p1 (make-process #'leaves t1))
+          (p2 (make-process #'leaves t2))
+          (l1 nil (run-process p1))
+          (l2 nil (run-process p2)))
+         ((or (not (eq l1 l2))
+              (not (and (live-process-p p1) (live-process-p p2))))
+          (eq l1 l2))))
+
+
+;;; Now try
+
+(fringe-equal '(a (b (c (d (e)))))
+              '(((((a) b) c) d) e))
+
+
+;;; Also, try tracing nextleaf.
+
+
+--- C.all/lisp/help/process
+--- Copyright University of Sussex 1987. All rights reserved.

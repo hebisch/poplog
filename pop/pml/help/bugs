@@ -1,0 +1,317 @@
+HELP BUGS
+
+Known bugs and deficiencies in PML.
+
+
+    CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- RECENT FIXES
+ -- [02.08.02] Bindings Lost from Abstype Declarations
+ -- [02.08.01] Incorrect Type for List.foldr'
+ -- [02.00.01] Numeric Record Labels
+ -- [02.04.04] Identifier Status
+ -- [02.00.02] Exhaustiveness Checking on Wildcard Record Patterns
+ -- [02.04.03] Scope of Value Constructors
+ -- [02.04.02] Use of "*" as a Type Constructor
+ -- [02.00.04] Local Structure Declarations
+
+ -- OUTSTANDING BUGS
+ -- [02.00.03] Order of Evaluation in Record Expressions
+ -- [02.00.05] Bind Warnings
+ -- [02.00.06] Type Explication
+ -- [02.00.07] Equality-Principal Signatures
+ -- [02.04.01] Retrospective Name Capture in Functor Bindings
+
+
+-- RECENT FIXES -------------------------------------------------------
+
+-- [02.08.02] Bindings Lost from Abstype Declarations -----------------
+
+> Certain identifiers bound by abstype declarations are not reported at
+> top-level, although the bindings are present in the environment:
+>
+>     - abstype t = T of int
+>     = with
+>     =     val n = T(0)
+>     = end;
+>       type t
+>
+>     - n;
+>       val it = - : t
+>
+> A similar problem exists with local declarations.
+>
+
+(7/1/93) Now fixed:
+
+    - abstype t = T of int
+    = with
+    =     val n = T(0)
+    = end;
+      type t
+      val n = - : t
+
+
+-- [02.08.01] Incorrect Type for List.foldr' --------------------------
+
+> The type of the built-in function List.foldr' is incorrect, and unsafe:
+>
+>     - List.foldr';
+>       val it = fn : ('a * 'b -> 'b) -> 'a list -> 'b
+>
+>     - fun cast x = List.foldr' (fn(_,x)=>x) [x];
+>       val cast = fn : 'a -> 'b
+>
+>     - cast 3 : real;
+>       val it = 3 : real
+>
+
+(7/12/92) Both List.foldr' and List.foldl' now have the correct types:
+
+    - List.foldr';
+      val it = fn : ('a * 'a -> 'a) -> 'a list -> 'a
+
+    - fun cast x = List.foldr' (fn(_,x)=>x) [x];
+      val cast = fn : 'a -> 'a
+
+    - cast 3 : real;
+
+    ;;; Type unification error - real type needed
+    ;;; Wanted   :  real
+    ;;; Found    :  int
+
+
+-- [02.00.01] Numeric Record Labels -----------------------------------
+
+> Numeric record labels are not distinguished lexically from integer
+> constants.
+>
+>     val x = {0001=1, 0002=2};
+>     val x = (1, 2) : int * int
+>
+
+(1/3/91) Numeric record labels are now properly restricted to values in
+the sequence 1, 2, 3, ... etc.
+
+    - val x = {0001=1, 0002=2};
+
+    ;;; Syntax error - misplaced integer constant
+    ;;; Expecting:  <record label>  but found:  0001
+
+
+-- [02.04.04] Identifier Status ---------------------------------------
+
+> An exception constructor can never be rebound as a value constructor or
+> as a variable:
+>
+>   - exception E;
+>     exception E
+>
+>   - datatype t = A|B|C|D|E;
+>
+>     ;;; ML SYNTAX ERROR - Exception rebound as constructor
+>     ;;; INVOLVING:  E
+>
+>   - structure S = struct val E = 0 end
+>   = open S;
+>     structure S : sig
+>         val E : int
+>     end
+>     val E = 0 : int
+>
+>   - E;
+>     val it = E : exn
+>
+> A similar problem afflicts value constructors, and there are various
+> other manifestations of the same bug.
+>
+
+(4/2/91) Changes in the interpretation of identifier status should have
+cleared up most (if not all) of such problems. Specifically:
+
+    - exception E
+      exception E
+    - datatype t = A|B|C|D|E;
+      datatype t
+      con A : t
+      con B : t
+      con C : t
+      con D : t
+      con E : t
+    - structure S = struct val E = 0 end
+    = open S;
+      structure S : sig
+          val E : int
+      end
+      val E = 0 : int
+    - E;
+      val it = 0 : int
+
+
+-- [02.00.02] Exhaustiveness Checking on Wildcard Record Patterns -----
+
+> Exhaustiveness checking can sometimes fail on matches involving wildcard
+> record patterns, producing spurious warning messages.
+>
+>     fun f ({1 = true, ...} : bool * bool) = 1
+>     |   f ({1 = false, ...}: bool * bool) = 2;
+>
+>     ;;; ML WARNING - Clauses of function binding are non-exhaustive
+>     ;;; INVOLVING:  fun f
+>
+
+(21/1/91) The match-checking algorithm now copes correctly with wildcard
+record patterns:
+
+  - fun f ({1 = true, ...} : bool * bool) = 1
+  = |   f ({1 = false, ...}: bool * bool) = 2;
+
+    val f = fn : bool * bool -> int
+
+
+-- [02.04.03] Scope of Value Constructors -----------------------------
+
+> Redeclaration of a type constructor hides any value constructors
+> associated with the type:
+>
+>     datatype t = A|B
+>     type t = int
+>     val x = A
+>
+>     ;;; ML TYPE ERROR - Unbound variable
+>     ;;; INVOLVING:  A
+
+(14/1/91) No longer true -- value constructors may persist independently
+of their parent type constructors.
+
+  - datatype t = A|B
+  = type t = int
+  = val x = A;
+
+    datatype t
+    constructor A : t
+    constructor B : t
+    eqtype t = int
+    val x = A : t
+
+
+-- [02.04.02] Use of "*" as a Type Constructor ------------------------
+
+> The identifier "*" can be bound as a type constructor, even though it is
+> never recognised as such in a type expression:
+>
+>     type 'a * = 'a list;
+>     eqtype 'a * = 'a list
+>
+>     [] : int *;
+>
+>     ;;; ML SYNTAX ERROR - Misplaced reserved word
+>     ;;; EXPECTING:  <type expression>  BUT FOUND:  ;
+
+(8/11/90) The identifier "*" is now disallowed as a type constructor in
+all circumstances:
+
+    type 'a * = 'a list;
+
+    ;;; ML SYNTAX ERROR - Misplaced identifier
+    ;;; EXPECTING:  <type constructor>  BUT FOUND:  *
+
+
+-- [02.00.04] Local Structure Declarations ----------------------------
+
+> Local structure declarations are not supported.
+>
+>     local structure S = struct end
+>     in    structure S' = struct end
+>     end;
+>
+>     ;;; ML SYNTAX ERROR - Misplaced reserved word
+>     ;;; EXPECTING:  "in"  BUT FOUND:  structure
+
+(2/10/90) Local structure declarations are now supported:
+
+    - local structure S = struct end
+    = in    structure S' = struct end
+    = end;
+
+      structure S' : sig
+      end
+
+
+-- OUTSTANDING BUGS ---------------------------------------------------
+
+-- [02.00.03] Order of Evaluation in Record Expressions ---------------
+
+The order of evaluation of fields in a record-valued expression is not
+defined.
+
+    let val r = ref 0
+    in
+        {start=(r := 1), finish=(r := 2)};
+        !r
+    end;
+    val it = 1 : int
+
+NB: this does not apply to tuple values:
+
+    let val r = ref 0
+    in
+        (r := 1, r := 2);
+        !r
+    end;
+    val it = 2 : int
+
+
+-- [02.00.05] Bind Warnings -------------------------------------------
+
+The compiler does not generate warnings about value bindings which may
+generate a Bind exception at run-time, nor about value bindings which
+bind no variables.
+
+    let val _::_ = [] in () end;
+
+    ;;; ML EXCEPTION: Bind
+
+
+-- [02.00.06] Type Explication ----------------------------------------
+
+Signatures are not checked for being type explicit. The following
+signature generates no type errors:
+
+    signature S = sig
+        local type t
+        in    val x : t
+        end
+    end;
+
+
+-- [02.00.07] Equality-Principal Signatures ---------------------------
+
+Signatures generated from signature declarations are not always
+equality-principal. In the signature generated from the following
+declaration, the datatype constructor t' does not admit equality:
+
+    signature S = sig
+        type t
+        datatype t' =
+            T of t
+        sharing type t = int
+    end;
+
+
+-- [02.04.01] Retrospective Name Capture in Functor Bindings ----------
+
+Sharing constraints in the result signature of a functor binding can
+constrain type and structure names bound in the argument signature:
+
+    functor F(type t1 type t2) : sig
+        sharing type t1 = t2
+    end = struct
+    end;
+
+    functor F(type t1; type t2) : sig
+    end
+
+
+--- C.all/pml/help/bugs
+--- Copyright University of Sussex 1991. All rights reserved. ----------

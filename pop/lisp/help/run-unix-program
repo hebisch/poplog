@@ -1,0 +1,129 @@
+HELP RUN-UNIX-PROGRAM                            John Williams, Mar 1990
+
+This file documents the RUN-UNIX-PROGRAM module, which defines the
+functions run-unix-program and kill-pid.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   run-unix-program
+      1.1   Syntax
+      1.2   Arguments
+      1.3   Results
+  2   kill-pid
+  3   Example: Running a C-Shell from Lisp
+
+
+-----------------------------------------------------------------------
+1  run-unix-program
+-----------------------------------------------------------------------
+
+1.1  Syntax
+-----------
+
+(run-unix-program name &key :args :input :output              [function]
+                            :error-output :wait)
+
+
+1.2  Arguments
+--------------
+
+  name              Name of Unix program to run
+
+  :args             List of argument strings for program
+                        (default nil)
+
+  :input            Input to program
+                        (filename, stream, :stream, default 'stdin')
+
+  :output           Output from program
+                        (filename, stream, :stream, default 'stdout')
+
+  :error-output     Error output from program
+                        (filename, stream, :stream, default 'stderr')
+
+  :wait             If t (default) wait for program to complete
+
+  :if-input-does-not-exist
+                    If :input is a filename, this is passed as the
+                    :if-does-not-exist parameter to open
+
+  :if-output-exists
+                    If :output is a filename, this is passed as the
+                    :if-exists parameter to open
+
+  :if-error-output-exists
+                    If :error-output is a filename, this is passed as
+                    the :if-exists parameter to open
+
+
+1.3  Results
+------------
+
+  1.        Stream for interacting with Unix program
+            (if :input or :output were :stream, nil otherwise)
+
+  2.        Stream for program errors
+            (if :error-output was :stream, nil otherwise)
+
+  3.        Program exit status (if :wait was t, nil otherwise)
+
+  4.        Unix process id of program.
+
+
+-----------------------------------------------------------------------
+2  kill-pid
+-----------------------------------------------------------------------
+
+(kill-pid pid &optional signum)                               [function]
+
+Sends signal number signum to the Unix process numbered pid. signum
+defaults to 9 (SIGKILL). Returns t if the signal was succesfully sent,
+and nil otherwise.
+
+
+-----------------------------------------------------------------------
+3  Example: Running a C-Shell from Lisp
+-----------------------------------------------------------------------
+
+; Load RUN-UNIX-PROGRAM module
+
+(require :run-unix-program)
+
+; We need two functions, send and rec, for sending commands to the
+; c-shell process, and receiving the output.
+
+(defun SEND (string stream)
+    (write-line string stream)
+    (finish-output stream))
+
+(defun REC (stream)
+    (loop
+        (if (listen stream)
+            (write-char (read-char stream))
+            (return (values)))))
+
+; Create c-shell process:
+; Assign standard input/output stream to s
+; Assign error output stream to e
+
+(multiple-value-setq
+    (s e status pid)
+    (run-unix-program "csh" :input :stream
+                            :output :stream
+                            :error-output :stream
+                            :wait nil))
+
+; Send a couple of commands to the c-shell, get the output
+
+(send "pwd" s) (rec s)
+
+(send "date" s) (rec s)
+
+; Kill off the c-shell process when finished
+
+(kill-pid pid)
+
+
+--- C.unix/lisp/help/run-unix-program
+--- Copyright University of Sussex 1990. All rights reserved.

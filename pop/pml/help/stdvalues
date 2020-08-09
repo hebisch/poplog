@@ -1,0 +1,546 @@
+HELP STDVALUES                                   R. J. Duncan, June 1989
+
+The predefined values and exceptions of PML.
+
+
+    CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- The StdValues Module
+ -- A Note on Overloading
+ -- Mathematical Functions and Exceptions
+ -- String Functions and Exceptions
+ -- Logical Functions
+ -- Reference Functions
+ -- List Functions
+ -- Equality and Ordering Functions
+ -- Combinators
+ -- Display Functions
+ -- Error Functions and Exceptions
+ -- Special Exceptions
+ -- Non-Standard Features
+
+
+-- The StdValues Module -----------------------------------------------
+
+signature StdValues
+structure StdValues : StdValues
+    The structure -StdValues- contains  the basic predefined values  and
+    exceptions of PML, with the  exception of the I/O functions  defined
+    in the structure -StdIO- (see HELP * STDIO). This set of  predefined
+    names is  almost  identical to  that  required by  the  Standard  ML
+    language definition, Appendix D:  differences are summarised at  the
+    end of this file. The structure  -StdValues- is open by default  and
+    the names  it defines  made  "pervasive" so  that they  are  visible
+    everywhere.
+
+    The meaning of  each name  is described  below. As  in the  language
+    definition, those functions  which can  be defined in  ML are  given
+    their  appropriate  ML  definitions.   Other  names  are   described
+    informally.
+
+    There are many more  predefined functions available  from PML -  see
+    for example HELP * INT, * REAL, * STRING, * LIST, * COMBINATORS.
+
+    The -StdValues- module is described by the following signature:
+
+    signature StdValues = sig
+
+        (* Mathematical Functions and Exceptions *)
+
+        exception Overflow
+        exception Quot
+        exception Div
+        exception Mod
+        exception Prod
+        exception Sum
+        exception Diff
+        exception Neg
+        exception Abs
+        exception Floor
+        exception Real
+        exception Sqrt
+        exception Exp
+        exception Ln
+
+        val op  /       : real * real -> real
+        val op div      : int * int -> int
+        val op mod      : int * int -> int
+        val op *        : num * num -> num
+        val op +        : num * num -> num
+        val op -        : num * num -> num
+        val ~           : num -> num
+        val abs         : num -> num
+        val floor       : real -> int
+        val real        : int -> real
+        val sqrt        : real -> real
+        val sin         : real -> real
+        val cos         : real -> real
+        val arctan      : real -> real
+        val exp         : real -> real
+        val ln          : real -> real
+
+        (* String Functions and Exceptions *)
+
+        exception Chr
+        exception Ord
+
+        val op ^        : string * string -> string
+        val size        : string -> int
+        val chr         : int -> string
+        val ord         : string -> int
+        val explode     : string -> string list
+        val implode     : string list -> string
+
+        (* Logical Functions *)
+
+        val not         : bool -> bool
+
+        (* Reference Functions *)
+
+        val !           : 'a ref -> 'a
+        val op :=       : 'a ref * 'a -> unit
+
+        (* List Functions *)
+
+        val op @        : 'a list * 'a list -> 'a list
+        val map         : ('a -> 'b) -> 'a list -> 'b list
+        val rev         : 'a list -> 'a list
+
+        (* Equality and Ordering Functions *)
+
+        val op =        : ''a * ''a -> bool
+        val op <>       : ''a * ''a -> bool
+        val op <        : nums * nums -> bool
+        val op >        : nums * nums -> bool
+        val op <=       : nums * nums -> bool
+        val op >=       : nums * nums -> bool
+
+        (* Combinators *)
+
+        val op o        : ('b -> 'c) * ('a -> 'b) -> 'a -> 'c
+
+        (* Display Functions *)
+
+        val print       : 'a -> 'a
+        val makestring  : 'a -> string
+
+        (* Error Functions and Exceptions *)
+
+        exception Error of string
+        exception Impossible of string
+
+        val error       : string -> 'a
+        val impossible  : string -> 'a
+
+        (* Special Exceptions *)
+
+        exception Interrupt
+        exception Match
+        exception Bind
+
+    end;    (* signature StdValues *)
+
+
+-- A Note on Overloading ----------------------------------------------
+
+Some of the following identifiers -  in particular, some of the  numeric
+functions  and  the  relational  operators  -  are  described  as  being
+"overloaded", meaning that the same identifier is used to stand for more
+than one  function,  each  having  a distinct  type.  The  SML  standard
+requires that  the  type  checker  should be  able  to  determine  which
+particular function is implied by each use of an overloaded  identifier:
+this may  require  the  use  of explicit  type  constraints  to  resolve
+potential ambiguities. For example, in the definition
+
+    fun double x : int = x + x;
+
+the type constraint ":int"  is necessary to identify  the use of "+"  as
+standing for integer (rather than real) addition.
+
+The precise forms of overloading are indicated in the relevant  sections
+below.
+
+
+-- Mathematical Functions and Exceptions ------------------------------
+
+See also HELP * INT, * REAL, * RATIO, * COMPLEX.
+
+
+exception Overflow
+    Raised on any real (floating-point) arithmetic overflow.
+
+
+exception Quot
+infix 7 /
+val (r1 : real) / (r2 : real) : real
+    Real division. The exception -Overflow- is raised if -r2- is zero or
+    if the result is out of range. The exception -Quot- is defined  as a
+    synonym for -Overflow- for compatibility with the SML standard.
+
+
+exception Div
+exception Mod
+infix 7 div mod
+val (i : int) div (d : int) : int
+val (i : int) mod (d : int) : int
+    Integer division and remainder. Given
+
+        val (q, r) = (i div d, i mod d)
+
+    then the relationship
+
+        i = d * q + r
+
+    holds, where either 0 <= r < d or d < r <= 0 (i.e. the remainder -r-
+    has the same sign as the divisor -d-). For both -div- and -mod-, the
+    exception -Div- is  raised if -d-  is zero. The  exception -Mod-  is
+    defined as  a  synonym for  -Div-  for compatibility  with  the  SML
+    standard. An  alternative  (typically  faster)  version  of  integer
+    division is provided by the operators -quot- and -rem- described  in
+    HELP * INT.
+
+
+exception Prod
+exception Sum
+exception Diff
+infix 7 *
+infix 5 + -
+val (n1 : num) * (n2 : num) : num
+val (n1 : num) + (n2 : num) : num
+val (n1 : num) - (n2 : num) : num
+    Multiplication, addition  and  subtraction on  integers  and  reals.
+    These identifiers are overloaded: the given types are meant to stand
+    for two  distinct types,  one  where every  occurrence of  the  type
+    constructor -num-  is  replaced by  -int-  and one  where  -num-  is
+    replaced likewise  by -real-.  The  exception -Overflow-  is  raised
+    whenever the result  of a real  operation is out  of range;  integer
+    operations never overflow. The  exceptions -Prod-, -Sum- and  -Diff-
+    are defined as  synonyms for -Overflow-  for compatibility with  the
+    SML standard.
+
+
+exception Neg
+val ~ (n : num) : num
+    Mathematical negation. This  identifier is overloaded  on the  types
+    -int- and -real- as described above. The exception -Neg- is  defined
+    for compatibility with the  SML standard but  should never arise  in
+    any current implementation of Poplog.
+
+
+exception Abs
+val abs (n : num) : num
+    Absolute value. This identifier is overloaded on the types -int- and
+    -real- as  described  above.  The exception  -Abs-  is  defined  for
+    compatibility with the SML  standard but should  never arise in  any
+    current implementation of Poplog.
+
+
+exception Floor
+val floor (r : real) : int
+    Returns the  largest integer  not greater  than -r-.  The  exception
+    -Floor- is  defined  for compatibility  with  the SML  standard  but
+    should never arise in any current implementation of Poplog.
+
+
+exception Real
+val real (i : int) : real
+    Returns the real  value equal  to -i-. The  exception -Overflow-  is
+    raised if  the result  is  out of  range.  The exception  -Real-  is
+    defined as a synonym for -Overflow-.
+
+
+exception Sqrt
+val sqrt (r : real) : real
+    The square root  of -r-. The  exception -Sqrt- is  raised if -r-  is
+    negative.
+
+
+val sin (r : real) : real
+    The sine of the angle -r-, -r- in radians.
+
+
+val cos (r : real) : real
+    The cosine of the angle -r-, -r- in radians.
+
+
+val arctan (r : real) : real
+    The arctangent of the angle -r-, -r- in radians.
+
+
+exception Exp
+val exp (r : real) : real
+    The exponential of -r-.  The exception -Overflow-  is raised if  the
+    result is out of range. The exception -Exp- is defined as a  synonym
+    for -Overflow- for compatibility with the SML standard.
+
+
+exception Ln
+val ln (r : real) : real
+    The natural logarithm of -r-. The exception -Ln- is raised if -r- is
+    zero or negative.
+
+
+-- String Functions and Exceptions ------------------------------------
+
+See also HELP * STRING.
+
+
+val size (s : string) : int
+    Returns the number of characters in -s-.
+
+
+exception Chr
+val chr (i : int) : string
+    Returns a string  containing the  single character  with ASCII  code
+    -i-. The exception -Chr- is raised if -i- is not in the range
+
+        0 <= i < 256.
+
+
+exception Ord
+val ord (s : string) : int
+    Returns the ASCII code of the first character of -s-. The  exception
+    -Ord- is raised if -s- is the null string.
+
+
+val explode (s : string) : string list
+    Returns a  list of  all the  characters in  -s- as  single-character
+    strings.
+
+
+val implode (l : string list) : string
+    Returns the concatenation all the strings in the list -l-.
+
+
+infix 6 ^
+val (s1 : string) ^ (s2 : string) : string
+    Returns the concatenation of the strings -s1- and -s2-. Definition:
+
+        fun s1 ^ s2 = implode [s1, s2];
+
+
+-- Logical Functions --------------------------------------------------
+
+val not (b : bool) : bool
+    Logical negation. Definition:
+
+        fun not true  = false
+        |   not false = true;
+
+
+-- Reference Functions ------------------------------------------------
+
+val ! (x : 'a ref) : 'a
+    The dereference function: returns the  contents of a reference.  The
+    dynamic behaviour of this function is given by the definition:
+
+        fun !(ref x) = x;
+
+    but its type is less restrictive than would be implied by this.
+
+
+infix 3 :=
+val (x : 'a ref) := (v : 'a) : unit
+    The assignment function: updates the  contents of the reference  -x-
+    to be the value -v-, this change being visible everywhere.
+
+
+-- List Functions -----------------------------------------------------
+
+See also HELP * LIST
+
+
+infix 5 @
+val (l1 : 'a list) @ (l2 : 'a list) : 'a list
+    Appends the list -l1- to the list -l2-. Definition:
+
+        fun []      @ ys = ys
+        |   (x::xs) @ ys = x :: (xs @ ys);
+
+
+val rev (l : 'a list) : 'a list
+    Reverses the list -l-. Definition:
+
+        fun rev []      = []
+        |   rev (x::xs) = rev xs @ [x];
+
+
+val map (f : 'a -> 'b) (l : 'a list) : 'b list
+    Transforms the list -l- under the function -f-. Definition:
+
+        fun map f []      = []
+        |   map f (x::xs) = f x :: map f xs;
+
+
+-- Equality and Ordering Functions ------------------------------------
+
+infix 4 =
+val (x : ''a) = (y : ''a) : bool
+    Equality of values: returns -true-  or -false- according to  whether
+    -x- is or is not equal to  -y-. A precise definition of equality  is
+    given in the SML standards document. Most of it is obvious; the only
+    feature worth stressing here  is that references  are defined to  be
+    equal only if they refer to the same address in memory: for example,
+    the expression
+
+        (ref 0) = (ref 0)
+
+    will always return -false-.  Note also that  the restriction of  -x-
+    and -y- to equality-typed values  means that equality is simply  not
+    defined on  functions and  abstract types:  application of  the  "="
+    function to objects of these types is forbidden by the type checker.
+
+
+infix 4 <>
+val (x : ''a) <> (y : ''a) : bool
+    Inequality of values: returns the opposite boolean value to "=".
+
+
+infix 4 < <= > >=
+val (x : nums) <  (y : nums) : bool
+val (x : nums) <= (y : nums) : bool
+val (x : nums) >  (y : nums) : bool
+val (x : nums) >= (y : nums) : bool
+    Comparisons on integers,  reals and strings.  These identifiers  are
+    overloaded: each of  the given  types is  meant to  stand for  three
+    distinct types, one where every occurrence of -nums- is replaced  by
+    -int-, another where -nums- is replaced by -real- and a third  where
+    -nums- is replaced by -string-. Ordering on integer and real numbers
+    is  the   obvious  mathematical   one;   ordering  on   strings   is
+    lexicographic by ASCII codes.
+
+
+-- Combinators --------------------------------------------------------
+
+See also HELP * COMBINATORS.
+
+
+infix 3 o
+val (f : 'b -> 'c) o (g : 'a -> 'b) : 'a -> 'c
+    Functional composition (right to left). Definition:
+
+        fun (f o g) x = f(g x);
+
+
+-- Display Functions --------------------------------------------------
+
+See also HELP * PRINTER, * STDIO.
+
+
+val makestring (x : 'a) : string
+    Constructs  a  string  representation  of  -x-,  identical  to   the
+    representation which  would  be  displayed  at  the  PML  top-level.
+    -makestring- can be  applied to a  value of any  type, but can  only
+    work effectively where  the type  of the  value is  ground: this  is
+    because the choice of  representation is determined  as much by  the
+    type as by  the run-time value.  Values of unknown  type are  always
+    represented by  the string  "-". Explicit  type constraints  may  be
+    required to restrict types which would otherwise be polymorphic. For
+    example, the definition:
+
+        fun showint n = makestring n;
+
+    is useless,  because the  type  of the  value  -n- is  unknown;  the
+    definition
+
+        fun showint (n : int) = makestring n;
+
+    exhibits the desired behaviour.
+
+
+val print (x : 'a) : 'a
+    A simple debugging aid: -print-  is like the identity function,  but
+    has the side-effect of printing a representation of its argument  on
+    the standard output stream. An almost-correct definition for -print-
+    would be:
+
+        fun print x = (output(std_out, makestring x ^ "\n"); x);
+
+    This doesn't  work  as  such  because the  value  of  -x-  given  to
+    -makestring- has an unknown type, but  this is taken care of in  the
+    actual implementation.
+
+
+-- Error Functions and Exceptions -------------------------------------
+
+exception Error (s : string)
+val error (s : string) : 'a
+    Raises the exception -Error- with value -s-. Definition:
+
+        fun error s = raise Error(s);
+
+    This is  a  general-purpose  error function.  The  string  -s-  is a
+    message describing the cause of the error.
+
+
+exception Impossible (s : string)
+val impossible (s : string) : 'a
+    Raises the exception -Impossible- with value -s-. Definition:
+
+        fun impossible s = raise Impossible(s);
+
+    This is  used to  indicate "impossible"  cases in  clausal  function
+    definitions or matches, i.e., cases which should never occur if  the
+    program is correct.  It is bad  practice simply to  omit such  cases
+    (and the ML compiler will give a warning wherever this is done),  as
+    it is always possible for a programming error elsewhere to cause the
+    unexpected  cases  to   show  up:  the   program  will  then   crash
+    mysteriously with a  -Match- exception (see  below). In those  cases
+    where  no  sensible  recovery  action  is  possible,  applying   the
+    -impossible-  function  to  an  appropriate  message  can  at  least
+    identify the source of the error. It also acts as a clear  indicator
+    to a reader  of the  program what  is and  what is  not expected  to
+    happen.
+
+
+-- Special Exceptions -------------------------------------------------
+
+The following  exceptions are  not associated  with the  failure of  any
+particular function, but indicate the occurrence of special events.
+
+
+exception Interrupt
+    Raised by a user interrupt, usually generated as a result of  typing
+    the interrupt character at the keyboard.
+
+
+exception Match
+    Raised on the failure of a match, i.e. when a function is applied to
+    an argument for which no  matching clause is found. The  possibility
+    of such failures is  always indicated by the  type checker when  the
+    function is compiled (unless this feature has been turned off -  see
+    HELP * WARNINGS).
+
+
+exception Bind
+    Raised on the failure of a value binding, i.e. when the value on the
+    right-hand-side of a value binding fails to match the pattern on the
+    left.
+
+
+-- Non-Standard Features ----------------------------------------------
+
+The following identifiers are not a part of Standard ML:
+
+    exception Error
+    exception Impossible
+    exception Overflow
+    exception Real
+
+    val error
+    val impossible
+    val makestring
+    val print
+
+The single  exception  -Overflow-  is  raised  on  any  real  arithmetic
+overflow.  The  individual  exceptions  associated  with  the  different
+mathematical operators (-Quot-, -Prod-, -Sum- etc.) are defined only  as
+synonyms. Likewise,  the  exception  -Div-  is  raised  on  any  integer
+division by zero, and the exception -Mod- is defined as a synonym.
+
+The relational  operators  ("<",  "<=", ">",  ">=")  are  overloaded  on
+strings as well as numbers.
+
+
+--- C.all/pml/help/stdvalues
+--- Copyright University of Sussex 1990. All rights reserved. ----------

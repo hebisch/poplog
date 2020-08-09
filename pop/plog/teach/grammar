@@ -1,0 +1,264 @@
+GRAMMAR                                 Chris Mellish
+                                        (based on a POP-11 teach file
+                                            by Aaron Sloman)
+
+            GENERATING AND ANALYSING SENTENCES
+
+This TEACH file tells you how to write programs that generate and analyse
+English sentences. Before you start, you should be familiar with the 'append'
+predicate for lists and with the notion of representing sentences by
+lists (see TEACH SIR).
+
+-- YOU NEED TO KNOW A LITTLE ABOUT GRAMMAR -----------------------------
+
+The following sections assume you know a bit about grammar. Nouns are words
+like "cat" "dog" "car" "number". Nounphrases are expessions like "the old
+man", "the dog that bit the cat", "each little lady who likes programming".
+We use NP as an abbreviation for "noun phrase".
+
+Verbs are words like "hit", "look", "choose", "put", "turn". Verb phrases,
+abbreviated VP, include things like "hit me", "look at the old man", "chose
+the book in the car", "put the dog in the car in the box".
+
+-- A SENTENCE IS AN 'NP' FOLLWED BY A 'VP' -----------------------------
+
+By joining an NP to a VP (which may contain embedded NPs) we can form a
+sentence (abbreviated S), for example:
+
+    NP                      VP
+    ==                      ==
+
+    [the,cat]              [bit,the,girl]
+    [the,man,in,the,car]   [looked,at,the,little,dog]
+    [he]                   [jumped]
+
+-- THERE ARE OTHER SYNTACTIC CATEGORIES --------------------------------
+
+In addition to nouns and verbs we have used other types of words, including
+determiners (abbrevated DET), like: "the", "each", "some" adjectives (ADJ)
+like: "old" "little" prepositions (PREP) like: "in" "at" "on" "under"
+
+We've also used different sorts of verbs - transitive verbs which require a
+following NP (e.g. bit) and intransitive verbs which don't (e.g. jumped).
+Some verbs may allow or even require the use of an associated preposition,
+e.g.
+
+    jump over NP
+    put NP in NP
+    look at NP
+
+We've also seen that NPs and VPs can have different forms, so that sentences
+(S) can have different forms.
+
+-- TYPES OF SENTENCES CAN BE DESCRIBED WITH GRAMMARS -------------------
+
+The different forms of sentences can be described economically by means of a
+grammar. The grammar is a set of rules saying what is required for something
+to be a sentence of the language. We can distinguish two kinds of rules that
+appear in grammars. PHRASAL RULES specify the types of sentences in terms of
+the phrases and subphrases that must be present. LEXICAL RULES indicate which
+words can be used in different roles in the sentence. If you give the computer
+some phrasal and lexical rules, it can show you what sorts of sentences they
+generate.
+
+-- PHRASAL RULES ------------------------------------------------------------
+
+How can we say in Prolog that an English sentence must consist of a NP
+followed by a VP? Assuming that we represent sentences by Prolog lists, this
+amounts to saying that the list for the sentence has two parts: the first is a
+noun phrase and the second a verb phrase. The result of appending these two
+parts is the sentence itself. In Prolog:
+
+    sentence(X) :- append(NP,VP,X), nounphrase(NP), verbphrase(VP).
+
+Notice that we are using 'append' here to find two possible lists (NP and VP)
+which when appended give the sentence X we are interested in. However, we are
+not satisfied with just any lists NP and VP. The former must be a 'nounphrase'
+and the latter a 'verbphrase'.
+
+We can define what it is to be a verb phrase similarly:
+
+    verbphrase(X) :- append(V,NP,X), verb(V), nounphrase(NP).
+
+Note that this rule only deals with TRANSITIVE verbs - verbs which take an
+object 'nounphrase'. Examples are "see", "hit" and "read". Write a rule
+yourself that handles INTRANSITIVE verbs, like "smile" and "sit". You can
+assume that we will give a definition of 'verb' and 'nounphrase' later.
+Indeed, here is a possible rule for 'nounphrase':
+
+    nounphrase(X) :- append(DET,NOUN,X), determiner(DET), noun(NOUN).
+
+Of course, there is nothing to stop us having several rules for 'nounphrase',
+corresponding to the different forms that a noun phrase may have.
+
+-- LEXICAL RULES ------------------------------------------------------------
+
+So far, our rules have not actually specified any English words. In order to
+say that a phrase is a 'verb', we cannot decompose it further into subphrases
+- we must actually list what words are verbs. Notice that our 'verb' predicate
+(in the way we have used it above) is talking about whether a LIST OF WORDS is
+a verb or not. So we must include list brackets around the words. Here is a
+partial definition of 'verb':
+
+    verb([eats]).
+    verb([drinks]).
+    verb([smiles]).
+
+Write lexical rules of this kind for the other lexical catagories we have
+introduced so far ('determiner' and 'noun'). Note that, because we are dealing
+with lists (sequences) of words, we can actually say that two words together
+make a noun, for instance:
+
+    noun([barbers,shop]).
+    noun([man]).
+
+-- ANALYSING SENTENCES ------------------------------------------------------
+
+Type in (or copy) the above pieces of program, and try asking some questions
+about whether things are 'sentence's or not. Make sure that you have the
+APPEND library file loaded before you try out these programs.
+
+Here are the sorts of questions you might ask:
+
+    ?- sentence([the,man,eats,pickles]).
+    ?- sentence([a,girl,saw,the,jar]).
+
+You will probably find that some questions are unexpectedly answered "no".
+This is usually an indication that your grammar is lacking appropriate phrasal
+or lexical rules. You may also find that some questions are unexpectedly
+answered "yes". This is usually an indication that your rules are not specific
+enough to exclude ungrammatical constructions. You might try adding to the
+program to fix some of these faults.
+
+Use the WHY facility (see TEACH WHY) to see how Prolog justifies saying that
+something is a sentence. The justification is in terms of what phrases and
+subphrases there are in that sentence. It is one kind of STRUCTURAL
+DESCRIPTION of the sentence. Building up structural descriptions is a very
+important activity for programs that attempt to extract the meaning from
+sentences in a principled way.
+
+-- GENERATING SENTENCES ----------------------------------------------------
+
+Here's how you get the computer to generate sentences according to your
+rules (you will find that not all the sentences generated actually look like
+good English. That is a sign that the grammar is inadequate). Try:
+
+    ?- sentence(X).
+
+You can make the computer generate alternative sentences by asking Prolog to
+give you alternative values for X. But be prepared to interrupt your program
+(by typing CTRL-C), because Prolog will eventually try making longer and
+longer lists and seeing whether they could be sentences, even though they
+couldn't possibly be.
+
+Alternatively, you can be more specific about the sentences to be generated:
+
+    ?- sentence([X,Y,the,man]).
+
+asks Prolog to try to find a sentence that starts with any two words (X and Y)
+and then finishes with "the man".
+
+Again, use WHY to see Prolog's justification for these sentences (to see the
+structural descriptions).
+
+-- PROGRAMS VERSUS DESCRIPTIONS ---------------------------------------------
+
+If you start to write a fairly complex grammar in Prolog (one which allows an
+infinite number of sentences), you may discover that the sentences Prolog
+generates do not cover the range of possible sentences in a representative
+way, or even that Prolog sometimes gets into an infinite loop. You should be
+able to work out why this is from your knowledge of Prolog's search strategy
+(see TEACH BACKTRACKING). You may also find that there are cases when Prolog
+gets into a loop analysing a sentence. This may not be due to a deficiency of
+your rules as a DESCRIPTION of what it is to be a sentence, but may be due to
+the particular search strategy Prolog uses. Because Prolog has a fixed mode of
+operation, certain ways of describing things will lead to more efficient
+programs for analysing sentences or generating sentences than others. It won't
+necessarily be the same descriptions that are best for both. It is important
+to realise that when a linguist talks about a grammar, he means any kind of
+rigorous, formal description of what sentences are and are not in the
+language. It is a bonus if we happen to have programming systems like Prolog
+that can take some such descriptions as PROGRAMS and use them to do sensible
+things. In many ways, it is surprising that such programming systems can be
+constructed at all. It is not surprising that we can write descriptions that
+fail to be efficiently executable in any particular programming system.
+
+-- EXTEND THE GRAMMAR -------------------------------------------------------
+
+Extend the rules given to cover more kinds of English sentences. Here are some
+ideas.
+
+Extend the grammar so that it will accept several adjectives in a row before a
+noun, e.g.
+
+    the happy little man
+    the old old old car
+
+Try to cover some examples with prepositional phrases, for example:
+
+    the man in the car kissed the cup
+    the computer hated every number in the room
+
+-- SOME RULES NEED TO BE RECURSIVE ------------------------------------------
+
+When you start to write any significant grammar of English, you will find that
+some phrases seem to be able to have phrases of the same type as parts. For
+instance, one might analyse "the man in the lift called me" as having at least
+the following components:
+
+    [the,man,in,the,lift] [called,me]
+    nounphrase            verbphrase
+
+but then "the man in the lift" (a noun phrase) has as one of its parts "the
+lift", which is a noun phrase in its own right (it can combine with a verb
+phrase as in "the lift hit the ground"). From this observation, we might write
+a rule as follows:
+
+    nounphrase(X) :-
+        append(DET,NOUN,Front),
+        append(Front,Prep,Front1),
+        append(Front1,NP,X),
+        determiner(DET),
+        noun(NOUN),
+        prep(Prep),
+        nounphrase(NP).
+
+(in diagram form:
+
+        the     man     in      the     lift
+       <DET>   <NOUN>  <Prep>   <-- NP ----->
+       <-- Front --->
+       <----- Front1 ------->
+       <----------------- X ---------------->   )
+
+which involves 'nounphrase' being defined in terms of itself! This is
+perfectly all right (although you might consider what would happen if you
+reorder the subgoals in this clause). The fact that grammatical categories in
+English (and other natural languages) are RECURSIVE in this way is an
+important linguistic insight.
+
+-- USE TRACER TO WATCH THE PROGRAM AT WORK ----------------------------------
+
+Use the TRACER facility (TEACH TRACER) to see how your program works out that
+something is an acceptable sentence. Notice that a lot of work is done
+producing silly answers from 'append' and then having to reject them. The
+suggested reading (see below) indicates a way to make the rules more
+efficient for sentence analysis.
+
+-- THE TRACER GIVES MORE INFORMATION IF THE SENTENCE IS UNACCEPTABLE ------
+
+You can also see what happens when an unacceptable sentence is provided. The
+program makes lots of attempts, but they don't lead anywhere. Of course, in
+this case WHY won't be of any use, because Prolog never manages to construct a
+complete justification (we need a "why not" facility!).
+
+-- FURTHER READING AND EXERCISES ---------------------------------------------
+
+Read Chapter 9 of "Programming in Prolog" by Clocksin and Mellish (you may
+need to look at some of Chapter 3 as well). Our Prolog system understands the
+"grammar rule" notation used there. Experiment with this as a more elegant way
+to express your rules. Investigate extending your program to produce explicit
+parse trees (structural descriptions).
+
+--- C.all/plog/teach/grammar -------------------------------------------
+--- Copyright University of Sussex 1987. All rights reserved. ----------

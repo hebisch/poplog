@@ -1,0 +1,166 @@
+HELP OPTIMIZE                                   John Williams, July 1987
+                                        Updated John Williams, July 1995
+
+This document describes how the optimize compiler declaration affects
+the performance of Poplog Common Lisp programs.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+  2   Speed / Safety Trade-offs
+  3   Speed / Space Trade-offs
+  4   Debug
+  5   Safety
+  6   Compilation-Speed
+  7   Tail-Recursion
+  8   See Also
+
+
+-----------------------------------------------------------------------
+1  Introduction
+-----------------------------------------------------------------------
+
+The optimize declaration enables programmers to indicate the relative
+importance of various performance characteristics to their application.
+Five such quantities are recognised:
+
+    compilation-speed       (speed of compilation)
+    debug                   (ease of debugging)
+    safety                  (ability to detect errors)
+    space                   (amount of memory used by Lisp)
+    speed                   (run-time execution speed)
+
+They may each be assigned numeric weights in the range 0 to 3 inclusive.
+
+Note:
+Poplog Common Lisp recognises both British (optimise) and US (optimize)
+spellings. However, Steele uses optimize so code that is intended to be
+portable should do likewise.
+
+
+-----------------------------------------------------------------------
+2  Speed / Safety Trade-offs
+-----------------------------------------------------------------------
+
+speed = 3 and safety = 0
+    User functions do not include stack-overflow or interrupt checks.
+    POTENTIALLY DANGEROUS.
+
+speed = 3
+    All notinline declarations are ignored.
+
+(speed - safety) >= 2
+    # Inline code for (= x y) does not check that x and y are numbers.
+
+    # Inline code for (/= x y) does not check that x and y are numbers.
+
+    # Inline code for (pop x), where x is a symbol, does not check that
+      the value of x is a cons.
+
+    # The compiler macro for endp produces (eq x nil) (i.e. no check
+      that x is a list is made).
+
+     # The compiler macro for zerop produces code that does not check
+      whether its argument is a number.
+
+    # dotimes will use special fast fixnum arithmetic operations for
+      incrementing and testing the index.
+
+    # When a function that expects keyword arguments is called, no check
+      is made that there are an even number of arguments to be matched
+      into keyword/value pairs.
+
+speed >= safety
+    (the type form) does not check that form evaluates to object(s) of
+    type type (i.e. it just evaluates and returns form).
+
+speed = 0
+    All inline declarations are ignored.
+
+
+-----------------------------------------------------------------------
+3  Speed / Space Trade-offs
+-----------------------------------------------------------------------
+
+space < speed
+    Calls to fourth, fifth, sixth, seventh, eighth, ninth, and tenth are
+    expanded to inline code (provided that the function name has been
+    declared inline). Note this also applies to implicit calls of these
+    functions, e.g. structure access functions where the structure is of
+    type list.
+
+space <= speed
+    The compiler plants inline code when it needs to ensure that a
+    user-defined function returns a particular number of results.
+    (Otherwise an assembler subroutine call is used).
+
+space > speed
+    Calls to various built-in functions that are normally expanded to
+    inline code are not done so. Functions affected are all those that
+    are subject to *inline-reduce-limit* (see HELP * INLINE).
+
+
+-----------------------------------------------------------------------
+4  Debug
+-----------------------------------------------------------------------
+
+debug = 3
+    # The Debugger options :r and :v will be available for the function
+      currently being compiled.
+
+    # The Debugger will have access to lexical variable names and
+      values in the function currently being compiled.
+
+
+-----------------------------------------------------------------------
+5  Safety
+-----------------------------------------------------------------------
+
+safety = 3
+    # An error is signaled if an attempt is made to read an unbound
+      variable.
+
+    # Dynamic-extent declarations for &rest parameter names are ignored.
+
+
+-----------------------------------------------------------------------
+6  Compilation-Speed
+-----------------------------------------------------------------------
+
+compilation_speed > speed
+compilation_speed = 3
+    No attempt is made to expand compiler macros.
+
+
+-----------------------------------------------------------------------
+7  Tail-Recursion
+-----------------------------------------------------------------------
+
+This option is a Poplog specific extension to Common Lisp.
+
+(optimise (tail-recursion 0))
+    No terminal call optimisation performed.
+
+(optimise (tail-recursion 1))
+    No terminal call optimisation performed.
+
+(optimise (tail-recursion 2))
+    Recursive terminal call optimised for functions defined via labels,
+    and global functions defined while *constant-functions* is true
+
+(optimise (tail-recursion 3))
+    As above, also any terminal call replaced by a `chain'. Hence this
+    covers recursive terminal calls when *constant-functions* is nil.
+
+
+-----------------------------------------------------------------------
+8  See Also
+-----------------------------------------------------------------------
+
+  HELP * BREAK
+  HELP * DECLARE
+  HELP * INLINE
+
+
+--- C.all/lisp/help/optimize
+--- Copyright University of Sussex 1987. All rights reserved.

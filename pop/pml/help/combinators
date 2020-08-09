@@ -1,0 +1,192 @@
+HELP COMBINATORS                               R. J. Duncan, August 1989
+
+Useful combinator definitions.
+
+
+    CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- The Combinators Module
+ -- Combinator Definitions
+
+
+-- The Combinators Module ---------------------------------------------
+
+signature Combinators
+structure Combinators : Combinators
+    The structure -Combinators- is a built-in structure of PML  defining
+    some useful  general-purpose combinators.  The meanings  of all  the
+    names defined  in the  structure  are described  below in  terms  of
+    Standard ML definitions.
+
+    The -Combinators- module has the following signature:
+
+        signature Combinators = sig
+
+            val I           : 'a -> 'a
+            val id          : 'a -> 'a
+
+            val K           : 'a -> 'b -> 'a
+            val const       : 'a -> 'b -> 'a
+            val unit        : 'a -> unit
+
+            val B           : ('b -> 'c) -> ('a -> 'b) -> 'a -> 'c
+            val compose     : ('b -> 'c) -> ('a -> 'b) -> 'a -> 'c
+            val composel    : ('a -> 'b) -> ('b -> 'c) -> 'a -> 'c
+
+            val C           : ('a -> 'b -> 'c) -> 'b -> 'a -> 'c
+            val commute     : ('a * 'b -> 'c) -> 'b * 'a -> 'c
+
+            val curry       : ('a * 'b -> 'c) -> 'a -> 'b -> 'c
+            val uncurry     : ('a -> 'b -> 'c) -> 'a * 'b -> 'c
+
+            val apply       : ('a -> 'b) -> 'a -> 'b
+            val applyn      : int -> ('a -> 'a) -> 'a -> 'a
+            val applywhile  : ('a -> bool) -> ('a -> 'a) -> 'a -> 'a
+            val repeat      : ('a -> 'a) -> int -> 'a -> 'a
+            val repeatwhile : ('a -> 'a) -> ('a -> bool) -> 'a -> 'a
+
+            val pair        : 'a -> 'b -> 'a * 'b
+            val fst         : 'a * 'b -> 'a
+            val snd         : 'a * 'b -> 'b
+            val before      : 'a * 'b -> 'a
+            val swap        : 'a * 'b -> 'b * 'a
+
+        end
+
+
+-- Combinator Definitions ---------------------------------------------
+
+
+val I (x : 'a) : 'a
+val id (x : 'a) : 'a
+    The identity function.
+
+        fun I x = x;
+
+    -id- is a synonym for -I-.
+
+
+val K (c : 'a) (_ : 'b) : 'a
+val const (c : 'a) (_ : 'b) : 'a
+    The constant function.
+
+        fun K c _ = c;
+
+    -const- is a synonym for -K-.
+
+
+val unit (_ : 'a) : unit
+    The constantly unit function.
+
+        val unit = K();
+
+
+val B (f : 'b -> 'c) (g : 'a -> 'b) : 'a -> 'c
+val compose (f : 'b -> 'c) (g : 'a -> 'b) : 'a -> 'c
+    Right to left function composition.
+
+        fun B f g = f o g;
+
+    -compose- is a synonym for -B-.
+
+
+val composel (f : 'a -> 'b) (g : 'b -> 'c) : 'a -> 'c
+    Left to right function composition.
+
+        fun composel f g = g o f;
+
+
+val C (f : 'a -> 'b -> 'c) : 'b -> 'a -> 'c
+    Reverses the arguments of a binary function.
+
+        fun C f x y = f y x;
+
+
+val commute (f : 'a * 'b -> 'c) : 'b * 'a -> 'c
+    Reverses the arguments of a binary operator.
+
+        fun commute f(x, y) = f(y, x);
+
+
+val curry (f : 'a * 'b -> 'c) : 'a -> 'b -> 'c
+    "Curries" the binary operator -f- so  that it can be applied to  its
+    arguments one at a time.
+
+        fun curry f x y = f(x, y);
+
+
+val uncurry (f : 'a -> 'b -> 'c) : 'a * 'b -> 'c
+    "Uncurries" the binary function -f- so that it can be applied to its
+    arguments as a pair.
+
+        fun uncurry f(x, y) = f x y;
+
+
+val apply (f : 'a -> 'b) (x : 'a) : 'b
+    Applies the function -f- to the argument -x-.
+
+        fun apply f x = f x;
+
+
+val applyn (n : int) (f : 'a -> 'a) (x : 'a) : 'a
+    Applies the function -f- to the argument -x- -n- times.
+
+        fun apply n f x = if n > 0 then applyn (n-1) f (f x) else x;
+
+
+val applywhile (p : 'a -> bool) (f : 'a -> 'a) (x : 'a) : 'a
+    Applies the function  -f- to  the argument -x-  for as  long as  the
+    condition -p- is true.
+
+        fun applywhile p f x = if p x then applywhile p f (f x) else x;
+
+
+val repeat (f : 'a -> 'a) (n : int) (x : 'a) : 'a
+    Applies the function -f- to the argument -x- -n- times. This is  the
+    same as -applyn-, but with the first two arguments reversed.
+
+        val repeat = C applyn;
+
+
+val repeatwhile (f : 'a -> 'a) (p : 'a -> bool) (x : 'a) : 'a
+    Applies the function  -f- to  the argument -x-  for as  long as  the
+    condition -p- is true.  This is the same  as -applywhile-, but  with
+    the first two arguments reversed.
+
+        val repeatwhile = C applywhile;
+
+
+val pair (x : 'a) (y : 'b) : 'a * 'b
+    Constructs a pair (a 2-tuple) from the arguments -x- and -y-.
+
+        fun pair x y = (x, y);
+
+
+val fst (p : 'a * 'b) : 'a
+    Selects the first component from the pair -p-.
+
+        fun fst(x, _) = x;
+
+
+val snd (p : 'a * 'b) : 'b
+    Selects the second component from the pair -p-.
+
+        fun snd(_, y) = y;
+
+
+infix 0 before
+val (x : 'a) before (y : 'b) : 'a
+    Evaluates -x- and -y- in order, then returns -x-.
+
+        infix 0 before
+        fun x before y = x;
+
+
+val swap (p : 'a * 'b) : 'b * 'a
+    Reverses the order of components in the pair -p-.
+
+        fun swap(x, y) = (y, x);
+
+
+--- C.all/pml/help/combinators
+--- Copyright University of Sussex 1991. All rights reserved. ----------

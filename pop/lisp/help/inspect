@@ -1,0 +1,143 @@
+HELP INSPECT                                     John Williams, May 1987
+
+This file documents the Poplog Common Lisp Inspector, a structure
+browser invoked by the function inspect. Pop-11 provides similar
+structure browsing facilities, see the Pop-11 version of HELP * INSPECT
+for details.
+
+The debugging package available during calls to break (i.e. after errors
+and interrupts) makes use of the inspect, so familiarity with its basic
+features will facilitate effective use of the debugger.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+  2   Inspect Commands
+  3   An Example
+
+
+-----------------------------------------------------------------------
+1  Introduction
+-----------------------------------------------------------------------
+
+inspect is a simple structure browser. It displays its argument, and
+then responds to user commands. The display typically consists of a one
+line description of the object, followed by each of its components on a
+separate line, numbered for reference purposes. To illustrate:
+
+    (inspect 'cdr)
+    A symbol
+      {0}      Name:  "CDR"
+      [1]     Value:  #<UNDEF>
+      [2]  Function:  #<FUNCTION CDR>
+      {3}   Package:  #<LISP PACKAGE>
+      [4]     Plist:  NIL
+
+Slot numbers are enclosed by [] if the value of the slot can be changed;
+and by {} otherwise.
+
+Some objects (eg fixnums) have no components:
+
+    (inspect 23)
+    A fixnum, 23
+
+
+-----------------------------------------------------------------------
+2  Inspect Commands
+-----------------------------------------------------------------------
+
+A variety of commands can be issued to the Inspector:
+
+  a <variable>      Assign current object to value of <variable>
+  b                 Print a backtrace of objects selected
+  e                 Switch to evaluate mode
+  g <slot num>      Redisplay current object from specified slot number
+  h or ?            Help
+  m                 Display more slots (if available)
+  p                 Toggle displaying of lists as pairs
+  q                 Quit, leave the inspector
+  s <slot num> <value>      Set a slot value to an evaluated expresion
+  .                 Redisplay current object from the top
+  -                 Move out a level of inspection
+  +                 Move in a level of inspection
+  0,1,2 ..          Inspect value of numbered slot
+
+
+-----------------------------------------------------------------------
+3  An Example
+-----------------------------------------------------------------------
+
+Define a structure called "person", with slots for name, age, and sex:
+
+    (defstruct person name age sex)
+
+    (setq p #s(person :name "john" :sex male :age 28.0))
+
+The following example uses inspect to give John a sex-change on his/her
+birthday!
+
+    (inspect p)
+    A person
+      [0]  NAME:  "john"
+      [1]  AGE:  28.0
+      [2]  SEX:  MALE
+    inspect> 0
+; First examine the NAME
+    A simple array, dimensions (4), element type STRING-CHAR
+      [0]  #\j
+      [1]  #\o
+      [2]  #\h
+      [3]  #\n
+    inspect> s 2 #\a
+    A simple array, dimensions (4), element type STRING-CHAR
+      [0]  #\j
+      [1]  #\o
+      [2]  #\a
+      [3]  #\n
+    inspect> -
+; Now do the SEX
+    A person
+      [0]  NAME:  "joan"
+      [1]  AGE:  28.0
+      [2]  SEX:  MALE
+    inspect> s 2 'female
+    A person
+      [0]  NAME:  "joan"
+      [1]  AGE:  28.0
+      [2]  SEX:  FEMALE
+; Finally do the AGE
+    inspect> 1
+    A single-float, 28.0
+      {0}  Mantissa:  3670016
+      {1}  Exponent:  -17
+      {2}      Sign:  1.0
+; Can't change components of a float (note the {} brackets)
+; So switch to normal Lisp evaluate mode, and calculate new value
+    inspect> a foo
+    Saved current object in FOO
+    inspect> e
+    == (incf foo)
+    29.0
+    == <EOF>
+; Back to inspect ...
+    A single-float, 28.0
+      {0}  Mantissa:  3670016
+      {1}  Exponent:  -17
+      {2}      Sign:  1.0
+    inspect> -
+    A person
+      [0]  NAME:  "joan"
+      [1]  AGE:  28.0
+      [2]  SEX:  FEMALE
+    inspect> s 1 foo
+    A person
+      [0]  NAME:  "joan"
+      [1]  AGE:  29.0
+      [2]  SEX:  FEMALE
+    inspect> q
+; Quit the inspector
+
+
+--- C.all/lisp/help/inspect
+--- Copyright University of Sussex 1987. All rights reserved.

@@ -1,0 +1,207 @@
+HELP STDIO                                       R. J. Duncan, June 1989
+
+Basic input/output in PML.
+
+
+    CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- The StdIO Module
+ -- I/O Stream Types
+ -- I/O Exceptions
+ -- Standard I/O Streams
+ -- Functions on Input Streams
+ -- Functions on Output Streams
+
+
+-- The StdIO Module ---------------------------------------------------
+
+signature StdIO
+structure StdIO : StdIO
+    The structure -StdIO- defines the  full set of I/O types,  functions
+    and exceptions  required by  the  Standard ML  language  definition,
+    Appendices C & D. This structure is open by default and the names it
+    defines made "pervasive" so as to be visible everywhere.
+
+    The -StdIO- module is described by the following signature:
+
+    signature StdIO = sig
+
+        (* I/O Stream Types *)
+
+        type instream
+        type outstream
+
+        (* I/O Exception *)
+
+        exception Io of string
+
+        (* Standard I/O Streams *)
+
+        val std_in          : instream
+        val std_out         : outstream
+        val std_err         : outstream
+
+        (* Functions on Input Streams *)
+
+        val open_in         : string -> instream
+        val close_in        : instream -> unit
+        val input           : instream * int -> string
+        val input_line      : instream -> string
+        val lookahead       : instream -> string
+        val end_of_stream   : instream -> bool
+        val is_term_in      : instream -> bool
+
+        (* Functions on Output Streams *)
+
+        val open_out        : string -> outstream
+        val open_append     : string -> outstream
+        val close_out       : outstream -> unit
+        val output          : outstream * string -> unit
+        val flush_out       : outstream -> unit
+        val is_term_out     : outstream -> bool
+
+    end;    (* signature StdIO *)
+
+
+-- I/O Stream Types ----------------------------------------------------
+
+type instream
+type outstream
+    The central  concept of  I/O in  ML  is the  stream: a  sequence  of
+    characters which may or may not be finite, and if finite, which  may
+    or may not  be terminated.  Each input stream  - or  instream -  has
+    associated with  it a  character producer,  usually a  disk file  or
+    input  device.  Likewise,  an  output  stream  -  outstream  -   has
+    associated with  it  a  character  consumer.  The  stream  transmits
+    characters from the producer to a program, or from a program to  the
+    consumer; terminating the stream  breaks the connection between  the
+    stream and its producer or consumer.
+
+
+-- I/O Exceptions ------------------------------------------------------
+
+exception Io (s : string)
+    Raised on any I/O failure: the string -s- describes the cause of the
+    fault. Some particular cases are described below.
+
+
+-- Standard I/O Streams ------------------------------------------------
+
+val std_in : instream
+    An input  stream whose  producer  is the  input  source of  the  PML
+    process, typically the  user's terminal.  This stream  may never  be
+    closed, although it may terminate  if end-of-file is reached on  the
+    input.
+
+
+val std_out : outstream
+    An output stream whose consumer is the output destination of the PML
+    process, typically the  user's terminal.  This stream  may never  be
+    closed.
+
+
+val std_err : outstream
+    An output stream whose consumer  is the error output destination  of
+    the PML  process, typically  the user's  terminal. This  stream  may
+    never be closed.
+
+
+-- Functions on Input Streams -----------------------------------------
+
+val open_in (s : string) : instream
+    Returns an  instream  whose producer  is  the file  named  -s-.  The
+    exception
+
+        Io("Cannot open " ^ s)
+
+    is raised  if the  file does  not  exist, or  cannot be  opened  for
+    reading.
+
+
+val close_in (is : instream) : unit
+    Empties and terminates  the instream -is-.  Subsequent reads on  the
+    instream will return the empty string, "".
+
+
+val input (is : instream, n : int) : string
+    Returns a  string  containing  the  next  -n-  characters  from  the
+    instream -is-,  removing them  from  the stream.  If the  stream  is
+    terminated with fewer  than -n- characters  remaining, then all  the
+    remaining characters are removed and returned. In particular,  input
+    on a terminated and empty stream returns the empty string, "".
+
+
+val input_line (is : instream) : string
+    Returns a string containing characters from the instream -is- up  to
+    and including  the  next  newline character,  "\n".  The  characters
+    returned are removed from  the stream. If  the stream is  terminated
+    with  no  newline  character  remaining,  then  all  the   remaining
+    characters are  removed  and  returned. In  particular,  input  on a
+    terminated and empty stream returns the empty string, "".
+
+
+val lookahead (is : instream) : string
+    Returns a string  containing the  next character  from the  instream
+    -is-. The character is not removed from the stream. If the stream is
+    terminated and empty, -lookahead- returns the empty string, "".
+
+
+val end_of_stream (is : instream) : bool
+    Returns -true-  if  the  instream  -is-  is  terminated  and  empty.
+    Definition:
+
+        fun end_of_stream is = lookahead is = ""
+
+
+val is_term_in (is : instream) : bool
+    Returns -true-  if  the instream  -is-  is not  terminated  and  its
+    associated character producer is a terminal.
+
+
+-- Functions on Output Streams ----------------------------------------
+
+val open_out (s : string) : outstream
+    Returns an outstream whose  consumer is the file  named -s-. If  the
+    file -s- does not exist it is created, otherwise it is truncated  to
+    zero length. The exception
+
+        Io("Cannot open " ^ s)
+
+    is raised if the file cannot be opened for writing.
+
+
+val open_append (s : string) : outstream
+    Returns an outstream whose  consumer is the file  named -s-. If  the
+    file -s-  does  not exist  it  is created,  otherwise  the  existing
+    contents of the file are preserved. The exception
+
+        Io("Cannot open " ^ s)
+
+    is raised if the file cannot be opened for writing.
+
+
+val close_out (os : outstream) : unit
+    Terminates the outstream  -os-. Any subsequent  attempt to write  on
+    the outstream will raise an exception.
+
+
+val output (os : outstream, s : string) : unit
+    Writes the characters in -s- to the outstream -os-. The exception
+
+        Io("Output stream is closed")
+
+    is raised if the stream is terminated.
+
+
+val flush_out (os : outstream) : unit
+    Flushes any characters buffered by the consumer associated with  the
+    outstream -os-.
+
+
+val is_term_out (os : outstream) : bool
+    Returns -true-  if the  outstream  -os- is  not terminated  and  its
+    associated character consumer is a terminal.
+
+
+--- C.all/pml/help/stdio
+--- Copyright University of Sussex 1991. All rights reserved. ----------

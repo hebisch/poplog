@@ -1,0 +1,286 @@
+HELP COMPILE                                    Robert Duncan, July 1993
+
+Compiling files in Prolog.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Using compile/2
+      1.1   Files
+      1.2   CompileMode
+
+  2   Other Compilation Predicates
+
+  3   Compiling Files from Ved
+
+  4   The Compiler's Input Stream
+
+  5   Commands
+
+  6   Term Expansion
+
+  7   Directives and Queries
+
+  8   File Inclusion
+
+
+-----------------------------------------------------------------------
+1  Using compile/2
+-----------------------------------------------------------------------
+
+The predicate compile/2 provides the standard interface to the Prolog
+compiler. A call to the compiler has the general form:
+
+    ?- compile(Files, CompileMode).
+
+where Files is a single filename or a list of filenames to be compiled
+in order. The CompileMode determines the interpretation of terms read
+from the files, and must be one of the three atoms:
+
+    consult
+    reconsult
+    query
+
+consult and reconsult are the normal modes for defining predicates;
+query mode is that used by the interactive top-level.
+
+For example, to compile an application built from the two files
+'code.pl' and 'data.pl' in the current directory:
+
+    ?- compile([code, data], reconsult).
+
+
+1.1  Files
+----------
+The Files argument to the compiler can be a single filename or a list of
+filenames, where a filename is an atom. The atom 'user' is recognised
+specially as referring to the interactive input (or the standard input
+if the process is non-interactive); any other atom is taken as a literal
+filename which must conform to the usual operating system conventions. A
+typical filename would be:
+
+    '~/prolog/typical.pl'           % On Unix
+
+    'sys$login:[prolog]typical.pl'  % On VMS
+
+The file extension '.pl' is standard for Poplog Prolog program files,
+and so can be omitted (provided that the resulting name is unambiguous).
+When compiling files in the current (default) directory, this often
+means that quotes around filenames are unnecessary, as in the example
+above.
+
+When given a single file to compile, the compiler works silently. When
+given a list of files, it prints a message for each file successfully
+compiled. If compiling any one file in a list raises an error which
+causes the compiler to abort, then none of the subsequent files in the
+list will be compiled.
+
+1.2  CompileMode
+----------------
+The CompileMode argument determines the interpretation of terms read
+from the input as follows:
+
+    reconsult
+        Terms are read as clauses to be added to the database. Within a
+        single file, all clauses having the same functor name and arity
+        are taken together as the procedure definition of a predicate,
+        and this definition replaces any existing definition of that
+        predicate currently in the database. Where all the clauses of a
+        definition are contiguous within the file, the definition is
+        implicitly static unless declared otherwise; where the clauses
+        are discontiguous, the definition is always dynamic.
+
+    consult
+        Like reconsult, except that rather than replacing definitions in
+        the database, clauses are added to the end of any existing
+        definition as if by assertz/1. Any definition which has clauses
+        added to it in this way automatically becomes dynamic.
+
+    query
+        Terms are read as goals to be evaluated. Each goal is evaluated
+        as soon as it is read and any variable bindings are displayed on
+        the 'user' output stream; if the 'user' input is interactive,
+        then the compiler can be persuaded to retry the goal to generate
+        subsequent solutions. This gives the same behaviour as the
+        standard interactive top-level.
+
+Any other value for CompileMode other than the three atoms described
+here will cause an error.
+
+The CompileMode argument determines the default compilation mode for all
+the files being compiled. This default can be overridden on a per-file
+basis by wrapping the filename in a term with functor +/1, -/1 or ?/1.
+These correspond to the available modes as follows
+
+    +/1     consult
+    -/1     reconsult
+    ?/1     query
+
+A file whose name is enclosed in one of these terms is compiled in the
+associated mode, regardless of the default mode. For example, to
+reconsult the file 'code.pl' and to consult the file 'data.pl' in the
+current directory:
+
+    ?- compile([-code, +data], reconsult).
+
+Note that '+' and '-' are both prefix operators and so can be applied
+without parentheses, but '?' is not an operator by default.
+
+
+-----------------------------------------------------------------------
+2  Other Compilation Predicates
+-----------------------------------------------------------------------
+
+Poplog Prolog has various other predicates for compiling files. All of
+these can be expressed in terms of compile/2 as follows:
+
+    compile(Files) :-
+        compile(Files, reconsult).
+
+    reconsult(Files) :-
+        compile(Files, reconsult).
+
+    consult(Files) :-
+        compile(Files, consult).
+
+    [File|Files] :-
+        compile([File|Files], consult).
+
+This last form means that the previous example could be equally well
+expressed as:
+
+    ?- [-code, +data].
+
+Some Prolog systems distinguish between compiled and interpreted code
+and in these systems, calling the compile predicate might have a
+different effect to calling, say, reconsult. Poplog Prolog makes no such
+distinction: all code is incrementally compiled through the medium of
+compile/2.
+
+
+-----------------------------------------------------------------------
+3  Compiling Files from Ved
+-----------------------------------------------------------------------
+
+You can compile a named file from Ved with the command:
+
+    <ENTER> load <filename>
+
+The load command is a generic command, not specific to Prolog, which
+uses the extension on the filename to determine which subsystem compiler
+to use on the file. So you must include the file extension on the file
+name (if it has one).
+
+You can also use the commands:
+
+    <ENTER> l1
+    <ENTER> lcp
+    <ENTER> lmr
+
+to compile all or part of the current file. Compiling a Prolog file --
+or part of a file -- in Ved is the same as reconsulting it.
+
+See HELP * PLOGVED.
+
+
+-----------------------------------------------------------------------
+4  The Compiler's Input Stream
+-----------------------------------------------------------------------
+
+Each time the compiler starts on a new file, a new input stream is
+created for the file and assigned to the current input. The input stream
+is private to the compiler, so does not conflict with any explicit use
+of see/1 on the same filename. This private input stream is identified
+by the atom 'inchan'.
+
+The compiler reads terms from the input using read/2. If the input is
+interactive, the compiler will prompt for terms in query mode with '?- '
+and in consult or reconsult mode with '| '. When 'end_of_file' is read,
+the current compilation is terminated and the previous value of the
+input is restored.
+
+Any goal executed from a file which reads from the current input will
+read from the file being compiled. You can temporarily divert the
+current input for the duration of a single goal using see/1:
+
+    :- see(AnotherFile), read(Term).
+
+but the compiler always resets its input after every directive it
+evaluates.
+
+See HELP * I_O.
+
+
+-----------------------------------------------------------------------
+5  Commands
+-----------------------------------------------------------------------
+
+Before reading each term, the compiler inspects the first word of the
+input stream to see if it matches one of a few special command names.
+If so, the word is removed from the input and the corresponding command
+procedure invoked. Compilation resumes once the command has completed.
+Standard commands allow for calling Ved, changing the current working
+directory, etc.
+
+See HELP * COMMANDS.
+
+
+-----------------------------------------------------------------------
+6  Term Expansion
+-----------------------------------------------------------------------
+
+Every term read by the compiler is first of all transformed by a call to
+the predicate expand_term/2. By default, this performs the standard
+grammar-rule expansion, transforming terms with principal functor -->/2
+into standard clauses (see HELP * GRAMMAR_RULE). This default action can
+be augmented with user-defined translations by adding clauses to the
+dynamic predicate term_expansion/2.
+
+See HELP * EXPAND_TERM.
+
+
+-----------------------------------------------------------------------
+7  Directives and Queries
+-----------------------------------------------------------------------
+
+After term expansion, a term with principal functor :-/1 or ?-/1 is
+interpreted specially as a directive or query. In either case, the
+argument of the term is executed immediately as a goal, but whereas a
+directive succeeds silently, a query will display any resulting variable
+bindings on the 'user' output stream and prompt on the 'user' input.
+
+The query compilation mode behaves just as if every term in the input
+were prefixed with a '?-'.
+
+Directives and queries are interpreted identically in all compilation
+modes, so a file containing only directives and queries will compile in
+the same way regardless of the mode.
+
+See HELP * DIRECTIVES.
+
+
+-----------------------------------------------------------------------
+8  File Inclusion
+-----------------------------------------------------------------------
+
+The predicate include/1 interpolates the contents of a file or a list of
+files into the current compilation stream. This is designed to be used
+as a directive:
+
+    :- include(Files).
+
+where Files can be a single filename (an atom) or a list of such. As
+with the compiler, the extension can be omitted from a filename where it
+is the default. Including a file is different from compiling it: terms
+read from the file are interpolated into the compiler's input stream as
+if they were read from the stream itself. In particular, this means that
+the terms are interpreted according to the current compilation mode.
+
+File inclusion works by pushing the current input onto an internal stack
+and then opening the included file. Terms are then read from this file
+as if from the original stream until 'end_of_file' is reached, at which
+point the previous input is popped from the stack and made current.
+
+
+--- C.all/plog/help/compile
+--- Copyright University of Sussex 1993. All rights reserved.

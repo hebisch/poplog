@@ -1,0 +1,175 @@
+HELP DEBUG                                      John Williams, July 1987
+
+This file overviews special tools, functions, and macros that may help
+in debugging Poplog Common Lisp programs.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Debugging Tools
+  2   Error Checking Macros
+      2.1   Poplog-specific variables *test-form* and *test-value*
+      2.2   Check-type example
+      2.3   Assert example
+
+
+-----------------------------------------------------------------------
+1  Debugging Tools
+-----------------------------------------------------------------------
+
+An important element of debugging is finding out what a program is doing
+at the point it goes wrong. The following utilities may assist in this:
+
+    trace
+    break
+    inspect
+    The PROFILE module
+
+trace is a macro that modifies functions so that they display their
+arguments and results each time they are executed.
+
+The function break invokes the Lisp Debugger. This starts up a new Lisp
+top-level loop which in addition to evaluating Lisp expressions in the
+usual way, allows you to examine the function call stack and inspect
+individual function-call stack frames.
+
+inspect is a simple structure browsing tool, enabling interactive
+investigation and modification of complex data-structures.
+
+The PROFILE module provides facilities for profiling execution of Poplog
+Common Lisp code. Profiling means finding out which functions are the
+most time-consuming.
+
+See the following files for further information:
+
+    HELP * TRACE
+    HELP * BREAK
+    HELP * INSPECT
+    HELP * PROFILE
+
+
+-----------------------------------------------------------------------
+2  Error Checking Macros
+-----------------------------------------------------------------------
+
+Another way to facilitate debugging is to use the special error-checking
+macros provided by Common Lisp. These are:
+
+
+    (check-type place type [string])
+
+    (assert test-form [({place}*) [datum {argument}*]])
+
+    (ccase keyplace {({({key}*) | key} {form}*)}*)
+
+    (ctypecase keyplace {(type {form}*)}*)
+
+    (ecase keyform {({({key}*) | key} {form}*)}*)
+
+    (etypecase keyform {(type {form}*)}*)
+
+
+ccase and ctypecase are similar to case and typecase respectively,
+except that they signal continuable errors if no key or type is matched.
+
+ecase and etypecase are, again, similar to case and typecase, but they
+signal fatal errors if no key or type is matched.
+
+check-type signals a continuable error if place is not of the specified
+type, and then returns nil.
+
+assert signals a continuable error if test-form is nil.
+
+(These macros are described in more detail in REF * ERRORS).
+
+
+2.1  Poplog-specific variables *test-form* and *test-value*
+-----------------------------------------------------------
+
+The macros listed above all arrange that the form being tested is
+accessible via the special variable *test-form*, and that the value of
+this form is accessible via the special variable *test-value*. If an
+error does occur, continuing (where possible) from the break point that
+follows the error will enable the user to setf a new value into
+*test-form*. If the new value is still invalid, the error will be
+re-signaled.
+
+Please note that these special variables are intended for inspection
+only. Explicitly changing their values during a break-point will
+probably not affect the behaviour of the program in the desired way.
+
+
+2.2  Check-type example
+-----------------------
+
+    (setq l '(a b c d e))
+    (A B C D E)
+
+    (check-type (car l) number)
+
+    ;;; MISHAP - Number needed
+    ;;; INVOLVING:  A
+    ;;; FILE     :  /rsuna/home/johnw/cond/debug
+    ;;; LINE     :  87
+    ;;; DOING    :  (CHECK-TYPE (CAR L) NUMBER)
+
+    Break:  (Error)
+     :H     Help
+     :C 1   Supply a new value for (CAR L)
+
+    <0> :c 1
+    ;;; Supply a new value for (CAR L)
+    New value: 3
+    NIL
+
+    l
+    (3 B C D E)
+
+
+2.3  Assert example
+-------------------
+
+The assert macro provides a mechanism for signaling continuable errors
+when a particular expression evaluates to nil. A list of `places' whose
+value might need to be changed during debugging can be included in the
+assert form. This list is accessible during a break via the special
+variable *assert-places*.
+
+In this example, we use assert to check that a number is within two
+bounds.
+
+    (defvar *min* 0)
+    *MIN*
+
+    (defvar *max* 10)
+    *MAX*
+
+    (setq l '(11 12 13 14 15))
+    (11 12 13 14 15)
+
+    (assert (< *min* (car l) *max*)                 ; test form
+            ((car l))                               ; list of places
+            "Value ~D not in the range ~D to ~D"    ; error message
+            (car l) *min* *max*)                    ; error args
+
+    ;;; MISHAP - Value 11 not in the range 0 to 10
+    ;;; FILE     :  /rsuna/home/johnw/cond/debug
+    ;;; LINE     :  136
+    ;;; DOING    :  (ASSERT (< *MIN* (CAR L) ...) ((CAR L)) ...)
+
+    Break:  (Error)
+     :H     Help
+     :C     You will be prompted for new values
+     :C 1   Supply a new value for (CAR L)
+
+    <0> :c 1
+    ;;; Supply a new value for (CAR L)
+    New value: 9
+    NIL
+
+    l
+    (9 12 13 14 15)
+
+
+--- C.all/lisp/help/debug
+--- Copyright University of Sussex 1987. All rights reserved.

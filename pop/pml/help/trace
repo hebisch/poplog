@@ -1,0 +1,387 @@
+HELP TRACE                                  Robert Duncan, December 1994
+
+Tracing function calls during program execution.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+
+  2   Compiling in Debug Mode
+
+  3   Using the Trace Command
+
+  4   Trace Output
+
+  5   Tracing Local Functions
+
+  6   Global Tracing
+
+  7   Exceptions
+
+
+-----------------------------------------------------------------------
+1  Introduction
+-----------------------------------------------------------------------
+
+Tracing a function allows you to observe all the calls made to that
+function during the execution of a program. The following transcript of
+an interactive session shows the steps involved in using the tracer,
+here to observe the behaviour of the member function:
+
+  - Compile.debug := true;                  (* Compile in debug mode *)
+    val it = () : unit
+
+  - fun member(x, [])    = false            (* Define a function *)
+  = |   member(x, y::ys) = (x = y) orelse member(x, ys);
+    val member : ''a * ''a list -> bool
+
+  - trace member                            (* Trace it *)
+
+  - member(3, [1,2,3,4]);                   (* Call it; trace follows *)
+  [   1]> member (3, [1, 2, 3, 4])
+  [   1]> member (3, [2, 3, 4])
+  [   1]> member (3, [3, 4])
+  [   1]< member true
+    val it = true : bool
+
+
+-----------------------------------------------------------------------
+2  Compiling in Debug Mode
+-----------------------------------------------------------------------
+
+In order to use the tracer you must compile your program with the flag
+Compile.debug set to true. There are two ways to do this: from ML, by
+evaluating the expression
+
+    Compile.debug := true;
+
+or from Ved, with the command
+
+    <ENTER> set ml_compile_debug
+
+The *ved_set command toggles the setting of a flag, so you can use this
+same command to turn debugging off again.
+
+The debug flag causes the compiler to plant extra code in each function
+to provide hooks for the tracer. This obviously makes the code size
+larger and reduces its execution speed; it also reduces the amount of
+last-call optimisation which the compiler performs, although functions
+which are truly tail-recursive remain so. For interactive development
+work, the overhead is probably sufficiently small that you can have the
+debug flag set all the time, so that the tracer is always available: you
+can arrange this by including the line
+
+    Compile.debug := true;
+
+in your "init.ml" file. You should remember, however, to set the flag
+false again and recompile your program whenever code size or execution
+speed is important.
+
+You can selectively set the debug flag on a per-file basis by using the
+compiler's localise function: doing
+
+    Compile.localise Compile.debug := true;
+
+will set the flag only for the duration of the current compilation. The
+previous value of the flag will be restored once the compilation has
+finished, even if it terminates with an error. See HELP * localise.
+
+You should set the debug flag now if you want to try out the examples in
+this file.
+
+
+-----------------------------------------------------------------------
+3  Using the Trace Command
+-----------------------------------------------------------------------
+
+To trace a function, use the trace command
+
+    trace function ...
+
+Like all commands, the trace command is recognised only at top-level.
+The arguments to the command are the names of the functions you want to
+trace, separated by white space and terminated by a newline. For
+general information about commands see HELP * COMMANDS.
+
+You can only trace functions accessible from the top-level environment,
+although that includes functions defined within structures if you use
+long identifiers. Each function must have been defined within a fun
+declaration, compiled with the Compile.debug flag set to true (the state
+of the flag is irrelevant when you execute the trace command, or when
+you run the program).
+
+Once a function has been traced, then all calls to that function will be
+reported on the error output stream, usually the terminal or Ved's
+interactive window. To stop tracing a function, use the untrace command:
+
+    untrace function ...
+
+Tracing is a property of the function value, so if you redefine a
+function by recompiling it, the new value is not automatically traced:
+you must redo the trace command if you want to trace the new definition.
+
+As a running example throughout the rest of this file, we will use the
+following program:
+
+    Compile.debug := true;
+
+    fun length([]) = 0
+    |   length(_::xs) = 1 + length(xs)
+
+    fun member(x, []) = false
+    |   member(x, y::ys) = (x = y) orelse member(x, ys);
+
+    fun filter p ([]) = []
+    |   filter p (x::xs) =
+        if p(x) then x :: filter p xs else filter p xs
+
+    fun even(n) = (n mod 2 = 0)
+
+You should load this program now, and then execute the command
+
+    trace length member filter
+
+The trace command produces no output unless any of its arguments are
+invalid in some way.
+
+
+-----------------------------------------------------------------------
+4  Trace Output
+-----------------------------------------------------------------------
+
+Normal trace output contains one line for each function call and one
+line for the matching return, like this:
+
+    [   N]> name arguments
+    [   N]< name result
+
+Function calls are flagged with the character `>` and returns with `<`.
+The arguments are the actual arguments of the call and result is the
+value returned. The call and return lines may not be adjacent if there
+are intervening calls to other traced functions. The number N is a depth
+counter which indicates the nesting of traced calls; in long traces, you
+can use this to match up calls with their returns.
+
+For example, calling the function length defined above:
+
+    length([1,2,3,4]);
+    [ 1]> length [1, 2, 3, 4]
+    [ 2]> length [2, 3, 4]
+    [ 3]> length [3, 4]
+    [ 4]> length [4]
+    [ 5]> length []
+    [ 5]< length 0
+    [ 4]< length 1
+    [ 3]< length 2
+    [ 2]< length 3
+    [ 1]< length 4
+
+This function is recursive, so the trace shows one call line and one
+return line for each of five calls with the trace counter tracking the
+depth of recursion.
+
+With a tail-recursive function, however, all the returns are collapsed
+to a single line, and the depth counter remains unchanged between calls.
+You can see this in a call to member:
+
+    member(3, [1,2,3,4]);
+    [ 1]> member (3, [1, 2, 3, 4])
+    [ 1]> member (3, [2, 3, 4])
+    [ 1]> member (3, [3, 4])
+    [ 1]< member true
+
+This reflects how the first two calls of member transfer control
+entirely to their recursive invocations, with the single result shared
+by all. In general, wherever you see two calls to the same function with
+the same depth count and no intervening returns, you can assume that the
+function is tail recursive.
+
+The arguments and results of calls are displayed using the standard
+top-level printer, so the output can be controlled with the flags
+described in HELP * PRINTER. However, to prevent trace output from being
+too verbose, the maximum printing depth is set quite low during tracing.
+This is controlled by a special flag trace_depth in the Printer module:
+change this if you want to see more or less output during tracing.
+
+As with top-level printing, the trace printer has to know the types of
+arguments and results before it can display them properly. The tracer
+tries to deduce appropriate types from the type of the particular
+application, but this does not always give the most informative results,
+particularly for local, polymorphic functions or in applications where a
+type is abstract at the call site. In these cases, the trace may show no
+more than a dash (-) to stand for a particular argument or result.
+
+
+-----------------------------------------------------------------------
+5  Tracing Local Functions
+-----------------------------------------------------------------------
+
+Because of the sophisticated scoping rules of SML, much of the work of a
+program is often done by functions which are not accessible through the
+top-level environment. These may be functions defined in let or local
+blocks, or functions not exported from modules. In such cases, tracing
+only the accessible functions may not provide much useful information.
+Consider the following redefinition of length to use a local tail-
+recursive function:
+
+    fun length(list) =
+        let fun length'([], n) = n
+            |   length'(_::xs, n) = length'(xs, n+1)
+        in  length'(list, 0)
+        end;
+
+    trace length    (* you must redo this to trace the new version *)
+
+In a trace of this function, the work done by the local length' is
+invisible:
+
+    length([1,2,3,4]);
+    [ 1]> length [1, 2, 3, 4]
+    [ 1]< length 4
+
+As yet, you cannot trace such hidden functions explicitly. However, you
+can ask to be shown more of what goes on inside a traced function by
+qualifying the function name given to the trace command. For this
+example, we might try:
+
+    trace length[length']
+
+This says that within any call of length, the tracer should also report
+on calls to a function named length'. This produces the more informative
+output:
+
+    length([1,2,3,4]);
+    [ 1]> length [1, 2, 3, 4]
+    [ 2]> length' ([-, -, -, -], 0)
+    [ 2]> length' ([-, -, -], 1)
+    [ 2]> length' ([-, -], 2)
+    [ 2]> length' ([-], 3)
+    [ 2]> length' ([], 4)
+    [ 2]< length' 4
+    [ 1]< length 4
+
+You can qualify a trace command argument with any list of names:
+
+    trace function[name1,name2,...]
+
+This means that during a call of the traced function, calls to any other
+function having one of the given names will also be traced. Names used
+as qualifiers cut across SML scoping rules: the name of a function -- in
+this context -- is the identifier which was bound by the fun declaration
+in which the function was defined. It makes no difference where the
+binding was done; in particular, the binding doesn't have to be local to
+the function being traced. The only condition is that the named
+functions must themselves have been compiled in debug mode.
+
+The special qualifier
+
+    [*]
+
+means ``any function'' and turns on full tracing for the duration of the
+traced function call. One use for this is in tracing higher-order
+functions. Consider a trace of the function filter defined above:
+
+    filter even [1,2,3,4,5];
+    [ 1]> filter fn [1, 2, 3, 4, 5]
+    [ 1]> filter fn [2, 3, 4, 5]
+    [ 2]> filter fn [3, 4, 5]
+    [ 2]> filter fn [4, 5]
+    [ 3]> filter fn [5]
+    [ 3]> filter fn []
+    [ 3]< filter []
+    [ 2]< filter [4]
+    [ 1]< filter [2, 4]
+
+This shows how filter is collecting a subset of items from its argument
+list, but not why those particular items are being chosen. We can see
+more by adjusting the trace on filter to include all its nested calls:
+
+    trace filter[*]
+
+    filter even [1,2,3,4,5];
+    [ 1]> filter fn [1, 2, 3, 4, 5]
+    [ 2]> even 1
+    [ 2]< even false
+    [ 1]> filter fn [2, 3, 4, 5]
+    [ 2]> even 2
+    [ 2]< even true
+    [ 2]> filter fn [3, 4, 5]
+    [ 3]> even 3
+    [ 3]< even false
+    [ 2]> filter fn [4, 5]
+    [ 3]> even 4
+    [ 3]< even true
+    [ 3]> filter fn [5]
+    [ 4]> even 5
+    [ 4]< even false
+    [ 3]> filter fn []
+    [ 3]< filter []
+    [ 2]< filter [4]
+    [ 1]< filter [2, 4]
+
+An important point to understand here is that the function even is not
+being traced explicitly, but only within the call to filter.
+
+You can turn off local tracing with the untrace command:
+
+    untrace length[length'] filter[*]
+
+
+-----------------------------------------------------------------------
+6  Global Tracing
+-----------------------------------------------------------------------
+
+You can use a list of qualifiers alone as an argument to the trace
+command:
+
+    trace [name1,name2,...]
+
+This turns on tracing for all functions called name1, name2, etc.,
+wherever they are defined and wherever they are called. This may be the
+only way to get a trace on a function hidden in a module somewhere, but
+you can use it to trace accessible functions too:
+
+    trace [length,member,filter]
+
+The advantage of doing things this way is that, because these qualifiers
+don't respect scoping rules, you can redefine any of the named functions
+and still keep a trace on them without having to redo the trace command.
+The disadvantages are that execution time will be further increased, and
+that any other locally-defined function which happens to have the same
+name as one of these will also appear in the trace, and may be difficult
+to distinguish.
+
+The command
+
+    trace [*]
+
+turns on full, global tracing, such that everything that can be traced,
+will be. This can produce a considerable quantity of output.
+
+
+-----------------------------------------------------------------------
+7  Exceptions
+-----------------------------------------------------------------------
+
+Within a call to a traced function, the exception traceback feature is
+automatically enabled so that exceptions will show up in the trace
+output. An exception appears in trace output as a sequence
+
+    [   N]E exception
+    [   N]X name
+          .
+          .
+          .
+    [   N]H name
+
+The character `E` in the first line indicates the raising of an
+exception; the exception packet is displayed. Lines marked `X` show
+function calls abandoned as a result of the exception: all discarded
+calls are printed, but exits from traced calls are indicated by changes
+in the trace counter N. The `H` line appears only if the exception is
+handled; normal tracing is resumed thereafter. See HELP * traceback.
+
+
+--- C.all/pml/help/trace
+--- Copyright University of Sussex 1994. All rights reserved.

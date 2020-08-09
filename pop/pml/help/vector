@@ -1,0 +1,145 @@
+HELP VECTOR                                 Robert Duncan, November 1990
+
+Sequences with constant time access.
+
+
+    CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- The Vector Module
+ -- The Vector Type
+ -- Vector Functions
+
+
+-- The Vector Module --------------------------------------------------
+
+signature Vector
+signature VECTOR
+structure Vector : Vector
+    The  structure  -Vector-  provides  an  implementation  of   simple,
+    one-dimensional, read-only vectors.  The structure  is described  by
+    the following signature:
+
+        signature Vector = sig
+
+            eqtype 'a vector
+
+            exception Size
+            exception Subscript
+
+            val vector      : 'a list -> 'a vector
+            val tabulate    : int * (int -> 'a) -> 'a vector
+            val length      : 'a vector -> int
+            val sub         : 'a vector * int -> 'a
+
+        end
+
+        signature VECTOR = Vector
+
+    The -Vector-  module is  not  part of  the  Definition, but  can  be
+    considered standard  insofar  as  it is  supported  by  all  current
+    Standard ML compilers.  For additional  (non-standard) functions  on
+    vectors see HELP * EXTENDED_VECTOR. For traditional updatable arrays
+    see HELP * ARRAY.
+
+
+-- The Vector Type ----------------------------------------------------
+
+eqtype 'a vector
+    The type of vectors. A vector is a sequence of elements all the same
+    type which supports indexed access in constant time. For a vector of
+    length -n-, index values are integers in the range
+
+        0 <= i < n
+
+    Vectors are  not  updatable:  changing  a  single  element  requires
+    copying the whole vector. See HELP * ARRAY for updatable vector-like
+    objects.
+
+    The vector  type  is abstract  in  the sense  that  it has  no  data
+    constructors -- vectors can be  created and manipulated only by  the
+    functions described in this file -- but it does admit equality,  two
+    vectors being equal whenever they  contain the same elements in  the
+    same order.  The semantics  of  vectors can  be described  with  the
+    following model implementation:
+
+        structure Vector : Vector = struct
+
+            datatype 'a vector = VECTOR of 'a list
+
+            (*  ... function definitions given below  *)
+
+        end;    (* structure Vector *)
+
+    This correctly  illustrates the  static  and dynamic  properties  of
+    vectors, but does not capture their space and time efficiency: it is
+    impossible to represent constant-time access in Standard ML, so this
+    feature is provided directly by the compiler.
+
+
+-- Vector Functions ---------------------------------------------------
+
+The descriptions of  functions given  below are  illustrated with  model
+definitions based on the datatype  defined above; as explained  already,
+these are  considerably less  efficient  than the  real  implementations
+which cannot be written in Standard ML.
+
+
+val vector (l : 'a list) : 'a vector
+    Constructs a new vector of size -length(l)-, where the i'th  element
+    of the vector is  initialised with the  corresponding item from  the
+    list.
+
+        val vector = VECTOR;
+
+
+exception Size
+val tabulate (n : int, init : int -> 'a) : 'a vector
+    Constructs a new vector of size  -n-, where the i'th element of  the
+    vector is initialised with the value -init(i)-. Raises the exception
+    -Size- if -n- is negative.
+
+        exception Size
+        fun tabulate(n, init) =
+            let fun tab i = if i = n then [] else init(i) :: tab(i+1)
+            in  if n < 0 then raise Size else VECTOR(tab 0)
+            end;
+
+
+val length (v : 'a vector) : int
+    Returns the  number  of  elements  in  the  vector  -v-.  This  is a
+    constant-time operation.
+
+        fun length(VECTOR l) =
+            let fun len [] = 0
+                |   len (_::l) = len l + 1
+            in  len l
+            end;
+
+
+exception Subscript
+val sub (v : 'a vector, i : int) : 'a
+    Returns the i'th  element of  the vector -v-.  Raises the  exception
+    -Subscript- if -i- is outside the range
+
+        0 <= i < length(v)
+
+    This is a constant-time operation.
+
+        exception Subscript
+        fun sub(VECTOR l, i) =
+            let fun nth 0 (x::_) = x
+                |   nth i (_::l) = nth (i-1) l
+                |   nth _ [] = raise Subscript
+            in  nth i l
+            end;
+
+    NB: -sub- is intended to be an infix operator of precedence 9. It is
+    recommended that  whenever  the  -Vector- structure  is  opened,  an
+    appropriate fixity directive should be appended, e.g:
+
+        open Vector
+        infix 9 sub
+
+
+--- C.all/pml/help/vector
+--- Copyright University of Sussex 1994. All rights reserved. ----------

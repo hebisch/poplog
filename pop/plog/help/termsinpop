@@ -1,0 +1,336 @@
+PLOGHELP TERMSINPOP                     Jonathan Laventhol, 22 July 1985
+                                 Revised by Kathryn Seifert, August 1986
+									  Revised by Robert Duncan, May 1987
+
+POP-11 procedures for manipulating Prolog terms and variables.
+
+    prolog_readterm() -> <prologterm>
+	prolog_readterm_to(<word>) -> <prologterm>
+    prolog_write(<prologterm>)
+    prolog_maketerm({<item>}*, <word>, <integer>) -> <prologterm>
+    prolog_complexterm(<item>) -> <boolean>
+    prolog_functor(<prologterm>) -> <word>
+    prolog_arity(<prologterm>) -> <integer>
+    prolog_arg(<integer>, <prologterm>) -> <item>
+    prolog_arg_nd(<integer>, <prologterm>) -> <item>
+    prolog_args(<prologterm>) -> {<item>}*
+    prolog_args_nd(<prologterm>) -> {<item>}*
+    prolog_appargs(<prologterm>, <procedure>) -> {<item>}*
+    prolog_appargs_nd(<prologterm>, <procedure>) -> {<item>}*
+    prolog_deref(<prologvar>) -> <item>
+    prolog_undefvar(<prologvar>) -> <boolean>
+    prolog_full_deref(<prologterm>) -> <item>
+    prolog_var_number(<prologvar>) -> <integer>
+    prolog_newvar() -> <prologvar>
+    prolog_generalise(<prologterm>) -> <item>
+    prolog_instance(<item>) -> <prologterm>
+    prolog_unify(<prologterm>, <prologterm>) -> <boolean>
+    prolog_unifyc(<prologterm>, <prologterm>, <procedure>)
+
+Keywords: POP-11, Prolog, mixed language programming, prolog terms,
+          prolog variables
+
+
+CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- INTRODUCTION
+ -- HOW PROLOG TERMS ARE REPRESENTED
+ -- PROCEDURES FOR MANIPULATING PROLOG TERMS
+ -- DEREFERENCING
+ -- EQUALITY ON PROLOG OBJECTS
+ -- KEEPING STRUCTURES BUILT BY PROLOG OVER BACKTRACKING
+ -- MISCELLANEOUS PROCEDURES
+ -- SECRETS
+ -- RELATED DOCUMENTATION
+
+
+-- INTRODUCTION -------------------------------------------------------
+
+This HELP file describes in detail the current facilities and procedures
+provided for manipulating Prolog terms and variables in POP-11.
+
+The representation of Prolog terms changed in V.11 POPLOG, and a
+description of these changes is given in PLOGHELP * OLDPLOGTERMS.
+
+
+-- HOW PROLOG TERMS ARE REPRESENTED -----------------------------------
+
+In general, it is not necessary to know much about how Prolog terms are
+represented in POPLOG. In particular, the following procedures enable
+you to read and write Prolog terms using the Clocksin and Mellish "core
+Prolog" syntax:
+
+prolog_readterm() -> <prologterm>
+    returns a Prolog term read from PROGLIST and terminated by a dot
+prolog_readterm_to(<word:W>) -> <prologterm>
+	returns a Prolog term read from PROGLIST and terminated by the word
+	W
+prolog_write(<prologterm:T>)
+    writes the Prolog term T to CUCHAROUT
+(See HELP * PROGLIST, HELP * CUCHAROUT)
+
+However, for developing some programs in a mixture of Prolog and POP-11,
+it is useful to know how Prolog terms are represented in POPLOG and what
+correspondences with POP-11 structures can be relied on. The following
+are the basic rules. Note that to understand Prolog datastructures one
+must also understand the notion of "dereferencing" (see below).
+
+PROLOG ATOMS are represented by POP-11 words. (Quoted atoms are read
+	from PROGLIST as POP-11 strings, but converted by the Prolog parser
+	into words.)
+PROLOG VARIABLES have their own datatype.  See section below.
+PROLOG LISTS are represented by POP-11 lists (i.e. built from pairs).
+PROLOG COMPLEX TERMS are represented by their own datatype.  This is an
+    improvement introduced in Version 11 and the procedures described in
+    this file are now the preferred ones.
+
+Any other POP-11 object is considered "atomic" in the sense that its
+functor is itself and it has arity zero. Good examples are numbers and
+the empty list [], but the same rule applies for all other data types
+not catered for above (for example: strings, booleans, vectors and
+procedures).
+
+
+-- PROCEDURES FOR MANIPULATING PROLOG TERMS ---------------------------
+
+prolog_maketerm({<item:I>}*, <word:F>, <integer:A>) -> <prologterm:T>
+    'prolog_maketerm' takes any number of items I which will correspond
+    to the arguments of the prologterm T being constructed, a word F
+    corresponding to the functor of the term, and an integer A
+    indicating the arity of the term. The procedure builds a prologterm
+    T with the given functor and arity, taking the items I off the
+    stack.  Constructs a pair if the functor is "." and arity is 2. If
+    arity is zero then the functor is taken to be 'atomic' and is
+    returned. Mishaps if the arity is less than zero or is not an
+    integer, or if the arity is greater than zero and the functor is not
+    a word.
+
+prolog_complexterm(<prologterm:T>) -> <boolean>
+    Returns true if T is a prologterm or a pair. Returns false for any
+    other object (thus, T should already be dereferenced).
+
+prolog_functor(<prologterm:T>) -> <word:W>
+    Returns the word W representing the principal functor of the term T.
+    If T is not a complex term then it is its own functor, and so is
+    returned. The procedure has an updater, but you should not, in
+    general, update the functors of terms.  The updater will only allow
+    you to change the functors of prologterms, not of lists or any other
+    object. This procedure replaces prolog_predword.
+
+prolog_arity(<prologterm:T>) -> <integer:I>
+    Returns the number of arguments of the given term. If T is not a
+    complex term then I will be 0. This procedure used to be known as
+    prolog_nargs.
+
+prolog_arg(<integer:N>, <prologterm:T>) -> <item>
+    Dereferences and returns the Nth argument of T. Mishaps if N is less
+    than 1 or is not an integer, or if N is greater than the arity of T.
+    This does not have an updater, since that would be meaningless for a
+    dereferencing procedure. Compare prolog_arg_nd.
+
+prolog_arg_nd(<integer:N>, <prologterm:T>) -> <item>
+    Like prolog_arg, but returns the Nth argument of T WITHOUT
+    dereferencing. Unlike prolog_arg this has an updater, to be used
+    with great caution: it changes the N'th element of a term at the top
+    level. (See warning at end of file: copy the term first).
+
+prolog_args(<prologterm:T>) -> {<item>}*
+    Returns all the (dereferenced) arguments of T - i.e. leaves them on
+    the stack.
+
+prolog_args_nd(<prologterm:T>) -> {<item>}*
+    Returns all the arguments of T WITHOUT dereferencing.
+
+prolog_appargs(<prologterm:T>, <procedure>) -> {<item>}*
+    Applies the given procedure to each dereferenced argument of T.
+
+prolog_appargs_nd(<prologterm:T>, <procedure>) -> {<item>}*
+    Like prolog_appargs, but does not de-reference.
+
+(See also REF * FASTPROCS)
+
+
+-- DEREFERENCING ------------------------------------------------------
+
+Prolog variables consist of chains of the datastructure "prologvar".
+This is structurally the same as a reference (see HELP * REFERENCES),
+that is, it has a single field known as the "content".  Whenever we want
+the value of a Prolog variable, we run down the chain of prologvars
+until we get to a content which isn't a prologvar, or is an
+uninstantiated prologvar - this process is known as "dereferencing".
+
+If the content isn't a prologvar, then this value is the "real" value.
+Uninstantiated variables are represented by prologvars which point to
+themselves -- but there is no need to know the representation of Prolog
+variables beyond that they usually consist of chains of prologvars, of
+unknown length.  In order to get the "real" value of a Prolog variable,
+you apply the procedure prolog_deref to it. Indeed, there is no other
+safe way of getting the content of a prologvar; if you ever want the
+value of a Prolog variable, use prolog_deref and you will get the
+dereferenced, real, value.  If the result is a Prolog variable, then
+your original variable is uninstantiated.
+
+prolog_deref(<prologvar:V>) -> <item>
+    Dereferences V.  If V isn't a Prolog variable, then it is returned.
+    If V is a Prolog variable, then its "real" value will be returned.
+    Usually this will be a Prolog term or other object.  If V is
+    uninstantiated, then the result will be a prologvar. This procedure
+    only dereferences the top level of the term V, and so the result can
+    contain components which are themselves not fully dereferenced.
+    Since prologvars are very similar to references, one possible
+    version of the deref procedure might be the following:
+            define prolog_deref(V) -> V;
+                while isref(V) and cont(V) /== V do
+                    cont(V) -> V;
+                endwhile
+            enddefine;
+
+prolog_undefvar(<prologvar:V>) -> <boolean>
+    True if V is an uninstantiated variable record. This is not the same
+    thing as the Prolog predicate var/1.  To get that behaviour, you
+    need to do
+        prolog_undefvar(prolog_deref(V)).
+    Following the model using the more familiar references, this
+    procedure might be written like this:
+        define prolog_undefvar(V);
+            isref(V) and cont(V) == V
+        enddefine;
+
+prolog_full_deref(<prologterm:T>) -> <item:C>
+    Returns a copy C of T; if T contains any chains of Prolog variables,
+    they are removed in C. Now any Prolog variables which are still in C
+    will be uninstantiated ones.
+
+prolog_var_number(<prologvar:V>) -> <integer>
+    Returns a integer for the prologvar V or FALSE if V is not a Prolog
+    variable. This number will be the same number as the variable prints
+    in the 'underscore notation' of Prolog. It is the lowest number of
+    any variable which is sharing with V. It is possible to reset the
+    numbering by giving V as false, but you are advised not to do this.
+
+prolog_newvar() -> <prologvar:V>
+    Creates a new prologvar V (suitable for use as argument to e.g.
+    prolog_var_number).
+
+Other complex objects (eg procedures, processes) can be manipulated by
+Prolog. These just form other classes of atomic structure (Prolog cannot
+discern any internal structure).
+
+
+-- EQUALITY ON PROLOG OBJECTS -----------------------------------------
+
+The POP-11 equality procedure, =, can be applied to Prolog terms and
+variables and works as follows:
+	- complex terms are compared in functor and arity and then
+	  recursively by arguments;
+	- variables are dereferenced before comparison;
+	- uninstantiated variables are compared with == (i.e. identity).
+This gives the same behaviour as the Prolog predicate ==/2.
+
+
+-- KEEPING STRUCTURES BUILT BY PROLOG OVER BACKTRACKING ---------------
+
+Prolog structures are built up by the successive instantiation of Prolog
+variables. Two important things happen to structures when backtracking
+occurs:
+
+1.  When Prolog returns to a choicepoint, any variables which were
+    instantiated after it originally left that point will lose their
+    bindings, and become uninstantiated again. This means that
+    structures built using these variables "disintegrate".
+2.  Any variables that were first introduced in that period cease to
+    have meaningful values.
+
+It is important to be aware of this if you wish to make use of Prolog
+structures in POP-11 programs. If you assign a structure built by Prolog
+to a POP-11 variable and then allow Prolog to backtrack to a point
+before the structure was created (for instance, if you return to the top
+level interpreter, which works basically on a "repeat, read, call,
+write, fail" pattern) you will find that the structure mysteriously
+disappears. This will not happen if you are only passing out simple
+values (for instance numbers and words) from Prolog, because of the way
+that these are automatically dereferenced. The procedure
+'prolog_full_deref' (see above) creates a new copy of structures without
+intermediate variable records, and these are immune to disintegration of
+the first sort. However, if the structures to be kept contain
+uninstantiated variables, because of the second problem, it is necessary
+to create a copy of the structure that contains other structures in
+their place.
+
+The following procedures enable this to be done:
+
+prolog_generalise(<prologterm:T>) -> <item:I>
+    As 'prolog_full_deref', except that any uninstantiated variables in
+    T are returned as special VARIABLE TOKENS in I. This is the best way
+    to make a copy of a Prolog term that will survive unchanged when
+    Prolog backtracks.
+
+prolog_instance(<item:I>) -> <prologterm:T>
+    The inverse of prolog_generalise. Takes a structure that may contain
+    "variable tokens" and returns a copy T with real Prolog variables
+    instead.
+
+
+-- MISCELLANEOUS PROCEDURES -------------------------------------------
+
+prolog_unify(<prologterm:A>, <prologterm:B>) -> <boolean>
+    Unifies A with B.  If either is uninstantiated , then one becomes
+    instantiated and is pushed onto the chain of references. Returns
+    true if successful.  However, if it fails (returns FALSE), it may
+    leave some variables instantiated - you should therefore use
+    prolog_unifyc (see below) where this is likely to occur.
+
+prolog_unifyc(<prologterm:A>, <prologterm:B>, <procedure:P>)
+    Unifies A with B.  If successful, the continuation passing procedure
+    P is applied (see DOC * CONTINUATION).
+
+
+-- SECRETS ------------------------------------------------------------
+
+There are other POP-11 procedures for working with Prolog objects. In
+general, you are advised not to use them.  They are for the internal
+workings of the Prolog system.  Here is some specific advice:
+
+NEVER alter the value of a Prolog variable in any other way than
+    prolog_unify. You can build structures which can cause the POP-11
+    system to hang. Unification is the only safe way to do it.
+
+NEVER alter any structures built by the Prolog system.  Copy them first,
+    then alter your copy.  In particular, don't use the updater of
+    prolog_functor on a structure built by the Prolog system.
+
+
+-- RELATED DOCUMENTATION ----------------------------------------------
+
+DOC * CONTINUATION
+	How continuation passing procedures in POP-11 relate to Prolog.
+	Slightly out of date.
+
+PLOGHELP * MIXED_LANGUAGES
+	Overview of interface between Prolog and other languages.
+
+PLOGHELP * PLOGTOPOP
+	How to call POP-11 from Prolog.
+
+PLOGHELP * PROCESSES
+	How to create POP-11 processes which use Prolog procedures.
+
+PLOGHELP * PROLOG_BARRIER_APPLY
+	POP-11 procedure which applies a procedure inside a Prolog
+	'barrier'.
+
+PLOGHELP * PROLOG_EVAL
+	How to evaluate the Prolog representation of a POP-11 expression.
+
+PLOGHELP * PROLOG_INVOKE
+	POP-11 procedure which invokes a Prolog term.
+
+PLOGHELP * PROLOG_VALOF
+	POP-11 procedure which returns the current value of a Prolog
+	predicate.
+
+HELP * COPYDATA
+	POP-11 procedure for copying data-structures.
+
+--- C.all/plog/help/termsinpop -----------------------------------------
+--- Copyright University of Sussex 1987. All rights reserved. ----------

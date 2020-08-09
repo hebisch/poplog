@@ -1,0 +1,171 @@
+PLOGHELP PLOGTOPOP                               Chris Mellish July 1983
+                                  Revised by Kathryn Seifert August 1986
+
+How to call POP-11 from Prolog
+
+Keywords: POP-11, Prolog, mixed language programming, continuations,
+          languages, interface
+
+
+CONTENTS - (Use <ENTER> g to access sections)
+
+ -- CALLING POP-11 FROM PROLOG
+ -- SIMPLE INTERFACE
+ -- EVALUATING EXPRESSIONS
+ -- CONTINUATION PASSING
+ -- RELATED DOCUMENTATION
+
+
+-- CALLING POP-11 FROM PROLOG -----------------------------------------
+
+One way to call a POP-11 procedure when Prolog is reading is to define a
+macro which calls the procedure (see PLOGHELP * MACRO). This is adequate
+when you require a procedure to be invoked immediately from the
+keyboard, but won't work if you want the procedure to be called under
+program control. This file describes the some of the other ways of
+calling POP-11 from Prolog.  Additional methods are mentioned in
+PLOGHELP * MIXED_LANGUAGES.
+
+
+-- SIMPLE INTERFACE ---------------------------------------------------
+
+There is a library package for doing simple things in POP-11 from
+Prolog. See PLOGHELP * SIMPLEPOP.
+
+
+-- EVALUATING EXPRESSIONS ---------------------------------------------
+
+To evaluate a POP-11 expression from a running Prolog program, call the
+built-in predicate 'prolog_eval' (see PLOGHELP * PROLOG_EVAL).  A call
+of 'prolog_eval' can take the following forms:
+
+    ?- prolog_eval(<prologterm>).
+    ?- prolog_eval(<prologterm>, <prologvar>).
+
+The first argument of this represents a POP-11 expression (as a Prolog
+term). The second argument (which is optional) will be matched with the
+result of evaluating the expression. It is important that the POP-11
+expression yield precisely the right number of results, because Prolog
+uses the POP-11 user stack in a special way.
+
+A Prolog representation of a POP-11 expression is evaluated (by
+'prolog_eval') to give a POP-11 value according to the rules outlined in
+PLOGHELP * PROLOG_EVAL. These rules ignore the problems of
+dereferencing (see PLOGHELP * TERMSINPOP).
+
+Here are some examples of some uses of 'prolog_eval':
+
+   ?- prolog_eval(nl(quote(N))).       ;;; Print N newlines
+
+   ?- prolog_eval(valof(foo),X).       ;;; Match X with the value of POP-11
+                                       ;;; variable FOO
+
+   ?- prolog_eval(sqrt(quote(X)),Y).   ;;; Find the square root of X
+                                       ;;; (hopefully a number) and match it
+                                       ;;; with Y
+
+After a POP-11 expression is evaluated, the result is seen as a Prolog
+term.  See PLOGHELP * TERMSINPOP.
+
+The predicate 'is' can be used interchangeably with 'prolog_eval' of 2
+arguments. That is,
+
+    ?- X is Y.              and
+    ?- prolog_eval(Y,X)             (NOTE: arguments the other way around!)
+
+achieve the same result. You may feel that IS is more natural. On the
+other hand, using 'prolog_eval' whenever arbitrary POP-11 procedures are
+being invoked helps to mark clearly the parts of a program that will not
+transport easily to other Prolog systems.
+
+A library predicate described in PLOGHELP * ARE provides similar
+facilities to 'prolog_eval', but without the necessity of the number of
+results being fixed in advance.
+
+
+-- CONTINUATION PASSING -----------------------------------------------
+
+For more flexible use of POP-11 with Prolog, it is useful to exploit the
+"continuation passing" interface.  In this interface, Prolog procedures
+are seen as POP-11 procedures that take an extra argument (see
+TEACH * CONTINUATIONS).  Apart from procedures to create Prolog terms
+(see PLOGHELP * TERMSINPOP), the only special procedure needed for this
+is 'prolog_unifyc'. The Prolog system provides a procedure
+'prolog_unifyc' with the functionality of the procedure 'unify' defined
+in DOC * CONTINUATION.
+
+Once some procedures have been written in the continuation-passing
+style, they can be made available as standard Prolog procedures by using
+the updater of the procedure 'prolog_valof' (see
+PLOGHELP * PROLOG_VALOF). The POP-11 code:
+
+    proc -> prolog_valof(pred,arity);
+
+causes the continuation-passing procedure PROC (written in POP-11) to be
+made available as the definition of the Prolog predicate with name PRED
+and arity ARITY.
+
+Here is an example of a POP-11 procedure used as a Prolog predicate:
+
+        define int(x,contn);
+           vars n;
+           0 -> n;
+           repeat forever
+              prolog_unifyc(n,x,contn);
+              n+1 -> n
+           endrepeat
+        enddefine;
+
+    int -> prolog_valof("int",1);
+
+This makes available a predicate int/1.  If the argument of 'int' is
+uninstantiated, this predicate produces, on backtracking, infinitely
+many solutions, the argument being bound to each positive integer in
+turn.
+
+
+-- RELATED DOCUMENTATION ----------------------------------------------
+
+DOC * CONTINUATION
+ How continuation passing procedures in POP-11 relate to Prolog
+ procedures. Slightly out of date.
+
+PLOGHELP * ARE
+ Library for evaluating POP-11 expressions with any number of
+ results from Prolog
+
+PLOGHELP * IS
+ Evaluating POP-11 expressions which return 1 result from Prolog
+
+PLOGHELP * MIXED_LANGUAGES
+ Overview of methods of interfacing Prolog and other languages
+
+PLOGHELP * POPSTRING
+ How to put POP-11 strings in Prolog programs
+
+PLOGHELP * POPTOPLOG
+ How to call Prolog from POP-11
+
+PLOGHELP * PROLOG_EVAL
+ How to evaluate the Prolog representation of a POP-11 expression
+
+PLOGHELP * PROLOG_LANGUAGE
+ Predicates and library package for switching from Prolog to POP-11
+
+PLOGHELP * PROLOG_SETQ
+ Reading and writing POP-11 variables from Prolog
+
+PLOGHELP * PROLOG_VALOF
+ POP-11 procedure which returns current value of a Prolog predicate
+
+PLOGHELP * SIMPLEPOP
+ Library package to do simple things in POP-11 from Prolog
+
+PLOGHELP * TERMSINPOP
+ Facilities for manipulating Prolog terms and variables in POP-11
+
+TEACH * CONTINUATIONS
+ Introduction to DOC * CONTINUATION
+
+--- C.all/plog/help/plogtopop ------------------------------------------
+--- Copyright University of Sussex 1987. All rights reserved. ----------

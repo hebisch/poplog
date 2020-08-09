@@ -1,0 +1,61 @@
+HELP PROTECT                                    Robert Duncan, July 1990
+
+Adding secure entry and exit code to functions.
+
+
+    CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- The Protect Module
+ -- The Protect Function
+
+
+-- The Protect Module -------------------------------------------------
+
+signature Protect
+structure Protect : Protect
+    The structure -Protect- is an autoloadable library module  described
+    by the following signature:
+
+        signature Protect = sig
+            val protect : (unit -> 'a) * ('a -> unit) -> ('b -> 'c)
+                                                       -> 'b -> 'c
+            val guard   : 'a ref -> ('b -> 'c) -> 'b -> 'c
+        end
+
+
+-- The Protect Function -----------------------------------------------
+
+val protect (entry:unit -> 'a, exit:'a -> unit) (f:'b -> 'c) : 'b -> 'c
+    Adds the  given  entry  and  exit code  to  the  function  -f-.  The
+    resulting function behaves like  -f-, except that  on each call  the
+    function -entry- is applied first and  the result saved away, to  be
+    given as argument to the function  -exit- after the call to -f-  has
+    returned. Once  the  entry  code has  completed,  execution  of  the
+    corresponding exit code is guaranteed regardless of whether the call
+    to -f- terminates normally or abnormally.
+
+    A possible definition for -protect- would be:
+
+        fun protect (entry,exit) f x =
+            let val s = entry()
+            in  fst(f x, exit s:unit)
+                handle e =>
+                    (exit s; raise e)
+            end;
+
+    The true definition  is even more  secure than this  however, as  it
+    will recover from errors  which cannot normally  be handled from  ML
+    (such as ``out of memory'' errors).
+
+
+val guard (r : 'a ref) (f : 'b -> 'c) : 'b -> 'c
+    A specialisation of the function -protect- which guards the value of
+    a reference for the duration of the call to -f-.
+
+    Definition:
+
+        fun guard r = protect (fn() => !r, fn x => r := x);
+
+
+--- C.all/pml/help/protect
+--- Copyright University of Sussex 1991. All rights reserved. ----------

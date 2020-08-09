@@ -1,0 +1,208 @@
+HELP FEATURES                                  Robert Duncan, March 1990
+
+
+Non-standard features of Poplog ML.
+
+
+    CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- End-of-line Comments
+ -- Commands
+ -- Closure Rules
+ -- Pervasive Declaration
+ -- External Interface
+ -- Abstraction
+ -- The Initial Basis
+
+
+-- End-of-line Comments -----------------------------------------------
+
+The PML lexical analyser recognises the token
+
+    ;;;
+
+as introducing an  "end-of-line comment".  The token  and all  following
+characters up to and including the  next newline are discarded from  the
+input. As  with the  standard comments,  end-of-line comments  serve  to
+separate lexical items.
+
+
+-- Commands -----------------------------------------------------------
+
+The PML  parser extends  the syntax  of  programs to  include a  set  of
+commands which  can be  typed in  place of  top-level declarations.  The
+modified syntax is as follows:
+
+    command ::=
+        id << arg-1 __ arg-n >> << ";" >>                   (n >= 0)
+
+    program ::=
+        command program
+        topdec ";" program
+        empty
+
+A command  consists of  a  command name  followed  by a  possibly  empty
+sequence of  arguments and  terminated  either by  a semicolon  or  by a
+newline.
+
+Command names are short identifiers. They are not reserved words and are
+only recognised as  command names when  occurring as the  first item  in
+top-level input. This makes it possible to reuse command names as normal
+identifiers; however, if ever  such an identifier is  to be used as  the
+first item in a top-level expression, it must be enclosed in parentheses
+to avoid its interpretation as a command name.
+
+Command arguments may  be standard  string constants  or else  arbitrary
+sequences of characters separated by white space, semicolons and  string
+quotes ("). This allows file names (for example) to be given as  command
+arguments without special quoting.
+
+A full list of commands is given in HELP * COMMANDS.
+
+
+-- Closure Rules ------------------------------------------------------
+
+PML  can  impose  the   following  closure  restrictions  on   non-local
+references within modules:
+
+A structure expression on the right-hand-side of a structure or  functor
+binding:
+
+    strid << ":" sigexp >> "=" strexp
+    funid "(" funformals ")" << ":" sigexp >> "=" strexp
+
+and the  signature  expression on  the  right-hand-side of  a  signature
+binding:
+
+    sigid "=" sigexp
+
+may refer non-locally to any module identifier (structure, signature  or
+functor identifier) but may refer non-locally to a core identifier  only
+if the identifier  has been declared  "pervasive", or in  the case  of a
+functor binding, if the  identifier is bound  by the formal  parameters.
+All identifiers in the standard environment are pervasive;  user-defined
+identifiers can  be  made  pervasive with  the  "pervasive"  declaration
+described below.
+
+These non-standard restrictions are enabled  by assigning -true- to  the
+variable -Compile.closure_rules- (see HELP * COMPILE). If this  variable
+has the  default  value  -false-,  then there  are  no  restrictions  on
+non-local references within modules, in accordance with the Definition.
+
+
+-- Pervasive Declaration ----------------------------------------------
+
+PML includes an extra top-level declaration type "perdec", as follows:
+
+    perdec ::=
+        "pervasive" longstrid-1 __ longstrid-n << perdec >> (n >= 1)
+
+    topdec ::=
+        perdec
+
+"pervasive" is accordingly a reserved word of PML.
+
+A pervasive declaration is  similar to an  "open" declaration, but  with
+the additional effect that  all the names  exported from the  structures
+being opened  are  made  "pervasive"  and  so  are  valid  as  non-local
+references within  modules  even when  closure  rules are  enabled  (see
+above). If  closure  rules  are  disabled  (the  default)  so  that  all
+non-local references are valid, then the pervasive and open declarations
+are exactly equivalent.
+
+
+-- External Interface -------------------------------------------------
+
+PML  includes  an  extra   top-level  declaration  type  "external"   to
+facilitate  mixed-language  programming;  "external"  is   accordingly a
+reserved word of PML. Use of the external declaration allows  variables,
+types, exceptions and structures to be defined in Pop-11 (which can then
+give access  to  any  other  language supported  by  Poplog).  For  full
+details, see HELP * EXTERNAL.
+
+
+-- Abstraction --------------------------------------------------------
+
+PML recognises the non-standard  "abstraction" declaration supported  by
+other ML compilers; "abstraction" is accordingly a reserved word of PML.
+The semantics of  the abstraction declaration  are not implemented:  the
+word "abstraction" is simply treated  as a synonym for "structure".  The
+PML compiler  prints  a  warning  to this  effect  when  an  abstraction
+declaration is  encountered for  the  first time.  The intention  is  to
+simplify the porting of programs developed for other compilers.
+
+
+-- The Initial Basis --------------------------------------------------
+
+The initial  basis of  PML is  packaged into  three separate  structures
+described in the help files:
+
+    HELP * STDTYPES
+    HELP * STDVALUES
+    HELP * STDIO
+
+All three structures are "pervasive" by default.
+
+The initial basis differs from that  of the Definition in the  following
+respects:
+
+1)  A new exception
+
+        Overflow
+
+    is  defined.  This  is  raised  on  all  real  arithmetic  overflows
+    regardless of the operation in progress. The exceptions
+
+        Quot Prod Sum Diff Neg Abs Exp Floor
+
+    required by the Definition are defined as synonyms for Overflow.
+
+    PML  supports  arbitrary-precision  ("big")  integers,  so   integer
+    operations never overflow.
+
+2)  The function
+
+        real : int -> real
+
+    can raise the exception  -Overflow- if the  integer argument is  too
+    big to  be represented  as  a real  number.  This is  a  possibility
+    overlooked in  the  Definition.  For compatibility  with  the  other
+    standard functions and operators, a new exception
+
+        Real
+
+    has been defined, but this also is merely a synonym for -Overflow-.
+
+3)  The order relations
+
+        < > <= >=
+
+    are overloaded on strings as well as numbers.
+
+4)  New functions
+
+        makestring : 'a -> string
+        print      : 'a -> 'a
+        error      : string -> 'a
+        impossible : string -> 'a
+
+    are defined; for full details see HELP * STDVALUES.
+
+
+Several other  pre-defined structures  are available  in PML,  providing
+other  commonly  used  functions  on  the  basic  types,  together  with
+functions and variables for controlling the behaviour of the PML system.
+See:
+
+    HELP * INT
+    HELP * REAL
+    HELP * STRING
+    HELP * LIST
+
+    HELP * COMPILE
+    HELP * MEMORY
+    HELP * SYSTEM
+
+
+--- C.all/pml/help/features
+--- Copyright University of Sussex 1994. All rights reserved. ----------

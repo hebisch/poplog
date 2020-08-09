@@ -1,0 +1,297 @@
+PLOGHELP DEBUG                              Kathryn Seifert July 1986
+
+Overview of the debugging facilities provided by POPLOG Prolog
+
+Keywords: overview, debugging, spy, trace, chatty, errors, bugs
+
+
+CONTENTS - (Use <ENTER> g to access sections)
+
+ -- INTRODUCTION
+ -- AN EXAMPLE OF THE BEHAVIOUR PRODUCED BY SPY
+ -- AN EXAMPLE OF THE BEHAVIOUR PRODUCED BY CHATTY
+ -- AN EXAMPLE OF THE BEHAVIOUR PRODUCED BY TRACER
+ -- RELATED DOCUMENTATION
+
+
+-- INTRODUCTION -------------------------------------------------------
+
+The main debugging facilities provided by Prolog are SPY and its related
+built-in predicates (see PLOGHELP * SPY). Another debugging facility is
+provided by the library file CHATTY (see PLOGHELP * CHATTY). Using SPY
+or CHATTY allows a programmer to 'watch' his or her program running in
+order to find out where it is going wrong. The two debugging facilities
+differ in the kind of tracing messages which they produce; example
+output of both SPY and CHATTY are given below.
+
+It is possible to set the SPY or CHATTY predicate on all of the
+predicates in the running program(s) or to choose to trace only certain
+given predicates. The user can also choose whether to LEASH (see
+PLOGHELP * LEASH) the tracing being performed by SPY, or to allow
+UNLEASHed tracing to occur (see PLOGHELP * UNLEASH).
+
+Another tracing package provided by Prolog is the TRACER library file
+(see PLOGHELP * TRACER and TEACH * TRACER). This library program allows
+users to watch the actions occurring as simple Prolog predicates are
+executed.  There are problems with this program, and it may produce
+unforeseen side-effects (See TEACH * AAreadme). However, it can be
+interesting to watch the output of the TRACER package.
+
+
+-- AN EXAMPLE OF THE BEHAVIOUR PRODUCED BY SPY ------------------------
+
+Given the following definitions of REVERSE and APPEND:
+
+    reverse([H|T], X) :-
+        reverse(T, Tr),
+        append(Tr, [H], X).
+    reverse(X, X).
+
+    append([H|T], L, [H|X]) :-
+        append(T, L, X).
+    append([], L, L).
+
+We can get spy to trace all of the goals in the following way:
+
+    ?- spy.
+    Spypoint placed on append/3
+    Spypoint placed on prolog_error/2
+    Spypoint placed on reverse/2
+    yes
+
+With the "spypoints" listed above in position, the following behaviour
+occurs when we make a call of REVERSE:
+
+    ?- reverse([1, 2, 3], X).
+    ** (1) Call : reverse([1, 2, 3], _1)?
+    ** (2) Call : reverse([2, 3], _2)?
+    ** (3) Call : reverse([3], _3)?
+    ** (4) Call : reverse([], _4)?
+    ** (4) Exit : reverse([], [])?
+    ** (5) Call : append([], [3], _3)?
+    ** (5) Exit : append([], [3], [3])?
+    ** (3) Exit : reverse([3], [3])?
+    ** (6) Call : append([3], [2], _2)?
+    ** (7) Call : append([], [2], _5)?
+    ** (7) Exit : append([], [2], [2])?
+    ** (6) Exit : append([3], [2], [3, 2])?
+    ** (2) Exit : reverse([2, 3], [3, 2])?
+    ** (8) Call : append([3, 2], [1], _1)?
+    ** (9) Call : append([2], [1], _6)?
+    ** (10) Call : append([], [1], _7)?
+    ** (10) Exit : append([], [1], [1])?
+    ** (9) Exit : append([2], [1], [2, 1])?
+    ** (8) Exit : append([3, 2], [1], [3, 2, 1])?
+    ** (1) Exit : reverse([1, 2, 3], [3, 2, 1])?
+    X = [3, 2, 1] ?
+    yes
+
+If we only want to SPY on the clauses for the APPEND predicate, we can do
+the following:
+
+    ?- nospy(reverse).
+    Spypoint on reverse/2 removed
+    yes
+
+    ?- reverse([1, 2, 3], X).
+    ** (1) Call : append([], [3], _1)?
+    ** (1) Exit : append([], [3], [3])?
+    ** (2) Call : append([3], [2], _2)?
+    ** (3) Call : append([], [2], _3)?
+    ** (3) Exit : append([], [2], [2])?
+    ** (2) Exit : append([3], [2], [3, 2])?
+    ** (4) Call : append([3, 2], [1], _4)?
+    ** (5) Call : append([2], [1], _5)?
+    ** (6) Call : append([], [1], _6)?
+    ** (6) Exit : append([], [1], [1])?
+    ** (5) Exit : append([2], [1], [2, 1])?
+    ** (4) Exit : append([3, 2], [1], [3, 2, 1])?
+    X = [3, 2, 1] ?
+    yes
+
+You can remove all of the current spypoints by typing:
+
+    ?- nodebug.
+    Spypoint on prolog_error/2 removed
+    Spypoint on append/3 removed
+    yes
+
+
+-- AN EXAMPLE OF THE BEHAVIOUR PRODUCED BY CHATTY ---------------------
+
+To load the CHATTY library file, type the following:
+
+    ?- library(chatty).
+    yes
+
+If we wish to use chatty on the predicates REVERSE, and APPEND, which
+were defined above, we call the predicate CHATTY which takes a list of
+the predicates to be traced as its argument:
+
+    ?- chatty([reverse, append]).
+    reverse / 2 is now chatty.
+    append / 3 is now chatty.
+    yes
+
+When we call REVERSE, the following behaviour is produced:
+
+    ?- reverse([1, 2, 3], X).
+    - Starting reverse([1, 2, 3], _1)
+    - | Try clause 1 of reverse
+    - | Starting reverse([2, 3], _2)
+    - | | Try clause 1 of reverse
+    - | | Starting reverse([3], _3)
+    - | | | Try clause 1 of reverse
+    - | | | Starting reverse([], _4)
+    - | | | | Try clause 2 of reverse
+    - | | | | clause 2 of reverse succeeded.
+    - | | | Starting append([], [3], _3)
+    - | | | | Try clause 2 of append
+    - | | | | clause 2 of append succeeded.
+    - | | | clause 1 of reverse succeeded.
+    - | | Starting append([3], [2], _2)
+    - | | | Try clause 1 of append
+    - | | | Starting append([], [2], _5)
+    - | | | | Try clause 2 of append
+    - | | | | clause 2 of append succeeded.
+    - | | | clause 1 of append succeeded.
+    - | | clause 1 of reverse succeeded.
+    - | Starting append([3, 2], [1], _1)
+    - | | Try clause 1 of append
+    - | | Starting append([2], [1], _6)
+    - | | | Try clause 1 of append
+    - | | | Starting append([], [1], _7)
+    - | | | | Try clause 2 of append
+    - | | | | clause 2 of append succeeded.
+    - | | | clause 1 of append succeeded.
+    - | | clause 1 of append succeeded.
+    - | clause 1 of reverse succeeded.
+    X = [3, 2, 1] ?
+    yes
+
+As with SPY, we can stop tracing being done on certain predicates (when
+only one predicate is being made chatty or unchatty, it can be given
+itself as an argument to CHATTY, without the list brackets):
+
+    ?- unchatty(append).
+    append / 3 is no longer chatty.
+    yes
+
+-- AN EXAMPLE OF THE BEHAVIOUR PRODUCED BY TRACER ---------------------
+
+The TRACER library file is loaded by the following command:
+
+    ?- library(tracer).
+    yes
+
+To start the tracing you type the following (don't worry that it says
+"no").
+
+    ?- trace.
+    no
+
+Now, execution of all predicates in your program will be TRACEd.  The
+following is an example of the final output produced by the the TRACER:
+
+    ?- reverse([a, b, c], X).
+
+    reverse([a,b,c],[c|[b|[a]]])
+    \-(1)-----\
+              reverse([b,c],[c|[b]])
+              \-(1)-----\
+                        reverse([c],[c])
+                        \-(1)-----\
+                                  reverse([],[])
+                                  \-(2)-----\
+                                  /---------/
+                                  append([],[c],[c])
+                                  \-(2)-----\
+                                  /---------/
+                        /---------/
+                        append([c],[b],[c|[b]])
+                        \-(1)-----\
+                                  append([],[b],[b])
+                                  \-(2)-----\
+                                  /---------/
+                        /---------/
+              /---------/
+              append([c|[b]],[a],[c|[b|[a]]])
+              \-(1)-----\
+                        append([b],[a],[b|[a]])
+                        \-(1)-----\
+                                  append([],[a],[a])
+                                  \-(2)-----\
+                                  /---------/
+                        /---------/
+              /---------/
+    /---------/
+
+The numbers surrounded by parentheses indicate which clause for a
+predicate was used.  TRACER is an interactive program: it will construct
+the tracing as you watch, and wait for you to press a key before going
+on to satisfy the next goal.  A problem with this program is that has
+a strange (and confusing) way of representing the newly reversed list.
+Another problem is that only simple predicates can be traced: it does
+not behave well if any cuts (!) are in the predicate's definition, and
+if the predicate is too involved, then the tracing will go off the
+screen.
+
+
+-- RELATED DOCUMENTATION ----------------------------------------------
+
+ ** HELP files which describe relevant built-in predicates and library
+    programs:
+
+PLOGHELP * CHATTY
+ Library program for tracing Prolog programs
+
+PLOGHELP * DEBUGGING
+ Predicate to list currently active spypoints
+
+PLOGHELP * LEASH
+ Predicate to control SPY, so that user is prompted after each spypoint.
+
+PLOGHELP * NODEBUG
+ Predicate to remove all current spypoints.
+
+PLOGHELP * NOSPY
+ Predicate to remove spypoints from specified predicates.
+
+PLOGHELP * QUIETSPY
+ Predicate to prevent SPY from printing out messages when spypoints are
+ placed or removed.
+
+PLOGHELP * TRACER
+ (buggy) library program for tracing the action of simple predicates.
+
+PLOGHELP * SPY
+ Main predicates used to invoke and control the SPY package.
+
+PLOGHELP * UNLEASH
+ Predicate to control SPY, so that user is not prompted after each
+ spypoint.
+
+
+ ** Other related documentation:
+
+PLOGHELP * BUGS
+ Where to find information about bugs in the Prolog system
+
+PLOGHELP * ERROR
+ Description of the kinds of errors which may arise while using Prolog
+
+PLOGHELP * PROLOG_ERROR
+ How to change the actions taken by the system when an error occurs
+
+PLOGHELP * POPLOG
+ Features of POPLOG Prolog
+
+TEACH * AAreadme
+ Warning and disclaimer concerning the TRACER library program
+
+TEACH * TRACER
+ Introduction to the TRACER library program
+
+
+--- C.all/plog/help/debug
+--- Copyright University of Sussex 1990. All rights reserved. ----------

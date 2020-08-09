@@ -1,0 +1,193 @@
+HELP BIT                                        Robert Duncan, July 1990
+
+Bitwise operations on integers.
+
+
+    CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- The Bit Module
+ -- Bitwise Operators and Functions
+
+
+-- The Bit Module -----------------------------------------------------
+
+signature Bit
+structure Bit : Bit
+    The structure -Bit- is an autoloadable library module which  enables
+    integers  to  be  manipulated  as  bit  patterns  according  to  the
+    two's-complement representation.  Because  integers can  be  of  any
+    size, the number of bits in an integer is (conceptually) indefinite,
+    with the sign bit being considered to  extend as far to the left  as
+    necessary in any particular context. Thus everywhere above its  most
+    significant bit,  a  positive integer  has  0 bits  and  a  negative
+    integer has 1 bits.
+
+    The bits within an integer are numbered from 0 upwards. Although  in
+    principal bit  numbers of  any magnitude  should be  legal,  certain
+    functions impose a limit on bit numbers for efficiency reasons. This
+    limit is  determined by  the  largest number  which can  fit  into a
+    machine word and may vary  between different implementations; it  is
+    considerably larger than is typically required by applications.  The
+    exception -BitNumber- is raised if ever the limit is exceeded.
+
+    The -Bit- structure is described by the following signature:
+
+        signature Bit = sig
+
+            exception BitNumber
+
+            val ||          : int * int -> int
+            val &&          : int * int -> int
+            val &~          : int * int -> int
+            val &?          : int * int -> bool
+            val ~~          : int -> int
+
+            val set         : int -> int -> int
+            val mask        : int -> int -> int
+            val clear       : int -> int -> int
+            val test        : int -> int -> bool
+            val complement  : int -> int
+
+            val <<          : int * int -> int
+            val >>          : int * int -> int
+
+            val shiftl      : int -> int -> int
+            val shiftr      : int -> int -> int
+
+            val setbit      : int -> int -> int
+            val clearbit    : int -> int -> int
+            val testbit     : int -> int -> bool
+
+            val size        : int -> int
+            val bitcount    : int -> int
+
+        end
+
+
+-- Bitwise Operators and Functions ------------------------------------
+
+exception BitNumber
+    Raised whenever  a  bit number  exceeds  the  implementation-defined
+    limit (see above).
+
+
+infix 6 ||
+val (i : int) || (j : int) : int
+val set (i : int) (j : int) : int
+    Bitwise logical OR: sets those bits in -i- which are set in -j-.
+
+
+infix 7 &&
+val (i : int) && (j : int) : int
+val mask (i : int) (j : int) : int
+    Bitwise logical AND: clears those bits  in -i- which are not set  in
+    -j-.
+
+
+infix 7 &~
+val (i : int) &~ (j : int) : int
+val clear (i : int) (j : int) : int
+    Bitwise logical AND-NOT: clears those bits  in -i- which are set  in
+    -j-.
+
+    Definition:
+
+        infix 7 &~
+        fun i &~ j = i && ~~j;
+
+
+infix 7 &?
+val (i : int) &? (j : int) : bool
+val test (i : int) (j : int) : bool
+    Bitwise test: returns  -true- if -i-  and -j- have  any bits set  in
+    common.
+
+    Definition:
+
+        infix 7 &?
+        fun i &? j = i && j <> 0;
+
+
+val ~~ (i : int) : int
+val complement (i : int) : int
+    Bitwise logical complement: inverts each bit in -i-.
+
+
+infix 5 <<
+val (i : int) << (j : int) : int
+val shiftl (i : int) (j : int) : int
+    Arithmetic left shift:  shifts -i-  left by -j-  places. A  negative
+    value of  -j- causes  a  right shift  by  the absolute  amount.  The
+    exception -BitNumber- will be raised if -j- is out of range.
+
+
+infix 5 >>
+val (i : int) >> (j : int) : int
+val shiftr (i : int) (j : int) : int
+    Arithmetic right shift: shifts -i-  right by -j- places. A  negative
+    value of  -j-  causes a  left  shift  by the  absolute  amount.  The
+    exception -BitNumber- will be raised if -j- is out of range.
+
+
+val setbit (n : int) (i : int) : int
+    Sets bit -n-  of -i-.  Raises the  exception -BitNumber-  if -n-  is
+    negative or larger than the bit-number limit.
+
+    Definition:
+
+        fun setbit n i =
+            if n < 0 then
+                raise BitNumber
+            else
+                set i (1 << n);
+
+
+val clearbit (n : int) (i : int) : int
+    Clears bit -n- of  -i-. Raises the exception  -BitNumber- if -n-  is
+    negative or larger than the bit-number limit.
+
+    Definition:
+
+        fun clearbit n i =
+            if n < 0 then
+                raise BitNumber
+            else
+                clear i (1 << n);
+
+
+val testbit (n : int) (i : int) : int
+    Tests bit -n- of -i-, returning -true- if the bit is set. Raises the
+    exception  -BitNumber-  if  -n-  is  negative  or  larger  than  the
+    bit-number limit.
+
+    Definition:
+
+        fun testbit n i =
+            if n < 0 then
+                raise BitNumber
+            else
+                test i (1 << n);
+
+
+val size (i : int) : int
+    Returns the length of -i- in bits, i.e. the smallest number -n- such
+    that:
+
+        i  <    (1 << n),   i >= 0
+        i  >=  (-1 << n),   i <  0
+
+    If -i-  is non-negative,  then -n-  is the  minimum number  of  bits
+    needed to represent -i- as  an unsigned integer; otherwise at  least
+    (n+1) bits  are  required  to  represent -i-  as  a  signed  integer
+    regardless of its sign.
+
+
+val bitcount (i : int) : int
+    Returns the number of 1 or 0 bits in -i-: 1 bits if -i- is  positive
+    or 0 bits  if -i- is  negative (a positive  integer has an  infinite
+    number of 0 bits because of the indefinite sign extension;  likewise
+    for 1 bits in a negative number).
+
+
+--- C.all/pml/help/bit
+--- Copyright University of Sussex 1991. All rights reserved. ----------

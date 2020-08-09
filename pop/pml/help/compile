@@ -1,0 +1,471 @@
+HELP COMPILE                                Robert Duncan, November 1989
+
+The PML compiler.
+
+
+    CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Compiling Files
+ -- File Names
+ -- Searching for Files
+ -- Autoloading
+ -- Compiler Modes
+ -- Compiler Output
+ -- Compiler Warnings
+ -- The Compile Module
+ -- Summary of Compiler Functions and Variables
+
+
+-- Compiling Files ----------------------------------------------------
+
+The standard method of compiling a file in PML is to use the command
+
+    load <filename>
+
+which invokes the  compiler on  the named file  (the syntax  and use  of
+commands is described in HELP * COMMANDS). The contents of the file  are
+read into the PML system just as if they had been typed at top-level; in
+particular, the file itself  may contain more  load commands to  compile
+other files.
+
+Because LOAD is a command rather than a function, the filename  argument
+needs no special quoting. Thus
+
+    load lib.ml
+
+compiles the file  ``lib.ml'' from  the current  working directory.  The
+argument may  also  be omitted  entirely,  in which  case  the  compiler
+recompiles the last file loaded; useful  when a file contains errors  of
+any kind.
+
+If the named  file can't be  found or  can't be read  because of  access
+permissions, the load fails with an error something like:
+
+    Error: cannot open file (no such file or directory)
+        lib.ml
+
+(but see below, in the section on 'Searching for Files').
+
+An alternative method of calling the  compiler is to apply the  function
+-use- defined in structure -Compile-. In this case, the argument must be
+a string:
+
+    Compile.use "lib.ml";
+
+Although this is  slightly more verbose  than using LOAD,  it does  have
+potential advantages. In  the first place,  if the named  file can't  be
+read for  any reason,  -use- raises  the exception  -Compile.Use-  which
+allows the calling program to retain control. It's also possible to  use
+the function in an expression, perhaps to compile a whole list of  files
+as in the next example:
+
+    List.app Compile.use [
+        "file-1.ml",
+        ....
+        "file-n.ml"
+    ];
+
+However, the  precise  semantics  of the  -use-  function  require  some
+explanation: it does not  compile the file immediately  at the point  at
+which it is applied but rather just  checks that the file exists and  is
+readable, and adds its  name to a queue  of files awaiting  compilation.
+The files  in the  queue are  not actually  compiled until  the  current
+declaration has completed, and then only if no error occurs. The  effect
+of this is that it's impossible  to compile a file while any  evaluation
+is in  progress.  In the  previous  example, if  any  one of  the  files
+"file-1" to "file-n" did not exist (so causing an exception), then  none
+of them would be compiled: the exception would abort the evaluation  and
+so prevent the compiler from processing the queue.
+
+You can also compile files from inside VED: the commands
+
+    <ENTER> load <filename>         (* compiles a named file *)
+    <ENTER> l1                      (* compiles the current buffer *)
+    <ENTER> lmr                     (* compiles the marked range *)
+
+are described in HELP * MLVED.
+
+
+-- File Names ---------------------------------------------------------
+
+File names, whether  quoted or not,  may be any  legal operating  system
+pathname. Abbreviations such as  logical names or environment  variables
+(and,  on  UNIX,  C-shell   style  "~"  abbreviations)  are   translated
+appropriately.
+
+Example:
+
+    load $poplib/pml/functions.ml   (* UNIX *)
+    load poplib:[pml]functions.ml   (* VMS  *)
+
+As a general rule, ML  program files should end in  one or other of  the
+extensions "sig" or "ml", "sig"  for files defining signatures and  "ml"
+for others: having the two distinct allows a signature file to have  the
+same basename as its structure or functor counterpart. Sticking to  this
+rule means that it's  often possible to omit  the extension from a  file
+name given to the compiler, as in:
+
+    load lib
+
+When interpreting a filename, the rule  used by the compiler is:  first,
+look for a  file with  the name  as given. If  not found,  and the  name
+doesn't already have  an extension,  try adding the  extension "ml";  if
+that doesn't exist either, try "sig".
+
+The "ml" and "sig"  extensions are conventions used  by the PML  system.
+Different  sites  may  have  their   own  rules:  "sml"  is  a   typical
+alternative. You can extend the convention by assigning to the variables
+-Compile.filetype- and  -Compile.sigfiletype-:  the  compiler  will  try
+these extensions before the standard ones. The default values for  these
+variables are ".ml" and ".sig"  respectively. It's important to  include
+the dot ("."), as  the extensions are simply  appended to the  basename.
+This makes it possible to add arbitrary  text to the end of a name:  for
+example, doing
+
+    Compile.sigfiletype := "_sig.ml";
+
+allows for the convention
+
+    S.ml        (* for structure S *)
+    S_sig.ml    (* for signature S *)
+
+
+-- Searching for Files ------------------------------------------------
+
+If a  filename  given to  the  compiler is  not  absolute, it  need  not
+necessarily  be  located  in  the  current  directory.  When  called  at
+top-level, the compiler will always look first for files in the  current
+directory, but  if not  found there,  it will  then search  each of  the
+directories  listed  in  the  variable  -Compile.searchpath-.  This   is
+initially set up to contain the names of system library directories,  so
+that a system library file can be loaded simply by giving its  basename,
+as in
+
+    load Option
+
+which compiles the library  *OPTION. The searchpath is  user-assignable,
+so you can  add your own  library directories to  it: this is  typically
+done in the "init.ml" initialisation file.
+
+If a file itself contains more  calls to the compiler, those  subsidiary
+files will be sought first relative to the directory of the parent  file
+and only then in the current  directory and the -searchpath- list.  This
+can simplify the organisation of applications built from several  files,
+since only the location of the  primary file needs to be known  exactly:
+the locations  of  any other  files  loaded  from it  can  be  expressed
+relative to that.
+
+Example:
+
+a directory called "example" contains some source files, "file-1.ml"  to
+"file-n.ml", and a link file, "link.ml", containing the lines:
+
+    load file-1
+    load file-2
+        ....
+    load file-n
+
+The command
+
+    load example/link
+
+is  sufficient  to  load  the  whole  application.  This  works  whether
+"example" is a subdirectory of the current working directory, or of some
+library directory in the -searchpath- list.
+
+
+-- Autoloading --------------------------------------------------------
+
+Certain files  can  be  compiled automatically.  Whenever  an  undefined
+structure name is encountered in a program. the compiler will  construct
+a file name by  appending ".ml" (or the  value of -Compile.filetype-  if
+different) to the structure  name and try  compiling the resulting  file
+using the standard searching mechanism described above. This process  is
+called AUTOLOADING, and  the idea  is that  the file  (if found)  should
+provide a definition for  the undefined structure, allowing  compilation
+to continue. Only if the file doesn't exist or doesn't define the  right
+structure is an ``Unbound identifier'' error given.
+
+Autoloading makes it possible to  use library structures without  having
+to explicitly compile them: the declaration
+
+    open Option;
+
+for example will automatically compile the *OPTION library, assuming  it
+hasn't already  been done.  It works  for functors  and signatures  too,
+although with signatures the signature file extension (-sigfiletype-) is
+used instead to construct the file name, making it possible to  autoload
+both a structure (or functor) and its signature.
+
+Autoloading blurs the distinction  between builtin and library  modules.
+This is generally convenient, but may  not always be so: a good  example
+is copying a program to a different system, when it's important to  know
+exactly which libraries  are being  used. In such  a case  you can  stop
+autoloading by assigning -false- to the variable -Compile.autoload-.
+
+
+-- Compiler Modes -----------------------------------------------------
+
+The compiler has two modes of  working: normal mode and debug mode.  The
+current mode is determined by the flag -Compile.debug-: set this -false-
+for normal mode (the  default) or -true- for  debug mode. The flag  does
+not apply to autoloaded files which are always compiled in normal  mode:
+if you want to compile a file in debug mode, you must load it explicitly
+while the -debug- flag is set.
+
+In debug mode, the compiler adds extra code to every function to provide
+information and hooks for use by dynamic debugging tools. This obviously
+increases code size and may reduce execution speed, but code compiled in
+normal mode does not support any kind of dynamic debugging.
+
+The only debugging  aid currently  provided by  PML is  a function  call
+tracer described in HELP *  TRACE. Other tools may  be added at a  later
+date.
+
+
+-- Compiler Output ----------------------------------------------------
+
+The  compiler  will  normally  produce  a  report  on  every   top-level
+declaration processed, consisting of a list of all the identifiers bound
+by the declaration, together with their types (or signatures) and  where
+appropriate  their  values.  Such   information  is  important:   values
+obviously, but types equally  so, since the true  type of an  identifier
+may  not  always  be  that   envisaged  by  the  programmer  (due   to a
+misconception of  some kind)  leading almost  certainly to  type  errors
+later on.
+
+Nevertheless, the amount of output can  become excessive, and so can  be
+controlled by two  flags. Setting -Compile.quiet-  to -true-  suppresses
+all (non-error) output, even  from expressions evaluated  interactively.
+Less drastically,  setting -Compile.quiet_load-  suppresses output  only
+from compilations invoked via the LOAD command or -use- function, output
+from the original interactive session being left untouched. This flag is
+set  automatically  when  files   are  autoloaded,  making   autoloading
+invisible. Finally, if the values  of variables are complex, leading  to
+unwanted amounts  of  output, this  can  be curtailed  by  changing  the
+-depth- indicator of the top-level printer described in HELP * PRINTER.
+
+The compiler will produce  extra output summarising  the time taken  for
+each top-level declaration or compilation when the flag  -Compile.timer-
+is set (this  is independent  of the  flags described  above). For  each
+declaration typed interactively, the compiler will add two lines to  the
+end of the normal report looking something like:
+
+    ;;; Compilation: CPU time = 0.01 secs, GC time = 0.0 secs
+    ;;; Execution:   CPU time = 0.04 secs, GC time = 0.0 secs
+
+This is fairly self-explanatory.  ``Compilation'' covers the time  taken
+to  parse  and   typecheck  the  declaration   and  to  generate   code;
+``Execution'' is the time taken executing any code planted. The CPU time
+figure is the total CPU time; the GC figure is the amount of that  taken
+up in garbage collection.
+
+When compiling  a file,  times  are collected  for  the whole  file  and
+summarised at the end, prefixed with the file name:
+
+    ;;; File: lib.ml
+    ;;; Compilation: CPU time = 0.56 secs, GC time = 0.0 secs
+    ;;; Execution:   CPU time = 0.02 secs, GC time = 0.0 secs
+
+
+-- Compiler Warnings --------------------------------------------------
+
+The flag -Compile.warnings- controls the production of warning  messages
+by the compiler. Currently the only warnings produced are those required
+by  the  Standard  ML  definition  concerning  the  exhaustiveness   and
+irredundancy of matches, but it  is envisaged that a more  sophisticated
+series of warnings will be enabled at a later date.
+
+For now, warnings are either on or  off depending on the setting of  the
+-warnings-  flag.  Disabling  warnings  turns  off  the   exhaustiveness
+checking as well as  the messages, so can  improve the running speed  of
+the compiler,  but  this is  recommended  only for  programs  which  are
+already known to produce no warnings.
+
+
+-- The Compile Module -------------------------------------------------
+
+signature Compile
+structure Compile : Compile
+    The variables  and  functions discussed  above  are defined  in  the
+    builtin structure -Compile-, described by the following signature:
+
+    signature Compile = sig
+
+        (* Compiling Files *)
+
+        exception Use of string
+
+        val use             : string -> unit
+        val filetype        : string ref
+        val sigfiletype     : string ref
+        val searchpath      : string list ref
+
+        (* Compiler Flags *)
+
+        val autoload        : bool ref
+        val closure_rules   : bool ref
+        val debug           : bool ref
+        val quiet           : bool ref
+        val quiet_load      : bool ref
+        val timer           : bool ref
+        val traceback       : bool ref
+        val warnings        : bool ref
+
+        (* Localising Compiler Flags *)
+
+        val localise        : 'a ref -> 'a ref
+
+    end
+
+
+-- Summary of Compiler Functions and Variables ------------------------
+
+exception Use of string
+val use (filename : string) : unit
+    Adds the  given  -filename-  to  a queue  of  files  waiting  to  be
+    compiled: the files are compiled in order at the end of the  current
+    declaration. The existence  of the file  and its access  permissions
+    are checked before  the name is  added to the  queue; the  exception
+
+        Use(filename)
+
+    is raised if the file cannot be read for any reason.
+
+
+val filetype : string ref
+    The default extension for ML program files. The compiler will append
+    this extension automatically to  filenames where required. VED  also
+    recognises files with this extension as being ML files.
+    Default value: ".ml"
+
+
+val sigfiletype : string ref
+    The default  extension for  ML signature  files. The  compiler  will
+    append this extension automatically to filenames where required. VED
+    also recognises files with this extension as being ML files.
+    Default value: ".sig"
+
+
+val searchpath : string list ref
+    A list of directories for the compiler to search when looking  for a
+    file with a relative pathname.
+    Default value:
+        ["$poplocal/local/pml/lib/", "$usepop/pop/pml/lib/"] (* UNIX *)
+        ["poplocal:[local.pml.lib]", "usepop:[pop.pml.lib]"] (* VMS *)
+
+
+val autoload : bool ref
+    When -true-, the compiler  will try automatically compiling  library
+    files in  order  to  resolve  undefined  module  names  (structures,
+    signatures and functors). When -false-, undefined module names cause
+    an immediate error.
+    Default value: true
+
+
+val debug : bool ref
+    Determines the current compilation mode. Set this -false- for normal
+    mode or -true- for debug mode. The different modes are described  in
+    the section ``Compiler Modes'' above.
+    Default value: false
+
+
+val closure_rules : bool ref
+    When -true-, the compiler imposes ``closure rules'' on modules.  The
+    exact rules are particular to  PML: no module (structure,  signature
+    or functor) may refer to any non-module name (variable, constructor,
+    exception or type constructor) external to the module which has  not
+    been declared "pervasive" (see HELP * PERVASIVE). The initial  basis
+    is automatically  pervasive.  When  -false-, no  closure  rules  are
+    applied: all names have  the same scope  inside modules as  outside.
+    This is in line with the Standard ML definition.
+    Default value: false
+
+
+val quiet : bool ref
+    Suppresses all non-error  output from  the compiler.  In the  normal
+    case, the compiler reports on every top-level declaration  processed
+    (but see -quiet_load- below). Setting -quiet- stops all output.
+    Default value: false
+
+
+val quiet_load : bool ref
+    Suppresses output from  recursive calls  to the  compiler, i.e.  not
+    from the very top-level session, but from calls invoked via the LOAD
+    command  or  -use-   function.  Setting  this   -true-  means   that
+    expressions or simple declarations  evaluated interactively or  from
+    inside VED  will  still print  results,  but more  extensive  output
+    caused by  compiling files  will be  suppressed. Note  that  -quiet-
+    takes precedence over -quiet_load-:  setting -quiet- suppresses  all
+    output regardless of the setting of -quiet_load-.
+    Default value: false
+
+
+val timer : bool ref
+    Enables the printing of timing statistics by the compiler.
+    Default value: false
+
+
+val traceback : bool ref
+    Enables  exception  traceback.  When  this  flag  is  -true-,   each
+    exception raised displays a traceback on the standard error stream.
+    Default value: false.
+
+    NB: this  feature  is experimental,  and  is not  guaranteed  to  be
+    provided in exactly this form in future releases of PML.
+
+    The general form of an exception traceback is as follows:
+
+        E <exception>
+        X <function>
+        ....
+        X <function>
+        H <function>
+
+    The first line (prefixed "E") displays the exception packet raised.
+
+    Subsequent lines  (prefixed  "X")  display the  names  of  functions
+    aborted by  the  exception, where  the  first such  line  names  the
+    function which raised  the exception. Anonymous  functions print  as
+    "<fn>". Consecutive calls to the same function are abbreviated  to a
+    single line, with the number of calls given in parentheses after the
+    function name. So the line
+
+        X loop (*28)
+
+    indicates that the function -loop- had been called 28 times.
+
+    The last line of the traceback (prefixed "H") gives the name of  the
+    function which handled the  exception. This line  may not appear  if
+    there was no handler installed;  in this case, the traceback  should
+    be followed immediately by the top-level exception message.
+
+
+val warnings : bool ref
+    Controls any warnings produced by  the compiler: if set -false-,  no
+    warning messages are  produced. This allows  the compiler to  omit a
+    certain amount of checking, so speeding up compilation; however,  it
+    is inadvisable to routinely disregard all warnings.
+    Default value: true
+
+
+val localise (r : 'a ref) : 'a ref
+    Localises the value  of the reference  -r- for the  duration of  the
+    current compilation. The value of the reference is saved away, to be
+    restored whenever  the compilation  finishes, whether  this  happens
+    normally or because of some error. The function is meant for use  in
+    localising the effects  of changes to  compiler flags. For  example,
+    placing the line
+
+        Compile.localise Compile.warnings := false;
+
+    at the start of a program file will ensure that warning messages are
+    suppressed throughout the rest of  the file, but the previous  value
+    of the -warnings- flag will be restored a soon as compilation of the
+    file has been completed.
+
+    Note that changes to localised flags do effect nested compilations.
+
+
+--- C.all/pml/help/compile
+--- Copyright University of Sussex 1994. All rights reserved. ----------

@@ -1,0 +1,216 @@
+HELP FASTINT                                    Robert Duncan, July 1990
+
+Fast, non-checking operations on small integers.
+
+
+    CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- The FastInt Module
+ -- The FastInt Type
+ -- Arithmetic Operators
+ -- Bitwise Operators
+
+
+-- The FastInt Module -------------------------------------------------
+
+signature FastInt
+structure FastInt : FastInt
+    The -FastInt- structure is  an autoloadable library module  defining
+    the type of ``fast'' integers. The fast integers are a subset of the
+    standard integer type where each member of the type is guaranteed to
+    fit into  a single  machine word.  Operations on  fast integers  are
+    implemented as simple machine instructions and subroutine calls  and
+    do no  overflow checking.  Use of  the fast  integer type  leads  to
+    faster, more compact, but less secure code.
+
+    The FastInt module is described by the following signature:
+
+        signature FastInt = sig
+
+            eqtype fastint
+
+            val maxint  : fastint
+            val minint  : fastint
+            val zero    : fastint
+            val one     : fastint
+
+            val fastint : int -> fastint
+            val int     : fastint -> int
+
+            val sign    : fastint -> fastint
+
+            val ~       : fastint -> fastint
+            val +       : fastint * fastint -> fastint
+            val -       : fastint * fastint -> fastint
+            val *       : fastint * fastint -> fastint
+            val div     : fastint * fastint -> fastint
+            val mod     : fastint * fastint -> fastint
+            val quot    : fastint * fastint -> fastint
+            val rem     : fastint * fastint -> fastint
+            val abs     : fastint -> fastint
+
+            val ==      : fastint * fastint -> bool
+            val <       : fastint * fastint -> bool
+            val <=      : fastint * fastint -> bool
+            val >       : fastint * fastint -> bool
+            val >=      : fastint * fastint -> bool
+
+            val max     : fastint -> fastint -> fastint
+            val min     : fastint -> fastint -> fastint
+
+            val ~~      : fastint -> fastint
+            val ||      : fastint * fastint -> fastint
+            val &&      : fastint * fastint -> fastint
+            val &~      : fastint * fastint -> fastint
+            val &?      : fastint * fastint -> bool
+
+            val >>      : fastint * fastint -> fastint
+            val <<      : fastint * fastint -> fastint
+
+        end
+
+
+-- The FastInt Type ---------------------------------------------------
+
+eqtype fastint
+val minint : fastint
+val maxint : fastint
+    The type of ``fast'' integers, a subset of the integers in the range
+
+        [minint, maxint]
+
+    The end points of the range  are chosen such that each fast  integer
+    fits into a single word of  the host machine; the actual values  may
+    vary between implementations.
+
+
+val fastint : int -> fastint
+val int : fastint -> int
+    Conversion between  standard integers  and fast  integers. The  fast
+    integers are a subset of the  standard integers, and thus the  -int-
+    function is the  identity function.  The -fastint-  function is  the
+    identity function on all integers  in the range [minint,maxint]  but
+    maps all values outside  that range onto  the nearest endpoint.  For
+    example:
+
+        fastint(int(maxint)+1) = maxint;
+
+
+val zero : fastint
+val one  : fastint
+    Useful constants, defined:
+
+        val zero = fastint 0;
+        val one  = fastint 1;
+
+
+-- Arithmetic Operators -----------------------------------------------
+
+Many of  the variable  names in  this  module shadow  the names  of  the
+standard numeric operations,  so you  should be careful  of opening  the
+structure at top level.
+
+
+val sign (i : fastint) : fastint
+    Returns the sign of the integer -i-: 1 for positive, 0 for zero  and
+    ~1 for negative.
+
+
+val ~ (i : fastint) : fastint
+val (i : fastint)  +   (j : fastint) : fastint
+val (i : fastint)  -   (j : fastint) : fastint
+val (i : fastint)  *   (j : fastint) : fastint
+val (i : fastint) div  (j : fastint) : fastint
+val (i : fastint) mod  (j : fastint) : fastint
+val (i : fastint) quot (j : fastint) : fastint
+val (i : fastint) rem  (j : fastint) : fastint
+val abs (i : fastint) : fastint
+    Basic mathematical operations on fast integers. These are  identical
+    to the standard  operations on  integers, except  that wherever  the
+    true result should lie outside the range [minint,maxint], the actual
+    result is undefined.  No exceptions are  raised for overflows,  even
+    for division  by  zero  (this  will typically  cause  some  kind  of
+    machine exception).
+
+
+val (i : fastint) <  (j : fastint) : bool
+val (i : fastint) <= (j : fastint) : bool
+val (i : fastint) >  (j : fastint) : bool
+val (i : fastint) >= (j : fastint) : bool
+    Ordering relations on fast integers. These obey the normal rules.
+
+
+infix 4 ==
+val (i : fastint) == (j : fastint) : bool
+    Equality on fast integers. The  type -fastint- is an equality  type,
+    so the standard equality function "=" is legal, but this specialised
+    version can be marginally faster.
+
+
+val max (i : fastint) (j : fastint) : fastint
+    Returns the greater of the two integers -i- and -j-.
+
+
+val min (i : fastint) (j : fastint) : fastint
+    Returns the lesser of the two integers -i- and -j-.
+
+
+-- Bitwise Operators --------------------------------------------------
+
+These are  a  subset of  the  operations defined  on  standard  integers
+described in HELP * BIT.
+
+
+val ~~ (i : fastint) : fastint
+    Bitwise logical complement: inverts each bit in -i-.
+
+
+infix 6 ||
+val (i : fastint) || (j : fastint) : fastint
+    Bitwise logical OR: sets those bits in -i- which are set in -j-.
+
+
+infix 7 &&
+val (i : fastint) && (j : fastint) : fastint
+    Bitwise logical AND: clears those bits  in -i- which are not set  in
+    -j-.
+
+
+infix 7 &~
+val (i : fastint) &~ (j : fastint) : fastint
+    Bitwise logical AND-NOT: clears those bits  in -i- which are set  in
+    -j-.
+
+    Definition:
+
+        infix 7 &~
+        fun i &~ j = i && ~~j;
+
+
+infix 7 &?
+val (i : fastint) &? (j : fastint) : bool
+    Bitwise test: returns  -true- if -i-  and -j- have  any bits set  in
+    common.
+
+    Definition:
+
+        infix 7 &?
+        fun i &? j = i && j <> zero;
+
+
+infix 5 <<
+val (i : fastint) << (j : fastint) : fastint
+    Arithmetic left shift:  shifts -i-  left by -j-  places. A  negative
+    value of -j- causes  a right shift by  the absolute amount.  Results
+    outside the range [minint,maxint] are undefined.
+
+
+infix 5 >>
+val (i : fastint) >> (j : fastint) : fastint
+    Arithmetic right shift: shifts -i-  right by -j- places. A  negative
+    value of -j-  causes a left  shift by the  absolute amount.  Results
+    outside the range [minint,maxint] are undefined.
+
+
+--- C.all/pml/help/fastint
+--- Copyright University of Sussex 1991. All rights reserved. ----------

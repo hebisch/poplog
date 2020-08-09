@@ -1,0 +1,179 @@
+PLOGHELP DYNAMIC                               Robert Duncan, March 1988
+                                                       Revised July 1993
+
+Dynamic predicates.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+
+  2   Dynamic and Static Predicates
+
+  3   Using the Dynamic Declaration
+
+  4   Finding Out if a Predicate is Dynamic
+
+  5   Related Documentation
+
+
+-----------------------------------------------------------------------
+1  Introduction
+-----------------------------------------------------------------------
+
+    :- op(254, fx, dynamic).
+
+    ?- dynamic PredicateSpec.
+
+Declares all the predicates identified by PredicateSpec to be dynamic,
+meaning that their definitions are likely to change during the course of
+the program, usually because of clauses being asserted or retracted.
+
+PredicateSpec must be a conjunction of simple specifications of the form
+
+    Fn/Arity
+
+where Fn is an atom (the functor name of the predicate) and Arity an
+integer (its arity). For example, the directive:
+
+    :- dynamic global_value/2, search_path/1.
+
+declares that both global_value/2 and search_path/1 are to be asserted
+or retracted.
+
+
+-----------------------------------------------------------------------
+2  Dynamic and Static Predicates
+-----------------------------------------------------------------------
+
+The Poplog Prolog compiler maintains two different forms of procedure
+compiled from a predicate definition. In the first form, called the
+static form, all the clauses in the definition are compiled into a
+single procedure. In the second form, the dynamic form, a separate
+procedure is compiled for each clause and a special "interpreting"
+procedure is used to execute each of these clause procedures in turn. A
+given predicate can be compiled in either form, but the static version
+will run considerably faster than its dynamic equivalent. The reason for
+the dynamic form is that it supports the operations of assert and
+retract: individual clause procedures can be added or removed from the
+set of clauses associated with a predicate without disruption.
+
+In normal operation, a predicate when first defined is always compiled
+in the static form. If the predicate is ever then used as the argument
+to an assert or retract, or if extra clauses are added to the definition
+by consulting, it has to be recompiled in the dynamic form before the
+operation can be performed. This has two drawbacks. Firstly it can be
+costly in time, as the recompilation can be a lengthy process if the
+existing static definition is big; this time penalty is added to the
+cost of the first assert or retract done on the predicate. Secondly it
+is possible to introduce inconsistencies in certain circumstances: for
+example, if the predicate is recompiled into the dynamic form at a point
+where a call to the static form is still active, two inconsistent views
+of the predicate can be created, as any changes made to the dynamic form
+will not be reflected in the still-active static version.
+
+To avoid these problems, the declaration dynamic/1 should be used to
+specify in advance those predicates which are to be asserted or
+retracted. Predicates so declared are compiled from the first in the
+dynamic form, so side-stepping the problems caused by recompilation on
+the fly. The declaration also serves a documentation function,
+indicating to readers of a program those predicates which can be
+expected to change during the course of running the program. A similar
+declaration is now standard in many other Prolog systems.
+
+The presence of this declaration does not restrict the use of assert and
+retract to dynamic predicates. Static predicates will still be
+re-compiled automatically where necessary as this is required for
+compatibility with existing programs, but this practice is now
+discouraged.
+
+
+-----------------------------------------------------------------------
+3  Using the Dynamic Declaration
+-----------------------------------------------------------------------
+
+The declaration dynamic/1 should be used to declare any predicate which
+satisfies one or more of the following conditions:
+
+    o   it is to be the subject of any form of assert or retract
+        operation
+
+    o   the clauses defining the predicate are to be assembled from
+        separate files compiled in consult mode
+
+    o   the clauses defining the predicate are all located in the same
+        file but are not contiguous
+
+A system predicate (see PLOGHELP * SYSTEM_PREDICATE) can't be made
+dynamic.
+
+The effect of the dynamic/1 declaration on a predicate depends on the
+status of the predicate at the time the declaration is evaluated:
+
+    o   if the predicate is undefined, an initial dynamic definition for
+        that predicate is automatically created with no clauses: the
+        effect is the same as if a single dummy clause were asserted and
+        then immediately retracted. Such a definition will fail if
+        called.
+
+    o   if the predicate has an existing static definition, it will be
+        recompiled immediately to the dynamic form. If in addition the
+        predicate has been declared no_clauses there will be no clauses
+        from which the definition can be recompiled, so the existing
+        definition will be lost. (The no_clauses declaration is
+        subsequently ignored for dynamic predicates.)
+
+    o   if the predicate is already dynamic, the declaration has no
+        effect.
+
+It follows that a dynamic predicate is never undefined: predicate_info/2
+will never report both dynamic and undefined for a predicate, and
+calling a dynamic predicate will never raise an 'UNDEFINED PREDICATE'
+error. This in turn means that dynamic predicates are unaffected by the
+current handling of undefined predicate errors set by unknown/2.
+
+Once a predicate has become dynamic, it remains so until either it is
+explicitly declared static again, or until it is abolished. Reconsulting
+the definition of a dynamic predicate just deletes any existing clauses
+from the database and compiles the new definition in dynamic mode.
+
+The companion declaration static/1 can be used to force a procedure back
+into static form. This is only useful at a point in a program where a
+predicate has been made dynamic because of any of the reasons given
+above, but is not going to change any more during the course of the
+program. The static declaration causes the predicate to be recompiled as
+a static procedure which will then run faster. Whether this extra speed
+will outweigh the cost of the recompilation will depend on the
+particular application.
+
+
+-----------------------------------------------------------------------
+4  Finding Out if a Predicate is Dynamic
+-----------------------------------------------------------------------
+
+Use predicate_info/2 to determine whether a predicate is dynamic: if so,
+the list of attributes reported for the predicate will contain the atom
+'dynamic'. For example:
+
+    ?- predicate_info(search_path/1, Info).
+    Info = [user_predicate, dynamic] ?
+
+See PLOGHELP * PREDICATE_INFO.
+
+
+-----------------------------------------------------------------------
+5  Related Documentation
+-----------------------------------------------------------------------
+
+PLOGHELP * NO_CLAUSES, * SYSTEM_PREDICATE
+    Other declaration forms.
+
+PLOGHELP * DATABASE
+    A summary of operations available on the Prolog database.
+
+PLOGHELP * EFFICIENCY
+    Hints on making Prolog programs more efficient.
+
+
+--- C.all/plog/help/dynamic
+--- Copyright University of Sussex 1993. All rights reserved.

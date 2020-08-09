@@ -1,0 +1,91 @@
+PLOGHELP PRINT                               Simon Nichols, October 1990
+                                        Updated, Simon Nichols, May 1991
+
+
+Predicates which write a term to the current output using portray/1.
+
+    ?- print(Term).
+    ?- printq(Term).
+
+The predicate print/1 attempts to print its argument using the
+user-defined predicate portray/1. If the call to portray/1 succeeds,
+then it is assumed that Term has been output. Otherwise, Term is printed
+in a manner similar to write/1, except that print/1 is called to print
+each argument (or component) of Term. Thus, portray/1 is invoked at each
+stage of the printing of Term, including nested sub-terms.
+
+The predicate printq/1 is similar, except that if no suitable portray
+clause exists for a term or any component of it, printq/1 behaves like
+writeq/1 rather than write/1. In other words, it quotes atoms which
+need to be quoted in order to be re-readable using read/1 (see
+PLOGHELP * WRITEQ).
+
+By defining clauses for portray/1 and using print/1 rather than write/1
+to print terms, you may define your own pretty printing. For example, if
+you would like lists to be printed enclosed in parentheses and without
+commas, add the following clause to portray/1:
+
+    portray(List) :-
+        (List = [] ; List = [_|_]), !,
+        print_list(List).
+
+and do all your output using print/1. This clause uses the predicate
+print_list/1 to print lists in the preferred format:
+
+    print_list(List) :-
+        write('('),
+        print_list1(List),
+        write(')').
+
+    print_list1([X]) :- !,
+        print(X).
+    print_list1([X|Xs]) :- !,
+        print(X),
+        tab,
+        print_list1(Xs).
+    print_list1([]).
+
+Note the recursive calls to print/1, to ensure that the sub-lists (and
+other terms) are printed using portray/1.
+
+The goal
+
+    ?- print([1,2,3,[4,5],6]).
+
+will output
+
+    (1 2 3 (4 5) 6)
+
+whereas the goal
+
+    ?- write([1,2,3,[4,5],6]).
+
+will still output
+
+    [1, 2, 3, [4, 5], 6]
+
+All debugging output is printed using print/1.
+
+Note: If you add clauses to portray/1 one at a time, make sure you use
+consult/1 rather than reconsult/1, otherwise you will lose your earlier
+clause definitions. (see PLOGHELP * CONSULT, PLOGHELP * RECONSULT).
+
+
+-- RELATED DOCUMENTATION ----------------------------------------------
+
+PLOGHELP * I_O
+ Overview of input/output operations in Prolog
+
+PLOGHELP * WRITE
+ Predicate which writes a term to the current output
+
+PLOGHELP * WRITEQ
+ Predicate which writes a term to the current output, quoting atoms to
+ make them readable by read/1
+
+PLOGHELP * DISPLAY
+ Predicate which writes a term to the current output in prefix format
+
+
+--- C.all/plog/help/print
+--- Copyright University of Sussex 1990. All rights reserved. ----------

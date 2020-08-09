@@ -1,0 +1,340 @@
+PLOGHELP I_O                                  Kathryn Seifert, July 1986
+                                      Revised by Robert Duncan, May 1987
+
+Overview of input/output operations in Prolog.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   How Prolog I/O Works
+
+  2   Naming Streams
+
+  3   Opening and Closing Streams
+
+  4   Reading-in Programs
+
+  5   Term and Character I/O
+
+  6   Interfacing to Pop-11 I/O
+
+  7   List of I/O Predicates and Help Files
+
+  8   Related Documentation
+
+
+-----------------------------------------------------------------------
+1  How Prolog I/O Works
+-----------------------------------------------------------------------
+
+Prolog provides predicates for both term-based and character-based input
+and output, together with predicates for the reading in and writing out
+of programs (i.e. procedure definitions).
+
+All input to a Prolog program is derived from a single source known as
+the current input stream. By default this stream is associated with the
+terminal so that input is taken interactively, but it's possible to
+change this source by use of the predicate see/1. The goal
+
+    ?- see(File).
+
+will make File the current input stream, so that subsequent input will
+be taken from there.
+
+Likewise, all output from a Prolog program is directed to a single
+current output stream, usually associated with the terminal. The
+predicate tell/1 is available for redirecting this output to an
+alternative destination.
+
+
+-----------------------------------------------------------------------
+2  Naming Streams
+-----------------------------------------------------------------------
+
+A stream is denoted in Prolog by an atom. Normally this will just be the
+name of a file expressed using the conventions of the operating system
+under which Poplog is running. Under UNIX for example, a stream might be
+
+    '~/prolog/temp.pl'
+
+or under VMS
+
+    '[prolog]temp.pl'
+
+Note the use of quotes around the filenames to allow the inclusion of
+special characters such as "/" and "[".
+
+There are in addition three atoms which represent special streams,
+namely 'user', 'errchan' and 'inchan'.
+
+The stream 'user' can be used either for input or output and in both
+cases it refers to the user's terminal. This stream is the default for
+Prolog to use whenever no other has been selected.
+
+The stream 'errchan' can be used for output only and refers to a special
+stream meant for displaying error or debugging messages. This too is
+normally connected to the user's terminal.
+
+The stream 'inchan' can be used for input only and refers to the private
+input stream of the current invocation of the Prolog compiler. It should
+not normally be specified explicitly.
+
+Finally, you can also use a Pop-11 character repeater (or consumer) as
+an input (or output) stream; this is discussed in more detail below.
+
+The names of the current input and output streams can be obtained by use
+of the predicates seeing/1 and telling/1.
+
+
+-----------------------------------------------------------------------
+3  Opening and Closing Streams
+-----------------------------------------------------------------------
+
+There is no need to explicitly open a stream in Prolog. The special
+streams are always open and can't be closed. For any other file, the
+first see done on it will open it automatically and start the input
+stream from the top of the file; subsequent sees will resume reading
+from the position previously reached. Likewise, the first tell on a file
+will open the file for writing (thereby deleting its existing contents,
+if any) and subsequent tells on the same file will cause output to be
+appended.
+
+The predicate seen/0 closes the current input stream and told/0 closes
+the current output stream. The predicate close/1 takes either an input
+or output stream as argument and closes the specified stream. After
+closing a stream, the current input (or output) reverts to 'user'.
+
+In the normal case, a file once opened (either for input or output) will
+remain open until explicitly closed by seen/0, told/0 or close/1. If it
+is required to access a file from the beginning, it is good practice to
+assume that the file is already open and explicitly close it before use.
+For example, to start reading a file from the top use a procedure
+something like:
+
+    see_from_beginning(File) :-
+        see(File),      ;;; to select it as current
+        seen,           ;;; to make sure it's closed
+        see(File).      ;;; to re-open it at the top
+
+It is also a good idea to close files which have been finished with:
+there is a limit to the number of files which can be kept open at any
+time, although the actual number varies from system to system.
+
+Abnormal terminations to programs (because of errors or through calling
+abort/0) won't automatically close files, so don't assume this.
+
+
+-----------------------------------------------------------------------
+4  Reading-in Programs
+-----------------------------------------------------------------------
+
+The predicate compile/2 is used to read procedure definitions and
+execute directives from a file. The goal
+
+    ?- compile(File, CompileMode).
+
+invokes the Prolog compiler on the input stream File, and implicitly
+redirects the current input to that stream for the duration of the
+compilation. Any input initiated by directives within the compiled file
+will thus read from File also, regardless of any previous setting of the
+current input.
+
+It is possible to see an alternative input source within a directive,
+but this has effect only for the duration of the directive: the input
+stream will be reset to File once the directive has been executed. In
+particular, a directive consisting only of a redirection, such as
+
+    :- see(user).
+
+has no visible effect.
+
+Compilation of a file or part of a file from Ved is the same as a call
+to compile/2 in reconsult mode.
+
+
+-----------------------------------------------------------------------
+5  Term and Character I/O
+-----------------------------------------------------------------------
+
+read/1 and write/1 are the basic predicates for the reading and writing
+of complete Prolog terms; get/1 and put/1 for characters. These all act
+on the current input and output streams.
+
+Character I/O predicates prefixed with tty (such as ttyget/1, ttyput/1)
+work in the same way as their non-prefixed counterparts but act directly
+on the terminal, regardless of the current input and output streams.
+
+It is generally unwise to mix term and character input on the same
+stream, as some characters can be lost.
+
+
+-----------------------------------------------------------------------
+6  Interfacing to Pop-11 I/O
+-----------------------------------------------------------------------
+
+This section will only be of interest to those who wish to do mixed-
+language programming. It assumes knowledge of the I/O facilities of
+Pop-11; for a summary of the help files available on this topic see
+HELP * IO.
+
+Prolog's current input stream is associated with the Pop-11 variable
+cucharin and the output stream with the variable cucharout. When a see
+is done for the first time on a stream, a character repeater is created
+for the stream (using the procedure discin if the stream is a file name)
+and assigned to cucharin; similarly, when an output stream is opened a
+character consumer is created and assigned to cucharout. Prolog
+maintains internal tables mapping stream names to their corresponding
+character procedures, so that when a see or tell is done on a subsequent
+occasion, the same procedure can be recovered for the stream.
+
+The special streams 'user', 'errchan' and 'inchan' correspond to
+particular character procedures: 'user' refers to the current value of
+charin or charout (depending on whether it is being used as an input or
+an output stream); 'errchan' refers to the current value of cucharerr
+and 'inchan' to the value of cucharin at the time that the current
+invocation of the Prolog compiler began, i.e it names the stream which
+is currently being compiled.
+
+Pop-11 procedures called from Prolog can access the current input and
+output streams simply by reading from cucharin and writing to cucharout.
+It is also possible to make Prolog address arbitrary Pop-11 streams by
+providing a character procedure directly as an argument to see or tell.
+As an example, suppose we have defined the following predicate which
+calls a goal after first redirecting the input to some given source:
+
+    call_with_input(Input, Goal) :-
+        see(Input),
+        call(Goal).
+
+We could invoke this from Prolog, taking the input from a named file:
+
+    ?- call_with_input('~/prolog/temp.pl', Goal).
+
+or we could invoke it from Pop-11, providing a character repeater as the
+input source:
+
+    vars input = /* ... some character repeater ... */
+    vars term = prolog_maketerm(input, Goal, "call_with_input", 2);
+    prolog_invoke(term) =>
+
+(see PLOGHELP * PROLOG_INVOKE). A similar approach would work for output
+too.
+
+
+-----------------------------------------------------------------------
+7  List of I/O Predicates and Help Files
+-----------------------------------------------------------------------
+
+PLOGHELP * CLOSE
+    Closes the specified input or output stream.
+
+PLOGHELP * COMPILE
+    Reads procedure definitions and goals from a file.
+
+PLOGHELP * DISPLAY
+    Writes a term to the current output in prefix format.
+
+PLOGHELP * GET
+    Reads characters from the current input and returns the first
+    printing character.
+
+PLOGHELP * GET0
+    Reads the next character from the current input.
+
+PLOGHELP * LISTING
+    Writes clauses from the database to the current output.
+
+PLOGHELP * NL
+    Prints newlines on the current output.
+
+PLOGHELP * NUMBERVARS
+    Controls the numbering of variables on output.
+
+PLOGHELP * PORTRAY
+    Tailors the action of the predicate print/1.
+
+PLOGHELP * PRINT
+    Writes a term to the current output.
+
+PLOGHELP * PROMPT
+    Changes the prompt used by read/1 and get/1.
+
+PLOGHELP * PUT
+    Writes a character to the current output.
+
+PLOGHELP * READ
+    Reads a term from the current input.
+
+PLOGHELP * SEE
+    Sets the current input stream.
+
+PLOGHELP * SEEING
+    Determines the name of the current input stream.
+
+PLOGHELP * SEEN
+    Closes the current input stream.
+
+PLOGHELP * SKIP
+    Reads characters from the current input until a given character
+    is found.
+
+PLOGHELP * TAB
+    Prints spaces on the current output.
+
+PLOGHELP * TELL
+    Sets the current output stream.
+
+PLOGHELP * TELLING
+    Determines the name of the current output stream.
+
+PLOGHELP * TOLD
+    Closes the current output stream.
+
+PLOGHELP * TTYFLUSH
+    Flushes the output buffer to the terminal.
+
+PLOGHELP * TTYGET
+    Reads characters from the terminal and returns the first printing
+    character.
+
+PLOGHELP * TTYGET0
+    Reads the next character from the terminal.
+
+PLOGHELP * TTYNL
+    Prints newlines on the terminal.
+
+PLOGHELP * TTYPUT
+    Prints a character on the terminal.
+
+PLOGHELP * TTYSKIP
+    Reads characters from the terminal until a given character is found.
+
+PLOGHELP * TTYTAB
+    Prints spaces on the terminal.
+
+PLOGHELP * WRITE
+    Writes a term to the current output.
+
+PLOGHELP * WRITEQ
+    Writes a term to the current output, quoting atoms where necessary.
+
+
+-----------------------------------------------------------------------
+8  Related Documentation
+-----------------------------------------------------------------------
+
+HELP * OUTPUT
+    Information about printing in Pop-11 programs.
+
+HELP * INPUTOUT
+    List of HELP files relating to Poplog's input/output system.
+
+HELP * INPUT
+    Information about input procedures in Pop-11 and Ved.
+
+REF * SYSIO
+    More detailed account of Poplog's basic I/O facilities.
+
+
+--- C.all/plog/help/i_o
+--- Copyright University of Sussex 1993. All rights reserved.

@@ -1,0 +1,122 @@
+PLOGHELP SAVE                             Jonathan Laventhol, March 1984
+                                   Revised Kathryn Seifert, October 1986
+                                     Revised Simon Nichols, October 1990
+
+Predicate to save the current state of the Prolog system.
+
+    ?- save(Filename).
+    ?- save(Filename, [lock, share, init, banner]).
+
+
+The evaluable predicates save/1 and save/2 save the current state of the
+the POPLOG Prolog system in -Filename-. This saved state is called a
+"saved image". -Filename- is an atom to which the extension ".psv" is
+added. For example:
+
+    ?- save(myimage).
+    yes
+
+This creates a saved image in the file "myimage.psv".
+
+When you restore a saved image, Prolog continues from where you left off
+in the saving program. You can restore the image like this:
+
+    ?- restore(myimage).
+    yes
+
+You can also restore the image from DCL (VMS) or the shell (UNIX) by
+typing:
+
+    $ prolog +myimage
+
+
+The two argument form save/2 fails when it creates a saved image and
+succeeds when the saved image is restored. This enables different
+actions to be performed on saving and restoring. For example:
+
+    ?- save(myimage, []), write('Saved image restored'), nl.
+    no
+
+    ?- restore(myimage).
+    Saved image restored
+    yes
+
+
+The second argument to save/2 is a (possibly empty) list of attributes
+for the saved image. An attribute is one of the atoms 'lock', 'share',
+'init' or 'banner', which have the following interpretation:
+
+    lock
+        -- Creates a saved image as a self-contained system on top of
+           which other "layered" saved images may be built (see
+           REF * SYSTEM for details on layered saved images).
+
+    share
+        -- Make the nonwriteable area of the saved image sharable by
+           all users. This attribute is only effective in combination
+           with the 'lock' attribute and is not supported by all
+           operating systems (specifically, only VMS and UNIX systems
+           which support shared memory or the mmap(2) system call).
+
+    init
+        -- Perform standard Prolog system initialisation, such as
+           compiling "init.pl" files.
+
+    banner
+        -- Print the Prolog system banner and version messages.
+
+
+The standard Prolog saved image is made as a locked, shareable image.
+
+
+Code similar to the following may be used to create a Prolog image which
+starts up with your favourite set of predicates already present:
+
+    % Compile predicates which are wanted in every session
+    :- [mysetup].
+
+    % Add to version messages
+    :- version('My Prolog').
+
+    % Create a locked system
+    :-  (save(myimage, [lock]) ->
+            prolog_restart              % restore: restart top-level
+        ;
+            write('myimage saved\n')    % save: print message
+        ).
+
+Note that there is no need to specify the 'init' or 'banner' attributes
+when calling prolog_restart/0.
+
+A saved image maker which starts an application when the image is
+restored would be along the following lines:
+
+    % Compile the application
+    :- [build].
+
+    % Create a locked system
+    :- save(myimage, [lock, init]), go.
+
+where the predicate go/0 starts the application.
+
+
+For compatibility with previous versions of POPLOG Prolog, the second
+argument to save/2 may be an integer, which is unified with 0 when the
+saved image is made and 1 when the image is restored. This form is not
+recommended.
+
+
+-- RELATED DOCUMENTATION ----------------------------------------------
+
+PLOGHELP * RESTORE
+    Restoring a saved image.
+
+PLOGHELP * PROLOG_RESTART
+    Restarting the Prolog system.
+
+REF * SYSTEM
+    Information on saved images and creating layered systems.
+
+
+--- C.all/plog/help/save
+--- Copyright University of Sussex 1991. All rights reserved. ----------

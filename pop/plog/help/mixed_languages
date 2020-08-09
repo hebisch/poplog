@@ -1,0 +1,533 @@
+PLOGHELP MIXED_LANGUAGES                      Kathryn Seifert  July 1986
+
+Methods of interfacing Prolog and other languages
+
+Keywords: interface, mixed language programming, languages, POP-11,
+          Prolog, Lisp, continuations
+
+
+CONTENTS - (Use <ENTER> g to access sections)
+
+ -- INTRODUCTION
+
+ -- CALLING PROLOG FROM POP11
+ -- (1)  The Procedures 'prolog_invoke' and 'prolog_maketerm'
+ -- (2)  Continuations
+ -- (3)  Prolog in POP-11 Processes
+
+ -- CALLING POP-11 FROM PROLOG
+ -- (1)  The Predicate 'prolog_eval'
+ -- (2)  The Predicate 'is'
+ -- (3)  LIBRARY ARE
+ -- (4)  LIBRARY SIMPLEPOP
+ -- (5)  The Predicate 'prolog_language' and LIBRARY LANGUAGES
+ -- (6)  Continuation Passing Procedures
+ -- (7)  The predicates 'prolog_setq' and 'prolog_val'
+ -- (8)  LIBRARY POPSTRING
+
+ -- THE PROLOG/LISP INTERFACE
+
+ -- RELATED DOCUMENTATION
+
+
+-- INTRODUCTION -------------------------------------------------------
+
+POPLOG provides facilities allowing programmers to write POP-11
+procedures which call Prolog procedures, and to write Prolog procedures
+which call POP-11 procedures. Similary, facilities are provided to call
+Lisp functions from Prolog and to create and invoke Prolog goals from
+Lisp. The Prolog/Lisp interface is documented in detail elsewhere; this
+file primarily describles mixed-language programming using Prolog and
+POP-11.
+
+
+-- CALLING PROLOG FROM POP11 ------------------------------------------
+
+the three main methods of calling Prolog procedures from POP-11
+procedures are discussed in detail in PLOGHELP * POPTOPLOG. These
+methods are outlined below.
+
+
+-- (1)  The Procedures 'prolog_invoke' and 'prolog_maketerm' ----------
+
+There are certain Prolog predicates which are available as POP-11
+procedures (see PLOGHELP * TERMSINPOP).  These procedures can be used in
+POP-11 to construct Prolog terms and variables, invoke Prolog goals, and
+find out the value of Prolog variables.
+
+These procedures include:
+
+(a)    prolog_newvar() -> <prologvar>
+       (See PLOGHELP * TERMSINPOP)
+
+(b)    prolog_maketerm({<word|list|prologterm>}*, <word>, <integer>)
+                                                    -> <prologterm>
+       (See PLOGHELP * TERMSINPOP)
+
+(c)    prolog_deref(<prologvar:V>) -> <term>
+       (See PLOGHELP * TERMSINPOP)
+
+(d)    prolog_full_deref(<prologvar:V>) -> <term:T>
+       (See PLOGHELP * PROLOG_DEREF)
+
+(e)    prolog_invoke(<prolog_term>) -> <boolean>
+       (See PLOGHELP * PROLOG_INVOKE)
+
+There are also a pair of useful macros -prolog_vars- and -prolog_lvars-
+which provide syntax for declaring dynamically scoped variables (vars)
+and lexicallly scoped variables (lvars) in POP-11 and initialising them
+to new prolog variables. See PLOGHELP * PROLOG_VARS and
+PLOGHELP * PROLOG_LVARS.
+
+Using some of the procedures and macros mentioned above, it is possible
+to write a POP-11 procedure which will construct and invoke a Prolog
+term equivalent to the following Prolog clause which finds all of the
+different lists which could be appended to produce a given list:
+
+    allsplits(List, Splits):-
+        fast_setof([X, Y], append(X, Y, List)).
+
+The POP-11 code:
+
+    define allsplits(list) -> splits;
+        prolog_lvars splits, x, y;
+        if prolog_invoke(
+            prolog_maketerm(
+                [^x ^y],
+                prolog_maketerm(x, y, list, "append", 3),
+                splits,
+                "fast_setof", 3))
+        then
+            prolog_full_deref(splits) -> splits
+        else
+            'Prolog goal failed' -> splits
+        endif
+    enddefine;
+
+This procedure produces the following behaviour:
+
+    allsplits([1 2 3 4]) ==>
+    ** [[[] [1 2 3 4]]
+        [[1] [2 3 4]]
+        [[1 2] [3 4]]
+        [[1 2 3] [4]]
+        [[1 2 3 4] []]]
+
+
+-- (2)  Continuations --------------------------------------------
+
+Continuation passing provides a powerful and flexible way of using
+POP-11 with Prolog.  See PLOGHELP * POPTOPLOG, DOC * CONTINUATION and
+TEACH * CONTINUATIONS for more detailed information about this
+programming method.  Continuation passing procedures defined in POP-11
+can be called from Prolog as normal Prolog predicates
+(see PLOGHELP * PLOGTOPOP). Similarly, Prolog predicates can be assigned
+to POP-11 variables, and called as POP-11 continuation passing
+procedures. In both of these cases, the POP-11 procedure
+
+    prolog_valof(<word:F>, <integer:A>) -> <procedure:P>
+
+and its updater
+
+    <procedure:P> -> prolog_valof(<word:F>, <integer:A>)
+
+are used, where P is a continuation passing procedure, F is functor of
+the corresponding Prolog structure, and A is the arity of the structure
+(see PLOGHELP * PROLOG_VALOF).
+
+Below is an example of a POP-11 procedure ('boys_name') which calls a
+Prolog procedure ('member') in the form of a POP-11 continuation passing
+procedure.  The Prolog procedure 'member' is defined as follows:
+
+    member(X, [X|_]).
+    member(X, [_|Y]) :-
+        member(X, Y).
+
+The POP-11 code:
+
+    vars mem = prolog_valof("member", 2);
+
+    define boys_name(name, continuation);
+        lvars name, continuation;
+        mem(name, [claude jon aaron ben], continuation)
+    enddefine;
+
+This procedure could be called in POP-11, using an appropriate
+continuation passing procedure passed in as the 'continuation' parameter
+(see DOC * CONTINUATION).  The procedure could also be called normally
+from Prolog if the following assignment is made:
+
+    boys_name -> prolog_valof("bn", 1);
+
+now a call to Prolog such as
+
+    ?- bn(aaron).
+
+can be made.
+
+
+-- (3)  Prolog in POP-11 Processes -------------------------------
+
+The interaction between Prolog and the POP-11 process or co-routining
+facility (see HELP * PROCESS and REF * PROCESS) is discussed in more
+detail in PLOGHELP * PROCESSES.
+
+
+-- CALLING POP-11 FROM PROLOG -----------------------------------------
+
+The main methods of calling POP-11 from Prolog are discussed in detail
+in PLOGHELP * PLOGTOPOP.  These methods (plus a few others) are outlined
+below.
+
+
+-- (1)  The Predicate 'prolog_eval' ------------------------------
+
+The predicates 'is' and 'prolog_eval' are explained in more detail in
+PLOGHELP * PLOGTOPOP and PLOGHELP * PROLOG_EVAL. The facilities provided
+by LIBRARY ARE are explained in PLOGHELP * ARE.
+
+POP-11 expressions can be evaluated from Prolog by using the Prolog
+predicate 'prolog_eval'.   There are two forms of this predicate:
+prolog_eval/1 evaluates a POP-11 expression and returns no result;
+prolog_eval/2 evaluates a POP-11 expression, and returns its result as
+its second argument.
+
+Two examples of some uses of 'prolog_eval':
+
+(1) A POP-11 procedure which prints its argument:
+
+    define printit(arg);
+        lvars arg;
+        arg =>
+    enddefine;
+
+prolog_eval/1 will call the POP-11 procedure (and return no result):
+
+    ?- prolog_eval(printit('hello boys and girls'))
+    ** hello boys and girls
+    yes
+
+(2) A value can be assigned to a POP-11 variable:
+
+    vars v = 77;
+
+And then a Prolog variable X can be unified with the value of the POP-11
+v using prolog_eval/2:
+
+    ?- prolog_eval(valof(v), X).
+    X = 77
+    ?
+    yes
+
+
+-- (2)  The Predicate 'is' ---------------------------------------
+
+The predicate 'is' takes two arguments and is declared as an infix
+operator.  It performs the same function as prolog_eval/2.  See
+PLOGHELP * IS for more detailed information. Two examples of the use of
+'is' follow:
+
+(1)
+    ?- X is valof(v).
+    X = 77
+    ?
+    yes
+
+(2)
+    ?- Y is last(rev([bear, monkey, panda, elephant])).
+    Y = bear
+    ?
+    yes
+
+
+-- (3)  LIBRARY ARE ----------------------------------------------
+
+LIBRARY ARE provides a predicate which takes two arguments and is
+declared as an infix operator.   It is equivalent to the predicate 'is'
+except that the POP-11 procedure which is given as the second argument
+can return any number of results.  The results are put in a list and
+unified with the first argument.  See PLOGHELP * ARE for more detailed
+information.  Two examples of the use of 'are' follow:
+
+(1)
+    :- library(are).
+
+    ?- X are explode(cat).
+    X = [99, 97, 116]
+    ?
+    yes
+
+(2)
+    ?- Y are dest([bear, monkey, panda, elephant]).
+    Y = [bear, [monkey, panda, elephant]]
+    ?
+    yes
+
+
+-- (4)  LIBRARY SIMPLEPOP ----------------------------------------
+
+LIBRARY SIMPLEPOP provides two predicates: the predicate 'dopop' which
+takes two forms dopop/1 and dopop/2; and the predicate dopopreturn/2.
+See PLOGHELP * SIMPLEPOP for more details.
+
+dopop/1 takes a Prolog string or atom which is compiled as a POP-11
+procedure.  Any results returned by the POP-11 procedure are ignored.
+dopop/2 is like dopop/1, except that any results produced by the POP-11
+procedure are placed in a list and unified with the second argument.
+dopopreturn/2 is like dopop/2, except that if a mishap occurs, then it
+will be unified with a term of the form:
+    pop_mishap(Message, Culprits, Callers)
+
+Here are three examples of the facilities provided by LIBRARY SIMPLEPOP:
+
+(1)
+    :- library(simplepop).
+
+    ?- dopop("printit('hello boys and girls')").
+    ** hello boys and girls
+    yes
+
+(2)
+    ?- dopop("dest([bear monkey panda elephant])", Result).
+    Result = [bear, [monkey, panda, elephant]]
+    ?
+    yes
+
+(3)
+    ?- dopopreturn("2 + 4; 8 * 'cat'", Result).
+    Result = pop_mishap(NUMBER(S) NEEDED, [8, cat],
+             [*, sysEXECUTE, sysCOMPILE, syscompile, compile])
+    ?
+    yes
+
+
+-- (5)  The Predicate 'prolog_language' and LIBRARY LANGUAGES ----
+
+See PLOGHELP * PROLOG_LANGUAGE for more detailed information on these
+facilities.
+
+The predicate 'prolog_language' can be used to invoke the compiler of
+any other language which you have loaded.  LIBRARY LANGUAGES provides
+several macros to make using 'prolog_language' easier; see
+PLOGHELP * PROLOG_LANGUAGE for more information on these macros.
+
+'prolog_language' has the following format:
+
+    ?- prolog_language(Language_name).
+
+If you have a file which contains a program, most of which is in Prolog,
+but some of which you wish to write in POP-11, you can use
+'prolog_language':
+
+    {prolog code}
+    ...
+
+    :- prolog_language('pop11').
+
+    define popproc(args) -> result;
+        ...
+    enddefine;
+
+    :- prolog_language('prolog').
+
+    plogproc(Args, Result) :-
+        prolog_eval(popproc(Args), Result).
+
+The predicate 'prolog_current_language' allows you to find out which
+compiler is currently being used:
+
+    ?- prolog_current_language(X).
+    X = prolog
+    ?
+    yes
+
+
+-- (6)  Continuation Passing Procedures --------------------------
+
+DOC * CONTINUATION, PLOGHELP * PLOGTOPOP and PLOGHELP * POPTOPLOG
+discuss continuation passing procedures in detail.
+PLOGHELP * TERMSINPOP and the sections in this file with the headings
+"USING PROLOG_INVOKE AND PROLOG_MAKETERM", and "USING CONTINUATIONS"
+discuss procedures which construct and manipulate Prolog terms and
+variables and are used in writing continuation passing procedures.
+
+Once a continuation passing procedure has been written in POP-11, the
+updater of the procedure 'prolog_valof' (see the above section "USING
+CONTINUATIONS") can be used to make the POP-11 procedure available in
+Prolog.  An example of such a continuation passing procedure and its
+call from Prolog follow:
+
+The POP-11 code:
+
+    define number(num, continuation);
+        lvars num, continuation;
+        if member(num, [one two three]) then
+            continuation()
+        elseif isinteger(num) then
+            continuation()
+        else
+            'not number' =>
+        endif
+    enddefine;
+
+    number -> prolog_valof("number", 1);
+
+Calls from Prolog:
+
+    ?- number(1).
+    yes
+
+    ?- number(three).
+    yes
+
+    ?- number(telephone).
+    ** not number
+    no
+
+
+
+-- (7)  The predicates 'prolog_setq' and 'prolog_val' -----------------
+
+The predicates
+
+    prolog_setq(Pop_variable_name, Value)
+    prolog_val(Pop_variable_name, Value)
+
+can be used to alter and examine the values of POP-11 variables.
+
+For example:
+
+    vars x = 14;
+
+    ?- prolog_val(x, X).
+    X = 14
+    ?
+    yes
+
+    ?- prolog_setq(x, kath), prolog_val(x, X).
+    X = kath
+    ?
+    yes
+
+These are both described fully in PLOGHELP * PROLOG_SETQ.
+
+
+-- (8)  LIBRARY POPSTRING ----------------------------------------
+
+See PLOGHELP * POPSTRING  for detailed information on this library
+package.  LIBRARY POPSTRING provides a facility to put POP-11 strings in
+Prolog programs.  A macro 'popstring' is created by the library which
+can be put before a Prolog word and will replace the word with an
+expression which makes a POP-11 string.  This macro must be used inside
+a call of 'prolog_eval' (see PLOGHELP * PLOGTOPOP and the section in
+this file with the heading "USING THE PREDICATE 'PROLOG_EVAL'").
+
+For example:
+
+    :- library(popstring).
+
+    ?- prolog_eval(pr(popstring 'this is a funny prolog word  ')).
+    this is a funny prolog word  yes
+
+
+-- THE PROLOG/LISP INTERFACE ------------------------------------------
+
+The Prolog library LISPINPLOG provides an interface for accessing Common
+Lisp functions from within Prolog. The Common Lisp module PROLOG
+provides facilities to create and invoke Prolog goals from Common Lisp.
+See PLOGHELP * LISPINPLOG and the Lisp helpfile HELP * PROLOG for
+details.
+
+A Prolog macro, "LISP", is provided for switching input from the Prolog
+top-level compiler to Lisp. To return to Prolog from Lisp, use the Lisp
+function PROLOG.
+
+In order to use Prolog and Lisp together, both systems must be loaded.
+The best way to do this is to type "clisp" to the shell or DCL; once you
+are in the Lisp system, you can load the module "prolog" (see the Lisp
+helpfile HELP * PROLOG).
+
+
+-- RELATED DOCUMENTATION ----------------------------------------------
+
+DOC * CONTINUATION
+ How continuation passing procedures in POP-11 relate to Prolog
+ procedures. Slightly out of date.
+
+HELP * POPLISP
+ Lisp documentation; how to call Lisp from POP-11 and POP-11 from Lisp
+
+HELP *PROLOG
+ The Lisp HELP file on mixed Prolog and Lisp programming
+
+PLOGHELP *LISPINPLOG
+ Calling Lisp from Prolog
+
+HELP * PROCESS
+ POP-11's process facility
+
+PLOGHELP * ARE
+ Library for evaluating POP-11 expressions with any number of
+ results from Prolog
+
+PLOGHELP * IS
+ Evaluating POP-11 expressions which return 1 result from Prolog
+
+PLOGHELP * PROLOG_LANGUAGE
+ Predicates and library package for switching from Prolog to POP-11
+
+PLOGHELP * PLOGTOPOP
+ How to call POP-11 from Prolog
+
+PLOGHELP * POPSTRING
+ How to put POP-11 strings in Prolog programs
+
+PLOGHELP * POPTOPLOG, HELP *PLOGINPOP
+ How to call Prolog from POP-11
+
+PLOGHELP * PROCESSES
+ How to create POP-11 processes which use Prolog procedures
+
+PLOGHELP * PROLOG_BARRIER_APPLY
+ POP-11 procedure which applies a procedure inside a Prolog 'barrier'
+
+PLOGHELP * PROLOG_COMPILE
+ POP-11 procedure which compiles a file of Prolog code
+
+PLOGHELP * PROLOG_EVAL
+ How to evaluate the Prolog representation of a POP-11 expression
+
+PLOGHELP * PROLOG_INVOKE
+ POP-11 procedure which invokes a Prolog term
+
+PLOGHELP * PROLOG_VARS
+ POP-11 macro which provides syntax for declaring dynamically scoped
+ variables initialised to new Prolog variables
+
+PLOGHELP * PROLOG_LVARS
+ POP-11 macro which provides syntax for declaring lexically scoped
+ variables initialised to new Prolog variables
+
+PLOGHELP * PROLOG_SETQ
+ Reading and writing POP-11 variables from Prolog
+
+PLOGHELP * PROLOG_VALOF
+ POP-11 procedure which returns current value of a Prolog predicate
+
+PLOGHELP * SIMPLEPOP
+ Library package to do simple things in POP-11 from Prolog
+
+PLOGHELP * TERMSINPOP
+ Facilities for manipulating Prolog terms and variables in POP-11
+
+REF * PROCESS
+ Detailed description of POP-11 processes
+
+TEACH * CONTINUATIONS
+ Introduction to DOC * CONTINUATION
+
+TEACH * PROLOGINPOP
+ Examples of POP-11 equivalents of Prolog clauses
+
+--- C.all/plog/help/mixed_languages ------------------------------------
+--- Copyright University of Sussex 1987. All rights reserved. ----------

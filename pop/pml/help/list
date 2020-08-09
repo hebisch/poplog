@@ -1,0 +1,377 @@
+HELP LIST                                      R. J. Duncan, August 1989
+
+Functions on lists.
+
+
+    CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- The List Module
+ -- List Functions
+
+
+-- The List Module ----------------------------------------------------
+
+signature List
+structure List : List
+    The structure -List- is a built-in structure of PML which  defines a
+    collection of  useful  functions on  lists.  A description  of  each
+    function is given below in terms  of a Standard ML definition:  this
+    is meant  as a  semantic  description only,  as  in most  cases  the
+    implementation is done at a lower level.
+
+    The -List- module is described by the following signature:
+
+        signature List = sig
+
+            exception Listof
+            exception Hd
+            exception Tl
+            exception Last
+            exception Nth
+            exception Find
+            exception Fold
+            exception Assoc
+
+            val null        : 'a list -> bool
+            val cons        : 'a -> 'a list -> 'a list
+            val append      : 'a list -> 'a list -> 'a list
+            val zip         : 'a list -> 'b list -> ('a * 'b) list
+            val fromto      : int -> int -> int list
+            val listof      : int -> 'a -> 'a list
+            val length      : 'a list -> int
+            val hd          : 'a list -> 'a
+            val tl          : 'a list -> 'a list
+            val last        : 'a list -> 'a
+            val nth         : int -> 'a list -> 'a
+            val nth0        : int -> 'a list -> 'a
+            val take        : int -> 'a list -> 'a list
+            val drop        : int -> 'a list -> 'a list
+            val takewhile   : ('a -> bool) -> 'a list -> 'a list
+            val dropwhile   : ('a -> bool) -> 'a list -> 'a list
+            val filter      : ('a -> bool) -> 'a list -> 'a list
+            val any         : ('a -> bool) -> 'a list -> bool
+            val exists      : ('a -> bool) -> 'a list -> bool
+            val all         : ('a -> bool) -> 'a list -> bool
+            val forall      : ('a -> bool) -> 'a list -> bool
+            val find        : ('a -> bool) -> 'a list -> 'a
+            val delete      : ''a -> ''a list -> ''a list
+            val member      : ''a -> ''a list -> bool
+            val map2        : ('a * 'b -> 'c) -> 'a list -> 'b list
+                                                         -> 'c list
+            val maptl       : ('a list -> 'b) -> 'a list -> 'b list
+            val app         : ('a -> unit) -> 'a list -> unit
+            val apptl       : ('a list -> unit) -> 'a list -> unit
+            val foldl       : ('a * 'b -> 'a) -> 'a -> 'b list -> 'a
+            val foldl'      : ('a * 'a -> 'a) -> 'a list -> 'a
+            val foldr       : ('a * 'b -> 'b) -> 'b -> 'a list -> 'b
+            val foldr'      : ('a * 'a -> 'a) -> 'a list -> 'a
+            val assoc       : ''a -> (''a * 'b) list -> 'b
+            val assocdef    : 'b -> ''a -> (''a * 'b) list -> 'b
+            val sort        : ('a * 'a -> bool) -> 'a list -> 'a list
+
+        end
+
+    For the definition of the type -list- see HELP * STDTYPES. For the
+    definition of the functions -map- and -rev- see HELP * STDVALUES.
+
+
+-- List Functions -----------------------------------------------------
+
+val null (l : 'a list) : bool
+    Returns -true- if -l- is the empty list.
+
+        fun null [] = true
+        |   null _  = false;
+
+    It is advisable  always to  use -null-  in preference  to an  inline
+    equality test against the constructor -nil- (or []) because it  does
+    not constrain the type of items in the list to be an equality type.
+
+
+val cons (x : 'a) (l : 'a list) : 'a list
+    Adds the item -x- to the front of the list -l-.
+
+        fun cons x l = x :: l;
+
+
+val append (l1 : 'a list) (l2 : 'a list) : 'a list
+    Concatenates the lists -l1- and -l2-.
+
+        fun append l1 l2 = l1 @ l2;
+
+
+val zip (l1 : 'a list) (l2 : 'b list) : ('a * 'b) list
+    Returns a list  of 2-tuples  constructed from  consecutive pairs  of
+    values from the lists -l1- and -l2-. If -l1- and -l2- are of unequal
+    length, trailing items in the longer list are discarded.
+
+        fun zip (x::l1) (y::l2) = (x,y) :: zip l1 l2
+        |   zip _       _       = [];
+
+
+val fromto (n : int) (m : int) : int list
+    Returns a list  of the integers  from -n- to -m-  inclusive, or  the
+    empty list if -n- is greater than -m-.
+
+        fun fromto n m = if n > m then [] else n :: fromto (n+1) m;
+
+
+exception Listof
+val listof (n : int) (x : 'a) : 'a list
+    Returns a list of length  -n-, where each item  in the list is  -x-.
+    Raises the exception -Listof- if -n- is less than zero.
+
+        fun listof n x =
+            if n < 0 then
+                raise Listof
+            else
+                map (fn _ => x) (fromto 1 n);
+
+
+val length (l : 'a list) : int
+    Returns the number of items in the list -l-.
+
+        fun length []     = 0
+        |   length (_::l) = length l + 1;
+
+
+exception Hd
+val hd (l : 'a list) : 'a
+    Selects the first item from the list -l-. Raises the exception  -Hd-
+    if -l- is the empty list.
+
+        fun hd []     = raise Hd
+        |   hd (x::_) = x;
+
+
+exception Tl
+val tl (l : 'a list) : 'a list
+    Drops the first item from the list -l-. Raises the exception -Tl- if
+    -l- is the empty list.
+
+        fun tl []     = raise Tl
+        |   tl (_::l) = l;
+
+
+exception Last
+val last (l : 'a list) : 'a
+    Selects the last item from the list -l-. Raises the exception -Last-
+    if -l- is the empty list.
+
+        fun last []     = raise Last
+        |   last [x]    = x
+        |   last (_::l) = last l;
+
+
+exception Nth
+val nth (n : int) (l : 'a list) : 'a
+    Selects the n'th  item from the  list -l-, where  items are  counted
+    from 1. Raises  the exception -Nth-  if -n- is  non-positive or  -l-
+    contains fewer then -n- items.
+
+        fun nth _ []     = raise Nth
+        |   nth 1 (x::_) = x
+        |   nth n (_::l) = nth (n-1) l;
+
+
+val nth0 (n : int) (l : 'a list) : 'a
+    Like -nth-, but counts from 0 rather than 1.
+
+        fun nth0 n = nth (n+1);
+
+
+val take (n : int) (l : 'a list) : 'a list
+    Takes the first -n- items from the list -l-. Returns the empty  list
+    if -n- is  less than  or equal  to zero, or  the whole  list if  -l-
+    contains fewer than -n- items.
+
+        fun take _ []     = []
+        |   take n (x::l) = if n > 0 then x :: take (n-1) l else [];
+
+
+val drop (n : int) (l : 'a list) : 'a list
+    Drops the first -n- items from the list -l-. Returns the whole  list
+    if -n- is  less than  or equal  to zero, or  the empty  list if  -l-
+    contains fewer than -n- items.
+
+        fun drop _ [] = []
+        |   drop n l  = if n > 0 then drop (n-1) (tl l) else l;
+
+
+val takewhile (p : 'a -> bool) (l : 'a list) : 'a list
+    Takes all the items from the front of the list -l- which satisfy the
+    predicate -p-.
+
+        fun takewhile _ []     = []
+        |   takewhile p (x::l) = if p x then x :: takewhile p l else [];
+
+
+val dropwhile (p : 'a -> bool) (l : 'a list) : 'a list
+    Drops all the items from the front of the list -l- which satisfy the
+    predicate -p-.
+
+        fun dropwhile _ [] = []
+        |   dropwhile p l  = if p(hd l) then dropwhile p (tl l) else l;
+
+
+val filter (p : 'a -> bool) (l : 'a list) : 'a list
+    Returns all the items from the list -l- which satisfy the  predicate
+    -p-.
+
+        fun filter p []     = []
+        |   filter p (x::l) = if p x then x::filter p l else filter p l;
+
+
+val any (p : 'a -> bool) (l : 'a list) : bool
+val exists (p : 'a -> bool) (l : 'a list) : bool
+    Returns -true- if any item in  the list -l- satisfies the  predicate
+    -p-.
+
+        fun any p []     = false
+        |   any p (x::l) = p x orelse any p l;
+
+    -exists- is a synonym for -any-.
+
+
+val all (p : 'a -> bool) (l : 'a list) : bool
+val forall (p : 'a -> bool) (l : 'a list) : bool
+    Returns -true- if all  items in the list  -l- satisfy the  predicate
+    -p-.
+
+        fun all p []     = true
+        |   all p (x::l) = p x andalso all p l;
+
+    -forall- is a synonym for -all-.
+
+
+exception Find
+val find (p : 'a -> bool) (l : 'a list) : 'a
+    Returns the  first  item  from  the list  -l-  which  satisfies  the
+    predicate -p-. Raises the exception -Find- if there is no such item.
+
+        fun find p []     = raise Find
+        |   find p (x::l) = if p x then x else find p l;
+
+
+val delete (x : ''a) (l : ''a list) : ''a list
+    Deletes all occurrences of -x- from the list -l-.
+
+        fun delete x []     = []
+        |   delete x (y::l) = if x=y then delete x l else y::delete x l;
+
+
+val member (x : ''a) (l : ''a list) : bool
+    Returns -true- if the item -x- occurs anywhere in the list -l-.
+
+        fun member x []     = false
+        |   member x (y::l) = (x=y) orelse member x l;
+
+
+val map2 (f : 'a * 'b -> 'c) (l1 : 'a list) (l2 : 'b list) : 'c list
+    Returns a list containing the  results of applying the function  -f-
+    to each successive pair of items drawn from the lists -l1- and -l2-.
+    If -l1- and -l2- are of unequal length, trailing items in the longer
+    list are discarded.
+
+        fun map2 f l1 l2 = map f (zip l1 l2);
+
+
+val maptl (f : 'a list -> 'b) (l : 'a list) : 'b list
+    Returns a list containing the  results of applying the function  -f-
+    first to the list -l- and then to each successive non-empty tail  of
+    -l-.
+
+        fun maptl f [] = []
+        |   maptl f l  = f l :: maptl f (tl l);
+
+
+val app (f : 'a -> unit) (l : 'a list) : unit
+    Applies the (side-effecting) function -f-  to each item in the  list
+    -l-.
+
+        fun app f []     = ()
+        |   app f (x::l) = (f x:unit; app f l);
+
+
+val apptl (f : 'a list -> unit) (l : 'a list) : unit
+    Applies the (side-effecting) function -f- first to the list -l-  and
+    then to each successive non-empty tail of -l-.
+
+        fun apptl f [] = ()
+        |   apptl f l  = (f l:unit; apptl f (tl l));
+
+
+val foldl (f : 'a * 'b -> 'a) (u : 'a) (l : 'b list) : 'a
+    Accumulates the items in the list -l- into a single value, using the
+    (left-associative) binary operator -f- with left unit -u-.
+
+        fun foldl f u []     = u
+        |   foldl f u (x::l) = foldl f (f(u,x)) l;
+
+    The expression
+
+        foldl f u [x1, x2, ..., xn]     (n >= 0)
+
+    is equivalent to
+
+        f( ... f(f(u, x1), x2) ..., xn)
+
+
+exception Fold
+val foldl' (f : 'a * 'a -> 'a) (l : 'a list) : 'a
+    Like -foldl-, but uses the  first item in the  list -l- as the  left
+    unit value. Raises the exception -Fold- if -l- is the empty list.
+
+        fun foldl' f []     = raise Fold
+        |   foldl' f (u::l) = foldl f u l;
+
+
+val foldr (f : 'a * 'b -> 'b) (u : 'b) (l : 'a list) : 'b
+    Accumulates the items in the list -l- into a single value, using the
+    (right-associative) binary operator -f- with right unit -u-.
+
+        fun foldr f u []     = u
+        |   foldr f u (x::l) = f(x, foldr f u l);
+
+    The expression
+
+        foldr f u [x1, x2, ..., xn]     (n >= 0)
+
+    is equivalent to
+
+        f(x1, f(x2, ..., f(xn, u) ...))
+
+
+exception Fold
+val foldr' (f : 'a * 'a -> 'a) (l : 'a list) : 'a
+    Like -foldr-, but uses the  last item in the  list -l- as the  right
+    unit value. Raises the exception -Fold- if -l- is the empty list.
+
+        fun foldr' f [] = raise Fold
+        |   foldr' f l  = foldr f (last l) (take (length l - 1) l);
+
+
+exception Assoc
+val assoc (x : ''a) (l : (''a * 'b) list) : 'b
+    Returns the value paired with key  -x- in the association list  -l-.
+    Raises the exception -Assoc- if  no such pair is found.  Comparisons
+    against -x- are done with the standard equality function "=".
+
+        fun assoc x []         = raise Assoc
+        |   assoc x ((k,v)::l) = if x = k then v else assoc x l;
+
+
+val assocdef (d : 'b) (x : ''a) (l : (''a * 'b) list) : 'b
+    Like -assoc-, but returns the default value -d- if no association is
+    found.
+
+        fun assocdef d x l = assoc x l handle Assoc => d;
+
+
+val sort (op<= : 'a * 'a -> bool) (l : 'a list) : 'a list
+    Sorts the list -l- into ascending order using the given ordering
+    relation. Uses a merge-sort algorithm.
+
+
+--- C.all/pml/help/list
+--- Copyright University of Sussex 1992. All rights reserved. ----------

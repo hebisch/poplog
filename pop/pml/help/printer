@@ -1,0 +1,180 @@
+HELP PRINTER                                     Robert Duncan, Nov 1989
+
+Controlling the top-level printer.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Introduction
+ -- How the Printer Works
+ -- The Structure Printer
+ -- Summary of Printer Control Variables
+
+
+-- Introduction -------------------------------------------------------
+
+The top-level printer is a system procedure responsible for the display
+of all data values. It is called by the compiler to display the values
+of variables bound at top-level, and can be invoked directly by the user
+through the functions -makestring- and -print- defined in structure
+-StdValues-. The built-in structure -Printer- exports a number of
+variables which control the format of output produced by the printer.
+
+For details of -makestring- and -print- see HELP * STDVALUES.
+
+
+-- How the Printer Works ----------------------------------------------
+
+The output of the printer depends on the type of the value being
+printed.
+
+Values of the basic constant types (int, real and string) print by
+default according to their lexical representations, although the exact
+format depends on the settings of the printer control variables.
+
+Records and tuples print according to the syntax rules for expressions.
+Their components are printed recursively: the maximum depth of recursion
+can be controlled with the variable -depth- (described below) in order
+to curtail excessive amounts of output. The order of fields within
+records is not significant, and may change between input and output.
+
+Datatype values and exceptions print as the appropriate constructor name
+followed by the argument (if present) printed recursively and enclosed
+in parentheses. The printer ignores any fixity declarations when
+printing constructors, assuming them all to be nonfix: this means that
+the output may not be syntactically correct. Lists are treated as a
+special case and displayed in more readable format as a comma-separated
+sequence of items enclosed in the list brackets `[' and `]'.
+
+Functions have no obvious external representation and so print
+uniformly as `fn'; abstract types likewise print as a single dash, `-'.
+Objects of derived or abbreviated types (i.e. those declared in -type-
+declarations) print according to their expanded type.
+
+
+-- The Structure Printer ----------------------------------------------
+
+
+signature Printer = sig
+    val depth           : int ref
+    val trace_depth     : int ref
+    val print_newline   : bool ref
+    val real_allplaces  : bool ref
+    val real_exponent   : bool ref
+    val real_places     : int ref
+    val string_quotes   : bool ref
+end
+
+structure Printer : Printer
+
+
+-- Summary of Printer Control Variables -------------------------------
+
+
+val depth : int ref
+    The maximum depth of structure which the printer will traverse. The
+    depth of a top-level item is counted as 1, and it increases by 1 for
+    each field of a record or argument of a data constructor. Any part
+    of an item which is at a depth greater than the maximum is displayed
+    as a single hash sign, `#'.
+
+    Example: the value
+
+        ref(1,2)
+
+    prints as follows at various settings of -depth-:
+
+        #                   (* depth = 0 *)
+
+        ref(#)              (* depth = 1 *)
+
+        ref(#, #)           (* depth = 2 *)
+
+        ref(1, 2)           (* depth > 2 *)
+
+    Lists are treated as a special case: the depth is increased by 1 for
+    each tail of the list traversed; if the maximum depth is exceeded
+    when more than one item remains unprinted in the list, this is
+    indicated with an ellipsis, `...'.
+
+    Example: the value
+
+        [1, 2, 3, 4, 5]
+
+    prints as follows:
+
+        [1, 2, 3, ...]      (* depth = 4 *)
+
+        [1, 2, 3, 4, #]     (* depth = 5 *)
+
+        [1, 2, 3, 4, 5]     (* depth > 5 *)
+
+    The default value for -depth- is 1000.
+
+
+val trace_depth : int ref
+    The value of -depth- used when printing trace output. This is
+    normally set low to prevent tracing from becoming too verbose. See
+    HELP * TRACE.
+
+
+val real_places : int ref
+    The maximum number of decimal places to be output when printing a
+    real number. The number will be rounded to fit, and any trailing
+    zeroes will normally be suppressed unless the flag -print_allplaces-
+    is true. Note that when the flag -print_exponent- is false, at least
+    one decimal place must be printed in order to satisfy ML's lexical
+    rules.
+    Default value: 6
+
+
+val real_allplaces : bool ref
+    Controls (with -real_places-) the number of decimal places to be
+    output when printing a real number. When -real_allplaces- is true,
+    the printer will display exactly the number of decimal places given
+    by -real_places-; when it's false, any trailing zeroes will be
+    suppressed.
+    Default value: false
+
+
+val real_exponent : bool ref
+    Controls whether real numbers should be displayed in exponential
+    format.
+    Default value: false
+
+
+val string_quotes : bool ref
+    Controls whether strings should be displayed as proper lexical
+    items. When -string_quotes- is true, strings are output enclosed in
+    string quote characters, `"', and with all non-printing characters
+    converted to lexical escapes. When -string_quotes- is false, strings
+    are simply written to the output as literal sequences of characters.
+    The distinction is best shown in an example: in the default case,
+    the top-level input
+
+        "\^GHello world!\n";
+
+    produces the output
+
+        val it = "\^GHello world!\n" : string
+
+    The same input after setting -string_quotes- false produces the
+    result:
+
+        val it = Hello world!
+      : string
+
+    typically accompanied by a ring on the terminal bell.
+    Default value: true
+
+
+val print_newline : bool ref
+    Controls the behaviour of the -print- function: when true, -print-
+    will automatically output a newline after every call. This variable
+    does not affect the -makestring- function, or the output produced
+    by the compiler.
+    Default value: true
+
+
+--- C.all/pml/help/printer
+--- Copyright University of Sussex 1994. All rights reserved. ----------

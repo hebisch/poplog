@@ -1,0 +1,207 @@
+HELP MISHAP                                     John Williams, July 1987
+                                                        Updated Feb 1995
+
+This file describes how Poplog Common Lisp reports errors, and how (by
+default) it recovers from them. For details of the debugging facilities
+available during break points, see HELP * BREAK. The file HELP * DEBUG
+provides a general overview of Lisp debugging techniques.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Classes of Error
+  2   Error Recovery
+  3   Message Format
+  4   When Errors May Occur
+  5   Read-Time Errors
+  6   Compile-Time Errors
+  7   Run-Time Errors
+  8   See Also
+
+
+-----------------------------------------------------------------------
+1  Classes of Error
+-----------------------------------------------------------------------
+
+Poplog Common Lisp provides three levels of error handling: fatal errors
+(signaled by the function error), continuable errors (signaled by
+cerror), and warnings (signaled by warn). They issue similar error
+messages, but differ in what happens next, as described below.
+
+
+-----------------------------------------------------------------------
+2  Error Recovery
+-----------------------------------------------------------------------
+
+The debugger will be entered after an error or warning in the following
+circumstances:
+
+    warn                If *break-on-warnings* is true.
+    error               If *break-on-errors* is true.
+    cerror              If *break-on-errors* is true.
+
+
+(The default values of *break-on-warnings* and *break-on-errors* are nil
+and t respectively).
+
+Otherwise, the following error recovery actions occur:
+
+    warn                Returns to its caller with nil.
+
+    error & cerror      Unwind to the nearest Lisp top-level loop, and
+                        resume the `read-eval-print' cycle.
+
+Note:
+If it can be proved that the stream *debug-io* is not connected to an
+interactive i/o device, the Debugger will not be entered.
+
+
+-----------------------------------------------------------------------
+3  Message Format
+-----------------------------------------------------------------------
+
+Error messages consist of several lines of text, each beginning with an
+end-of-line comment marker (;;;) followed by one of the following
+keywords:
+
+    MISHAP
+    INVOLVING
+    FILE
+    LINE
+    COMPILING
+    DOING
+    CALLING
+
+The keywords appear in the order shown. Some keywords may be omitted:
+see below for details.
+
+Note: Warning messages start with the keyword "Warning", and print the
+keywords in lower case (in order to make messages appear less abrasive).
+
+A sample error:
+
+    (if (member "p" "octopus") (print 'yes) (print 'no))
+
+    ;;; MISHAP - List needed
+    ;;; INVOLVING:  "octopus"
+    ;;; FILE     :  /poplog/lisp/help/mishap
+    ;;; LINE:       82
+    ;;; DOING    :  (IF (MEMBER "p" "octopus") (PRINT 'YES) ...)
+    ;;; CALLING  :  ENDP
+
+
+The MISHAP line describes the basic nature of the error, in this case
+the fact that member has been passed a non-list as its second argument.
+
+The INVOLVING line mentions Lisp objects that might have been
+responsible in some way for the error (in this case the string
+"octopus"). This line is omitted if there are no relevant objects.
+Arguments to the call of error, cerror, and warn not otherwise used by
+the formatting of the MISHAP part of the message will be displayed in
+the INVOLVING line. For example:
+
+    (error "Object of type ~S needed" 'string 23)
+
+    ;;; MISHAP - Object of type STRING needed
+    ;;; INVOLVING:  23
+
+The FILE line indicates which source file was being compiled when the
+error occurred. It is omitted if Lisp is currently reading from the
+terminal.
+
+The DOING part of the message is always a reminder of the top-level
+command given to Lisp. It is particularly valuable when compiling from a
+disc file.
+
+The CALLING line shows what functions were being executed at the time of
+the error. The most immediate caller is the one on the left. So, in the
+example above, it was the function endp that discovered that "octopus"
+wasn't a list. This line is omitted if a break is entered after the
+error (the normal situation); the debugger command :b should be issued
+to obtain similar information. (See HELP * BREAK for more details).
+
+Note:
+You can limit the number of callers displayed on the CALLING line by
+assigning to the Poplog-specific variable *lisp-calling-limit*. See
+REF * POPLOG_ONLY for details.
+
+
+-----------------------------------------------------------------------
+4  When Errors May Occur
+-----------------------------------------------------------------------
+
+At any given time, the Lisp system is in one of three states:
+
+    Reading a top-level form            (read-time)
+    Compiling that top-level form       (compile-time)
+    Executing the resulting code        (run-time)
+
+The status of the Lisp system influences the format of error messages,
+as discussed below.
+
+
+-----------------------------------------------------------------------
+5  Read-Time Errors
+-----------------------------------------------------------------------
+
+Read-time errors can be identified by the presence of the marker "read"
+in the CALLING part of the message. In the following example, the
+character 7 has been included in a binary number:
+
+    (sqrt #b10101017)
+
+    ;;; MISHAP - #\7 is not a radix 2 digit
+    ;;; CALLING :  "#b" "read"
+
+
+-----------------------------------------------------------------------
+6  Compile-Time Errors
+-----------------------------------------------------------------------
+
+Compile-time errors are indicated by the presence of a COMPILING line in
+the message. Thus:
+
+    (floor (abs 2 3) 4)
+
+    ;;; MISHAP - ABS expects one argument
+    ;;; COMPILING:   (ABS 2 3)
+    ;;; DOING     :  (FLOOR (ABS 2 3) 4)
+
+Note that the compiler can not tell if the arguments are appropriate to
+the function: which is, of course, why run-time errors may occur.
+However, many improper uses of special-forms can be detected during
+compilation:
+
+    (defun foo (a)
+        (setq a b c))
+
+    ;;; MISHAP - SETQ expects an even number of arguments
+    ;;; COMPILING:   (SETQ A B C)
+    ;;; DOING     :  (DEFUN FOO (A) ...)
+
+The COMPILING line displays the expression that could not be compiled.
+All compile-time error messages include this line. Like run-time errors,
+the DOING line shows the expression being executed (unless it is the
+same as that printed on the COMPILING line).
+
+
+-----------------------------------------------------------------------
+7  Run-Time Errors
+-----------------------------------------------------------------------
+
+Run-time errors result when Lisp tries to apply a function to
+inappropriate arguments, as in the first example discussed above, where
+the function member was applied to a string, not a list.
+
+
+-----------------------------------------------------------------------
+8  See Also
+-----------------------------------------------------------------------
+
+  HELP * BREAK              Describes the Poplog Common Lisp Debugger.
+  HELP * DEBUG              Overview of Debugging tools in Poplog Lisp.
+   REF * POPLOG_ONLY        Lists Poplog-specific Lisp variables.
+
+
+--- C.all/lisp/help/mishap
+--- Copyright University of Sussex 1987. All rights reserved.

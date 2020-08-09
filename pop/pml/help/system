@@ -1,0 +1,278 @@
+HELP SYSTEM                                     Robert Duncan, July 1989
+
+
+PML system variables and functions.
+
+
+    CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Introduction
+ -- The System Module
+ -- System Version
+ -- Restarting and Leaving PML
+ -- Saving and Restoring the System State
+ -- Documentation Directories
+ -- Miscellaneous Features
+
+
+-- Introduction -------------------------------------------------------
+
+The structure -System- is  a built-in module  providing a collection  of
+system utilities for controlling PML.
+
+The names defined in this  module are necessarily non-standard, so  care
+should be taken when using them in  programs: it's often a good idea  to
+collect all such references into a single place, so that they can easily
+be deleted or substituted when porting to another Standard ML system.
+
+Some system functions are  grouped into substructures: these  structures
+are  available  as  modules  in  their  own  right  and  are  documented
+separately in their associated help files.
+
+
+-- The System Module --------------------------------------------------
+
+
+signature System = sig
+
+    (* Substructures *)
+
+    structure Compile   : Compile       (* see HELP * COMPILE *)
+    structure Memory    : Memory        (* see HELP * MEMORY  *)
+    structure Printer   : Printer       (* see HELP * PRINTER *)
+
+    (* System Version *)
+
+    val version         : string list ref
+    val revision        : int
+
+    (* Restarting and Leaving PML *)
+
+    val restart         : unit -> 'a
+    val reset           : unit -> 'a
+    val exit            : unit -> 'a
+
+    (* Saving and Restoring the System State *)
+
+    val make            : {image : string, lock : bool, share : bool,
+                            banner : bool, init : bool} -> bool
+    val save            : string -> bool
+    val restore         : string -> 'a
+
+    (* Documentation Directories *)
+
+    val helppath        : string list ref
+    val teachpath       : string list ref
+
+    (* Miscellaneous Features *)
+
+    val readprompt      : string ref
+
+end
+
+structure System : System
+
+
+-- System Version -----------------------------------------------------
+
+
+val version : string list ref
+    A list of version messages printed by PML on startup.
+
+
+val revision : int
+    The PML  revision number.  This uniquely  identifies the  particular
+    release of the POPLOG Standard ML subsystem.
+
+
+-- Restarting and Leaving PML -----------------------------------------
+
+
+val restart () : 'a
+    Restarts the  PML system.  This function  never returns,  hence  its
+    arbitrary return type. In the normal case, -restart- exits from  all
+    outstanding compilation  streams,  reinitialises the  system  (which
+    includes recompilation of the  "init.ml" files), prints the  version
+    messages and reenters the PML compiler; when called from inside  VED
+    immediate mode, -restart- restarts only the immediate mode compiler.
+    In either case the global  environment is left unchanged.  -restart-
+    is used most commonly on restoration of a saved image (see below).
+
+
+val reset () : 'a
+    Aborts the current  evaluation and  resets the  PML top-level.  This
+    function never returns.
+
+
+val exit () : 'a
+    Exits from the PML system. In the normal case, -exit- terminates the
+    whole POPLOG  process  and returns  to  the operating  system;  when
+    called from inside  VED immediate mode,  -exit- terminates only  the
+    immediate mode compiler.
+
+
+-- Saving and Restoring the System State ------------------------------
+
+
+val make {image:string,lock:bool,share:bool,banner:bool,init:bool} :bool
+    Makes a ``saved image'' of the current state of the PML system.  The
+    image is written to the file named -image-: an extension ".psv" will
+    be added  automatically to  the name  if not  given explicitly.  The
+    image is  written in  such a  way  that it  can be  restored  with a
+    subsequent call to -restore- (qv). The state of the PML system after
+    restoring the image  will be exactly  as it was  when the image  was
+    made except for one difference:  the call to -make- returns  -false-
+    when the image is made, but -true- when it is restored.
+
+    Options to the -make- function are as follows:
+
+        lock
+            Makes a  "locked"  image:  the heap  is  partitioned  before
+            saving  into   writeable   and   non-writeable   areas;   on
+            restoration of the image,  the non-writeable area is  locked
+            into the heap  and is  subsequently ignored  by the  garbage
+            collector. This has the advantage of reducing the time spent
+            garbage collecting,  but it  does mean  that any  non-useful
+            data  in  the   non-writeable  heap  area   will  never   be
+            garbage-collected away, so  you should  always minimise  the
+            amount of such data before making a locked image.
+
+            A locked image may also be shared - see below.
+
+        share
+            Valid only in conjunction with the -lock- option, this makes
+            the non-writeable portion  of the saved  image shareable  by
+            all users of the  image. This feature  is effective only  on
+            VMS and on those UNIX systems which provide either a  shared
+            memory facility or the mmap(2) system call.
+
+        banner
+            Causes the image to  print the list  of version messages  on
+            start-up.
+
+        init
+            Causes the  image  to  compile the  "init.p"  and  "init.ml"
+            initialisation files on start-up.
+
+    There are typically two uses for  saved images. In the first  place,
+    it's common to want to build an image which behaves exactly like the
+    standard PML  image, except  that certain  useful library  functions
+    have been precompiled. Assuming that the library functions live in a
+    file "mylib.ml", this can be accomplished as follows:
+
+        load mylib
+        System.version := !System.version @ ["Library Image"];
+        if System.make {
+                image="mylib",
+                lock=true,
+                share=false,
+                banner=false,
+                init=false
+            }
+        then
+            System.restart()
+        else
+            output(std_out, "Library image made\n");
+
+    Alternatively, the  image  may  be  intended  to  run  a  particular
+    application, here represented by a call to the function -run-:
+
+        load application
+        System.version := ["Application Image"];
+        if System.make {
+                image="application",
+                lock=true,
+                share=false,
+                banner=true,
+                init=false
+            }
+        then
+            (output(std_out, "\n");
+             run() handle exn =>
+                output(std_out, "\n! Exception: " ^ makestring exn ^ "\n");
+             System.exit())
+        else
+            output(std_out, "Application image made\n");
+
+    Beware that  a saved  image faithfully  preserves the  state of  the
+    system exactly as  it was, including  any VED buffers,  junk in  the
+    environment and  so on.  Images are  best made  from a  PML  process
+    created specially for the purpose,  avoiding VED and compiling  only
+    those files required for  the application. Also,  the format of  the
+    saved image file is particular to the version of PML under which  it
+    was made, and so  must be remade  whenever a new  version of PML  is
+    installed.
+
+    For both these reasons,  it's a good idea  to keep the  instructions
+    for making important images in command scripts which can be run from
+    the DCL or  shell prompt.  For example,  suppose that  the code  for
+    making an image  (such as either  of the examples  given above)  was
+    kept in a file called "mkimage.ml", then the image could be  rebuilt
+    with the single command:
+
+        pml %nort -nostdin -noinit -load mkimage
+
+
+val save (image : string) : bool
+    A simplified interface to -make-, defined:
+
+        fun save image = make {
+                image=image,
+                lock=false,
+                share=false,
+                banner=false,
+                init=false
+            };
+
+
+val restore (image : string) : 'a
+    Restores a  PML system  image from  the file  named by  -image-.  An
+    extension ".psv" will be added automatically to -image- if not given
+    explicitly. Restoring an image returns  PML to exactly the state  it
+    was in at the time that the image was made, so that the continuation
+    for the call of  -restore- is never  executed (hence the  apparently
+    arbitrary return value). See the description of -make- above.
+
+    A saved image can  be restored automatically when  PML starts up  by
+    giving its name  as an  argument to the  PML DCL  or shell  command,
+    flagged with the character "+". For example, the command
+
+        pml +mylib
+
+    runs PML and  then immediately restores  the image "mylib.psv".  The
+    normal PML start-up actions  are suppressed by  default, but can  be
+    reinstated by giving  appropriate arguments to  the -make-  function
+    when the image is made, or by using the -restart- function when  the
+    image is restored.
+
+
+-- Documentation Directories ------------------------------------------
+
+
+val helppath : bool ref
+    List of directories  in which documentation  files should be  sought
+    for the HELP command.
+    Default value:
+        ["$poplocal/local/pml/help/", "$usepop/pop/pml/help/"]    (UNIX)
+        ["poplocal:[local.pml.help]", "usepop:[pop.pml.help]"]    (VMS)
+
+
+val teachpath : bool ref
+    List of directories  in which documentation  files should be  sought
+    for the TEACH command.
+    Default value:
+        ["$poplocal/local/pml/teach/", "$usepop/pop/pml/teach/"]  (UNIX)
+        ["poplocal:[local.pml.teach]", "usepop:[pop.pml.teach]"]  (VMS)
+
+
+-- Miscellaneous Features ---------------------------------------------
+
+
+val readprompt : string
+    String used  for prompting  when  input is  done on  an  interactive
+    (terminal) stream.
+    Default value: "" (i.e. no prompting)
+
+
+--- C.all/pml/help/system
+--- Copyright University of Sussex 1992. All rights reserved. ----------

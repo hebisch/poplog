@@ -1,0 +1,98 @@
+HELP OPTION                                  Robert Duncan, January 1990
+
+Indicating failure without using exceptions.
+
+
+    CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- The Option Module
+ -- The Option Type
+
+
+-- The Option Module --------------------------------------------------
+
+signature Option
+structure Option : Option
+    The structure -Option- is  an autoloadable library module  described
+    by the following signature:
+
+        signature Option = sig
+
+            datatype 'a option =
+                NONE
+            |   SOME of 'a
+
+        end
+
+
+-- The Option Type ----------------------------------------------------
+
+datatype 'a option
+con NONE
+con SOME (x : 'a)
+    The -option- datatype is used to indicate the success or failure  of
+    an evaluation: a  successful evaluation returns  SOME value  where a
+    failure returns NONE.
+
+    For example, a simple search function can use an option to  indicate
+    whether or not the search was successful:
+
+        fun find p [] = NONE
+        |   find p (x::xs) = if p x then SOME(x) else find p xs;
+
+    A call to this function would have to test the result:
+
+        case find p items of
+            SOME(item) => (* ... use -item- ... *)
+        |   NONE => (* ... take default action ... *)
+
+    As in this example, use of the option datatype can often provide  an
+    alternative to  exceptions.  The exception-raising  version  of  the
+    above function looks like:
+
+        exception Find;
+        fun find p [] = raise Find
+        |   find p (x::xs) = if p x then x else find p xs;
+
+    and the associated call:
+
+        find p items handle Find => (* ... take default action ... *)
+
+    It's possible  to  write  wrapper functions  which  convert  between
+    arbitrary option-returning  functions  and  their  exception-raising
+    equivalents:
+
+        (*
+            must : ('a -> 'b option) -> 'a -> 'b
+                converts an option-returning function to an
+                exception-raising version
+         *)
+
+        exception Must;
+        fun must f x =
+            case f x of
+                SOME(value) => value
+            |   NONE => raise Must;
+
+        (*
+            may : ('a -> 'b) -> 'a -> 'b option
+                converts back the other way
+         *)
+
+        fun may f x = SOME(f x)
+            handle
+                Interrupt => raise Interrupt
+            |   _ => NONE;
+
+    More generally, the type
+
+        'ty option
+
+    can be thought of as "lifting" the base type 'ty to include an extra
+    unique value -- "not found", "undefined" or whatever -- which can be
+    used as a placeholder whenever there is no appropriate value of  the
+    base type.
+
+
+--- C.all/pml/help/option
+--- Copyright University of Sussex 1991. All rights reserved. ----------
