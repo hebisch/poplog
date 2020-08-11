@@ -893,16 +893,16 @@ define I_PUSH_FIELD();
 enddefine;
 
 define I_POP_FIELD();
-    lvars type, _size, structure, offset, exptr;
+    lvars type, btype,_size, structure, offset, exptr;
     ;;; printf('I_POP_FIELD\n');
     explode(asm_instr) -> exptr -> offset -> structure -> _size -> type -> ;
-    if type fi_&& t_BASE_TYPE == t_BIT then
+    if ((type fi_&& t_BASE_TYPE) ->> btype) == t_BIT then
         do_bit_field(type, _size, structure, offset, true, exptr);
         return();
     endif;
     lvars _reg = load_field_addr(type, structure, _size, offset, exptr);
     drop_pop_reg(_R1, _USP);
-    drop_op3(_int(access_op(type)) _biset _cond_all_bits,
+    drop_op3(_int(access_op(btype)) _biset _cond_all_bits,
              _R1, _reg, _0);
 enddefine;
 
