@@ -525,7 +525,7 @@ i_typespec
         window: XptWindow,
         message_type: ulong,
         format: int,
-        data: byte[20],
+        data: long[5],
     },
 
     XMappingEvent {

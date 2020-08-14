@@ -517,7 +517,7 @@ external declare XEvents in c;
         union {
             char b[20];
             short s[10];
-            int l[5];
+            long l[5];
             } data;
     } XClientMessageEvent;
 
