@@ -17,6 +17,7 @@ constant
     space       = "\s",
     tab         = "\t",
     undef       = "undef",
+    sys_word_bits = WORD_BITS,
 ;
 
     ;;; Internal version number, for allowing library files etc to

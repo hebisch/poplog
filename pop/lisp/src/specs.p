@@ -15,13 +15,18 @@ section $-lisp;
 /* Field spec <-> element type conversions */
 
 lconstant Word_spec_to_int
-    = newproperty([
-                                   [ulong    64]
-                                   [long    -64]
-                                   [uint     32]
+    = newproperty([ %
+#_IF sys_word_bits = 64
+                   [ulong    64],
+                   [long    -64]
+#_ELSE
+                   [ulong    32],
+                   [long    -32]
+#_ENDIF
+                   %
+                   [uint     32]
                    [int     -32]
                    [uint    32]
-                  ;;;  [long    -32]
                    [pint    -30]
                    [ushort   16]
                    [short   -16]
@@ -30,10 +35,13 @@ lconstant Word_spec_to_int
 
 
 lconstant Int_spec_to_word
-    = newproperty([
-                                   [64    ulong]
-                                   [-64    long]
-                                   [-32     int]
+    = newproperty([ %
+#_IF sys_word_bits = 64
+                   [64    ulong],
+                   [-64    long]
+#_ENDIF
+                   %
+                   [-32     int]
                    [32      uint]
                    [-30     pint]
                    [-16     short]
@@ -156,10 +164,12 @@ lconstant Spec_to_key
 
 define spec_->_key(spec) -> key;
     if isintegral(spec) then
-            if abs(spec) > 64 then
-        "full"
+            if abs(spec) > sys_word_bits then
+                "full"
+#_IF sys_word_bits = 64
             elseif abs(spec) > 32 then
                if spec > 0 then "ulong" else "long" endif;
+#_ENDIF
             elseif abs(spec) > 16 then
                if spec > 0 then "uint" else "int" endif;
             elseif abs(spec) > 8 then
