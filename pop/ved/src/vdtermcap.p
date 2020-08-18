@@ -9,8 +9,7 @@
 #_INCLUDE 'vddeclare.ph'
 
 
-/* Altered to turn off termcap on linux systems */
-#_IF DEF NCR or DEF LINUX
+#_IF DEF NCR
     /*  Termcap not available -- see comment in "termcap.p"
     */
 define vedtermcapscreen(_);

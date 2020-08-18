@@ -341,10 +341,8 @@ define veduseterm(name);
     if testdef sys_autoload then weakref sys_autoload(pdr_name) -> endif;
     if isdefined(pdr_name) then
         valof(pdr_name)();
-#_IF not(DEF LINUX)
     elseif testdef vedtermcapscreen then
         weakref vedtermcapscreen(name);
-#_ENDIF
     else
         return(false);
     endif;
