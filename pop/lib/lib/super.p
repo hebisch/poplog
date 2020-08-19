@@ -1,8 +1,8 @@
-/*  --- Copyright University of Sussex 1989.  All rights reserved. ---------
+/*  --- Copyright University of Sussex 2009.  All rights reserved. ---------
  >  File:           C.all/lib/lib/super.p
  >  Purpose:        prolog like extenstion to the POP-11 database
  >  Author:         Steve Hardy (see revisions)
- >  Documentation:  HELP * SUPER
+ >  Documentation:  HELP * SUPER, HELP * WHICH
  >  Related Files:
  */
 
@@ -488,7 +488,6 @@ define global syntax foreach;
     pop11_loop_start(y);
     sysNEW_LABEL() -> z;
     pop11_loop_end(z);
-    sysVARS(x,0);
     erase(pop11_comp_expr_to([do then]));
     sysCALL("fetch");
     sysPOP(x);
@@ -516,7 +515,6 @@ define global syntax forevery;
     pop11_loop_start(y);
     sysNEW_LABEL() -> z;
     pop11_loop_end(z);
-    sysVARS(x,0);
     sysPUSHQ("and");
     erase(pop11_comp_expr_to([do then]));
     sysCALL("conspair");
