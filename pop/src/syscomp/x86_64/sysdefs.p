@@ -97,8 +97,8 @@ global constant macro (
 
     ;;; ANSI C returns floats as single, not double
     ANSI_C = true,
-    ;;; changed by A.S. 6 Jan 2005, on advice from Robert Duncan
-    C_FLOAT_RESULT_SINGLE = false,
+    ;;; AMD64 returns a float as 32-bits in XMM0
+    C_FLOAT_RESULT_SINGLE = true,
 
     ;;; list of procedures to be optimised as subroutine calls
     ;;; format of entries is
