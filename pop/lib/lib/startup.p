@@ -26,6 +26,8 @@ compile_mode :pop11 +strict;
 ;;; Poplog has been linked with X Window System support:
 ;;; include any X-specific libraries here
 
+uses popxlib;
+
 #_IF DEF vedprocess
     ;;; Standard Ved is defined
     #_IF DEF popxlink_motif or DEF popxlink_openlook
@@ -41,8 +43,16 @@ compile_mode :pop11 +strict;
 
 ;;; Include general libraries here
 
+uses popuseslist;
+uses poppackagelist;
+uses objectclass;
+uses prwarning;
+uses emacsreadline;
+
 #_IF DEF vedprocess
 uses vedset;
+uses ved_autosave;
+
 #_ENDIF
 
 
