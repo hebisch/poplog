@@ -10,9 +10,11 @@ section;
 
 weak constant procedure key_of_dataword;
 
+lconstant bytes_in_word = sys_word_bits/8;
+
 define lconstant Nbytes(item);
     lvars item;
-    (datasize(item) fi_- 2) * 4
+    (datasize(item) fi_- 2) * bytes_in_word
 enddefine;
 
 lconstant Infoblk = inits(512);
