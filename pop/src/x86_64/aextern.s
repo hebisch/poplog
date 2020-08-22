@@ -127,14 +127,12 @@ define lconstant macro gen_storesf;
 ;;; just load the value
 
         '\tmovlpd  -8(%rbp), %xmm' >< cf >< '\n';
-        '\tsarl $1, %r12d\n';
         '\tjmp next_arg\n\n';
 
 ;;; convert to single
 
     'single_', >< cf >< ':\n';
         '\tcvtsd2ss   -8(%rbp), %xmm' >< cf >< '\n';
-        '\tsarl $1, %r12d\n';
         '\tjmp next_arg\n\n';
         cfn -> cf;
     endwhile
@@ -161,14 +159,12 @@ float_arg6:
     movq -8(%rbp), %rax
     movq %rax, (%rsp, %r14)
     addq    $8, %r14
-    sarl $1, %r12d
     jmp next_arg
 
 single_6:
     cvtsd2ss  -8(%rbp), %xmm7
     movss   %xmm7, (%rsp, %r14)
     addq    $8, %r14
-    sarl $1, %r12d
     jmp next_arg
 
 
@@ -316,6 +312,7 @@ L6.1:   ;;; Push the result
     jmp     *%r13
 
 next_arg:
+    sarl    $1, %r12d
     subq    $8, %r15
     jnz     argloop
 
