@@ -2188,6 +2188,10 @@ linux_setper(int argc, char * * argv, char * * envp)
                 write(2, err_mess, sizeof(err_mess)-1);
             }
         }
+        /* 0x0400000 is READ_IMPLIES_EXEC */
+        if (!(pers & 0x0400000)) {
+            personality(pers|= 0x0400000);
+        }
     }
 #endif
 }
