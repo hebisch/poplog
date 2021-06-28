@@ -1,0 +1,743 @@
+DOC CONTINUATION                              C.Mellish and S.Hardy 1983
+                                             Reformatted - A.S. May 1987
+
+This is a slightly expanded version of a paper with the same title  that
+appeared in IJCAI-83  - the  8th International Joint  Conference on  AI,
+University of Karlsruhe 1983.
+
+After  this  paper  was  written,  lexically  scoped  identifiers   were
+introduced into  Poplog and  changes  were made  to the  Poplog  virtual
+machine to support a more  efficient implementation of compiled  Prolog.
+(The timings given in the paper are out of date.)
+
+
+              INTEGRATING PROLOG IN THE POPLOG ENVIRONMENT
+              ============================================
+
+                      Chris Mellish and Steve Hardy
+                      Cognitive Studies Programme,
+                         University of Sussex,
+                         Falmer, Brighton, UK.
+
+
+CONTENTS
+
+ --  Introduction
+ --  Prolog within High Level Language Systems
+ --  The POPLOG Environment
+ --  Partial Application and Procedure Closures in POP-11
+ --  Implementing Backtracking by Continuation Passing
+ --  A Simple Prolog without Datastructures
+ --  Representing Prolog Datastructures
+ --  More Complex Control Structures
+ --  The Actual Implementation
+ --  Future Developments
+ --  Conclusions
+ --  Acknowledgements
+ --  References
+
+
+Introduction
+------------
+
+There are some kinds of programs  that people are unlikely ever to  want
+to write  in Prolog,  simply because  the most  "natural"  computational
+concepts [Hardy 82a] for  the tasks at hand  are hard to reconcile  with
+the declarative, "logical"  flavour of Prolog  programs. Moving a  robot
+arm, making  sounds or  pictures or  running a  screen editor  might  be
+examples of  such  tasks.  Even  if such  barriers  could  be  overcome,
+programming in Prolog would waste  the expertise that already exists  in
+writing these kinds  of programs  in "conventional"  languages. Just  as
+there is a  need for the  Prolog programmer to  use other languages  for
+particular applications, so the  programmer using mainly  "conventional"
+languages can  gain  from  using Prolog.  For  instance,  a  Prolog-like
+interface to  a  CAD  system  [Swinson  80]  or  a  relational  database
+[Kowalski 81] would have many advantages.
+
+Arguments like  these  provide  strong support  for  the  production  of
+MULTI-LANGUAGE  PROGRAMMING  ENVIRONMENTS.  At  Sussex,  there  are  two
+projects  addressing  the  problems  of   putting  Prolog  in  such   an
+environment.  One  of  these  [Hunter,  Mellish,  Owen  82]   involves a
+distributed ring  of processors  communicating by  message passing.  The
+other involves  the  POPLOG  system, a  mixed  language  AI  programming
+environment which  runs on  conventional hardware.  As well  as  Prolog,
+POPLOG supports POP-11,  a development  of POP2  [Burstall, Collins  and
+Popplestone 77], which  is a  language with semantics  similar to  LISP.
+This paper concentrates  on the POPLOG  system and the  way in which  we
+have integrated Prolog  with POP-11 in  this system. It  is a  shortened
+version of a longer research report [Mellish and Hardy 82].
+
+
+Prolog within High Level Language Systems
+-----------------------------------------
+
+There have been a number of projects involving implementing  Prolog-like
+languages within LISP systems, notably the LOGLISP [Robinson and  Sibert
+82] and QLOG  [Komorowski 82]  systems. Since  POP-11 is  so similar  to
+LISP, it is worthwhile stating some of our main aims for comparison:
+
+1. BANDWIDTH OF INTERFACE. LOGLISP and QLOG both incorporate  mechanisms
+   for calling LISP routines as  "subroutines" from the logic  language,
+   as well as low bandwidth interfaces in the other direction. We aim to
+   develop a model of how Prolog datastructures and control can mesh  in
+   with those  of POP-11,  so that,  for instance,  POP-11 programs  can
+   create backtracking points and control the generation of solutions by
+   Prolog.
+2. SYMMETRY BETWEEN LANGUAGES. A multi-language programming  environment
+   should treat the  languages it  supports in a  symmetrical way.  Both
+   LOGLISP and QLOG  are clearly  logic languages  implemented in  LISP,
+   rather than  the other  way around.  In the  POPLOG system,  we  have
+   achieved a symmetry by  having Prolog an  equal partner with  POP-11,
+   programs in both languages being  compiled into instructions for  the
+   same virtual machine.
+3. COMPATIBILITY. Our  aim  is  to  provide  a  Prolog  system  that  is
+   compatible with an existing standard  [Clocksin and Mellish 81],  and
+   which can  be used  without any  knowledge of  the other  programming
+   languages in POPLOG.  In our  aim for compatibility,  we differ  from
+   both QLOG and LOGLISP, but especially from LOGLISP, as it is not  our
+   intention to investigate alternative ways of running logic programs.
+4. EFFICIENCY. Aiming for an efficient  Prolog system, we have  followed
+   Warren [Warren  77], and  have implemented  only a  compiler (not  an
+   interpreter, as in both QLOG and LOGLISP). POPLOG Prolog running on a
+   VAX 11/780  takes  approximately  254  msec  to  do  Warren's  "naive
+   reverse" benchmark [Warren 77]. Ignoring processor differences,  this
+   compares  favourably  with  figures  given  by  Warren  for  the  DEC
+   System-10 interpreter running on a KI-10 processor (1160 msec)  and a
+   figure derived from  a Prolog interpreter  [Clocksin and Mellish  79]
+   running on a PDP-11/40 (1077 msec). In speed, POPLOG Prolog does  not
+   yet compare favourably with the DEC System-10 compiler (53.7 msec).
+    [Note: these timings were made using an early version of Poplog.]
+
+
+The POPLOG Environment
+----------------------
+
+The POPLOG system is an  AI programming environment developed at  Sussex
+University [Hardy 82b]. POPLOG currently runs  under VMS on the DEC  VAX
+series of computers, although implementations  for VAX UNIX, PERQ  and a
+M68000-based machine are planned. In POPLOG, a text editor, called  VED,
+is interposed  between the  user and  compilers for  POP-11 and  Prolog.
+Although interaction can by-pass the editor where appropriate, the  user
+is usually  communicating with  VED,  the text  editor. The  user's  VDU
+screen continuously displays  a portion  of some  selected files.  These
+files may belong  either to  the user  or be  documentation or  tutorial
+files. When user presses the 'DOIT' button on the keyboard, part of  the
+'current' file is sent to one of the compilers. The fragment of text  is
+compiled, and the compiler  sends back any output  to VED which  splices
+the output into a designated output  file and hence displays the  output
+on the user's VDU screen. Since the output is stored in an edit file  it
+is easy to review any  output that has scrolled off  the top of the  VDU
+screen. A simple interaction with POPLOG will consist of the user typing
+in a command, pressing  the DOIT button and  observing the output;  this
+cycle is then  repeated. If  a definition needs  to be  modified two  or
+three keystrokes after editing suffice to have the procedure re-compiled
+and incorporated into the existing compiled program.
+
+The link between the programming languages and the underlying machine is
+the POPLOG virtual  machine. The  two compilers  produce POPLOG  virtual
+machine code, which is  then translated into machine  code for the  host
+machine. At the level of  host machine code, it  is possible to link  in
+programs written  in  other languages,  such  as FORTRAN.  The  two-step
+compilation process, together with the fact  that most of the system  is
+written in  POP-11, makes  POPLOG inherently  portable. At  a time  when
+there are so many exciting developments in hardware design we wanted the
+POPLOG system to be relatively independent of any actual computer. About
+three man months  work should be  sufficient to move  the system to  any
+32-bit computer.
+
+POPLOG is  based on  a stack  oriented virtual  machine. Expressions  in
+POP-11 and Prolog are translated into instructions for this machine. For
+example, the following  is a  simple POP-11  assignment statement.  Note
+that the assignments go from left to right.
+
+    x + y -> z;
+
+This statement translates into the virtual machine instructions:
+
+    push    x    - Put the value of variable X on the stack
+    push    y    - Put the value of variable Y on the stack
+    call    +    - Call the addition procedure, which removes
+                   two elements from the stack and replaces them
+                   by their sum
+    pop     z    - remove one element from the stack and store
+                   in the variable Z
+
+A second stack  is used  to save the  values of  local variables  during
+procedure calls.  For  example, the  following  is the  definition  of a
+POP-11 procedure to double a number:
+
+    define double(x);
+        x * 2
+    enddefine;
+
+This definition translates to:
+
+    save     x    - Save the value of variable X on the system stack
+    pop      x    - Set variable X from the user stack
+    push     x    - Put the value of X onto the user stack
+    pushq    2    - Put the integer 2 onto the user stack
+    call     *    - Call the multiplication procedure
+    restore  x    - Restore the value of X from the system stack
+
+These instructions are translated to true machine code and then packaged
+up into a  'procedure record'  which is  then assigned  to the  variable
+DOUBLE. The multiplication procedure, when  called, will take two  items
+off the user stack and leave one  result behind. The argument to a  CALL
+instruction can be any  user procedure or  system procedure. This  means
+that the virtual machine is effectively user extendable.
+
+Procedures for  "planting"  instructions  for the  virtual  machine  are
+accessible to the ordinary programmer within POPLOG. This means that the
+POP-11 and  Prolog  compilers  are  just two  of  many  possible  POPLOG
+programs that create new pieces of machine code.
+
+
+Partial Application and Procedure Closures in POP-11
+----------------------------------------------------
+
+In this section we illustrate one technique used in POPLOG to create new
+procedures, PARTIAL APPLICATION. In the  next section, we show how  this
+can be used for implementing Prolog.  For clarity, the examples will  be
+shown in  the form  of POP-11  procedures. It  must be  remembered  that
+Prolog code is not translated  into POP-11 procedures, but rather  gives
+rise directly to POPLOG virtual machine instructions.
+
+Partial  application  is  a  technique  whereby  a  procedure  and  some
+arguments for that procedure  can be 'frozen' together  to create a  new
+procedure, a CLOSURE. This is similar to a LISP closure, except that  in
+POPLOG the  environment is  not saved.  Partial application  is used  to
+provide elegant input/output mechanisms  in POP-11 and this  application
+is a  good  introduction  to  closures.  POP-11  provides  a  number  of
+primitive   procedures   for   accessing    disc   files.   With    some
+simplifications, two of these are:
+
+  * SYSOPEN  which,  given  the  name  of a disc file, returns a 'device
+    descriptor' for reading from that file.
+  * SYSREAD  which,   given  a  device descriptor,   created  by SYSOPEN,
+    returns the 'next' character from the disc file.
+
+Thus:
+
+    sysopen('foobaz') -> d;
+
+The variable D  will now hold  a device descriptor  for the file  called
+FOOBAZ. To read the  first character from this  file and assign it  to a
+variable X, we would do:
+
+    sysread(d) -> x;
+
+A subsequent  call to  SYSREAD with  the same  descriptor will  get  the
+second character  and so  on. If  we 'partially  apply' SYSREAD  to  the
+device descriptor D, thus:
+
+    sysread(%d%) -> p;
+
+then the variable P will hold a closure. Partial application is  denoted
+by 'decorated parentheses', '(%' and '%)'. We can now simply apply P  to
+read succesive characters from the file, thus:
+
+    p() -> x;
+
+
+Implementing Backtracking by Continuation Passing
+-------------------------------------------------
+
+Prolog is implemented using  a technique called 'continuation  passing'.
+In this technique, procedures are given an additional argument, called a
+CONTINUATION. This continuation (which is a closure) describes  whatever
+computation remains  to  be  performed once  the  called  procedure  has
+finished ITS computation. Suppose, for example that we have a  procedure
+PROG which has just  two steps: calling the  subprocedure FOO and  then,
+when that  has  finished,  calling the  subprocedure  BAZ.  Were  such a
+procedure to  be  written using  explicit  continuations, BAZ  would  be
+passed as an  extra argument to  FOO since BAZ  is the continuation  for
+FOO. Actually, PROG itself would also have a continuation and this  must
+be passed to BAZ as ITS continuation, thus:
+
+    define prog(continuation);
+        foo(baz(%continuation%))
+    enddefine;
+
+Thus,  if  we  invoke  PROG  we  must  give  it  explicit  instructions,
+CONTINUATION, as  to what  is to  be  done when  it has  finished.  PROG
+invokes FOO, giving FOO as its continuation the procedure BAZ which  has
+been partially applied to the  original continuation since that is  what
+is to be  done when BAZ  (now invoked  by FOO as  its continuation)  has
+finished its task.
+
+Continuations have  proved  of  some  significance  in  studies  on  the
+semantics of programming languages  [Strachey and Wadsworth 74]  [Steele
+76]. This apparently round about way of programming also has an enormous
+practical  advantage   for  us   -   since  procedures   have   explicit
+continuations there is no  need for them to  'return' to their  invoker.
+Conventionally, sub-procedures returning to their invokers means:
+
+    I have finished - continue with the computation
+
+With explicit continuations we can assign a different meaning to a  sub-
+procedure returning to its invoker, say:
+
+    Sorry - I wasn't able to do what you wanted me to do
+
+PROG accomplishes its task  by first doing FOO  and then doing BAZ.  The
+power of  continuation programming  is made  clear if  we define  a  new
+procedure NEWPROG, thus:
+
+    Try doing FOO but if that doesn't work then try doing BAZ
+
+This is represented thus:
+
+    define newprog(continuation);
+        foo(continuation);
+        baz(continuation);
+    enddefine;
+
+If we now invoke NEWPROG (with  a continuation) then it first calls  FOO
+(giving it the same continuation as itself). If FOO is succesful then it
+will invoke the  continuation. If  not then  it will  return to  NEWPROG
+which then  tries BAZ.  If BAZ  too fails  (by returning)  then  NEWPROG
+itself fails by returning to ITS invoker.
+
+Now consider the following Prolog procedure:
+
+    happy(X) :- healthy(X), wise(X).
+
+This says that X is HAPPY if X is HEALTHY and WISE. If this is the  only
+clause for HAPPY  then we  may translate  this to  the following  POP-11
+procedure:
+
+    define happy(x, continuation);
+        healthy(x, wise(%x, continuation%))
+    enddefine;
+
+A call of this procedure can be interpreted as meaning:
+
+    Check that X is happy and if so do the CONTINUATION
+
+This is  accomplished  by passing  X  to HEALTHY  but  giving  HEALTHY a
+continuation which then  passes X across  to WISE. Let  us suppose  that
+someone is HEALTHY if they either JOG or else EAT CABBAGE, ie:
+
+    healthy(X) :- jogs(X).
+    healthy(X) :- eats(X, cabbage).
+
+This can be translated as:
+
+    define healthy(x, continuation);
+        jogs(x, continuation);
+        eats(x, "cabbage", continuation);
+    enddefine;
+
+Finally, let us assume that  we know that CHRIS  and JON both JOG.  This
+can also be represented by a POP-11 procedure:
+
+    jogs(chris).
+    jogs(jon).
+
+    define jogs(x, continuation);
+        if x = "chris" then continuation() endif;
+        if x = "jon" then continuation() endif;
+    enddefine;
+
+
+A Simple Prolog without Datastructures
+--------------------------------------
+
+The translation of JOGS given in the last section does not cater for the
+case where X is unknown and we  wish to FIND someone who JOGS. In  fact,
+we need to  take account of  the special features  of Prolog  variables.
+Prolog variables  start off  "uninstantiated" and  can only  be  given a
+value once. In addition, two  "uninstantiated" variables can be made  to
+"share" which means that  as soon as  one of them  obtains a value,  the
+other one automatically obtains the same value. In the Prolog sub-system
+of POPLOG, this is dealt with by representing unknowns by single element
+data structures called "references". These are created by the  procedure
+CONSREF and their components are accessed by the procedure CONT.
+
+The CONTents of  one of these  REFerences is initially  UNDEF, a  unique
+"word" (comparable to  a LISP atom).  If a variable  is instantiated  to
+some value, this  value is placed  into the reference  contents. If  two
+variables "share", one reference cell is made to contain (a pointer  to)
+the other. To find the  "real" value of a  sharing variable, it is  then
+necessary to "dereference" it (look for the contents of the  "innermost"
+reference).
+
+In the JOGS example, instead of simply comparing X with the word  CHRIS,
+it is necessary to attempt to  'unify' the data structure with the  word
+CHRIS. If we are trying to FIND somebody who jogs, X will be a reference
+with contents UNDEF,  whereas if  we are  trying to  CHECK whether  some
+specific person jogs, it will be a word (such as CHRIS).
+
+Here is  a  simplified  version  of  our  unification  procedure.  UNIFY
+operates by binding Prolog variables which have no value (ie by  putting
+something other than UNDEF into the reference). Once the unification  is
+complete, UNIFY  performs  the continuation,  and  if this  returns  (ie
+fails), UNIFY undoes the changes it made to the datastructures and  then
+itself returns.  If the  two structures  cannot be  unified, then  UNIFY
+returns without taking any action. Thus, calling the continuation  means
+success (in Prolog terms) and returning means failure.
+
+   define unify(x,y,c);
+      if x == y then
+         c()
+      elseif isref(x) and cont(x) /= "undef" then
+         unify(cont(x),y,c)
+      elseif isref(y) and cont(y) /= "undef" then
+         unify(x,cont(y),c)
+      elseif isref(x) then
+         y -> cont(x);
+         c();
+         "undef" -> cont(x)
+      elseif isref(y) then
+         unify(y,x,c)
+      endif
+   enddefine;
+
+The procedure first sees if the  two given datastructures, X and Y,  are
+identical. If  so, it  immediately applies  the continuation  C. If  the
+structures aren't identical, but  either of X and  Y is a variable  that
+has become bound (a reference with contents not UNDEF) then  unification
+can use the value of  that variable instead. In the  case where X is  an
+unbound variable (not the same  as Y), UNIFY binds  it to Y (by  setting
+the CONTents  of X  to Y)  and  calls the  continuation. Once  this  has
+returned, UNIFY  unbinds  the variable  (by  resetting its  CONTents  to
+UNDEF) and then itself returns. This definition of unification does  not
+deal with the case where X or  Y is a Prolog complex term. The  handling
+of Prolog datastructures is not significantly more complex.
+
+Given the existence of  the UNIFY procedure,  the correct definition  of
+JOGS is now simply:
+
+   define jogs(x,c);
+      unify(x,"chris",c);
+      unify(x,"jon",c)
+   enddefine;
+
+
+Representing Prolog Datastructures
+----------------------------------
+
+Most POPLOG  datastructures are  treated  by Prolog  as new  classes  of
+constants, the exceptions  being those  used to  implement the  standard
+Prolog datastructures (terms). A Prolog term has a fixed type (principal
+functor) and length (arity), and it is important that accessing a  given
+component can be achieved  in constant time. This  means that terms  are
+well represented by array-like structures (called "vectors" in POPLOG).
+
+List pairs in standard Prolog are simply instances of the general  term,
+whereas in POPLOG, as in LISP, the pair is a special datastructure.  For
+compatibility, we  have  actually  implemented Prolog  pairs  as  POPLOG
+pairs, although this is not visible to the Prolog user who does not wish
+to use the other POPLOG languages.
+
+As an example  of how complex  datastructures are handled,  here is  the
+definition of the list  concatenation predicate APPEND, together  with a
+"corresponding" POP-11 program:
+
+   append([],X,X).
+   append([L|M],Y,[L|N]) :- append(M,Y,N).
+
+   define append(x,y,z,c);
+      vars l, m, n;
+      unify(x,[],unify(%y,z,c%));
+      consref("undef") -> l;
+      consref("undef") -> m;
+      consref("undef") -> n;
+      unify(x,conspair(l,m),
+         unify(%z,conspair(l,n),
+            append(%m,y,n,c%)%))
+   enddefine;
+
+This procedure attempts to  unify the first argument,  X, with an  empty
+list and if successful unifies the second and third arguments, Y and  Z,
+with each other and then applies the continuation C. If this returns (ie
+fails), it creates three new unbound  Prolog variables, L, M and N.  The
+first argument  of APPEND  is unified  with a  pair made  (by using  the
+procedure CONSPAIR) from L and  M. If X is  already a pair, this  should
+set L and M to its "car"  and "cdr" respectively. The third argument  to
+APPEND is unified with a pair made  from L and N. This ensures that  the
+first elements of X and Z  are identical. Finally the recursive call  of
+APPEND is performed and if this is succesful the original continuation C
+is performed!
+
+
+More Complex Control Structures
+-------------------------------
+
+So far, we have seen how passing continuations between procedures allows
+Prolog-style backtracking to be  implemented in POPLOG. However,  when a
+continuation-expecting procedure is called from one that is not provided
+with one, what  continuation should it  be given? In  fact, there  are a
+number of  non-local control  procedures  in POPLOG  that can  be  used,
+giving rise to a variety of ways of invoking Prolog programs.
+
+First of all,  consider the problem  of calling the  Prolog system  as a
+"subroutine" from POP-11. We wish to present some query, and simply find
+out whether it  can be  satisfied, possibly  finding out  the values  of
+relevant variables  in  the first  solution.  In this  case,  the  final
+continuation to  be executed  needs to  be something  that will  cause a
+procedure exit  right  back to  where  the first  Prolog  predicate  was
+called. The  procedures  THROW  and CATCH,  which  are  developments  of
+facilities available in some LISP systems,  enable this to be done.  The
+facility can be packaged up in the form of a procedure YESNO_CALL.
+
+   define succeed();
+      true
+   enddefine;
+
+   define dorun(proc);
+      proc(throw(%"yesno"%));
+      false
+   enddefine;
+
+   define yesno_call(p);
+      catch(%dorun(%p%),succeed,"yesno"%)
+   enddefine;
+
+The  procedure  YESNO_CALL  takes  a  continuation-expecting   procedure
+(Prolog procedure)  as its  argument  and produces  a new  procedure  (a
+closure of CATCH) which always 'returns',  leaving TRUE or FALSE on  the
+stack (according to whether the final continuation is executed or  not).
+CATCH is supplied  with three arguments  - a main  procedure to  call, a
+second procedure and a "pattern". The first thing that CATCH does is  to
+simply call  the  first procedure.  If,  during the  execution  of  this
+procedure, THROW is called  with an argument  that matches the  pattern,
+control returns immediately to CATCH,  which calls the second  procedure
+and then returns. If THROW is never called with an appropriate argument,
+CATCH just returns as soon as the first procedure does.
+
+In this instance,  the main  procedure given to  CATCH is  a closure  of
+DORUN, which will  call the Prolog  procedure and, if  that returns  (ie
+fails), simply put the value FALSE on the stack. The Prolog procedure is
+given a continuation such that, if it succeeds, it will perform a  THROW
+back to the  original CATCH.  The second CATCH  argument, SUCCEED,  will
+then run, and will put the value TRUE on the stack. In this example, the
+pattern used to "link" the THROW and the CATCH is simply the word YESNO.
+
+THROW and CATCH can be used  to provide an implementation of the  Prolog
+"cut" operator. Simple uses of the  cut can be accomplished through  the
+YESNO_CALL procedure. For instance, the Prolog clauses:
+
+   tax_code(X,Y) :- employs(Z,X), !, employed_code(X,Y).
+   tax_code(X,Y) :- unemployed_code(X,Y).
+
+could be translated into a POP-11 procedure as follows:
+
+   define tax_code(x,y,c);
+      if yesno_call(employs)(consref("undef"),x) then
+         employed_code(x,y,c)
+      else
+         unemployed_code(x,y,c)
+      endif
+   enddefine;
+
+A  problem  with  this  particular  implementation  of  "cut"  is   that
+information about variables that  exist previously and are  instantiated
+within the YESNO_CALL is lost. Hence certain variables will not be reset
+if backtracking  subsequently takes  place. One  remedy for  this  would
+involve packaging up  the actions depending  on the truth  value of  the
+condition into an EXPRESSION  CONTINUATION [Strachey and Wadsworth  74].
+In fact,  our  actual  implementation solves  the  problem  by  secretly
+keeping reset information in a different way (see below).
+
+Sometimes one would like  to use the Prolog  system as a "generator"  of
+solutions to some problem. These solutions may need to be produced  in a
+"lazy" fashion [Henderson and Morris 76]  and we may wish to  manipulate
+the generator in CONNIVER-like  ways [Sussman and  McDermott 72]. To  do
+this, we need to exploit the POPLOG mechanisms for handling  coroutining
+between multiple  processes. To  create  a POPLOG  process, we  use  the
+procedure CONSPROC, which when given a procedure returns a process which
+when invoked with RUNPROC will  call the given procedure. CONSPROC  must
+also be given the arguments that  will be needed by the procedure  and a
+count of  the number  of  arguments. A  running process  interrupts  its
+execution by  calling the  procedure SUSPEND.  This causes  the  process
+which originally  invoked  it  to  restart.  Suppose  we  had  a  Prolog
+predicate LEGAL_MOVE, which returned possible  legal moves in some  game
+in its one argument. We might want to produce a generator that  produced
+these, one  by one,  as they  were  needed by  some other  program.  The
+following POP-11 code would do this:
+
+   vars x;
+   consref("undef") -> x;
+
+   vars generator;
+   consproc(x,suspend(%x,1%),2,legal_move) -> generator;
+
+CONSPROC is being  used here  to make a  new process  involved with  the
+calling of LEGAL_MOVE.  LEGAL_MOVE is provided  with two arguments,  the
+normal Prolog argument X, which is to be instantiated to some move,  and
+a continuation. The continuation  will be invoked  when the Prolog  goal
+succeeds. In this case,  it will SUSPEND the  execution of the  process,
+leaving one result,  X, on  the stack. Thus  to get  the first  possible
+legal move into a variable Y, we now write:
+
+    runproc(0,generator) -> y;
+
+(the 0 specifies  that no arguments  are to be  passed to the  process).
+When we wish to obtain the  second move, we call RUNPROC with  GENERATOR
+again. The process  is now "woken  up", and it  acts as if  its call  to
+SUSPEND has simply  returned like  a normal procedure  call. Within  the
+continuation passing model,  procedure return means  failure. Hence  the
+legal move generator will  backtrack to find  another solution. When  it
+has succeeded, it will again SUSPEND with X put on the stack.
+
+In  this  example,  the  generator  is  returning  its  answers  in  the
+"reference" created  for  the  variable X.  As  Prolog  backtracks,  the
+contents of this reference will  be reset to UNDEF  and then set to  the
+next solution. In order that Y  keeps an unchanging record of the  first
+solution, it  must actually  be given  the DEREFERENCED  version of  the
+value returned by the generator.
+
+
+The Actual Implementation (1983)
+-------------------------------
+
+What we  have presented  so  far is  a model  for  how Prolog  could  be
+implemented within POPLOG. This is the model that we expect our users to
+have, and the system is expected to behave  as if this is the way it  is
+actually constructed. Given this basic framework, it is possible to make
+certain optimisations  that  are INVISIBLE  TO  THE USER.  This  section
+mentions some of the more interesting optimisations that we have made.
+
+1. The number of closures constructed, and the number of control  frames
+   grown, can be reduced by having  compiled Prolog clauses make use  of
+   modified unification  code,  which  always  'returns'  and  indicates
+   success or failure with a boolean result. The disadvantage with  this
+   is  that  the  responsibility  for  resetting  Prolog  variables   on
+   backtracking is no  longer taken  by UNIFY,  but must  be handled  by
+   extra procedure calls at each backtrack point. Moreover, there  needs
+   to be  a  globally  accessible datastructure  ("trail")  for  holding
+   variables to be reset on backtracking.
+2. The number of  datastructures created  can be reduced  by having  the
+   compiler generate  special purpose  UNIFICATION CODE  for  structures
+   mentioned in the heads  of clauses, rather than  code to create  such
+   structures and  then  invoke  a  general  UNIFY  procedure.  This  is
+   Warren's  approach  [Warren  77],  and  is  one  way  of  introducing
+   "structure sharing" [Boyer and Moore 72].
+3. The control frames for Prolog procedures can actually be discarded as
+   soon as there are no more untried choices. The POPLOG procedure CHAIN
+   allows the compiler to produce code to do this. CHAIN simply provides
+   an alternative way of calling a POPLOG procedure, which discards  the
+   current stack frame before invoking  the new procedure. The  explicit
+   representation of continuations and the use of CHAIN have a potential
+   for allowing  more  space  to  be  reclaimed  than  in  normal  "tail
+   recursion optimising" schemes [Warren 80].
+4. The representation of a Prolog procedure as a SINGLE POPLOG procedure
+   is not  always appropriate,  especially when  the use  of the  Prolog
+   predicates ASSERT and RETRACT causes  individual clauses to come  and
+   go  rapidly.   Our   Prolog   compiler   can   use   an   alternative
+   representation, with each CLAUSE represented by a procedure, and  can
+   choose which representation to use.
+
+
+Future Developments
+-------------------
+
+There are many possible ways in which we can extend the POPLOG system to
+enhance mixed language programming further.
+
+First of all, we can  make more use of  the screen editor interface  and
+realise its great potential for debugging. There already exists a POPLOG
+implementation of  the STRIPS  problem solver  [Fikes and  Nilsson  71],
+which produces a continuous display of the changing goal tree using  the
+facilities of the editor. It would be extremely valuable to have  such a
+debugging aid for Prolog programs.
+[Note added by A.S. 1987. Prolog LIB CT and LIB Tracer does this.]
+
+Secondly, we have hardly begun to  explore the productive ways in  which
+programs can use the facilities of the two languages. POPLOG is  already
+being used for mixed language programming in natural language processing
+and vision, but many  of the possibilities are  unexplored, such as  the
+possibilities for using Prolog in conjunction with the POPLOG  "process"
+mechanism. We  also need  to further  develop and  refine the  range  of
+syntaxes available for accessing these facilities.
+
+Finally, more work needs to be done on basic implementation. Some issues
+that we are considering are  the space/time efficiency of various  types
+of in-line  unification code,  and ways  to minimise  the "trailing"  of
+variables.
+
+
+Conclusions
+-----------
+
+The POPLOG  system provides  an  integrated environment  for  developing
+genuinely MIXED LANGUAGE programs in POP-11 and Prolog. We believe  that
+its most important features in this respect are as follows. Firstly, the
+POP-11 and Prolog compilers are just two of potentially many  procedures
+which generate code for the underlying virtual machine. This means  that
+the two languages are compatible at a low level, without there being the
+traditional  asymmetry  between  a  language  and  its   implementation.
+Secondly, the  continuation  passing  model  provides  a  semantics  for
+communication between these two languages which allows for far more than
+a simple "subroutine calling" interface. Finally, the control facilities
+available within POPLOG make it possible to implement a system which  is
+faithful to the theoretical model, but which is nevertheless efficient.
+
+
+Acknowledgements
+----------------
+
+We would like to thank John  Gibson, the main implementer of POPLOG  and
+the POP-11 compiler, as well as Aaron Sloman and Jon Cunningham for many
+useful discussions.
+
+
+References
+----------
+
+Boyer, R.S.  and  Moore, J.S.,  "The  Sharing of  Structure  in  Theorem
+    Proving Programs", in Machine  Intelligence 7,  Edinburgh University
+    Press, 1972.
+Burstall, R.M.,  Collins, J.S.  and  Popplestone, R.J.,  PROGRAMMING  IN
+    POP-2,  Department   of  Artificial   Intelligence,  University   of
+    Edinburgh, 1977.
+Clocksin, W.F. and  Mellish, C.S.,  "The UNIX  Prolog System",  Software
+    Report 5,  Department  of  Artificial  Intelligence,  University  of
+    Edinburgh, 1979.
+Clocksin, W.F. and  Mellish,  C.S., "Programming  in  Prolog",  Springer
+    Verlag, 1981.
+Fikes,  R.E.  and  Nilsson,  N.J.,  "STRIPS:  A  New  Approach  to   the
+    Application of  Theorem  Proving  to  Problem  Solving",  Artificial
+    Intelligence 2, 1971.
+Hardy,  S.,  "Towards  More  Natural  Programming  Languages"  Cognitive
+    Studies Memo CSRP 006, University of Sussex, 1982a.
+Hardy, S.,  "The POP  Programming Environment",  Cognitive Studies  Memo
+    CSRP 005, University of Sussex, 1982b.
+Henderson, P. and Morris, J.H.,  "A Lazy Evaluator",  Proceedings of the
+    3rd ACM Symposium on Principles of Programming Languages, 1976.
+Hunter J.R.W., Mellish, C.S. and Owen, D.,  "A Heterogeneous Interactive
+    Distributed Computing  Environment  for  the  Implementation  of  AI
+    Programs", SERC grant application, School of Engineering and Applied
+    Sciences, University of Sussex, 1982.
+Komorowski,  H.J., "QLOG  -  The  Programming  Environment for Prolog in
+    LISP", in  Clark,  K.L.  and Taernlund,  S.-A.,  LOGIC  PROGRAMMING,
+    Academic Press, 1982.
+Kowalski, R., "Logic as a Database Language", Department  of  Computing,
+    Imperial College, London, 1981.
+Mellish,  C.S.  and  Hardy,  S.,   "Integrating  Prolog  in  the  POPLOG
+    Environment", Cognitive Studies Memo CSRP 010, University of Sussex,
+    1982.
+Pereira, L.M., Pereira, F. and Warren, D., "User's Guide to DECsystem-10
+    Prolog", Occasional Paper 15, Department of Artificial Intelligence,
+    University of Edinburgh, 1979.
+Robinson, J.A. and Sibert, E.E., "LOGLISP: An Alternative to  Prolog" in
+    MACHINE INTELLIGENCE 10, Ellis Horwood, 1982.
+Steele, G.L., "LAMBDA:  The Ultimate Declarative", Memo 379,  Artificial
+    Intelligence Lab, MIT, 1976.
+Strachey, C.  and  Wadsworth,  C.P.,   "Continuations:  A   Mathematical
+    Semantics for  Handling  Full Jumps",  Technical  Monograph  PRG-11,
+    Programming Research Group, Oxford University, 1974.
+Sussman, G.J. and McDermott, D.V., "The CONNIVER Reference Manual", Memo
+    203, AI Lab, MIT, 1972.
+Swinson,  P.S.G.,  "Prescriptive  to  Descriptive  Programming:   A  Way
+    Ahead for  CAAD",  in Taernlund,  S.-A.,  Proceedings of  the  Logic
+    Programming Workshop, Debrecen, Hungary, 1980.
+Warren, D.H.D.,  "Implementing  Prolog",  Research  Reports  39  and 40,
+    Department of  Artificial  Intelligence,  University  of  Edinburgh,
+    1977.
+Warren, D.H.D.,  "An  Improved  Prolog  Implementation  which  Optimises
+    Tail Recursion",  in  Taernlund,  S.-A., Proceedings  of  the  Logic
+    Programming Workshop, Debrecen, Hungary, 1980.
+
+/*----<Copyright University of Sussex 1983. All rights reserved.>----*/
