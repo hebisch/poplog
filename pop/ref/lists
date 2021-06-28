@@ -1,0 +1,653 @@
+REF LISTS                                           John Gibson Mar 1994
+
+        COPYRIGHT University of Sussex 1994. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<       LISTS AND PAIRS       >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+This REF file provides information on the 'list' data structure: how  it
+is constructed from pairs, the two  types of lists: normal and  dynamic,
+as well as detailing the predicates for use on pairs and lists, pair and
+list constructor and access procedures, and other list utilities.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+
+  2   Predicates on Pairs and Lists
+
+  3   Pair Constructor and Access Procedures
+
+  4   List Constructor Procedures
+
+  5   List Access Procedures
+
+  6   Other List Utilities
+
+  7   Generic Data Structure Procedures on Lists
+
+  8   Miscellaneous
+
+
+
+---------------
+1  Introduction
+---------------
+
+A pair  is a  record which  contains two  arbitrary Poplog  data  items,
+called the front and the back of the pair: these structures may be  used
+in their own right for any purposes.
+
+The most frequent use of pairs, however, is to represent lists of items.
+A list is represented in Poplog as a chain of pairs, where the front  of
+each pair in the chain is used to hold the next element of the list, and
+the back to  hold the  continuation of the  chain, which  may be  either
+another pair or the special item [] (the value of nil) at the end of the
+list. The two parts of the pair are then known respectively as the  head
+and the tail (of  the list represented by  the pair). Thus, whereas  the
+head of a list can be any item, the tail must always be another list.
+
+Lists in Poplog can  also be dynamic:  a dynamic list  is one where  the
+final element-holding pair in the chain contains in its back not []  but
+another (special)  pair,  this pair  having  in its  back  a  procedure.
+Whenever an attempt is made to access  the head or tail of this  special
+pair, the procedure is called with the expectation that it will  produce
+as result the next element of the list (or the item termin if there  are
+no more to come).  The result is then  added to the end  of the list  by
+placing it in  the front of  the special pair  and constructing  another
+special pair to go in  its back (thus the  old special pair becomes  the
+last proper pair of the list).
+
+A pair whose  back is  a procedure  is therefore  a valid  list, as  yet
+unexpanded, and  which  will be  expanded  by the  application  of  list
+procedures like hd, tl, etc. The front of such a pair will contain  true
+until the procedure in its back produces termin, at which time the front
+becomes false. This indicates that the list is now null (and application
+of hd, tl etc will produce an error).
+
+See TEACH * PAIRS, * LISTS for tutorial introductions to pairs and lists
+in Pop-11. HELP * LISTS overviews the on-line documentation relating  to
+list processing in Pop-11.
+
+
+
+
+--------------------------------
+2  Predicates on Pairs and Lists
+--------------------------------
+
+atom(item) -> bool                                           [procedure]
+        Returns true if item is not a pair, false otherwise.  Equivalent
+        to not(ispair(item)).
+
+
+isdynamic(item) -> p                                         [procedure]
+        Returns the generator procedure p underlying a dynamic list,  or
+        false if item is not a dynamic list.
+
+
+ispair(item) -> bool                                         [procedure]
+        Returns true if item is a pair, false otherwise.
+
+
+islist(item) -> bool                                         [procedure]
+        Returns true if item is a  list, false otherwise. A list is  one
+        of:
+
+          # The value of the constant nil, i.e. [].
+
+          # A pair whose back is [], a procedure, or another pair.
+
+          # A pair  whose  front  is  a boolean,  and  whose  back  is a
+            procedure, i.e. a dynamic list.
+
+
+islink(item) -> bool                                         [procedure]
+        Returns true if item is a non-null pair.
+
+
+null(list) -> bool                                           [procedure]
+        Returns true if the list list is empty, false otherwise. list is
+        empty if it is either
+
+          # The value of the constant nil, i.e. [].
+
+          # A pair with front false and back a procedure, i.e a  dynamic
+            list whose procedure has returned termin.
+
+        Note that  applying  null to  an  unexpanded dynamic  list  pair
+        causes it to be expanded.
+
+
+lmember_=(item, list) -> sublist_or_false                    [procedure]
+        If item is  an element of  the list list,  returns the  trailing
+        portion of  list starting  with that  element, otherwise  false.
+        E.g.
+
+                lmember_=(2, [1 5 4 6 2 3 7 9]) =>
+                ** [2 3 7 9]
+
+                lmember_=([3 4 5], [1 2 [3 4 5] 6 7]) =>
+                ** [[3 4 5] 6 7]
+
+        Note that equality is  determined with the  operator =, that  is
+        the result will be  a list if list  contains an element that  is
+        structurally equal to item.
+
+
+lmember(item, list) -> sublist_or_false                      [procedure]
+        If item is  an element of  the list list,  returns the  trailing
+        portion of  list starting  with that  element, otherwise  false.
+        E.g.
+
+                lmember(2, [1 5 4 6 2 3 7 9]) =>
+                ** [2 3 7 9]
+
+        Note that, unlike lmember_=, equality is determined by using the
+        operator  ==  (absolute  equality),  which  generally  makes  it
+        faster. But
+
+                lmember([3 4 5], [1 2 [3 4 5] 6 7]) =>
+                ** <false>
+
+        returns false because although the item argument is structurally
+        equal to a member of list, it is not the actual same structure.
+
+
+member(item, list) -> bool                          [procedure variable]
+        The default procedure in this variable is the same as lmember_=,
+        but returns true instead of a sublist, i.e. member is defined as
+
+                lmember_=(item, list) and true
+
+        For example:
+
+                member(2, [1 5 4 6 2 3 7 9]) =>
+                ** <true>
+
+                member([3 4 5], [1 2 [3 4 5] 6 7]) =>
+                ** <true>
+
+
+
+
+-----------------------------------------
+3  Pair Constructor and Access Procedures
+-----------------------------------------
+
+conspair(item1, item2) -> pair                               [procedure]
+        Constructs and returns  a pair  whose front is  item1 and  whose
+        back is item2.
+
+
+front(pair) -> item                                          [procedure]
+item -> front(pair)
+        Returns or updates the front of the pair pair.
+
+
+back(pair) -> item                                           [procedure]
+item -> back(pair)
+        Returns or updates the back of the pair pair.
+
+
+destpair(pair) -> (item1, item2)                             [procedure]
+        Returns two results, the front item1  and the back item2 of  the
+        pair pair.
+
+
+recursive_front(item1) -> item2                              [procedure]
+        Repeatedly applies front to item1 while a pair, and then returns
+        whatever (non-pair) value results.
+
+        (This procedure is used by  syspr to extract a procedure's  name
+        from its pdprops  when printing the  procedure. The pdprops  can
+        thus contain (e.g) a pair whose front is the name and whose back
+        is some other data.)
+
+
+lastpair(pair) -> item                                       [procedure]
+item -> lastpair(pair)
+        Where pair is the first in a chain of pairs (usually a non-empty
+        list), returns  or  updates the  last  pair in  the  chain.  For
+        example:
+
+            vars l = [a b c d e];
+            lastpair(l) =>
+            ** [e]
+            "f" -> lastpair(l);
+            l =>
+            ** [a b c d|f]
+
+        (Note that in  this example, the  update operation has  replaced
+        the last pair in the list with a word -- hence it is no longer a
+        valid list.)
+
+        Since it operates at the pair level, lastpair will not  expand a
+        dynamic list, or even recognise one as such. (The last pair of a
+        dynamic list has the generator procedure in its back.)
+
+
+
+
+------------------------------
+4  List Constructor Procedures
+------------------------------
+
+nil -> list                                                   [constant]
+        Constant containing the unique item [], the empty list. Thus
+
+                nil -> x;
+
+        is equivalent to
+
+                [] -> x;
+
+
+conslist(item1, item2, ..., itemN, N) -> list                [procedure]
+        Returns a list  list constructed  from the  top N  items on  the
+        stack.
+
+
+cons(item, list1) -> list2                                   [procedure]
+        Constructs and returns a list whose head is item and whose  tail
+        is the list list1 (exactly like ::).
+
+
+item :: list1 -> list2                                      [operator 4]
+        This operator constructs and returns  a list whose head is  item
+        and whose tail is the list list1.
+
+
+initl(len) -> list                                           [procedure]
+        Constructs a list of length  len. Initially each element is  the
+        empty list nil.
+
+
+pdtolist(p) -> list                                          [procedure]
+        Constructs and returns a dynamic list from the procedure p, i.e.
+        a pair whose front is true and whose back is the procedure  p. p
+        should produce  exactly one  item each  time it  is called,  and
+        <termin> (the value of the constant termin) as the last item.
+
+
+expandlist(list) -> list                                     [procedure]
+        Returns  list  unchanged.  If  list  is  a  dynamic  list   then
+        expandlist will  expand  all  its elements  and  make  the  list
+        static. This  procedure will  loop  forever if  the list  is  of
+        infinite length.
+
+
+sysconslist_onto(list1) -> list2                             [procedure]
+        The result list2 of this procedure  is a list consisting of  all
+        the  elements  on  the  user   stack  up  to  the  unique   item
+        <popstackmark>  (the  value   of  the  constant   popstackmark),
+        followed by the argument list list1.
+
+        Pop-11 list constructors use this with a trailing ^^ followed by
+        a variable, e.g,
+
+                [% 5, 6, 7, 8 %] -> list;
+                [% 1, 2, 3, 4 % ^^list ]
+
+        is equivalent to
+
+                popstackmark, 1, 2, 3, 4;
+                sysconslist_onto(list);
+
+        and produces the list [1 2 3 4 5 6 7 8].
+
+
+sysconslist() -> list                                        [procedure]
+        Same as sysconslist_onto([]). Pop-11 list constructors use this,
+        i.e,
+
+                [% 1, 2, 3, 4 %]
+
+        is equivalent to
+
+                popstackmark, 1, 2, 3, 4;
+                sysconslist();
+
+
+
+
+-------------------------
+5  List Access Procedures
+-------------------------
+
+dest(list) -> tail_list -> head_item                         [procedure]
+        Returns two results,  the tail and  the head of  the list  list,
+        which must not be null.
+
+
+hd(list) -> head_item                                        [procedure]
+head_item -> hd(list)
+        Returns or updates the head of the list list, which must not  be
+        null.
+
+
+tl(list) -> tail_list                                        [procedure]
+tail_list -> tl(list)
+        Returns or updates the tail of the list list, which must not  be
+        null.
+
+
+subscrl(N, list) -> item                                     [procedure]
+item -> subscrl(N, list)
+        Returns or updates the N-th element of the list list (where  the
+        first element has  subscript 1). Because  this procedure is  the
+        class_apply procedure of  pairs, this  can also be  used in  the
+        form
+
+                list(N) -> item
+                item -> list(N)
+
+
+destlist(list) -> (item1, item2, ..., itemN, N)              [procedure]
+        Puts the N elements of the list list on the stack, together with
+        the number N.
+
+
+dl(list) -> (item1, item2, ..., itemN)                      [procedure]
+(item1, item2, ..., itemN) -> dl(list)
+        Puts the N elements of the list list on the stack, e.g.
+
+                dl([1 2 3 4])
+
+        is equivalent to 1, 2, 3, 4. The updater fills list with the top
+        N items from the stack, e.g.
+
+                vars list = [a b c d];
+                1, 2, 3, 4 -> dl(list);
+                list =>
+                ** [1 2 3 4]
+
+
+oneof(list) -> item                                          [procedure]
+        Returns a  randomly chosen  element of  list (using  the  random
+        number generator * random). For example:
+
+            vars list = [cat dog goat];
+            oneof(list) =>
+            ** cat
+            oneof(list) =>
+            ** goat
+
+        (list must not be empty.)
+
+
+
+
+-----------------------
+6  Other List Utilities
+-----------------------
+
+applist(list, p)                                             [procedure]
+-> applist(list, p)
+        Applies the procedure p  to each element of  the list list.  The
+        updater applies  the  updater  of  p to  each  element  of  list
+        backwards, i.e.
+
+                -> applist(list, p)
+
+        is functionally the same as
+
+                applist(rev(list), updater(p))
+
+        Compare with maplist.
+
+
+copylist(list1) -> list2                                     [procedure]
+        Returns a copy of the list, list1, i.e. list2 is a list in which
+        all the pairs are  copies of those in  list1. copylist does  not
+        copy elements of list1 which are themselves lists, see  copytree
+        for a recursive copier.
+
+
+copytree(list1) -> list2                                     [procedure]
+        This makes a list, list2, which is a copy of list1. Any elements
+        of list1 which are themselves lists are recursively copied.
+
+
+delete(item, list1)          -> list2                        [procedure]
+delete(item, list1, eq_p)    -> list2
+delete(item, list1, N)       -> list2
+delete(item, list1, eq_p, N) -> list2
+        Deletes occurrences of  item from  list1, producing  a new  list
+        list2 (which shares the largest possible trailing sublist of the
+        original).
+
+        eq_p  is  an  optional  argument;  if  supplied,  it  must  be a
+        procedure of the form
+
+                eq_p(list_element, item) -> bool
+
+        eq_p is  used to  compare each  list element  against item,  and
+        those for which  it returns  true are deleted.  If not  supplied
+        eq_p defaults to nonop = (i.e. structure equality).
+
+        N is a second optional argument:  if supplied, it is an  integer
+        >= 0  which  specifies  how many  matching  elements  should  be
+        deleted (e.g,  if  1 then  only  the first  occurrence  will  be
+        removed). If not supplied, all occurrences are deleted.
+
+        For example,
+
+            delete(1, [1 2 3 4 5 6 1 9 8]) =>
+            ** [2 3 4 5 6 9 8]
+
+        (In this example, the  trailing sublist [9  8] is unaffected  by
+        the delete and will be shared with the original list.)
+
+
+ncdelete(item, list1)          -> list2                      [procedure]
+ncdelete(item, list1, eq_p)    -> list2
+ncdelete(item, list1, N)       -> list2
+ncdelete(item, list1, eq_p, N) -> list2
+        Same as delete (see  above), but does not  copy list pairs  that
+        need to  be changed,  and thus  (may) destructively  change  the
+        original list. The result list2 will be == to list1 unless there
+        are one or more  leading matching occurrences  of item that  are
+        deleted.
+
+
+flatten(item) -> list                                        [procedure]
+        Returns a  list  of  all  the  items  produced  by  'recursively
+        list-destructing' item, where this means:
+
+          # if   item   is   a   list,   the   result   of   recursively
+            list-destructing each element;
+
+          # item otherwise.
+
+        In other words, 'flattens' every tree of lists or sub-lists that
+        can be traced from item.
+
+
+listlength(list) -> N                                        [procedure]
+        Returns the number of elements n in the list list.
+
+
+maplist(list1, p) -> list2                                   [procedure]
+list2 -> maplist(list1, p)
+        Applies the procedure p to each element of the list list1,  and
+        returns a list  of all  results produced  in so  doing. This  is
+        equivalent to
+
+                [% applist(list1, p) %] -> list2
+
+        The action of the updater is
+
+                dl(list2) -> applist(list1, p)
+
+
+ncmaplist(list, p) -> list                                   [procedure]
+        Applies procedure  p to  every element  of its  first  argument,
+        replacing that element with the  result of calling p.  ncmaplist
+        is destructive  in  that  it  re-uses the  pairs  of  its  first
+        argument. For example:
+
+            vars l = [0.6 2.2 2.9 4.0];
+            ncmaplist(l, round) =>
+            ** [1 2 3 4]
+            l =>
+            ** [1 2 3 4]
+
+        Compare with maplist.
+
+
+rev(list1) -> list2                                          [procedure]
+        Returns a new list which is the list list1 reversed.
+
+
+ncrev(list) -> list                                          [procedure]
+        Destructively reverses the order of  the elements of list,  i.e.
+        it re-uses the links of its argument.
+
+
+setfrontlist(item, list1) -> list2                           [procedure]
+        Returns list2 formed by moving the  item to the front of  list1,
+        or adding the item if not already present.
+
+
+shuffle(list1) -> list2                                      [procedure]
+        Returns list2,  a  copy of  the  list list1  with  the  elements
+        randomly re-ordered.
+
+
+nc_listsort(list, p) -> list                                 [procedure]
+        Sorts the argument list according  to the ordering procedure  p,
+        using a merge sort  algorithm. nc_listsort is Non-Copying  (i.e.
+        it re-uses the  list pairs  in list  in building  up the  sorted
+        result, and Non-Checking  (no checks  are made  to confirm  that
+        list is indeed a list, and dynamic lists are not expanded).
+
+        The ordering procedure p should be of the form
+
+                p(item1, item2) -> bool
+
+        i.e. a procedure which  takes two items  and returns true  (non-
+        false actually) if item1 should come before item2 in the  sorted
+        list. <= (for  numbers) and alphabefore  (for words or  strings)
+        are examples of this kind of procedure.
+
+
+syssort(list, p) -> list                                     [procedure]
+syssort(list, copy, p) -> list
+        Uses * nc_listsort to produce a sorted copy of list, unless  the
+        optional boolean argument copy is false, in which case the  sort
+        is non-copying. Dynamic  lists are expanded  before the  sorting
+        takes place.
+
+
+sort(list1) -> list2                                         [procedure]
+        Returns a list of sorted items, using
+
+                syssort(list1, p) -> list2
+
+        If list1 begins with  a number, the operation  <= (less than  or
+        equal) is used for the ordering procedure p; otherwise, list1 is
+        assumed  to  contains  words  or  strings,  and  the   procedure
+        alphabefore is  used.  (If  the list  contains  both  words  and
+        numbers then a mishap will occur).
+
+
+insertsort(list, p) -> list                                  [procedure]
+        Sorts list according  to the  comparison procedure  p, using  an
+        insert sort algorithm. insert_sort is non-copying.
+
+
+flatlistify(list1) -> list2                                  [procedure]
+        Given a  list list1,  whose  elements include  sub-lists  and/or
+        vectors embedded  arbitrarily, flatlistify  will return  another
+        list list2 in which every sub-list or vector is replaced by  the
+        sequence of words  required to  compile it as  Pop-11 code  with
+        pop11_compile. For example:
+
+            vars x = [a [ b c { d e [ f ] g }] h];
+            vars y = flatlistify(x);
+            x =>
+            ** [a [b c {d e [f] g}] h]
+            y =>
+            ** [a [ b c { d e [ f ] g } ] h]
+            length(x) =>
+            ** 3
+            length(y) =>
+            ** 14
+
+
+
+
+---------------------------------------------
+7  Generic Data Structure Procedures on Lists
+---------------------------------------------
+
+The  following   generic  data   structure  procedures   (described   in
+REF * DATA) are applicable to a list list:
+
+    length(list) -> N
+        Same as listlength(list).
+
+    explode(list) -> (item1, ..., itemN)
+    (item1, item2, ..., itemN) -> explode(list)
+        Applied to a list, explode is the same as dl.
+
+    last(list) -> item
+    item -> last(list)
+        Returns or updates the last element  of list (which must not  be
+        null).
+
+    allbutfirst(N, list) -> sub_list
+    allbutlast(N, list) -> sub_list
+        Return the sublist consisting of all the elements of list except
+        the first N (allbutfirst) or last N (allbutlast). In the case of
+        allbutfirst  this  will  be  an  actual  sublist  of  list;  for
+        allbutlast it will be a newly-constructed list.
+
+datalength, appdata and fill treat lists as their first pair, i.e.  as a
+data structure having two elements.
+
+
+
+
+----------------
+8  Miscellaneous
+----------------
+
+pair_key -> key                                               [constant]
+nil_key -> key                                                [constant]
+        Constants holding key structures for  pairs and the unique  item
+        [] (see REF * KEYS).
+
+
+assoc(list) -> assoc_p                                       [procedure]
+        Creates a procedure assoc_p  encoding an association table.  The
+        argument list  supplies initial  associations in  the form  of a
+        list of  two element  lists.  assoc_p when  given an  item  will
+        return its associated value, or false if there isn't one, i.e.
+
+                assoc_p(item) -> value
+
+        For anything but  very tiny association  tables, you should  use
+        properties rather than this procedure - see REF * PROPS.
+
+
+appassoc(assoc_p, p)                                         [procedure]
+        Applies the  procedure  p  to  each  entry  in  the  association
+        structure assoc_p (which must have  been created by assoc).  The
+        procedure p is applied as:
+
+            p(item, value)
+
+        for each item/value association in assoc_p.
+
+        For convenience, appassoc  can also  be used  on properties.  In
+        this case, it is equivalent to calling appproperty.
+
+
+
+--- C.all/ref/lists
+--- Copyright University of Sussex 1994. All rights reserved.

@@ -1,0 +1,927 @@
+REF DATA                                            John Gibson Dec 1995
+
+       COPYRIGHT University of Sussex 1995. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<   GENERIC DATA PROCEDURES   >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+This file  describes  data  representation  in  Poplog,  and  provides a
+comprehensive list of all Poplog data types (together with the REF files
+containing further information on each). Generic functions applicable to
+most structures (including  user defined ones)  are then described.  The
+final sections deal with the internal format of Poplog data structures.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Representation of Data in Poplog
+      1.1   Overview
+      1.2   List of Data Types
+      1.3   Notes
+
+  2   Predicates on Objects
+
+  3   Information About Objects
+
+  4   Comparison Procedures
+
+  5   Structure Concatenation
+
+  6   Generic Data Structure Procedures
+
+  7   Generic Vector/Byte Structure Procedures
+
+  8   Miscellaneous Procedures
+
+  9   Format of Poplog Data Structures
+      9.1   Byte-Accessible Structures
+
+
+
+-----------------------------------
+1  Representation of Data in Poplog
+-----------------------------------
+
+1.1  Overview
+-------------
+In many programming language systems, the types of data objects are  not
+encoded explicitly within the  objects, but are  merely implicit in  the
+way in which they are processed;  that is, objects are not  identifiable
+at run-time.
+
+In Poplog, however (as in most AI programming environments), data  items
+carry around with  them an  explicit representation of  type, which  all
+procedures in the  system can  use in deciding  how to  process a  given
+object. This is achieved by representing all items to be manipulated  as
+encoded bit patterns (of  the size of the  'natural' word length of  the
+underlying machine) which identify themselves as either:
+
+    (a)  directly containing the actual data (simple objects), or
+
+    (b)  as pointers to data structures (compound objects)
+
+The latter pointer  types are  then further distinguished  by a  special
+field in the  data structures  to which  they point,  which contains  an
+identifying key structure for the class of object (keys are described in
+REF * KEYS.) See the section Format of Poplog Data Structures below  for
+further details on the layout of Poplog structures.
+
+(Note that  the above  encoding  scheme does  not  apply to  integer  or
+floating-point data  held  in 'packed'  record  or vector  fields  (e.g.
+strings.) These values  are implicitly  typed by  the fields  containing
+them, and  so  can be  represented  'normally'. However,  extraction  or
+insertion of  these field  values necessitates  conversion to  and  from
+Poplog  representation,  this  being  performed  automatically  by   the
+corresponding access and update procedures.)
+
+
+1.2  List of Data Types
+-----------------------
+Below is  a complete  list  of the  data  types currently  available  in
+Poplog, together with their identifying names as given by the  procedure
+* dataword. Note that only integers and decimals are simple objects: all
+others are compound.
+
+    "biginteger"
+        Arbitrarily-large integer               (REF * NUMBERS)
+
+    "boolean"
+        The unique items * true and * false     (REF * RECORDS)
+
+    "complex"
+        Complex number                          (REF * NUMBERS)
+
+    "ddecimal"
+        Double-length floating-point            (REF * NUMBERS)
+
+    "decimal"
+        Floating-point (simple)                 (REF * NUMBERS)
+
+    "device"
+        Input/Output device                     (REF * SYSIO)
+
+    "dstring"
+        String of display characters            (REF * STRINGS)
+
+    "external_ptr"
+        Pointer to external data                (REF * EXTERNAL_DATA)
+
+    "ident"
+        Identifier (constant or variable)       (REF * IDENT)
+
+    "integer"
+        Integer (simple)                        (REF * NUMBERS)
+
+    "intvec"
+        Signed packed-integer vector            (REF * INTVEC)
+
+    "shortvec"
+        Signed short packed-integer vector      (REF * INTVEC)
+
+    "key"
+        Class key                               (REF * KEYS)
+
+    "matchvar"
+        Used for matching items with =          (REF * RECORDS)
+
+    "nil"
+        The unique item [] in * nil             (REF * LISTS)
+
+    "pair"
+        Pair (and lists)                        (REF * LISTS)
+
+    "procedure"
+        Procedures in general and closures      (REF * PROCEDURE)
+        Property procedures                     (REF * PROPS)
+        Array procedures                        (REF * ARRAYS)
+
+    "process"
+        Process                                 (REF * PROCESS)
+
+    "prologterm"
+        Prolog term                             (REF * PROLOG)
+
+    "prologvar"
+        Prolog variable                         (REF * PROLOG)
+
+    "ratio"
+        Ratio of two integers (i.e. fraction)   (REF * NUMBERS)
+
+    "ref"
+        Single-element reference                (REF * RECORDS)
+
+    "section"
+        Permanent identifier section            (REF * SECTIONS)
+
+    "stackmark"
+        The item * popstackmark                 (REF * STACK)
+
+    "termin"
+        The unique item <termin> in * termin    (REF * CHARIO)
+
+    "undef"
+        Undef record (initial values of idents) (REF * IDENT)
+
+    "vector"
+        Standard full vector                    (REF * VECTORS)
+
+    "word"
+        Word                                    (REF * WORDS)
+
+    "XptDescriptor"
+        X toolkit Interface Descriptor          (REF * XptDescriptor)
+
+
+1.3  Notes
+----------
+(The type "descriptor" is also present in VMS Poplog; this is  described
+in REF * EXTERNAL.)
+
+There is no special data type for characters, as these are simply  8-bit
+integers.  Character  strings   are  merely   "packed"  vectors   with a
+field-size of 8.
+
+For each built-in data-type there is a global permanent constant  whose
+name starts with the * dataword and ends with _key, and whose value  is
+the   key   for   that   class,   e.g.   * integer_key,    * ratio_key,
+* biginteger_key, * device_key etc.
+
+* conskey (described in REF * KEYS)  can be used  to create new  record
+classes or vector classes (e.g. bit-vectors.) REF * DEFSTRUCT describes
+the syntax construct * defclass,  which packages these facilities  in a
+more convenient form for programming use.
+
+The procedures given below provide various functions applicable to  many
+structures (including user defined ones) although (with the exception of
+= etc)  not  to  numbers.  See also  REF * PRINT  for  generic  printing
+procedures.
+
+
+
+
+------------------------
+2  Predicates on Objects
+------------------------
+
+issimple(item) -> bool                                       [procedure]
+        Returns true if item is a  simple object (i.e. a simple  integer
+        or a simple decimal), false otherwise.
+
+
+iscompound(item) -> bool                                     [procedure]
+        Returns true if item is a pointer to a data structure, false  if
+        item is simple.
+
+
+isrecordclass(item) -> key                                   [procedure]
+isvectorclass(item) -> key                                   [procedure]
+        These  two   procedures   return  datakey(item)   if   item   is
+        respectively a  record-type  data  structure  (reference,  pair,
+        record type constructed  with * conskey  etc), or a  vector-type
+        data  structure  (string,  intvec,  full  vector,  vector   type
+        constructed with conskey etc.) Otherwise they return false.
+
+        (Note that  compound  items  for which  both  isrecordclass  and
+        isvectorclass are false are  'special' objects, e.g  procedures,
+        keys, etc.)
+
+
+isinheap(struct) -> bool                                     [procedure]
+        For a compound object struct, returns  true if struct is in  the
+        working heap, i.e. is not an object in in the system area, false
+        otherwise. (Note that structures  locked by * sys_lock_heap  are
+        still counted as part  of the heap,  so that * isinheap  remains
+        true for  these,  whereas those  locked  with  * sys_lock_system
+        become part of the system, and isinheap becomes false. See  also
+        * is_fixed in REF * EXTERNAL_DATA.)
+
+
+is_poplog_item(item) -> key                                  [procedure]
+        Returns datakey(item)  if  item  is recognisable  as  a  genuine
+        Poplog item (i.e.  a simple  or compound  data item),  otherwise
+        false. (This procedure is included for system checking;  users
+        should not normally need it.)
+
+
+
+
+----------------------------
+3  Information About Objects
+----------------------------
+
+datakey(item) -> key                                         [procedure]
+        Returns the  key  structure of  the  class of  which  item  is a
+        representative. For example:
+
+            datakey(3) =>
+            ** <key integer>
+            datakey([a b c]) =>
+            ** <key pair>
+            datakey("fred") =>
+            ** <key word>
+            datakey(hd) =>
+            ** <key procedure>
+
+        For more information on keys see REF * KEYS, HELP * CLASSES.
+
+
+dataword(item) -> word                                       [procedure]
+        Returns the name of the class of which item is a representative.
+        For example:
+
+            dataword(3) =>
+            ** integer
+            dataword([a b c]) =>
+            ** pair
+            dataword("fred") =>
+            ** word
+            dataword(hd) =>
+            ** procedure
+
+        Note that (unlike the datakey of  an item), the dataword is  not
+        necessarily unique (i.e. two different classes can have the same
+        dataword). For more information see REF * KEYS.
+
+
+key_of_dataword(word) -> key                                 [procedure]
+        Given a word which is a dataword, return the corresponding  key.
+        (This is a library property, initialised for built in keys,  and
+        updated by defclass, but not  currently by conskey itself.)  For
+        more information on keys see REF * KEYS.
+
+
+datasize(item) -> Nwords                                     [procedure]
+        Returns the number of Poplog words occupied by the item item  in
+        memory. (A Poplog word is the  native word size of the  machine,
+        64  bits   on  Alpha   OSF,  and   32  on   all  other   current
+        implementations.)  If  item  is  simple  (i.e.  an  integer   or
+        decimal), 0 is returned.
+
+
+
+
+------------------------
+4  Comparison Procedures
+------------------------
+
+item1 ==  item2 -> bool                                     [operator 7]
+item1 /== item2 -> bool                                     [operator 7]
+        The operator == returns true  if item1 and item2 are  absolutely
+        identical (i.e.  pointers to  the  same structure  or  identical
+        simple numbers), otherwise false.
+
+        /== is the same as not(item1 == item2).
+
+
+item1 =  item2 -> bool                                      [operator 7]
+item1 /= item2 -> bool                                      [operator 7]
+        The operator = compares item1 and item2 by running the * class_=
+        procedure from the key of item2, i.e.
+
+            class_=(datakey(item2))(item1, item2)
+
+        The  default  value  of  any  key's  class_=  is  the   standard
+        comparison procedure run by * sys_=.  (In other words, = is  the
+        same as sys_= unless the class_= procedure has been changed.)
+
+        /= is the same as not(item1 = item2).
+
+
+item1 =-> item2                                            [operator 10]
+        The 'equals assign' operator =-> is  the same as =, but  instead
+        of returning a boolean result, mishaps with 'NON-EQUAL ARGUMENTS
+        FOR =->' if item1 and item2 are not equal.
+
+        The principal use of this operator (and the reason for the  name
+        'equals assign') is with an item2 containing matchvars, e.g.
+
+                list =-> [=?x =?y =?z];
+
+        is a way of decomposing a structure and assigning its components
+        to variables.
+
+
+sys_=(item1, item2) -> bool                                  [procedure]
+        Does a  standard  comparison  of item1  and  item2,  recursively
+        element by element if they  are structures, and returns true  if
+        they are the same, false otherwise.
+
+        The sub-elements of two structures of the same class and  length
+        are compared  by calling  the class_=  procedure of  the  second
+        sub-element (i.e. same as calling = on them).
+
+        If item1 and item2 are numbers of any kind then the result  will
+        depend on  their  mathematical equality/inequality  --  see  the
+        description of = and /= in REF * NUMBERS.
+
+        item2 may  also  be,  or  contain,  matchvar  records  to  match
+        arbitrary   items.   See   HELP * EQUAL,   and   Matchvars    in
+        REF * RECORDS.
+
+
+item1 equals item2 -> bool                                  [operator 7]
+item1 equals (item2, accept_match_p) -> bool
+        This operator is an alternative version of = that guarantees  to
+        find  any   possible  match   involving  repeated   list-segment
+        matchvars, i.e. =??  variables that  occur more  than once  in a
+        pattern. (It is, however, significantly slower than =.)
+
+        It can take  as an optional  third argument a  procedure of  the
+        form
+
+                accept_match_p() -> bool
+
+        which is called when a match is found. If accept_match_p returns
+        true, equals returns true; if accept_match_p returns false,  the
+        next match is  tried, or equals  returns false if  there are  no
+        further matches.
+
+        See the section Pattern Matching With = in HELP * EQUAL.
+
+
+sys_nonlocal_equals(item1, item2) -> bool                    [procedure]
+sys_nonlocal_equals(item1, item2, accept_match_p) -> bool
+        This procedure is the same as the equals operator, but does  not
+        localise or initialise the value of * pop_matchvars_bound.
+
+
+
+
+--------------------------
+5  Structure Concatenation
+--------------------------
+
+See also * >< and * sys_>< in REF * PRINT for concatenating the printed
+representation of items.
+
+
+struct1 <> struct2 -> struct3                               [operator 5]
+        Concatenates struct_1 and  struct_2, which must  be of the  same
+        type, the result also being of that type; permissible types  are
+        strings, any kind of vector, lists and words. E.g.
+
+                [1 2 3] <> [4 5 6] is [1 2 3 4 5 6]
+                {a b c} <> {d e f} is {a b c d e f}
+                'a ' <> 'string' is 'a string'
+                "word1" <> "word2" is "word1word2"
+
+        This operator also composes two procedures, so that
+
+                p1 <> p2
+
+        is a new procedure  which first runs p1  and then runs p2  (see
+        the    section    Generic    Datastructure    Procedures     on
+        Procedures/Closures   in   REF * PROCEDURE    for   a    fuller
+        description.)
+
+        Note that if one of the arguments  to <> is empty the result  is
+        simply the non-empty argument. (Compare with * ><.)
+
+
+struct1 nc_<> struct2 -> struct3                           [operator -5]
+        This operator is identical to  <>, except that when struct1  and
+        struct2 are lists, the  second list struct2  is joined onto  the
+        end of the struct1, without  copying struct1 (which is then  the
+        result.) E.g.
+
+                vars list = [1 2 3];
+                list nc_<> [4 5 6] =>
+                ** [1 2 3 4 5 6]
+                list =>
+                ** [1 2 3 4 5 6]
+
+
+packitem(list) -> item                                       [procedure]
+        If list  is  a  list  of  integers,  returns  a  single  integer
+        constructed by considering  list as  a list  of base-10  digits,
+        e.g.
+
+            packitem([1 3 5]) =>
+            ** 135
+
+        Otherwise, the  characters  from  all  the  items  in  list  are
+        concatenated into a single word (using * dest_characters to  get
+        the characters):
+
+            packitem([cat er 'pillar']) =>
+            ** caterpillar
+
+            packitem([w a r t h o g]) =>
+            ** warthog
+
+
+unpackitem(item) -> list                                     [procedure]
+        If item is an integer, returns a list containing all the base-10
+        digits in item, as integers, e.g.
+
+            unpackitem(135) =>
+            ** [1 3 5]
+
+        Otherwise, item should be a character object to which  * appdata
+        can be applied: in  this case, the result  is a list  containing
+        all the letters in item, as words of length 1:
+
+            unpackitem("cat") =>
+            ** [c a t]
+
+
+
+
+------------------------------------
+6  Generic Data Structure Procedures
+------------------------------------
+
+These procedures can be applied to most kinds of data structures,  that
+is,  compound  items  which  can  be  considered  to  have  independent
+components or  elements (which essentially includes  everything  except
+numbers, ordinary procedures, and special objects like * true, * false,
+* termin, * nil, etc.)
+
+Note that each REF file on an individual data type has a section  called
+Generic Data  Structure  Procedures  on datatype,  which  describes  the
+action of these procedures on that particular type (for example, Generic
+Data Structure Procedures on Lists in REF * LISTS).
+
+
+datalength(struct) -> N                                      [procedure]
+length(struct) -> N                                          [procedure]
+        Returns the length of the  structure struct, i.e. the number  of
+        elements it  contains. The  only difference  between length  and
+        datalength is in how they treat lists: length applied to a  list
+        returns the  length of  the  list (like  * listlength),  whereas
+        datalength returns  2 for  the  length of  the first  pair.  For
+        example:
+
+            length("abcd") =>
+            ** 4
+            length({a b c d}) =>
+            ** 4
+            length('abcd') =>
+            ** 4
+            length([a b c d]) =>
+            ** 4
+            datalength([a b c d]) =>
+            ** 2
+
+        Other examples: the datalength  of a property  is its number  of
+        entries, while  the datalength  of a  closure is  its number  of
+        frozvals, etc.  If struct  is the  key of  a record  class  then
+        datalength gives  the  number  of  fields  in  the  record  (see
+        REF * KEYS).
+
+        (Since length  has to  determine  what sort  of argument  it  is
+        given, it is slightly more efficient to use listlength when  the
+        argument is known to be a list, and datalength when known not to
+        be one.)
+
+
+appdata(struct, p)                                           [procedure]
+        Applies the procedure p in turn to each element of the structure
+        struct. (Treats lists as their first pair.)
+
+
+mapdata(struct1, p) -> struct2                               [procedure]
+        Applies the procedure p in turn to each element of the structure
+        struct1, and uses fill  to fill a copy  struct2 of struct1  with
+        the resultant values. Could be defined as:
+
+            define mapdata(struct1, p) -> struct2;
+                lvars struct1, p;
+                appdata(struct1, p);   ;;; get result values
+                if isword(struct1) then
+                    ;;; can't use fill with words
+                    consword(datalength(struct1)) -> struct2
+                else
+                    fill(copy(struct1)) -> struct2
+                endif
+            enddefine;
+
+        Compare with * ncmapdata.
+
+
+ncmapdata(struct, p) -> struct                               [procedure]
+        Same as * mapdata, but does not copy its argument (and therefore
+        cannot work on words.) Defined as
+
+                fill(appdata(struct, p), struct)
+
+
+copy(struct1) -> struct2                                     [procedure]
+        Returns a  copy  struct2  of the  structure  struct1,  in  which
+        sub-structures  are  not  copied  except  where  they  form   an
+        'essential' part of the outer structure -- see the REF files  on
+        individual data types. (Note in particular that copy applied  to
+        a list will only copy the initial pair: use * copylist to copy a
+        complete list non-recursively -- see REF * LISTS.)
+
+
+copydata(struct1) -> struct2                                 [procedure]
+        Copies its  argument,  and  recursively  copies  its  components
+        (unlike * copy  which  only  copies  the top  level  of  a  data
+        structure.) There is an error check for one-level circularity.
+
+
+matchvar_instantiate(struct1)        -> struct2              [procedure]
+matchvar_instantiate(struct1, flags) -> struct2
+        Given a structure struct1, returns a structure struct2 in  which
+        any matchvars in struct1 or  its components are replaced by  the
+        values of  their corresponding  identifiers. (See  HELP * EQUAL,
+        and Matchvars in REF * RECORDS for a description of matchvars).
+        For example:
+
+              vars x = "mary", y = [tom dick harry];
+              matchvar_instantiate([the children of =?x are =??y]) =>
+              ** [the children of mary are tom dick harry]
+
+        This procedure only copies as  much of struct1 as necessary;  if
+        struct1 or  any  of  its components  contain  no  matchvars  (or
+        contain only matchvars  which are  not replaced),  that part  of
+        struct2 will share structure with the original struct1.
+
+        The optional integer  flags argument can  specify the  following
+        bits (note that bits 1 and 2 are mutually exclusive):
+
+            Bit     Meaning
+            ---     -------
+             0      If set,  then  only  matchvars  whose  corresponding
+                    identifier is in * pop_matchvars_bound are  replaced
+                    by   their   value.   Other   matchvars   are   left
+                    uninstantiated.
+
+             1      Mishap if any uninstantiated matchvar remains in the
+                    structure. This includes both 'anonymous'  matchvars
+                    with no corresponding  identifier (which by  default
+                    are   left   alone),   as   well   as   those   left
+                    by virtue of bit 0 being set.
+
+             2      Replace any uninstantiated matchvars with  pop_undef
+                    for single item (=? and  =*) or [] for  list-segment
+                    (=?? and =**).
+
+        (With the flags argument omitted, all bits default to 0.)
+
+
+explode(struct) -> (item1, item2, ...,  itemN)               [procedure]
+(item1, item2, ..., itemN) -> explode(struct)
+        Puts the N elements of the structure struct on the stack. Except
+        when struct is a list, this is the same as:
+
+                appdata(struct, identfn)
+
+        When struct is  a list, explode  puts the elements  of the  list
+        struct on the stack, i.e. the same as
+
+                dl(struct)
+
+        In both  cases,  the updater  does  the opposite,  i.e.  given a
+        structure struct,  fills  its N  elements  with items  from  the
+        stack.
+
+
+datalist(struct) -> list                                     [procedure]
+        Produces a list of the elements of the structure struct. This is
+        equivalent to
+
+                [% explode(struct) %]
+
+
+fill(item1, item2, ..., itemN, struct) -> struct             [procedure]
+        Given an N-element structure struct, fills it with N items  from
+        the stack (and also returns struct as result.) For example:
+
+                fill(1, 2, 3, 4, initv(4)) =>
+                ** {1 2 3 4}
+
+        The only difference  between this procedure  and the updater  of
+        * explode is  that the  latter treats  a list  pair as  a  list,
+        whereas fill  would  treat  it  as  a  pair,  i.e.  a  2-element
+        structure.
+
+
+allbutfirst(N, struct) -> sub_struct                         [procedure]
+allbutlast(N, struct)  -> sub_struct                         [procedure]
+        These procedures both take a (simple) integer N and a  structure
+        struct, which  may  be  a  list, a  word,  or  any  vector-class
+        structure (such as  a string  or a vector).  They both  return a
+        structure of  the same  kind with  either the  first N  elements
+        (allbutfirst) or  last  N  elements  (allbutlast)  removed.  The
+        structure struct must therefore have at least N elements.
+
+        For example:
+
+            allbutfirst(3, [cat dog mouse elephant pig horse]) =>
+            ** [elephant pig horse]
+            allbutlast(3, [cat dog mouse elephant pig horse]) =>
+            ** [cat dog mouse]
+            allbutfirst(2, "abcdefgh") =>
+            ** cdefgh
+            allbutlast(2, "abcdefgh") =>
+            ** abcdef
+
+
+last(struct) -> item                                         [procedure]
+item -> last(struct)
+        Where struct is a  list, a vector-class  object (e.g. string  or
+        vector), or  a word,  returns  or updates  the last  element  of
+        struct (which must have at least one element). For example:
+
+            last([1 2 3 4]) =>
+            ** 4
+            last('abcde') =>
+            ** 101
+
+        The updater of  last can be  used to change  the last item  of a
+        data structure, e.g.
+
+            vars v = {what is the time};
+            v =>
+            ** {what is the time}
+            "date" -> last(v);
+            v =>
+            ** {what is the date}
+
+        (Note that you CANNOT update the last character in a word.)
+
+
+check_item(item, check, string)                              [procedure]
+        Checks item conforms  to the test(s)  specified by check.  check
+        can be a procedure, or  a list of procedures. Procedures  should
+        take one  argument  and return  a  boolean result  (for  example
+        * isinteger and * isstring.)
+
+        item conforms to  the tests  specified by  check if  one of  the
+        procedures returns a  non-false value when  applied to item.  If
+        item does  not conform  to any  of the  supplied test  a  mishap
+        occurs with the message string string.
+
+        If string is  false a mishap  message of the  following form  is
+        displayed:
+
+            ;;; MISHAP - EXPECTING types - FOUND dataword
+
+        Where dataword is the * dataword of item, and types is a list of
+        the * pdprops of the procedure(s) in check. If the pdprops  of a
+        procedure starts with the substring "is" then that substring  is
+        removed before the pdprops are printed.
+
+        For example, compiling this
+
+            vars foo = 10;
+            check_item(foo, [% isstring, isword %], false);
+
+        produces the following mishap
+
+            ;;; MISHAP - EXPECTING STRING OR WORD - FOUND INTEGER
+
+        check_string could have been implemented as:
+
+            check_item(%isstring, false%)
+
+        Also see * checkinteger and * check_string.
+
+
+
+
+-------------------------------------------
+7  Generic Vector/Byte Structure Procedures
+-------------------------------------------
+
+initvectorclass(n, init_item, vec_key) -> vec                [procedure]
+        The purpose of  this procedure is  to enable new  vectors to  be
+        initialised  with  a  given  item  (the  normal  vector   'init'
+        procedures initialise each element to a fixed value.) It creates
+        and returns  a new  vector of  the class  specified by  the  key
+        structure vec_key (using its * class_init.) The vector will have
+        n elements, each of which is initialised to the value  init_item
+        (which must of course be suitable  for the kind of vector  being
+        constructed.) For example, to construct a string (which is  just
+        a special sort of vector) consisting of five 'a' characters do:
+
+                initvectorclass(5, `a`, string_key)
+
+        To construct a five element  full vector using * nil (the  empty
+        list) you could do:
+
+                initvectorclass(5, nil, vector_key)
+
+        See REF * VECTORS for more information on vectors.
+
+
+sysanyvecons(item1, item2, ..., itemN, L, cons_p) -> vec     [procedure]
+sysanyvecons(cons_p, item1, item2, ..., itemN, L) -> vec
+        Given  a   vector-class  constructor   procedure  cons_p   (like
+        * consvector,  * consstring,  etc),  constructs  and   returns a
+        vector vec of that class containing  all the items on the  stack
+        EXCEPT the last L.
+
+        The procedure cons_p may  be the last  argument (first form)  or
+        the first argument (second form): in both cases, L is the length
+        of the stack  before pushing  any of the  arguments. This  means
+        that the first  form removes L  and cons_p from  the stack,  and
+        then performs
+
+            stacklength() - L -> N;
+            cons_p(N) -> vec;
+
+        whereas the second removes L from the stack and then performs
+
+            stacklength() - (L+1) -> N;
+            subscr_stack(N+1) -> cons_p;
+            cons_p(N) -> (, vec);       ;;; erase cons_p from the stack
+                                        ;;; after constructing vec
+
+        The items item1,  ..., itemN must  be suitable for  the kind  of
+        vector being constructed.
+
+        (sysanyvecons is  used e.g.  by  the Pop-11  * cons_with  vector
+        constructor,  which  saves  the   stacklength  L,  compiles   an
+        expression to push  the constructor procedure  cons_p, and  then
+        compiles a constructor expression {...}. It then calls
+
+                sysanyvecons(cons_p, item1, item2, ..., itemN, L)
+
+        to produce a vector of all the items in the {...} expression.)
+
+
+move_subvector(s_sub, s_vec, d_sub, d_vec, N)                [procedure]
+        Where s_vec and d_vec are any two vector-type structures, copies
+        the N components  of s_vec  starting at subscript  s_sub to  the
+        components of d_vec starting at subscript d_sub.
+
+        The values  coming  out  of  the source  vector  s_vec  must  be
+        appropriate for the  type of the  destination vector d_vec,  and
+        d_vec must be large enough to hold them.
+
+
+set_subvector(item, sub, vec, N)                             [procedure]
+        Where vec is any vector-type structure, sets the N components of
+        vec starting at subscript sub to have the value item (which must
+        be an appropriate value for the type of vector.)
+
+
+move_bytes(s_bsub, s_bytestruct, d_bsub, d_bytestruct, N)    [procedure]
+        Where  s_bytestruct   and  d_bytestruct   are  any   two   'byte
+        accessible' structures (as defined below), copies the N bytes of
+        s_bytestruct  starting   at  byte   s_bsub  to   the  bytes   of
+        d_bytestruct starting at byte d_bsub.
+
+        In addition,  either  s_bytestruct  or d_bytestruct  may  be  an
+        external pointer-class structure. In this  case the N bytes  are
+        copied from/to the byte addresses contained by the pointer(s).
+
+
+set_bytes(char, bsub, bytestruct, N)                         [procedure]
+        Sets the N  bytes of  the byte  accessible structure  bytestruct
+        starting at byte number bsub to have the value char, which  must
+        be an integer from 0 to 255 inclusive.
+
+        In  addition,  bytestruct  may  be  an  external   pointer-class
+        structure. In this case the N bytes addressed by the pointer are
+        set to char.
+
+
+
+
+---------------------------
+8  Miscellaneous Procedures
+---------------------------
+
+datafile(filename) -> structure                              [procedure]
+structure -> datafile(filename)
+        A facility for saving (certain kinds of) Poplog data  structures
+        on disk,  and  subsequently reading  them  back in.  To  write a
+        structure to disk, use;
+
+            structure -> datafile(filename)
+
+        Similarly, to read a structure back from disk, use:
+
+            datafile(filename) -> structure
+
+        The permitted  data types  are:  words, numbers,  lists,  vector
+        types, record types, arrays, ordinary properties, and booleans.
+
+
+
+
+-----------------------------------
+9  Format of Poplog Data Structures
+-----------------------------------
+
+For most programming  purposes in  Poplog it  is not  necessary to  know
+anything about the layout of data structures in the system; however,  in
+certain contexts  this becomes  important  (in particular,  when  Poplog
+structure are to be processed by external agents.) This section outlines
+the relevant details.
+
+As mentioned  above in  Representation  of Data  in Poplog,  a  compound
+object is a pointer to a data structure, and different structure classes
+are distinguished  by an  extra  field containing  a  pointer to  a  key
+structure. For fixed-length structures like records the key by itself is
+sufficient to describe the  structure. For variable-length objects  like
+vectors, however,  the  number of  elements  must also  be  known:  this
+necessitates another field to contain a vector length.
+
+To meet these  requirements, Poplog  structures have  a 2-word  'header'
+which contains the key, and, in the case of a vector, its length;  for a
+record, the length word is not needed,  and so may be allocated to  hold
+one  or  more  ordinary  fields.  On  the  other  hand,  data  processed
+externally  will  not  normally  be  expected  to  contain  such  header
+information (since  it is  concerned with  the run-time  description  of
+objects, for which external programming languages don't make allowance.)
+
+To keep both sides happy therefore, the header is effectively  'hidden',
+by making it occupy not the  first two words addressed by the  structure
+pointer, but the two immediately behind. Pictorially, the situation  for
+records and vectors is
+
+              -- --------------          -------------- --
+              |  |  field(s)  |          |   length   |  |
+        header|  |------------|          |------------|  |header
+              |  |    key     |          |    key     |  |
+              -- |------------|          |------------| --
+             >-> |            |      >-> |            |
+                 |  remaining |          |   vector   |
+                 |  field(s)  |          |  elements  |
+
+where >-> marks the location actually addressed by the pointer (i.e. the
+third word of a structure.)
+
+Thus an  external program  processing  a vector  pointer just  sees  the
+elements; in the case of a record, it sees the fields that begin at  the
+pointer -- but NOT  any allocated in the  spare header word. The  latter
+point is important  when using  * defclass or * conskey  to specify  the
+layout of a record to be processed externally, because field(s) will  be
+allocated in the header word unless you prevent it. (This is done simply
+by including the symbol >-> as a  dummy field in the record; >->  forces
+the following fields to begin at  the pointer, and appearing first  will
+therefore prevent any use of the header word.)
+
+
+9.1  Byte-Accessible Structures
+-------------------------------
+Certain  procedures  (* move_bytes  and   * set_bytes  in  this   file,
+* sysread, * syswrite, and * sys_io_control, in REF * SYSIO etc)  allow
+uncontrolled 'bulk'  operations  on the  data  in structures  from  the
+pointer position  onwards  (see  previous  section.)  To  prevent  such
+operations using Poplog-encoded  data in  "full" fields  in a  spurious
+way, or (worse still) creating spurious encoded data, these  procedures
+operate only on structures which have  no such fields from the  pointer
+position onwards.  A structure  satisfying this  requirement is  called
+byte-accessible.
+
+For vectors, this excludes only  "full" ones; for records, it  prohibits
+anything with a "full" field except in the spare header word (i.e.  if a
+"full" field is present it must come first in the record and be the only
+one).
+
+Note that in byte-subscripted operations  on these structures, the  byte
+at subscript 1 is the first byte  at the pointer (as, for example,  in a
+string.)
+
+
+
+--- C.all/ref/data
+--- Copyright University of Sussex 1995. All rights reserved.

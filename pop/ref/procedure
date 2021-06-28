@@ -1,0 +1,569 @@
+REF PROCEDURE                                       John Gibson Jan 1995
+
+     COPYRIGHT University of Sussex 1995. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<         PROCEDURES          >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+This REF  file  describes procedure  records  and procedure  calling  in
+Poplog.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+      1.1   Proper Procedures
+      1.2   Closures
+
+  2   Predicates on Procedures
+
+  3   Accessing Procedure Fields
+
+  4   Closures
+
+  5   Generic Datastructure Procedures on Procedures/Closures
+      5.1   Composing Procedures with <>
+
+  6   Calling and Chaining Procedures
+
+  7   Call Stack Information
+
+  8   Miscellaneous
+
+
+
+---------------
+1  Introduction
+---------------
+
+A  procedure  record   in  Poplog   is  an  object   whose  datakey   is
+<key procedure>, and which contains executable code (native machine code
+in all current implementations). Although  there are different types  of
+procedures, all are structured in such  a way that they can be  executed
+by the same protocol  (i.e. extract the address  of the executable  code
+and transfer control to it). In addition, all procedures have an updater
+field (possibly  holding another  procedure,  to be  run when  the  base
+procedure is  executed in  update mode),  and a  pdprops field  (usually
+containing the procedure name).
+
+There are two basic types of procedure: proper procedures and closures:
+
+1.1  Proper Procedures
+----------------------
+A proper  procedure  is  one  that maintains  an  environment  of  local
+variables (lexical and/or dynamic),  and that creates  a stack frame  on
+the call stack. As well as  containing local variable values, the  stack
+frame holds the address of the procedure of which this is an  invocation
+(the owner  of  the frame),  and  the  return address  into  the  caller
+procedure.
+
+Most proper procedures are  created by the  Poplog Virtual Machine  from
+code planted by compilers (for details see REF * VMCODE).
+
+However, there are  two special  forms of proper  procedure: arrays  and
+composites.  Array  procedures  are  created  by  * newanyarray,   while
+composite procedures result from  concatenating two procedures  together
+with the operator <> (see Composing Procedures with <> below).
+
+1.2  Closures
+-------------
+A closure is  a structure which  binds a procedure  (its * pdpart)  with
+zero or more  argument values  (its frozen values,  see * frozval).  The
+executable code inside a closure loads  the frozen values onto the  user
+stack and then executes the pdpart  procedure (which may in its turn  be
+another closure or  a proper  procedure). Unlike  a proper  procedure, a
+closure does not maintain local variables  or a call stack frame of  its
+own: only the procedure  it invokes does. Thus  there is no record  of a
+closure having been invoked.
+
+Closures are created  explicitly by * consclosure  (or * partapply),  as
+described below. The Pop-11 syntax form
+
+    p(% ... %)
+
+compiles to  a  call  of  consclosure.  Closures  may  also  be  created
+implicitly if a  nested procedure accesses  non-local lexical  variables
+(as described  in Implementation  of Lexical  Scoping in  REF * VMCODE).
+Such lexical closures are "protected" and  it is not possible to  change
+their pdpart, pdnargs, or pdprops. Protected closures are recognized  by
+isclosure defined below. Some examples,  and further explanation can  be
+found in HELP * CLOSURES.
+
+Other  closures  are   created  by  various   system  facilities,   e.g.
+* newproperty  and  * newanyproperty  create  closures  that   represent
+properties (see REF * PROPS).
+
+
+
+
+---------------------------
+2  Predicates on Procedures
+---------------------------
+
+See also REF * PROPS and REF * ARRAYS for predicates on special forms of
+procedures.
+
+
+isprocedure(item) -> bool                                    [procedure]
+        Returns true if item is a procedure (i.e. a proper procedure  or
+        a closure), false if not.
+
+
+isclosure(item) -> bool                                      [procedure]
+        Returns 1 if item  is a protected closure,  true if item is  any
+        other type of closure, false otherwise.
+
+
+ispcomposite(item) -> bool                                   [procedure]
+        Returns true if item  is a procedure  produced by composing  two
+        procedures with  the  operator  <>  (see  Generic  Datastructure
+        Procedures on Procedures/Closures below), or false otherwise.
+
+
+
+
+-----------------------------
+3  Accessing Procedure Fields
+-----------------------------
+
+pdnargs(p) -> n                                              [procedure]
+n -> pdnargs(p)
+        Returns or updates the number of arguments n of the procedure p,
+        where n is an integer in the range  0 - 254. When p is a  proper
+        procedure, the  default  value of  n  is the  number  of  formal
+        arguments given when the procedure was constructed.
+
+        A closure, on the other hand, is initially set up so that  until
+        an explicit value is assigned to it with the updater of pdnargs,
+        the value returned is
+
+                 pdnargs(pdpart(p)) - datalength(p)
+
+        i.e. the number of arguments of  its pdpart minus the number  of
+        frozen values. (This will  be negative if  the number of  frozen
+        values exceeds  the  pdnargs  of  the  pdpart,  which  is  quite
+        possible since closures are allowed to have a lot more than  254
+        frozvals.)
+
+        The pdnargs of a composite  procedure is defined as the  pdnargs
+        of the first procedure, ie:
+
+                 pdnargs(p1 <> p2) == pdnargs(p1)
+
+        The pdnargs of arrays (including sparse arrays) is equal to  the
+        number of dimensions of the array. The pdnargs of a property  is
+        always equal to 1.
+
+        Assigning an explicit value to  an object's pdnargs causes  that
+        value to be returned by pdnargs thereafter.
+
+
+pdprops(p) -> item                                           [procedure]
+item -> pdprops(p)
+        Returns or updates the 'props'  field of the procedure p  (which
+        may contain anything).
+
+        (Note that  for  Pop-11  procedures  defined  using  define  ...
+        enddefine the pdprops defaults to a word which is the name given
+        in the  definition (excluding  any  section pathname),  and  for
+        procedures created using procedure ... endprocedure the  pdprops
+        defaults to false. In  both cases with_props (See  REF * SYNTAX)
+        can be used to override the default, as can explicit use of  the
+        updater of pdprops.)
+
+
+updater(p) -> up                                             [procedure]
+up -> updater(p)
+        Returns or updates  the updater  up of  the procedure  p. up  is
+        false if p  does not  have an  updater; assigning  false to  the
+        updater of p will remove it.
+
+
+
+
+-----------
+4  Closures
+-----------
+
+consclosure(p, item1, item2, ..., itemN, N) -> clos          [procedure]
+        Constructs and returns a  closure based on  the procedure p  and
+        whose N frozen  values are  item1, .., itemN.  In Pop-11  terms,
+        this is equivalent to
+
+                 p(% item1, item2, ..., itemN %)
+
+        If p has  an updater  up, then  the updater  of the  constructed
+        closure will be
+
+                consclosure(up, item1, item2, ..., itemN, N)
+
+        Note that N may be upto (at least) 65,000 -- the exact limit  is
+        implementation dependent. (Thus  closures can have  considerably
+        more frozvals than proper procedures can have arguments.)
+
+
+partapply(p, list) -> clos                                   [procedure]
+        Same as
+
+                 consclosure(p, destlist(list))
+
+        (i.e. partapply = destlist <> consclosure).
+
+
+pdpart(clos) -> p                                            [procedure]
+p -> pdpart(clos)
+        Returns or updates the procedure part of the closure clos,  i.e.
+        the procedure on  which the closure  clos was constructed.  Note
+        that clos can  be a  proper procedure,  in which  case false  is
+        returned.
+
+
+frozval(n, clos) -> item                                     [procedure]
+item -> frozval(n, clos)
+        Returns or updates  the n-th  frozen value item  of the  closure
+        clos.
+
+
+sys_grbg_closure(clos)                                       [procedure]
+        Puts the  closure clos  on an  internal freelist  so it  can  be
+        reused by  consclosure.  (Note  that  currently,  this  is  only
+        effective for closures with up to  16 frozvals -- a clos  having
+        more than 16 will be ignored.)
+
+
+
+
+----------------------------------------------------------
+5  Generic Datastructure Procedures on Procedures/Closures
+----------------------------------------------------------
+
+The   generic   datastructure   procedures   described   in   REF * DATA
+(datalength, appdata, explode, fill, etc, and others defined in terms of
+those) are all applicable  to closures (but  not to proper  procedures).
+They treat a closure as if it  were a vector of its frozen values,  e.g.
+if a closure clos has N frozen values, then datalength(clos) = N.
+
+    copy may also be applied to closures, and to proper procedures which
+are not part of the system (those for which isinheap is true). Note that
+as usual with copy, only the top-level structure is copied: the pdprops,
+pdnargs and updater (and for closures the pdpart and the frozen  values)
+remain as for the original.
+
+    The  structure  comparison   procedure  sys_=   treats  two   proper
+procedures as  equal if  and  only they  are  identical (i.e.  ==).  Two
+closures are deemed  equal if their  pdparts are =,  they have the  same
+number of frozen values, and the corresponding frozen values are =.
+
+
+5.1  Composing Procedures with <>
+---------------------------------
+The operator  <> is  also applicable  to all  kinds of  procedures  (see
+REF * DATA  for  its  action  on  other  data  types):  For  p1  and  p2
+procedures, the call
+
+        p1 <> p2 -> p3
+
+constructs  a  (proper)  procedure  which  is  the  composition  of  its
+arguments, i.e. p3 is a procedure which will call p1 followed by p2.  p3
+is thus equivalent to
+
+        procedure(); p1();  p2() endprocedure;
+
+If p2 has an updater, the updater of p3 will be a procedure which  calls
+p1 and then calls the updater of p2, i.e.
+
+        procedure(); p1();  -> p2() endprocedure;
+
+(if p2  has no  updater then  neither will  p3).
+
+A procedure produced  by <>  can be  tested for  with ispcomposite  (see
+above). The pdnargs  of a  composite procedure are  set to  pdnargs(p1).
+sys_= treats two composite  procedures as equal  if their p1  procedures
+are = and their p2 procedures are =.
+
+
+
+
+----------------------------------
+6  Calling and Chaining Procedures
+----------------------------------
+
+apply(p)                                                     [procedure]
+-> apply(p)
+        Executes the procedure p. The  update form executes the  updater
+        of p.
+
+        (Note that this procedure represents a stack frame, i.e. will be
+        in the calling chain  while p is being  applied; this is not  so
+        for the non-checking version fast_apply, see REF * FASTPROCS).
+
+
+applynum(p, N)                                               [procedure]
+-> applynum(p, N)
+        Applies the given procedure  (or item) p,  integer N times.  The
+        updater  applies  the   updater  of   p,  N   times.  See   also
+        REF * dupnum, * apply, * fast_apply.
+
+
+sysrepeat(num, p)                                            [procedure]
+        Applies procedure p, num times. Unlike applynum, num may be  any
+        kind of real  number, not just  an integer (and  is slower  as a
+        consequence). See also  * applynum (and the  Pop-11 syntax  word
+        * repeat).
+
+
+chain(p)                                                     [procedure]
+        Exits the current  procedure, restoring the  environment of  its
+        caller,  and  then  executes  the   procedure  p.  (Thus  p   is
+        effectively 'chained' onto the current procedure.)
+
+
+chainfrom(target, p)                                         [procedure]
+        Exits back up the calling chain until immediately inside a  call
+        of the target  procedure specified  by target,  exits from  this
+        call, and then executes the procedure p.
+
+        The argument target may be either an actual procedure (in  which
+        case  exiting  terminates  on  reaching  a  call  of  the  given
+        procedure),   or   a   callstack    length   as   returned    by
+        * callstacklength (in  which exiting  terminates when  the  call
+        stack length is <= target).
+
+
+chainto(target, p)                                           [procedure]
+        Exits back up the calling chain until immediately inside a  call
+        of the target procedure specified  by target, and then  executes
+        the procedure p. The value of  target is as for chainfrom,  i.e.
+        an explicit procedure or a call stack length.
+
+
+exitfrom(target)                                             [procedure]
+        Equivalent to chainfrom(target, identfn).
+
+
+exitto(target)                                               [procedure]
+        Equivalent to chainto(target, identfn).
+
+
+jumpout(p, N) -> jumpout_p                                   [procedure]
+        Returns a procedure jumpout_p which when applied will cause exit
+        from the current caller (i.e. the procedure that called  jumpout
+        in the first place).
+
+        Before effecting  the  exit,  jumpout_p first  calls  the  given
+        procedure p (with no arguments). Then, if the user stack  length
+        excluding the top N items is greater than it was at the time  of
+        the jumpout call, a sufficient  number of items above the  top N
+        are removed to reset  it to that value.  (I.e. when the exit  is
+        effected, the user stack should be  in its state at the time  of
+        the jumpout, but with N items added.) See SHOWLIB * jumpout.
+
+        For example, the following procedure scans a binary tree looking
+        for the first element which is bigger than some given number:
+
+            define search(num, tree);
+                lvars found = jumpout(identfn, 1);
+
+                define scan(tree);
+                    if atom(tree) then
+                        if isnumber(tree) and tree > num then
+                            found(tree)
+                        endif
+                    else
+                        scan(hd(tree));
+                        scan(tl(tree))
+                    endif
+                enddefine;
+
+                scan(tree);
+                return(pop_undef);
+            enddefine;
+
+            search(5, [[1 4 [6 3]] 8]) =>
+            ** 6
+            search(9, [[1 4 [6 3]] 8]) =>
+            ** <undef>
+
+        Note that unless you want the stack-cleaning effect of  jumpout,
+        exitfrom is usually  easier (i.e. the  above example could  just
+        use exitfrom(tree, search) when the number is found).
+
+
+catch(apply_p, if_caught, catch_pattern)                     [procedure]
+throw(throw_item)                                            [procedure]
+        These two procedure work  in conjunction: catch 'catches'  calls
+        of throw.
+
+        catch applies  the  procedure  apply_p  (which  make  then  take
+        further arguments off  the stack), inside  an environment  which
+        retains the values of the if_caught and catch_pattern  arguments
+        for later use with a call of throw occurring inside apply_p  (or
+        inside procedures that it calls, etc).
+
+        Such a call of  throw then 'throws'  the argument throw_item  to
+        the most recent call  of catch that will  catch it, that is,  it
+        repeatedly exits through  all procedures upto  the next call  of
+        catch, until it reaches a call of catch for which
+
+                throw_item matches catch_pattern
+
+        is true. When this happens, the if_caught argument to the  catch
+        call is then applied if it is a procedure, or simply returned as
+        result from that catch otherwise.  A mishap results if there  is
+        no call of catch whose catch_pattern matches throw_item.
+
+        See SHOWLIB * CATCH.
+
+
+
+
+-------------------------
+7  Call Stack Information
+-------------------------
+
+For additional  information  concerning  local  variables  of  currently
+active procedures see REF * IDENT.
+
+
+caller(n) -> p_or_false                                      [procedure]
+        Where n  is an  integer >=  0, returns  the n-th  caller of  the
+        current procedure; caller(0) is the current procedure. false  is
+        returned if there are less than  n procedures in the call  chain
+        above the current one.
+
+        See also * caller_valof.
+
+
+iscaller(p, m) -> n                                          [procedure]
+iscaller(p) -> n
+        Determines whether the procedure p  is currently in the  calling
+        chain, returning the  caller number n  of p if  so, or false  if
+        not. The search  for p  is begun at  the m-th  caller, the  form
+        iscaller(p) being the same as iscaller(p, 0).
+
+        E.g. a procedure to count  the number of currently active  calls
+        of a given procedure p:
+
+                define count_calls(p) -> count;
+                    lvars p, count = 0, n = 0;
+                    while iscaller(p, n) ->> n do
+                        count + 1 -> count;
+                        n + 1 -> n          ;;; skips this call of p
+                    endwhile
+                enddefine;
+
+
+syscallers() -> list                                         [procedure]
+        Returns a list of all procedures currently in the calling chain,
+        starting with caller(2)  inside syscallers (i.e.  the caller  of
+        the procedure calling syscallers). Defined as
+
+                define syscallers() -> list;
+                    lvars list, n = 2, p;
+                    [%  while caller(n) ->> p do
+                            p;
+                            n + 1 -> n
+                        endwhile
+                    %] -> list
+                enddefine;
+
+
+callstacklength(target) -> len_or_false                      [procedure]
+        Returns the total length  of the call stack  (i.e. of all  stack
+        frames) upto  and  including  the  stack  frame  represented  by
+        target.
+
+        target may be either an integer caller number (as for * caller),
+        or an explicit procedure (in  which case the target stack  frame
+        is the most recent call of that procedure).
+
+        false is returned if  target is not found  (i.e. there are  less
+        than target current calls  for an integer, or  target is not  in
+        the calling chain for a procedure).
+
+        The length returned is given in Poplog word units (one word unit
+        representing the size  of a  Poplog item).
+
+        Note that since the size in words of stack frames for particular
+        procedures  is  implementation  dependent,  callstacklength  may
+        return different values on different implementations,
+
+        (In general, the size of  an individual stack frame varies  with
+        the number  of  local  variables the  procedure  has  (including
+        ordinary lexical  locals and  dynamic  locals). In  all  current
+        implementations except  SPARC (Sun4)  machines, the  approximate
+        size is N+2, where N is the total number of locals; for SPARC it
+        is
+
+            max(L,16) + (N-L)
+
+        where  L  is  the  number   of  type-1  lexical  locals   (for a
+        description of which see REF * VMCODE). Thus SPARC stack  frames
+        are a minimum of 16 words.)
+
+
+pop_callstack_lim -> int                                      [variable]
+int -> pop_callstack_lim
+        This (active) variable holds  an integer specifying the  maximum
+        length to which the call stack may expand (in word units as  for
+        callstacklength above).
+
+        To accommodate very deeply nested recursive programs, it may  be
+        necessary to assign this variable  a larger value. Note  though,
+        that since  the  size of  a  given procedure's  stack  frame  is
+        implementation dependent (as described under * callstacklength),
+        any fixed value will  not necessarily allow  the same number  of
+        procedure calls on different machines.
+
+        For this reason, the  default value is always  such as to  allow
+        for 2 to  the power of  14 (16384) calls  of a procedure  with 3
+        lvars, regardless  of the  implementation; basing  an  increased
+        value on the default (e.g. doubling it with:
+
+            pop_callstack_lim * 2 -> pop_callstack_lim;
+
+        etc) will therefore provide some measure of portability.
+
+        When the size of the  call stack exceeds pop_callstack_lim,  the
+        mishap
+
+            'RLE: RECURSION LIMIT (pop_callstack_lim) EXCEEDED'
+
+        results;  this  may  indicate  that  your  program  requires  an
+        increased limit.  However, because  of operating-system  imposed
+        memory limits, assigning too large a value to  pop_callstack_lim
+        may instead result in the mishap
+
+            'ROM: NO MORE MEMORY AVAILABLE (needing callstack space)'
+
+        showing that  Poplog  cannot obtain  more  memory for  the  call
+        stack.
+
+        What can be done about this depends on the operating system.  In
+        VMS, all program memory comes out  of the same pool, and so  the
+        mishap simply indicates that your program as a whole,  including
+        the call stack  space, has  reached the size  permitted by  your
+        page file quota. In Unix systems, call stack space is  allocated
+        separately from other  memory: on  Berkeley Unix,  the limit  is
+        given (and can be changed by) the cshell 'limit stack'  command;
+        on the HP Bobcat, there is a fixed limit of 512 Kwords.
+
+        (See also * popmemlim and * pop_prolog_lim.)
+
+
+
+
+----------------
+8  Miscellaneous
+----------------
+
+procedure_key -> key                                          [constant]
+        This constant  holds  the  key  structure  for  procedures  (for
+        details see REF * KEYS).
+
+
+
+--- C.all/ref/procedure
+--- Copyright University of Sussex 1995. All rights reserved.

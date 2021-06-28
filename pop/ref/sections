@@ -1,0 +1,632 @@
+REF SECTIONS                                        John Gibson Oct 1992
+
+     COPYRIGHT University of Sussex 1992. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<          SECTIONS           >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+This REF file provides the why and  the how behind the use of  sections.
+i.e.   creating   and    manipulating   sections,    importing/exporting
+identifiers, miscellaneous procedures etc. The mechanics of sections are
+illustrated by some examples at the end.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+
+  2   Pathnames
+
+  3   The section Construct
+
+  4   Global Identifiers
+
+  5   Section Procedures
+
+  6   Predicates on Sections
+
+  7   Creating/Manipulating Sections
+
+  8   Standard Sections
+
+  9   Importing/Exporting Identifiers
+
+ 10   Miscellaneous
+
+ 11   Examples
+
+
+
+---------------
+1  Introduction
+---------------
+
+As described  in  REF * IDENT,  a declaration  of  a  permanent  program
+identifier (i.e. a variable or a constant) results in the attachment  of
+a identifier record to the  corresponding word, this record  maintaining
+the idval (or valof) and  identprops of the program identifier.  Program
+sections provide  a  means whereby  this  attachment can  be  made  on a
+localised basis, i.e.  the same  word can be  associated with  different
+permanent identifiers in different sections of a program. (Note that the
+section mechanism does NOT  apply to lexically-scoped identifiers,  i.e.
+those declared with lvars or  lconstant. From here on 'identifier'  will
+always mean 'permanent identifier'.)
+
+    The motivation for  sections is that  in writing a  part of a  large
+program (or in writing  a library program or  system which other  people
+are going to use), it may be convenient to use particular words to  name
+private identifiers on the  basis of mnemonic  significance. But at  the
+same time these  private identifiers  should not  conflict or  interfere
+with identifiers of the same name either in other parts of the  program,
+or that users of the  library program/system will employ. (This  applies
+particularly to frequently used variable names, e.g. "x".) For  example,
+the mere use  of a  variable name in  a library  routine will  prevent a
+warning message being issued for that  variable when employed by a  user
+who has forgotten to declare it as local to a procedure (assuming he has
+the library routine loaded).
+
+    Another useful aspect  of sections  is that they  can be  cancelled.
+Cancelling  a   section  simultaneously   cancels  all   the   permanent
+identifiers local  to that  section,  implying that  the words  used  to
+reference them (if not used elsewhere) will be garbage collected.
+
+    Pop-11 sections are  analagous to directories  in a  tree-structured
+file system, where the identifiers play the role of files. Just as files
+in different  directories may  have  the same  name, so  identifiers  in
+different  sections   may   also;   just   as   directories   may   have
+sub-directories, so sections may have sub-sections. Just as there is the
+concept of  'current directory',  so there  is the  concept of  'current
+section', and the user may make any node in the section tree the current
+section at any time -- changing sections in this way involves the system
+in manipulating the identifier fields  in all word records currently  in
+the dictionary.
+
+    The ability to import and export identifiers provides a facility not
+(usually) found in file systems. Importing an identifier named X  into a
+sub-section B of a section  A means that references to  X in B refer  to
+the  identifier  associated  with  X  in  A;  similarily,  exporting  an
+identifier Y from B upto A means that references to Y in A refer to  the
+identifier as  declared  in B.  Thus  the former  allows  references  to
+identifiers already declared  in sections above  the current one,  while
+the latter allows mew identifiers to  be declared in such sections  from
+within the current.
+
+    The construction of the section tree is in terms of section records,
+each section record containing  information about the identifiers  local
+to that section, as well as  a list of section records for  sub-sections
+of that section. The root node of this tree is the section record in the
+constant pop_section,  which  represents  the  'top-level'  of  the  POP
+system, and all other sections can be reached by working downwards  from
+this. Procedures are  provided to  enable the  user to  effect this  and
+other manipulations on sections and identifiers at run-time (see below),
+as well as syntactic constructs for use at compile-time.
+
+
+
+
+------------
+2  Pathnames
+------------
+
+As with  directories,  sections are  identified  by name;  a  'pathname'
+syntax is provided  to enable reference  to identifiers within  sections
+(in a manner similar to UNIX file  pathnames). The word "$-" is used  to
+separate parts of the pathname (rather than "/" as in UNIX), so that for
+example
+
+                $-tom$-dick$-harry
+
+refers to the identifier  harry in subsection dick  of section tom  (tom
+being a subsection of pop_section), while
+
+                $-foo
+
+refers to the  top-level identifier  foo. Again  analagously to  UNIX, a
+pathname not beginning with '$-' is taken to be relative to the  current
+section, e.g.
+
+                bill$-ben
+
+means the identifier ben in the subsection bill of the current section.
+
+
+
+
+------------------------
+3  The section Construct
+------------------------
+
+The section  construct  is the  principal  way of  using  sections  when
+compiling programs. It has the form
+
+        section <pathname> <imports> => <exports> ;
+
+            <statement sequence>
+
+        endsection
+
+where both <imports> and <exports> are optional sequences of words,  the
+"=>" being omitted if there are no exports.
+
+    <pathname> is a pathname as described above, but in THIS context  it
+refers to a section, not an identifier. So
+
+        section $-tom$-dick$-harry; ... endsection
+
+specifies subsection  harry  of subsection  dick  of subsection  tom  of
+pop_section, etc. In addition,  the name of  pop_section is <blank>  (it
+is!), so that omitting the pathname references the top-level, thus
+
+        section; ... endsection
+
+(there must be  no imports or  exports in this  case because they  don't
+make sense at top-level).
+
+    The effect of section is to save the current section, make the named
+section the current,  and then  continue compiling  until endsection  is
+encountered, at which  point the previous  current section is  restored.
+After entering the named section, section_import is called on each  word
+specified  by  <imports>,  and  section_export  on  each  specified   by
+<exports>  --   see  under   'Section  Procedures'   below.  (In   fact,
+section_import and section_export are  also called in each  intermediate
+section in the specified path. This implies, e.g, that
+
+        section $-tom$-dick$-harry xxx => yyy;
+            ...
+        endsection
+
+will import xxx from top-level down through tom and dick into harry, and
+export yyy from harry up through them to top-level.)
+
+
+
+
+---------------------
+4  Global Identifiers
+---------------------
+
+Most permanent identifiers are normally required to be accessible in all
+sub-sections of the section in which  they are declared, and thus to  be
+imported into  sub-sections without  any  explicit declaration  to  that
+effect.
+
+To this end, an  identifier can be declared  as global, meaning that  it
+should be  considered  an automatic  import  into any  sub-section  of a
+section where it is accessible. This can be done either at run-time with
+sysGLOBAL (see REF * VMCODE), or at compile-time with a vars or constant
+statement prefixed by global, e.g.
+
+            global vars x, y, z;
+            global constant a, b, c;
+
+The keyword global can also appear in a define statement after the  word
+"define" (but before any "vars" or "constant"). E.g.
+
+            define global x(); ... enddefine;
+            define global constant y(); ... enddefine;
+
+However, to make the continual use of global unnecessary in Pop-11,  the
+compile_mode option  :pop11  +global  may be  used;  this  automatically
+defaults  all  permanent  identifiers  to  global.  Moreover  (since  in
+practice non-global  identifiers  are  rarely needed),  this  option  is
+included in the 'macro'  option :pop11 +strict used  by most system  and
+library code.
+
+If required, the :pop11 +global option can be overridden with nonglobal,
+which may appear anywhere that global can, e.g.
+
+            nonglobal vars x, y, z;
+            define nonglobal x(); ... enddefine;
+
+
+
+
+---------------------
+5  Section Procedures
+---------------------
+
+These procedures allow  the manipulation  of sections by  the user  (the
+syntactic constructs  described  above  being implemented  in  terms  of
+these). At  system  startup  time  the current  (and  only)  section  is
+pop_section,  which  represents  the  'normal'  top-level  of  POP.  New
+sections are then created by use of section_subsect as described below.
+
+    On  entering  a  section  (by  assigning  to  current_section),  all
+non-imported words  have  their identifiers  set  to "undef",  with  the
+following exceptions:
+
+        # All system words.
+
+        # All words having system identifiers associated with them.
+
+        # All words having associated with them identifiers marked as
+          global (this actually subsumes (2), since all system
+          identifiers are so marked).
+
+    After  this,  words   having  section-local   identifiers  are   set
+appropriately. The  process  of  entering a  section  actually  involves
+'unwinding' all  sections  up to  the  lowest common  ancestor  of  that
+section and the current one, and then recursively entering all  sections
+from there down to the given one (although the user need not be aware of
+this).
+
+    Whenever a  new identifier  is declared  (i.e. with  vars,  constant
+etc), this identifier is made local  to the current section, unless  the
+identifier name has been  declared as an export  (see below). By use  of
+word_identifier (described below), new identifiers can be created in any
+section regardless  of the  current section  context. Redeclarations  of
+existing identifiers  merely  alter  the  information  in  the  existing
+identifier record, and so do not change their section status in any way.
+
+
+
+
+-------------------------
+6  Predicates on Sections
+-------------------------
+
+issection(item) -> bool                                      [procedure]
+        Returns <true> if item is a section, <false> otherwise.
+
+
+
+
+---------------------------------
+7  Creating/Manipulating Sections
+---------------------------------
+
+section_subsect(name, sect, create) -> sub_sect              [procedure]
+section_subsect(sect) -> sub_sect_list
+        In the first form of the call, given a section sect, returns the
+        subsection called name  of sect  (name is  a word).  If no  such
+        subsection currently exists, then
+
+            (a) If create is true, a new subsection of sect called
+            name is created and returned;
+
+            (b) If create is <false>, the mishap NONEXISTENT SECTION
+            occurs.
+
+        In the second form, given a section sect, returns a list of  all
+        subsections of sect.
+
+
+section_supersect(sect) -> super_sect                        [procedure]
+        Given a section  sect, returns the  section super_sect of  which
+        sect is  a  subsection, or  <false>  if sect  is  the  top-level
+        section pop_section.
+
+
+section_cancel(sect)                                         [procedure]
+section_cancel(sect, zap_pdprops)
+        Cancels the section sect, i.e. breaks the link to sect from  its
+        supersection (sect must not be top-level, although it's quite OK
+        for sect to be the CURRENT section).
+
+        If the  optional  boolean  argument  zap_pdprops  is  true,  the
+        pdprops of all procedures held in local identifiers of sect  are
+        set to <false>  (providing that they  are user procedures  whose
+        current pdprops  is  the  word  with  which  the  identifier  is
+        associated -- if not the pdprops are left untouched).
+
+        section_cancel also recursively  applies itself  (with the  same
+        value for zap_pdprops)  to any subsections  of sect,  cancelling
+        them too.
+
+
+section_name(sect) -> word                                   [procedure]
+        This procedure returns the name of  sect, or <false> if sect  is
+        pop_section (note  that  the  name does  not  include  the  full
+        pathname of sect).
+
+
+section_pathname(sect) -> string                             [procedure]
+        Returns the full pathname of sect, as a string (blank if sect is
+        pop_section).
+
+
+
+
+--------------------
+8  Standard Sections
+--------------------
+
+pop_section -> sect                                           [constant]
+        The value of this constant is the top-level section record,  the
+        root node of the section tree.
+
+
+pop_default_section -> sect                                   [variable]
+sect -> pop_default_section
+        This variable holds the default section to return to on  doing a
+        setpop (or when vederror is called inside VED). In other  words,
+        they both do the assignment
+
+            pop_default_section -> current_section;
+
+        The initial value of this variable is pop_section.
+
+
+current_section -> sect                                       [variable]
+sect -> current_section
+        This (active) variable  holds the current  section; its  initial
+        value is pop_section.
+
+
+
+
+----------------------------------
+9  Importing/Exporting Identifiers
+----------------------------------
+
+section_export(word)                                         [procedure]
+        Declares the word word  to be an export  of the current  section
+        (which must not  be top-level),  meaning that  whenever word  is
+        subsequently declared,  the identifier  attached to  it is  made
+        local to the section above (or  the section above that if it  is
+        exported from there ,  etc). At the same  time, word is made  an
+        import to  the current  section;  thus the  identifier  actually
+        'rises' to the highest  level section it  is NOT exported  from,
+        while at the same time 'sinking' down from there to the  current
+        section through all intermediate sections.
+
+        If word currently  has a  local identifier  associated with  it,
+        this 'rises' as described  above and ceases to  be local; if  it
+        has an  associated imported  identifier, then  exporting has  no
+        effect unless word  is cancelled and  redeclared, in which  case
+        the redeclaration is exported.
+
+
+section_import(word)                                         [procedure]
+        Declares the word word  to be an import  of the current  section
+        (which  must  not  be  top-level),  thus  making  available  the
+        identifier associated with word in the super-section of SECT. If
+        word already has a local identifier associated with it, this  is
+        CANCELLED. word is automatically  declared in the  super-section
+        if it is undefined there.
+
+
+
+
+-----------------
+10  Miscellaneous
+-----------------
+
+sys_read_path(first_item, use_itemread, needsect) -> result  [procedure]
+        Reads a  section/identifier  pathname  from  the  current  input
+        stream (i.e. from proglist).
+
+        If needsect is <false>, the pathname is interpreted as referring
+        to an identifier,  and the  appropriate word_identifier  (called
+        with CONTEXT argument "undef" -- see below) is the result.
+
+        If needsect has a true  value, the pathname is interpreted  as a
+        section name  (all sections  referenced  being created  if  they
+        don't exist).  For any  true  value of  needsect other  than  []
+        (nil), the  section  record for  the  target section  is  simply
+        returned; however, for  needsect =  [] the  result is  instead a
+        list of  all  section records  in  the pathname,  starting  with
+        pop_section if the pathname is absolute (i.e. begins with "$-").
+
+        It  is  assumed  that  the  pathname  begins  with  (the   word)
+        first_item,  which  has   already  been   read  from   proglist;
+        successive items of the pathname are then read with itemread  if
+        use_itemread is true, or readitem otherwise. (If the first  item
+        has not  been  read  then  the  first_item  argument  should  be
+        readitem() or itemread(), etc.)
+
+
+word_identifier(word, sect, context) -> word_id              [procedure]
+        This procedure enables sectioned  identifiers to be  represented
+        by unique word records.
+
+        Given a dictionary word  word and a  section sect, it  returns a
+        unique word word_id which has associated with it the  identifier
+        associated with word in  the section sect.  The word word_id  is
+        not entered in the  dictionary, and so  does not participate  in
+        the section mechanism; thus the identifier associated with it is
+        always guaranteed to be  that associated with  word in sect  (in
+        other words  word_id  is  a 'symbolic'  representation  of  that
+        particular identifier record).
+
+        What is meant by 'the  identifier associated with word in  sect'
+        further depends on the value of the context argument, which  can
+        take the following values:
+
+            false
+                Only identifiers strictly local  to sect are  considered
+                (i.e. not  including imports,  either explicit  ones  or
+                implicit "global" ones); <false> is returned if there is
+                no currently associated identifier.
+
+            the word "undef"
+                Same as  false,  but  if there  is  currently  no  local
+                identifier associated  with word,  an 'undeclared'  word
+                identifier is returned (see below).
+
+            anything else
+                Imported identifiers are  taken into  account, i.e.  the
+                state of word as  it would be if  sect were the  current
+                section is considered; false is returned if there is  no
+                currently associated identifier.
+
+        In all cases, the  characters of the word  word_id are the  full
+        section  pathname  of  its  identifier,  except  that  top-level
+        identifiers are not prefixed by '$-'.
+
+        The case of the "undef"  context argument is different from  the
+        other two in  that it  returns an  'undeclared' word  identifier
+        when there is no current local identifier. This word  identifier
+        will act as a vehicle for  declaring word in sect, in the  sense
+        that any later attachment of an identifier to word_id (e.g. with
+        ident_declare or  sysSYNTAX,  or  by a  direct  assignment  with
+        identof, etc),  will simultaneously  attach that  identifier  to
+        word in section sect. Conversely, a later declaration of word in
+        sect will cause the new identifier to become attached to word_id
+        also.
+
+        [Note that in all cases, cancelling word_id with syscancel  will
+        cancel word in sect. It  does not, however, actually remove  the
+        identifier from word_id, since word_id is supposed to  represent
+        that identifier uniquely. What it does do is to remove the  link
+        between word_id and word in sect, so that from the point of view
+        of  any   further   operations  it   becomes   a   'stand-alone'
+        identifier.]
+
+        If the word argument to word_identifier is not a dictionary word
+        (i.e. it is itself  a word identifier, or  a copied word),  then
+        word is just returned unchanged.
+
+        Note that  in  Pop-11,  any ident  expression  for  a  permanent
+        identifier  may  be  surrounded  by  word  quotes  to  get   the
+        corresponding quoted word identifier, e.g.
+
+            "ident $-mysect$-xxxx" -> word_id;
+
+        In addition, "nonactive" may be used in place of "ident":
+
+            "nonactive $-ved_current_file" -> pair;
+
+        This returns  the  word  identifier inside  a  'nonactive  pair'
+        suitable for giving to (e.g.) sys_current_val. Either "ident" or
+        "nonactive" may be followed by "weakref" to return the word in a
+        'weakref pair':
+
+            "ident weakref $-mysect$-xxxx" -> pair;
+
+        See REF * VMCODE.
+
+
+fast_app_sect_idents(sect, p)                                [procedure]
+        Applies the procedure p to all identifiers local to the  section
+        sect.  That  is,  for  each  word  having  a  local   identifier
+        associated with  it in  sect,  p is  called  with the  word  and
+        identifier record as arguments, i.e.
+
+                p(WORD, IDENT)
+
+        If sect is pop_section, then p is called for all words having an
+        associated top-level identifier.
+
+        If the  procedure  p create  new  words in  the  dictionary,  or
+        deletes existing  ones, or  declares or  cancels identifiers  in
+        sect, exactly what p is applied to is undefined; in this case it
+        is advisable to use a 'non-fast' version such as the following:
+
+               define app_sect_idents(sect, p);
+                    lvars sect, procedure p, n, v;
+                    {% fast_app_sect_idents(sect, identfn) %} -> v;
+                    for n from 1 by 2 to datalength(v) do
+                        p(subscrv(n,v), subscrv(n+1,v))
+                    endfor
+                enddefine;
+
+        etc.
+
+
+section_key -> key                                            [constant]
+        This  constant  holds  the  key  structure  for  sections   (see
+        REF * KEYS).
+
+
+
+
+------------
+11  Examples
+------------
+
+We will  now illustrate  the  mechanics of  sections by  some  examples.
+Suppose we declare list as a constant:
+
+        constant list = [this is a list of words];
+
+Normally, the  following procedure  definition  will produce  a  mishap,
+because list has already been declared as a constant (and so cannot be a
+procedure local):
+
+        define count(list);
+            if list == [] then
+                0
+            else
+                hd(list) + count(tl(list))
+            endif;
+        enddefine;
+
+However, if we put this definition  inside a section called various  (if
+we want to make sure  it's a subsection of  top-level we should call  it
+$-various)
+
+        section various;
+
+        define count(list);
+            if list == [] then
+                0
+            else
+                hd(list) + count(tl(list))
+            endif;
+        enddefine;
+
+        endsection;
+
+this is  OK, because  the local  variable  list used  in count  now  has
+nothing whatever  to  do  with  the previous  definition  of  list  as a
+constant -- the  word "list"  is associated  with different  identifiers
+inside and  outside of  section various.  Outside of  this section,  the
+identifier which  is the  local of  count is  inaccessible by  the  name
+'list' (but could be accessed as 'various$-list').
+
+    On the other hand, this applies  also the identifier count, i.e.  it
+cannot be accessed outside of various, and this is probably not what  we
+want. So if count is required to be used outside of various, we can make
+it an export of the section:
+
+        section various => count;
+        define count(list); ... enddefine;
+        endsection;
+
+Thus the definition of count  is treated as if  it were made outside  of
+various, while at the same time list remains internal to the section.
+
+    Now on entering a section, it  is NOT the case that any  identifiers
+defined outside are automatically  accessible inside. This is  generally
+what we want, i.e  that these external  identifiers should not  conflict
+with ones which are  internal to the section.  So in the example  above,
+the constant  list is  not available  inside various,  and so  does  not
+conflict with the local  of count. If we  have another constant,  vector
+say, and  we  try  to access  it  inside  section various,  it  will  be
+undefined:
+
+        constant vector = {1 2 3 4 5 6 7 8 9};
+        section various;
+        vector=>
+        ;;; DECLARING VARIABLE vector
+        ** <undef vector>
+        endsection;
+
+However, we can either make vector an explicit import of section various
+
+        section various vector;
+        vector=>
+        ** {1 2 3 4 5 6 7 8 9}
+        endsection;
+
+or, if we know that we are going to want to import it into any  section,
+we could have declared it as global in the first place:
+
+        global constant vector = {1 2 3 4 5 6 7 8 9};
+        section various;
+        vector=>
+        ** {1 2 3 4 5 6 7 8 9}
+        endsection;
+
+(Note that, in the definition of  count above, the system procedures  +,
+==, hd and tl were accessible inside various by virtue of being declared
+global, as all system identifiers are.)
+
+
+
+
+--- C.all/ref/sections
+--- Copyright University of Sussex 1992. All rights reserved.

@@ -1,0 +1,1809 @@
+REF SYSTEM                                          John Gibson May 1995
+
+        COPYRIGHT University of Sussex 1995. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<        POPLOG SYSTEM        >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<     CONTROL PROCEDURES      >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+This REF file deals  with the top-level  procedures and variables  which
+Poplog uses to start  itself up (including the  use of saved images  and
+special  flags),  execute  the  language  sub-systems,  perform  runtime
+actions, start X,  control the memory  space and exit.  It explains  its
+relationship to the operating systems which  call it and how the  Poplog
+program is realised.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   General System Startup
+      1.1   Saved Images
+      1.2   Special Flags
+      1.3   Remaining Arguments
+
+  2   Starting up Standard Language Systems
+
+  3   Directory Search Paths (popsavepath and popcomppath)
+
+  4   Additional Startup Mechanism in Unix
+
+  5   Procedures and Variables Concerned with System Startup
+
+  6   Runtime Actions
+
+  7   Starting up X-Windows Facilities
+
+  8   System Exit
+
+  9   Store Management
+
+ 10   Saving and Restoring the System State
+      10.1  Creating Layered Systems
+      10.2  Note on VMS Saved Images
+            ... Alpha VMS
+
+ 11   Incremental Save and Restore
+
+ 12   System Identification
+      12.1  Poplog Version
+      12.2  Machine & Operating System
+
+
+
+-------------------------
+1  General System Startup
+-------------------------
+
+Poplog, like any other program, is  invoked by issuing a command to  the
+operating system command interpreter (DCL on VMS machines, generally the
+C-shell on Unix machines).
+
+When Poplog starts up, it converts  the command by which it was  invoked
+into a list of strings, which is assigned to the variable poparglist0.
+
+The first element of this list is always the name under which Poplog was
+invoked; this is also  assigned to the variable  poparg0. In Unix it  is
+the usual '0-th'  argument, while  in VMS  it is  the full  name of  the
+Poplog image file being executed  (see poparglist0 below for details  of
+command line to argument translation in VMS).
+
+The remaining items  (if any) in  poparglist0 are the  arguments to  the
+command that invoked  Poplog, and  the sublist from  the second  element
+onwards is  assigned  to  the  variable  poparglist  (from  whence  each
+argument is taken as it is processed, so that poparglist always contains
+any remaining unprocessed arguments).
+
+The following two types of special argument may occur at the  beginning,
+and are always interpreted first by the system:
+
+    +filename
+        where filename is the name of a saved image to restore
+
+    %flag
+        where flag is the name of a special flag
+
+Saved image arguments must come first, followed by special flags.
+
+
+
+1.1  Saved Images
+-----------------
+These are arguments beginning  with a + character,  and specify a  saved
+image to restore: the argument (with the + removed) is taken as the name
+of the saved image. For  filenames not including an explicit  directory,
+the  directories  given   by  the   environment  variable/logical   name
+"popsavepath" are searched (see below).
+
+After restoring the  image, further  arguments beginning  with the  same
+character are taken as layered saved images to be restored on top of the
+previous one, and so on. Note that a saved image remembers the arguments
+for any previous images it was created on top of, and that these will be
+resurrected automatically if  omitted. Thus with  a sequence of  layered
+images, only  the  last need  be  specified (although  startup  will  be
+slightly quicker if all arguments are supplied).
+
+The  base  Poplog  executable  together  with  any  saved  images   then
+constitutes the complete  `image' being  run; where  saved image(s)  are
+present, control will be passed to the last one after any special  flags
+have been processed.
+
+For example,
+
+        pop11 +mysave
+
+(N.B. For upward compatibility reasons, the characters / in VMS and - in
+Unix may also  be used  to indicate saved  images, PROVIDING  + has  not
+already been used (i.e. + turns  off recognition of these on  subsequent
+arguments)).
+
+
+
+1.2  Special Flags
+------------------
+Special flags are arguments  that start with the  character `%` (in  VMS
+this must  be escaped  with a  preceding `\`,  since `%`  is a  wildcard
+character and  the  argument  would  undergo  filename  expansion).  The
+following flags are recognised:
+
+    Flag            Action
+    ----            ------
+    %nort           Prevents execution of any  `runtime actions' in  the
+                    image, and stops the variable pop_runtime being  set
+                    true. See Runtime Actions below.
+
+    %noinit         Assigns true to the variable pop_noinit.
+
+    %nobanner       Assigns true to the variable pop_nobanner.
+
+    %x              Assigns nil to the variable popunderx.
+
+The %x argument may  optionally be followed by  a parenthesised list  of
+arguments, which is assigned  to the variable  popunderx instead of  the
+empty list  (as  explained  below  under  poparglist0).  (In  Unix,  the
+parentheses must must  be escaped with  a preceding `\`  since they  are
+shell metacharacters).
+
+For example,
+
+        pop11 %x \( arg1 arg2 \)        (Unix)
+        pop11 \%x ( arg1 arg2 )         (VMS)
+
+Except for pop_runtime, all the  variables associated with command  line
+flags have  a  default value  of  false, assigned  if  the flag  is  not
+present. They affect subsequent startup behaviour, as described below.
+
+
+
+1.3  Remaining Arguments
+------------------------
+After processing saved  image and  special flag  arguments, any  runtime
+actions in  the  image are  executed  (unless %nort  was  present),  and
+control passes to the image.  Where saved image(s) are present,  control
+is passed to  the last  one (i.e.  the syssave  or sys_lock_system  that
+created it will return true).
+
+Thus the argument  processing described  above applies  when any  Poplog
+image or saved  image is run,  and the interpretation  of any  remaining
+arguments is  in  general  up  to the  particular  image.  However,  the
+standard Poplog  language subsystems  (Pop-11,  Prolog, CLisp  and  PML)
+accept further  arguments allowing  them to  be run  in different  modes
+(after which as usual, any remaining arguments are in poparglist).
+
+
+
+
+----------------------------------------
+2  Starting up Standard Language Systems
+----------------------------------------
+
+The base Poplog executable is the file
+
+         $popsys/basepop11       (Unix)
+         popsys:basepop11        (VMS)
+
+This can be invoked directly under the name "basepop11", but more  often
+than not, entry  to Poplog  is via one  of the  four language  subsystem
+commands:
+
+    pop11
+    prolog
+    clisp
+    pml
+
+These are all defined  to run the base  executable together with one  or
+more layered saved images appropriate to the particular language.
+
+Command definitions are set up by the Poplog login file:
+
+         $usepop/pop/com/popenv          (Unix)
+         usepop:[pop.com]popenv.com      (VMS)
+
+The "pop11" command definition is equivalent to:
+
+         basepop11 +$popsavelib/startup  (Unix)
+         basepop11 +popsavelib:startup   (VMS)
+
+The other languages are layered on top of "pop11": the "pml" command for
+example (for running Poplog ML) is equivalent to:
+
+         pop11 +$popsavelib/pml          (Unix)
+         pop11 +popsavelib:pml           (VMS)
+
+and the "prolog"  and "clisp"  definitions are  similar. (Strictly,  the
+directory "popsavelib"  need  not  be  specified  for  the  saved  image
+arguments because  it  is  included in  the  search  path  "popsavepath"
+described below. However, making it explicit reduces startup time.)
+
+All four language systems can be run in three different modes:
+
+    (1) execute expression mode
+
+    (2) compile file mode
+
+    (3) interactive mode
+
+On startup, they all call  the procedure syssetup, which checks  whether
+there is a further as yet unprocessed argument in poparglist, and if so,
+processes it as follows:
+
+ o  If the argument is one of
+
+        ved help teach ref doc
+
+    then this indicates  normal interactive startup  but inside the  Ved
+    editor (with the given Ved command).  The next argument (if any)  is
+    taken as a filename argument for the Ved command. E.g,
+
+        prolog ved myfile.pl
+
+ o  Otherwise, if the first character of  the argument is `:`, mode  (1)
+    is chosen. The rest of the argument is treated as a string of source
+    text, and  is  compiled. The  system  then exits.  (Note:  arguments
+    containing `:`  usually have  to be  quoted, on  both Unix  and  VMS
+    systems). E.g,
+
+        pop11 ":1+2=>"
+
+ o  Any other argument is  interpreted as the name  of a source file  to
+    compile (i.e.  mode  (2)).  If  the filename  does  not  include  an
+    explicit  directory,  the  directories  given  by  the   environment
+    variable 'popcomppath' are searched  (see below). Again, the  system
+    exits once the file has been compiled. E.g,
+
+        clisp foo.lsp
+
+If there is no argument in poparglist, or if Ved startup was  specified,
+then mode (3) is selected, and the system sets itself up for interactive
+use:
+
+ o  Unless pop_nobanner has been  set true via  the %nobanner flag,  the
+    general Poplog banner  -- popheader followed  by popcopyright --  is
+    printed, together with any  language-specific messages from  Prolog,
+    Common Lisp or Standard ML.
+
+ o  Unless pop_noinit  has  been set  true  via the  %noinit  flag,  all
+    appropriate "init" files are compiled.
+
+ o  If popunderx  has  been set  true  by  the %x  flag,  the  procedure
+    sysxsetup (described below)  is called. This  opens a connection  to
+    the X server.
+
+ o  If Ved startup  was specified, then  Ved is entered  with the  given
+    command.
+
+ o  Otherwise, setpop is called.  This calls pop_setpop_compiler,  which
+    will run the incremental compiler for the appropriate language.
+
+See Subsystem  Image  Startup in  REF * SUBSYSTEM  for a  more  detailed
+description of the procedure  syssetup. For additional information,  see
+HELP * INITIAL.
+
+
+
+
+-------------------------------------------------------
+3  Directory Search Paths (popsavepath and popcomppath)
+-------------------------------------------------------
+
+A  directory  search  path  mechanism  is  supported  for  saved   image
+filenames, and Pop-11 source file names specified in mode (2). A  search
+path is  an environment  variable/logical  name whose  translation  is a
+sequence of directory names, separated  from one another by ':'  (colon)
+characters in Unix or "|" (vertical bar) characters in VMS (and in which
+an empty  directory name  is interpreted  as the  current  directory). A
+filename that does not  include an explicit  directory is then  searched
+for in the given sequence of directories.
+
+For saved  images, the  search  path is  given by  "popsavepath",  whose
+standard value is
+
+        :$poplib:$poplocalbin:$popsavelib   (Unix)
+        |poplib:|poplocalbin:|popsavelib:   (VMS)
+
+(i.e.  search  the   current  directory  first,   then  "poplib",   then
+"poplocalbin", and finally "popsavelib".
+
+For Pop-11  source files,  the search  path is  given by  "popcomppath",
+whose standard value is
+
+        :$poplib:$poplocalauto:$popautolib:$popliblib   (Unix)
+        |poplib:|poplocalauto:|popautolib:|popliblib:   (VMS)
+
+(i.e.  search  the   current  directory  first,   then  "poplib",   then
+"poplocalauto", then "popautolib" and finally "popliblib")
+
+
+
+
+---------------------------------------
+4  Additional Startup Mechanism in Unix
+---------------------------------------
+
+In Unix systems  only, there  is an additional  startup mechanism  which
+allows the name under which the Poplog  image was invoked to be used  as
+an argument. When the system  is invoked under the  name X, it looks  to
+see if there is an environment variable called 'pop_X', and if so, makes
+the translation string of that variable the first argument (shifting  up
+the other arguments  if necessary).  Thus for example,  if you  create a
+link called 'mysave' to the Poplog image '$popsys/pop11', and define  an
+environment variable:
+
+        setenv pop_mysave "$pop_pop11 +mysave"
+
+then running the command "mysave" will have the same as effect as:
+
+        pop11 +mysave
+
+which in turn is equivalent to:
+
+        basepop11 +startup +mysave
+
+For this reason,  the directory  '$popsys' in fact  contains the  Poplog
+image linked under various names (with corresponding 'pop_X' environment
+variables defined), thus enabling the  system to be invoked as  "pop11",
+"ved", "prolog", etc.
+
+When this translation  occurs, poparglist0 gets  altered to reflect  the
+actual command run. In  particular the first element  (arg 0) is set  to
+the string  'basepop11'.  However  the  variable  poparg0  contains  the
+original arg 0 that Poplog was invoked with.
+
+
+
+
+---------------------------------------------------------
+5  Procedures and Variables Concerned with System Startup
+---------------------------------------------------------
+
+See also Runtime Actions below.
+
+
+poparglist0 -> list                                 [protected variable]
+        Contains the arguments with which Poplog was invoked, as a  list
+        of strings (or sub-lists of strings, see below).
+
+        The system initially  constructs a  basic list  of strings,  the
+        first element of which is always the name under which the system
+        was run (in Unix this is the usual 0-th argument; in VMS, it  is
+        the full name of the image file being executed, in lower case.)
+
+        In Unix, the  remaining argument  strings are as  passed by  the
+        execve call  that  initiated  the process;  in  VMS,  the  basic
+        argument strings are derived as explained below.
+
+        After setting  up the  basic list  of strings,  the system  then
+        processes the argument strings '(' and ')' specially. These  are
+        treated as "list brackets", and  cause all arguments strings  in
+        between to  be  gathered  into  a  single  sub-list  element  of
+        poparglist0 (note that when used in a Unix shell command, both (
+        and ) must be escaped with  backslash). A sub-list can be  empty
+        (i.e. if ')'  immediately follows '('),  or can contain  further
+        sub-lists delineated by nested occurrences of '(' and ')',  etc.
+        Any non-paired  '(' or  ')'  strings will  cause a  mishap  (and
+        system exit).
+
+        Derivation of Argument Strings in VMS
+        This simulates a  Unix style shell  with automatic expansion  of
+        filenames containing wildcards, as follows:
+
+        Argument strings are  constructed from the  DCL foreign  command
+        line by splitting  it at whitespace  boundaries, all  alphabetic
+        characters being translated to lower  case. To get spaces,  tabs
+        or uppercase alphabetic etc,  in an argument  it must be  quoted
+        with double quotes ",  which Poplog then  strips off (note  that
+        the trailing quote can be omitted on the last argument).  Inside
+        a quoted  argument,  two adjacent  double  quotes are  taken  to
+        represent the character ". E.g.
+
+            pop11 +MYsave "aBcD" "" " """
+
+        will produce the 5-element list
+
+            ['usepop:[pop.pop]pop11.exe;1' '+mysave' 'aBcD' ''  "]
+
+        with the last being a string  containing a ". Outside of  quoted
+        arguments, a  \  (backslash) can  also  be used  to  escape  the
+        following character; thus
+
+            pop11 +mysave a\Bc\D
+
+        will have the same  effect as "aBcD"  (although note that  since
+        DCL translates all unquoted lower case to upper, a\bc\d produces
+        the same effect).
+
+        Any argument containing the unquoted/unescaped wildcards
+
+            *  %  ...
+
+        is then replaced with  the filenames produced by  sys_file_match
+        applied to it (with an empty default filename). There must be at
+        least one matching filename.
+
+            In addition (because DCL  foreign command lines are  limited
+        to a  maximum  length of  255  characters), a  'file  expansion'
+        facility is provided to enable larger numbers of arguments to be
+        passed. An argument of the form
+
+                @filename
+
+        (i.e. beginning with an unquoted/unescaped @), will be  replaced
+        in the argument list with all arguments read from the text  file
+        filename (or  from  all the  files  matched by  filename  if  it
+        contains wildcards).
+
+        The processing of this  file is identical  to the processing  of
+        the command line described above, except for newlines (which  do
+        not appear  in a  foreign command  line): when  not enclosed  in
+        quotes or escaped  these are  treated as  spaces, and  therefore
+        serve to separate arguments. (Also, although unquoted  uppercase
+        alphabetic is  still translated  to lowercase,  the initial  DCL
+        translation of  lower to  upper is  absent --  thus in  a  file,
+        a\bc\d will give all lowercase). Files may contain further 'file
+        expansion' arguments of the same kind.
+
+        Note also that in a file of arguments a line containing a single
+        @ character (and  not inside  quotes) is  taken as  end-of-file.
+        While there is no need to  use this when filename is an ordinary
+        disk file, it is occasionally  useful for delimiting the end  of
+        the arguments when  using @sys$input  in a  DCL command  stream,
+        etc.
+
+
+poparg0 -> string                                   [protected variable]
+        This is  the  first element  of  poparglist0 as  it  was  before
+        startup processing.  (In  particular, before  any  rewriting  of
+        poparglist0 in response to pop_X environment variables in  Unix.
+        If  no   such   rewriting   occurred,  it   is   the   same   as
+        hd(poparglist0).)
+
+
+poparg1 -> string                                      [active variable]
+        This active  variable returns  the first  item from  poparglist0
+        after poparg0  and any  subsequent specially  flagged  arguments
+        (i.e. those beginning with `+`, `-`, or `%`). If no such item is
+        present in  poparglist0, false  is returned  instead.  Libraries
+        that take special action if loaded on Poplog startup may need to
+        examine poparg1 (see LIB * MKREFINDEX for an example).
+
+
+poparglist -> list                                            [variable]
+list -> poparglist
+        This is  a trailing  sublist  of poparglist0  (possibly  empty),
+        excluding those arguments that  have already been processed  (as
+        described in the sections above).
+
+
+pop_nobanner -> bool                                          [variable]
+bool -> pop_nobanner
+        This variable is  set by  the %nobanner argument  to Poplog.  If
+        set, printing of  the Poplog banner  is suppressed. Its  default
+        value is false.
+
+
+pop_noinit -> bool                                            [variable]
+bool -> pop_noinit
+        This variable is set by the %noinit argument to Poplog. If  set,
+        it  suppresses  the  call  of  "init"  files  on  normal  Poplog
+        language-image startup  (see below).  This means  that  'init.p'
+        files, etc will not be compiled.
+
+
+sys_process_poparg1(expr_compiler, file_compiler, extn)      [procedure]
+        This procedure  implements standard  Poplog argument  processing
+        for expression or file compilation.  It examines the first  item
+        in poparglist.
+
+        If  that  item   begins  with   a  colon   (:),  the   procedure
+        expr_compiler is applied to  a character repeater that  contains
+        all the characters (except  the colon) from  all the strings  in
+        poparglist.
+
+        Otherwise, the first  item in poparglist  is considered to  be a
+        filename. If it doesn't include  an extension part, extn  (which
+        should be a string) is appended.
+
+        If  the  filename  includes  a  directory  part,  the  procedure
+        file_compiler is applied  to it. Otherwise,  for each  directory
+        name  specified  in  the  environment  variable   "popcomppath",
+        file_compiler is applied to the directory name concatenated with
+        the  filename.  In  either  case,  if  file_compiler   returns a
+        non-false  result,  sys_process_poparg1  returns;   otherwise, a
+        mishap results.
+
+        On normal Pop-11 startup,  sys_process_poparg1 is invoked  (from
+        syssetup) as follows:
+
+            sys_process_poparg1(pop11_compile, trycompile, '.p')
+
+
+sys_parse_poparglist(argspec, arglist) -> (prop, rest)       [procedure]
+        This procedure is used  for processing Unix shell-style  command
+        line arguments to Poplog. It assumes  that arglist is a list  of
+        the form
+
+            [ flag1 arg1 flag2 arg2 ... ]
+
+        where arg1, arg2 etc are optional.
+
+        sys_parse_poparglist  returns  two  results,  a  property   prop
+        mapping flags  specified  in  argspec to  argument  values  from
+        arglist, and  rest, a  list of  the items  remaining in  arglist
+        after all the  flags and  their associated  arguments have  been
+        removed.
+
+        argspec should be a list  of two-element lists or vectors,  each
+        of the form
+
+            [ flag 0-or-1 ]
+
+        If the  second element  is  0, then  an  occurrence of  flag  in
+        arglist will cause true to be associated with it in the property
+        prop. If the second element is  1, then an occurence of flag  in
+        arglist will cause the item following flag to be associated with
+        it in the property prop.
+
+        sys_parse_poparglist  will  signal   errors  in  the   following
+        situations: if the same flag  occurs more than once in  arglist,
+        or if a flag that should be followed by argument is not followed
+        by one.
+
+        An example:
+
+            vars p r;
+            sys_parse_poparglist(
+                [['-a' 1] ['-b' 0] ['-c' 1]],
+                ['-c' 3 '-a' 1 '-b' 4 5 6]) -> (p, r);
+
+                p('-a') =>
+                ** 1
+                p('-b') =>
+                ** <true>
+                p('-c') =>
+                ** 3
+                r =>
+                ** [4 5 6]
+
+        sys_parse_poparglist is  not  used during  the  standard  Poplog
+        startup sequence; it is intended  for library programs that  are
+        run as arguments to Poplog (e.g. LIB * MKIMAGE).
+
+
+sysinitcomp()                                                [procedure]
+        Called by  the standard  Poplog language  images on  startup  to
+        compile 'init.p' files (except when invoked with expression/file
+        compilation arguments, etc, or when Poplog was given the %noinit
+        special flag).
+
+        If it exists, '$popsys/init.p' ('popsys:init.p' on VMS, etc)  is
+        first  compiled;  then  if  '$poplib/init.p'  exists,  that   is
+        compiled, otherwise 'init.p'  in the current  directory if  that
+        exists.
+
+
+setpop()                                                     [procedure]
+        Resets the Poplog system: unwinds all procedure calls, restoring
+        dynamic local values, and clears the user stack, etc.
+
+        If this  is  the  first setpop  (indicated  by  pop_first_setpop
+        true), or if standard  input (pop_charin_device) is a  terminal,
+        then pop_setpop_compiler  is  called to  (re)start  compilation.
+        Otherwise, sysexit is called to exit the system.
+
+        If compilation is restarted, pop_first_setpop is set false,  and
+        the variables cucharout  and cucharerr  are set  to charout  and
+        charerr respectively.
+
+
+pop_setpop_compiler()                     [protected procedure variable]
+        Called by setpop after the system has been reset.
+
+        In the base Poplog executable and standard language images,  the
+        default value of this variable  is a procedure which  (re)starts
+        compilation  for  the  subsystem   specified  by  the   variable
+        subsystem. That is, it
+
+            o Checks  that  the  compiler   and  other  procedures   for
+              subsystem are loaded;
+
+            o Calls the subsystem SS_RESET procedure;
+
+            o Calls the subsystem SS_COMPILER  procedure with charin  as
+              argument.
+
+        In addition, the variable pop_compiler_subsystem is locally  set
+        to subsystem (meaning that this represents a  compiler-subsystem
+        barrier). See REF * SUBSYSTEM for information about subsystems.
+
+        pop_setpop_compiler is also called by vedsetpop after  resetting
+        'immediate mode'  in Ved.  (vedsetpop  locally redefines  it  to
+        perform the  same actions  as above,  but with  vederror  called
+        instead of mishap if errors occur, etc.)
+
+        (Note however, that in the XVed standalone image, the  top-level
+        value of pop_setpop_compiler does  something different. It  does
+        not a  run  a  top-level  compiler, but  merely  waits  for  and
+        processes XVed events.)
+
+
+pop_first_setpop -> bool                                      [variable]
+bool -> pop_first_setpop
+        true before  setpop  is  first  called,  and  thereafter  false.
+        (Although setting it back to true will force the next setpop  to
+        reset,  regardless  of  whether  pop_charin_device  represents a
+        terminal.)
+
+
+
+
+------------------
+6  Runtime Actions
+------------------
+
+Poplog compilers  generally allow  source files  to contain  `top-level'
+code, that is, code which is executed at compile-time to perform various
+setting-up actions.
+
+However, when  compiling  source  code  to produce  a  saved  image  (or
+compiling  with  Popc  to  produce   an  executable  image,  etc),   the
+compile-time execution  of some  kinds of  action may  be  inappropriate
+because they depend on the run-time environment in which the image  will
+actually be used (for example, a procedure that sets up for a particular
+type of terminal).
+
+The system therefore provides  a mechanism whereby  such actions can  be
+automatically deferred  until the  appropriate time.  Essentially,  this
+comes down to a global  list of procedures (pop_runtime_actions),  which
+are executed whenever an image or  saved image starts up -- UNLESS  that
+image is  run with  the  special argument  %nort.  That is,  the  system
+assumes that `now' is `run-time' except when this argument is present.
+
+Action   procedures   are   accumulated   in   the   first   place   (in
+pop_runtime_actions) by the procedure sys_runtime_apply. This tests  the
+boolean variable pop_runtime  to determine whether  an action should  be
+executed  immediately   or   added  to   pop_runtime_actions.   However,
+pop_runtime can only be set by the system on image startup, because when
+one image is being  built on another, all  actions from the first  image
+must go un-executed into the new image (together with any new ones).
+
+Thus pop_runtime  is only  false when  the current  image was  run  with
+%nort. Running an image without %nort sets it true, as well as executing
+any existing actions.
+
+
+pop_runtime -> bool                                 [protected variable]
+        This boolean variable  indicates whether `now'  is `runtime'  or
+        not. It will have  a true value  unless the current  image/saved
+        image being run was given the startup argument %nort.
+
+        When true, its  value is  either the  boolean true  or the  word
+        "undef" ; the latter value indicates that the image did not have
+        any runtime  actions.  Thus  true indicates  that  actions  have
+        actually been run.
+
+        (N.B. Rather than  setting it false,  %nort actually leaves  the
+        value of  pop_runtime  unaltered. Thus  %nort  doesn't  actually
+        guarantee that pop_runtime is false, since it may have been true
+        already in the image. However, this can only happen when running
+        a `compromised'  saved image,  i.e.  one created  after  runtime
+        actions have  been run,  and  will NOT  occur  with any  of  the
+        standard Poplog saved images or the base system.)
+
+
+pop_runtime_actions -> list                         [protected variable]
+        The list  of action  procedures to  be executed  at runtime.  If
+        pop_runtime is true this  list will always  be empty, since  any
+        existing actions will  have been  run already, and  no new  ones
+        will accumulate.
+
+        (Note that when running action procedures on image startup, this
+        list is tailed  before running  each procedure;  thus an  action
+        procedure can determine which procedures are yet to be run.)
+
+
+sys_runtime_apply(action_p)                                  [procedure]
+        This procedure  `applies' a  runtime-action procedure  action_p.
+        That is, if pop_runtime is already true it simply calls
+
+                apply(action_p)
+
+        Otherwise, if pop_runtime is false, it adds action_p to the  end
+        of the list of procedures in pop_runtime_actions.
+
+
+
+
+-----------------------------------
+7  Starting up X-Windows Facilities
+-----------------------------------
+
+As explained above  the command  line flag %x  can be  used to  assign a
+non-false value to popunderx. This also causes sysxsetup to be run.
+
+Instead of using the command line, users who expect always to be running
+Poplog under X windows may put into their init.p files something like:
+
+        unless islist(popunderx) do
+            [] -> popunderx;
+            sysxsetup();
+        endunless;
+
+
+popunderx -> list_or_false                                    [variable]
+list_or_false -> popunderx
+        This variable is set to  a list if the  %x command line flag  is
+        used when Poplog is started up, as described above. Otherwise it
+        is assigned the default value false.
+
+        If %x is  followed in the  command line by  a bracketed list  of
+        arguments i.e. between `(` and `)`, then a corresponding list of
+        strings is constructed and assigned  to popunderx. If %x is  not
+        qualified, nil  is assigned  to  popunderx. If  popunderx  has a
+        non-false value, various procedures  will assume that Poplog  is
+        running under X. (This may cause  obscure errors if no X  server
+        is available.)
+
+
+sysxsetup()                                         [procedure variable]
+        This procedure is run by syssetup if popunderx is non-false (eg,
+        when Poplog is invoked with the %x flag.) Its default value is a
+        procedure  which  simply  calls  XptDefaultSetup  to  create  an
+        application context with name  derived from -poparg0- and  class
+        'Poplog' (for use in app-defaults, .xrdb files etc), and then to
+        create  a  single  display  connection.  These  are  stored   in
+        XptDefaultAppContext and XptDefaultDisplay (initially, they  are
+        false).
+
+        The user's init.p file, or  some other program can directly  run
+        sysxsetup or XptDefaultSetup whether or not the %x flag has been
+        used. Knowledgeable users may set up connections to an X  server
+        in other ways. See also HELP * X.
+
+        Since syssetup calls sysxsetup after sysinitcomp, sysxsetup  can
+        be redefined in init.p or initx.p if desired.
+
+
+
+
+--------------
+8  System Exit
+--------------
+
+sysexit()                                                    [procedure]
+        Exits the Poplog  system: closes  all files and  returns to  the
+        operating system:  the  variable  procedure  popexit  is  called
+        before doing this.  sysexit is  called by setpop  when it  reads
+        <termin> from the standard input.
+
+
+popexit()                                           [procedure variable]
+        Holds a procedure to be run  on exit from the system, i.e.  when
+        sysexit is called (thus the procedure in popexit may prevent the
+        system from actually exiting, e.g.  by doing a setpop).  Default
+        value is identfn.
+
+        (Note that in Unix Poplog, sysexit is called in certain  'fatal'
+        conditions where the system  is forced to  exit, for example  by
+        HUP or TERM  signals (see REF * ASYNC).  Since attempting to  do
+        I/O on terminals in  this state may cause  the process to  hang,
+        any of the standard devices popdevin/out/err and poprawdevin/out
+        which represent a terminal are replaced by null devices. popexit
+        procedures which  attempt to  do terminal  I/O should  therefore
+        take this into account, by first testing whether the appropriate
+        device is  in fact  a  terminal (and  do  nothing if  not).  The
+        correct test to use in this context is
+
+                systrmdev(dev) == true
+
+        which will be  true only if  dev is a  terminal and, in  systems
+        with Berkeley job control, only  if the process is a  foreground
+        job -- see REF * SYSIO.)
+
+
+pop_exit_ok -> bool                                           [variable]
+bool -> pop_exit_ok
+        Controls the status value returned  by sysexit to the  operating
+        system: if false, the standard error code (1 in Unix,  SS$_ABORT
+        in VMS) is returned, otherwise  the standard success code (0  in
+        Unix, SS$_NORMAL in VMS).
+
+        The default value is true, but  note that a call of mishap  will
+        set it false if the standard input is not a terminal (since  the
+        default value of interrupt under these circumstances is sysexit,
+        this guarantees that  a mishap  will result in  an error  status
+        being returned).  It is  also set  false by  the default  signal
+        handlers for HUP and TERM (see popexit above).
+
+
+fast_sysexit()                                               [procedure]
+        Exits the Poplog system without doing any of the tidying actions
+        described above. That  is, it does  not flush internal  buffers,
+        does not call popexit and does not write unwritten Ved files.
+
+
+
+
+-------------------
+9  Store Management
+-------------------
+
+popgcratio -> int                                             [variable]
+int -> popgcratio
+        Controls the weighting of garbage collection time in determining
+        memory allocation for the system. After each garbage collection,
+        the decision as to whether expand or contract memory is made  by
+        computing
+
+            (average automatic GC CPU time) * popgcratio
+            --------------------------------------------   - 1
+                (average program CPU time between GCs)
+
+        and then expanding or contracting by an amount proportional both
+        to this  value,  and  to  the amount  of  new  memory  used  for
+        structures since the last garbage collection.
+
+        The maximum  permitted value  for  popgcratio is  1024,  default
+        value is 40.
+
+        popmemlim imposes  an  absolute upper  limit  on the  amount  of
+        expansion. If  this is  set too  low, the  frequency of  garbage
+        collections may be far greater than necessary.
+
+        Also see * popgctrace.
+
+
+popmemlim -> int                                              [variable]
+int_or_false -> popmemlim
+        This  (active)  integer  variable  specifies  the  (approximate)
+        maximum number of words  to which the  system should expand  the
+        combined memory area for the heap and user stack. When  reached,
+        (or on some occasions, slightly  exceeded), the system will  not
+        expand further, and the mishap
+
+           'ROM: MEMORY LIMIT (popmemlim) EXCEEDED (using XXXX space)'
+
+        results. Here XXXX  is 'heap',  'stack' or  'fixed' to  indicate
+        whether the memory allocation request that caused the mishap was
+        for  an   ordinary  heap   structure,  the   user  stack,   or a
+        fixed-address heap structure.
+
+        The default value is 300000 (but higher defaults are used by the
+        Prolog and Lisp systems); if this  is not large enough for  your
+        program, you  should  experiment with  increasing  it  gradually
+        (e.g. in steps of 100000, or doubling it, etc). Increasing it by
+        too large  an amount  may cause  garbage collections  to  become
+        slower, by  virtue  of  there being  insufficient  extra  memory
+        available to  use the  copying  algorithm (see  pop_gc_copy  and
+        popgctrace below).
+
+        Assigning false (or a positive  biginteger) to popmemlim is  the
+        same as assigning the maximum  possible value (i.e. the  largest
+        simple integer).
+
+        Note that, regardless of popmemlim, the mishap
+
+            'ROM: NO MORE MEMORY AVAILABLE (needing XXXX space)'
+
+        may also occur.  This indicates  that the system  can expand  no
+        further, because  no  more  memory can  be  allocated  from  the
+        operating system (either because of a set limit on process size,
+        or through a lack of swap space, etc).
+
+        popmemlim cannot be  set smaller  than the current  size of  the
+        heap/user stack area; any value less than this will be  replaced
+        with the current size.
+
+        (See   also    pop_callstack_lim    in    REF * PROCEDURE    and
+        pop_prolog_lim in REF * PROLOG.)
+
+
+popminmemlim -> int                                           [variable]
+int -> popminmemlim
+        This (active) integer variable  specifies the minimum number  of
+        words at which the system should maintain the combined heap/user
+        stack memory area. When below this limit, the system will expand
+        up to it at the next garbage collection (if it can); thereafter,
+        it will never contract below this limit.
+
+
+sysgarbage()                                                 [procedure]
+        Forces the system  to do  a garbage collection.  (Note that  the
+        time for such a user-invoked garbage collection is not  included
+        in the automatic GC time total -- see popgcratio below).
+
+        (For information on user-specified actions to be performed  when
+        a  structure   is   about   to   be   garbage   collected,   see
+        REF * sys_destroy_action.)
+
+
+pop_after_gc()                                      [procedure variable]
+        The procedure  in  this  variable is  run  after  every  garbage
+        collection (default value identfn).
+
+
+pop_gc_copy -> bool                                           [variable]
+bool -> pop_gc_copy
+        If this variable is true (the default), then garbage collections
+        use  a  'copying'  algorithm,  which  temporarily  requires  the
+        allocation of extra memory in which to copy all non-locked  heap
+        structures; otherwise (or  if the required  extra memory is  not
+        available), a 'non-copying' algorithm is used.
+
+        The non-copying algorithm is generally 25% - 50% slower than the
+        copying one (although in some  situations it may be faster,  and
+        therefore worth setting this variable false). (Note however that
+        at certain  times the  system needs  to be  able to  shift  heap
+        structures up in memory, and  requires the copying algorithm  to
+        do  this;  thus  copying   collections  may  still  occur   when
+        pop_gc_copy is false.)
+
+
+popgctrace -> bool_or_int                                     [variable]
+bool_or_int -> popgctrace
+        If this variable (default value false) is true then a message is
+        output after each  garbage collection,  giving the  GC time  and
+        details of memory allocation (the characters of the message  are
+        output through cucharout).
+
+        The first line of the message has the form
+
+            GC-code(X) time MEM: u used + f free + s stack = total
+
+        where code is a  4-letter code indicating  why the GC  happened,
+        and time is the time for the garbage collection in seconds. X is
+        a letter indicating which garbage collection algorithm was  used
+        (C = copying, N = non-copying).
+
+        Values for code are as follows:
+
+            code    Reason Indicated
+            ----    ----------------
+            auto    The combined area for relocatable structures and the
+                    user stack was full.
+
+            fixd    The area for fixed-address structures was full.
+
+            ftbl    The internal table  of open  files/devices was  full
+                    when trying to open a  device. (A GC can free  space
+                    in  this  table  by  closing  and  removing  garbage
+                    devices.)
+
+            fopn    The operating-system imposed limit on the number  of
+                    open devices  was  reached  when  trying  to  open a
+                    device. (By closing garbage  devices, a GC can  make
+                    more available.)
+
+            plog    The  combined  area   for  the   Prolog  trail   and
+                    continuation stack was full.
+
+            save    GC done by syssave.
+
+            lock    GC done by sys_lock_system.
+
+            user    Direct call of sysgarbage from a user program.
+
+        If popgctrace has  any non-false  value other  than an  integer,
+        only  the  first  line  is  output.  Additional  information  is
+        obtained by  giving  it  an integer  value,  whose  bits  select
+        further message lines as follows:
+
+            Bit     Meaning
+            ---     -------
+             0      Same as  setting  both  bits 2  and  3  (for  upward
+                    compatibility in assigning  1 to  get the  callstack
+                    and Prolog information).
+
+             1      Fixed-address structures; prints
+
+                        FIXED: u used + fb freeblks + f free = total
+
+                    where used  is the  number of  words used  by  fixed
+                    structures,  freeblks   the   number  used   up   in
+                    (discontiguous) free  blocks,  free  the  number  of
+                    (contiguous) free, and total the total. These values
+                    are included in the first-line totals, freeblks  and
+                    free being subsumed together under total words free.
+
+                    (Note that  space  for fixed-address  structures  is
+                    allocated from free blocks if possible, but  because
+                    of fragmentation a given figure for freeblks doesn't
+                    imply that  that  much  is actually  usable  in  any
+                    context.)
+
+             2      Callstack; prints
+
+                        CALLSTACK: cstack
+
+                    where  cstack  is  the  number  of  words  used   by
+                    procedure-call stack frames.
+
+             3      Prolog store area; prints
+
+                      PROLOG: trail trl + free free + contn ctn = total
+
+                    where trl is the number of words used by the  trail,
+                    free the number  free, ctn  the number  used by  the
+                    continuation stack, and total the total.
+
+        The MEM figures refer to totals  for all heap segments: used  is
+        the number of words  used by structures,  free the number  free,
+        stack the number taken by the  user stack, and total the  total.
+        If the  heap is  locked with  sys_lock_heap then  an  additional
+        l lock figure precedes used, i.e.
+
+         GC-code(X) time MEM: l lock + u used + f free + s stack = total
+
+        where lock is the  total number of words  in the locked part  of
+        the heap (note this includes both used and unused space).
+
+
+popgctime -> int                                    [protected variable]
+        Contains the total cpu time spent doing non user-invoked garbage
+        collections,  in  1/100ths  second.  Also  see  popgctrace   and
+        systime.
+
+
+popmemused -> int                                   [protected variable]
+        Contains the total number of words of heap memory in use at  the
+        last garbage collection.
+
+
+sys_lock_heap()                                              [procedure]
+        Tells the system to 'lock' the heap at its current endpoint. The
+        effect of this is  that all structures in  the heap before  this
+        point will automatically be treated as non-garbage (considerably
+        reducing the amount of work needed  to be done on them  during a
+        garbage collection). Structures created after the  sys_lock_heap
+        will be treated normally.
+
+        It is sensible to call sysgarbage before sys_lock_heap. E.g.  at
+        the end of a file which  compiles a lot of procedures which  are
+        not going to be edited, do
+
+                sysgarbage(); sys_lock_heap();
+
+        See also sys_lock_system below.
+
+
+sys_unlock_heap()                                            [procedure]
+        Reverses the  effect of  sys_lock_heap, so  that all  structures
+        previously locked in now participate  fully in the next  garbage
+        collection.
+
+
+pop_malloc_min_alloc -> Nbytes                                [variable]
+Nbytes -> pop_malloc_min_alloc
+        (Unix Only) This active variable controls the minimum amount  of
+        memory that  Poplog's version  of UNIX * malloc  should  request
+        from the  operating system  each time  it requires  further  new
+        memory.
+
+        Continual malloc requests  for new memory  (i.e. resulting  from
+        external procedure calls) may lead to excessive segmentation  of
+        the Poplog heap  if they  alternate too  frequently with  Poplog
+        heap expansion,  and  may  eventually result  in  Poplog's  heap
+        segment table overflowing (with the mishap 'MEMORY SEGMENT TABLE
+        FULL').
+
+        Assigning a higher value to pop_malloc_min_alloc will cure  this
+        problem.
+
+
+
+
+-----------------------------------------
+10  Saving and Restoring the System State
+-----------------------------------------
+
+There are two procedures  that create Poplog  saved images: syssave  and
+sys_lock_system. The latter  is always  to be  preferred for  creating a
+proper `system'  image  (even  without  other layers  on  top),  and  is
+described in the next section.
+
+Note that from Version 14.1 of Poplog, there is an essential interaction
+between saved images  and runtime actions  (see Runtime Actions  above).
+Basically, this means that any saved image created after runtime actions
+have been executed is `deficient' or `compromised' in the sense that  it
+may fail to work properly in one  or more respects (or indeed, at  all).
+This happens when the system in which  you are saving the image was  NOT
+started with the special argument %nort.
+
+If you are just  using e.g. syssave to  save some work informally,  this
+may or may  not matter  (and in  any event,  cannot be  helped). To  use
+either procedure to  create a `proper'  (or `production quality')  saved
+image, you MUST run the image in which you compile your system with  the
+%nort argument  (which  allows  runtime actions  to  accumulate  and  go
+unexecuted into your saved image).
+
+(Runtime actions are particularly relevant to certain uses of externally
+loading -- in fact, the main purpose for which they were introduced. See
+REF * EXTERNAL.)
+
+
+syssave(filename) -> restored                                [procedure]
+        Saves the total  state of  the Poplog  system in  a file  called
+        filename (this includes  the state  of external  loading --  for
+        details see REF * EXTERNAL).
+
+        The result of this  procedure is false  on immediate return;  on
+        restoring the file with sysrestore (qv) the result will be true.
+
+        filename may be either a word or a string: if a word, '.psv'  is
+        appended.
+
+        (In VMS, see Note on VMS Saved Images below.)
+
+
+sysrestore(filename)                                         [procedure]
+sysrestore(filename, mode)
+        Restores the Poplog system to be in the state it was at the time
+        the saved image specified by  the filename filename was  created
+        (with syssave or sys_lock_system). Note however that
+
+            # The standard files (popdevin, popdevout, popdeverr);
+            # poparglist and popenvlist;
+            # poppid and popusername.
+
+        all remain as they were before the call of sysrestore.
+
+        When this procedure exits, it will be as if the call of  syssave
+        or sys_lock_system that created the file had returned, but  with
+        true as result instead of false.
+
+        By default, a mishap will result if either (a) filename does not
+        exist, or (b) the identification  string from filename does  not
+        match the current value of pop_system_version (i.e. filename may
+        only be restored into  the same system  environment in which  it
+        was created).
+
+        The optional  boolean argument  mode can  be used  to  prevent a
+        mishap occurring in either of these cases. false means no mishap
+        for case  (a), true  means  no mishap  for  either (a)  or  (b).
+        Instead of producing a mishap, sysrestore will simply return  to
+        its caller (with no result).
+
+        filename may be either a word or a string: if a word, '.psv'  is
+        appended.
+
+        VMS  Note:  If  filename  is   a  shareable  image  created   by
+        sys_lock_system the nonwriteable part of filename will be shared
+        between all users in  the same group,  unless filename has  been
+        installed with  sys_install_image  to be  shareable  system-wide
+        (i.e. there is a permanent system global section for it).
+
+
+pop_after_restore()                                 [procedure variable]
+        The procedure in this variable is run by sysrestore  immediately
+        after a successful restore  and before returning (default  value
+        identfn).
+
+
+
+10.1  Creating Layered Systems
+------------------------------
+The procedure  sys_lock_system makes  possible the  creation of  layered
+systems in Poplog. It takes the current heap endpoint to be the boundary
+of a self-contained 'system' on top of which other layers will be built,
+and is similar to a sys_lock_heap combined with an (optional) syssave to
+create a saved image for the new system. However, its behaviour  differs
+from this in two important respects:
+
+    First, the locking of the current contents of the heap is permanent,
+and cannot be undone; the structures locked in cease to be 'part of  the
+heap', and  become  'part  of the  system'.  Second,  all  (relocatable)
+structures are  partitioned  into two  areas  of memory:  writeable  and
+nonwriteable  (the  structures  put  in  the  nonwriteable  area  become
+physically write-protected, so that  any subsequent attempt to  update a
+field in  one of  them will  cause  an error).  The importance  of  this
+partitioning is that
+
+    (a) nonwriteable structures  mean that  garbage collection  time  is
+        reduced (since the garbage collector can just ignore them);
+
+    (b) if a  saved image  is being  created, the  area of  nonwriteable
+        structures can (at least in principle) be made shareable by  all
+        users of the saved image;
+
+    (c) it is unnecessary  for the  nonwriteable area to  be saved  when
+        creating further saved images on  top of the new system  (either
+        with syssave or with another sys_lock_system).
+
+(Note that a major  consequence of (c) is  that subsequent saved  images
+created on  top  of  the  new  system can  only  be  restored  into  the
+environment of that system, and NOT into basic Poplog -- i.e. one  saved
+image must be layered on top of another.)
+
+    The above considerations make it  desirable that as many  structures
+as possible go into  the nonwriteable area. To  facilitate this, and  to
+provide means to ensure that structures that must be writeable are  kept
+so, there is a 3-level mechanism for specifying which structures  should
+be put where:
+
+    (1) At an  individual level,  with the  property  sys_writeable_prop
+        (and the operators  writeable and nonwriteable  which assign  to
+        it, see  below).  An  individual  structure  can  be  marked  as
+        definitely writeable or definitely nonwriteable.
+
+    (2) A class default, with an optional "writeable" or  "nonwriteable"
+        attribute for the key of a  class of structures (see conskey  in
+        REF * KEYS). If present, this default is used for any  structure
+        of the class not individually marked in (1).
+
+    (3) A general  default specified  directly to  sys_lock_system,  for
+        anything not covered by (1) or (2).
+
+Of the data structures built into the system, all the  'non-specialised'
+types such as  pairs (and  so lists), and  the vector-classes  (strings,
+full vectors,  etc),  have neither  a  writeable or  nonwriteable  class
+default. They  are  thus  governed  by  the  general  default  given  to
+sys_lock_system, and for this to be  nonwriteable you may need to  apply
+writeable to  some individual  structures of  this type  (as system  and
+library code  does).  (The  one  exception  to  this  is  single-element
+references: these have a writeable class default).
+
+Otherwise, specialised  built-in types  have  a default  which  reflects
+their function,  e.g  words and  variable  identifiers are  always  kept
+writeable; numbers such as bigintegers, ratios and complex which have no
+updateable fields are nonwriteable, etc. Certain specific structures the
+system knows cannot be updated are  also made nonwriteable (such as  the
+strings of  word records).  The  default for  any  existing key  can  be
+determined with class_attribute (see REF * KEYS).
+
+    One class requiring special mention  is procedures (and closures  in
+particular). These have a nonwriteable  default, and so the pdprops  and
+updater fields become non-assignable  in any procedure not  individually
+marked writeable; for closures  this applies to  the pdpart and  frozval
+fields  also.  However  (since  they  are  sometimes  used  in  a  'data
+structure' mode where the frozvals need to be updated),  sys_lock_system
+allows a writeable default for closures to be specified.
+
+    (N.B. None of  the above  applies to  fixed-address structures  used
+with external procedures. These cannot be moved into nonwriteable areas,
+and so always remain writeable.)
+
+
+sys_lock_system(false, mode_flags, system_id)                [procedure]
+sys_lock_system(filename, mode_flags, system_id) -> restored
+        Permanently  locks  the   current  heap  as   a  new   'system',
+        partitioning all relocatable heap structures into writeable  and
+        nonwriteable memory areas, and optionally saves the system state
+        in a saved image (see the general description of this  procedure
+        above).
+
+        (Note that the variable  pop_record_writeable should usually  be
+        set true before commencing compilation of a program to be  saved
+        with sys_lock_system -- see Note 1 below.)
+
+        The arguments are as follows:
+
+        filename
+            false in the first form, or a filename string in the second.
+
+            If   filename    is    supplied,    then    following    the
+            writeable/nonwriteable partitioning,  a  'special'  call  of
+            syssave with  filename  argument filename  creates  a  saved
+            image to preserve the initial  state of the new system.  The
+            result  of  syssave  is  returned  as  the  result  of  this
+            sys_lock_system, i.e. false after saving, true on restoring.
+            (The call  is  'special' in  the  sense that  it  saves  the
+            nonwriteable  area,  whereas   any  subsequent  syssave   or
+            sys_lock_system will not.)
+
+            When the argument is false,  no saved image is created,  and
+            no result is returned.
+
+        mode_flags
+            An integer argument, in which bits 0 - 2 have the following
+            meanings:
+
+               Bit  Meaning
+               ---  -------
+                0   On restoring  the  saved image,  this  bit  controls
+                    whether the memory into which the nonwriteable  area
+                    is mapped will be shared  by all users of the  image
+                    (but see Note 4 below):
+                        0 = unshared, 1 = shared
+
+                1   This bit determines  the default  placement for  all
+                    structures  not  individually  or  class-marked   as
+                    writeable/nonwriteable:
+                        0 = writeable, 1 = nonwriteable
+
+                2   Normally,   closures    not   individually    marked
+                    writeable/nonwriteable   default   to   nonwriteable
+                    (since  they  are  procedures,  and  procedures  are
+                    class-marked nonwriteable). Setting this bit  allows
+                    user closures  (but not  protected system  ones)  to
+                    default to writeable:
+                      0 = closures nonwriteable, 1 = closures writeable
+
+            (N.B. For compatibility with  older versions of Poplog,  the
+            mode_flags argument  may  also  be  a  boolean,  true  being
+            equivalent to 2:001 and false to 2:000, i.e. general default
+            writeable/closure  default  nonwriteable,  with  or  without
+            sharing.)
+
+        system_id
+            A  system   identification  string.   As  mentioned   above,
+            subsequent  saved   images  created   in  the   new   system
+            environment can be only  restored into the same  environment
+            (either without  ever  leaving  it or  after  restoring  the
+            system saved  image).  To  ensure that  any  attempt  to  do
+            otherwise   is   trapped   as   an   error,   the   variable
+            pop_system_version holds  an identification  string for  the
+            current system,  this  being  recorded on  any  saved  image
+            created therein. sysrestore will  produce an error if  asked
+            to restore an image whose identification does not equal  the
+            current value of pop_system_version.
+
+            For the new system being created, pop_system_version is  set
+            to  the  system_id  string  'timestamped'  by  concatenating
+            sysdaytime() onto the end.
+
+        Notes
+
+        (1) The variable pop_record_writeable should usually be set true
+            before commencing compilation of a program to be saved  with
+            sys_lock_system. This  is because  many system  and  library
+            routines rely  on  the  writeable operator  to  ensure  that
+            individual structures  they use  are kept  writeable  (which
+            becomes ineffective when pop_record_writeable is false).
+
+            To guard against  this, sys_lock_system will  mishap if  any
+            necessary  call   to   writeable  was   ignored   owing   to
+            pop_record_writeable being false. 'Necessary' in this  sense
+            means  that  (with  the   given  mode_flags  argument)   the
+            structure(s) for which  writeable was  ignored would  become
+            nonwriteable.
+
+        (2) After processing  the  entries  in  sys_writeable_prop,  the
+            property is cleared  (since the  entries are  of no  further
+            use). In  addition,  pop_record_writeable is  set  to  false
+            afterwards.
+
+        (3) To reflect  the fact  that  the nonwriteable  and  writeable
+            areas  have  been  removed  from  the  heap,  popmemlim  and
+            popminmemlim are  reduced  by  their  total  size  (but  for
+            popmemlim, not below 32K words).
+
+        (4) Although bit 0  in the mode_flags  argument may always  take
+            either  value,  whether  or  not  sharing  actually  happens
+            depends upon  the operating  system. Currently  (May  1995),
+            sharing is possible in VMS, Sun0S and OSF1 (but not HP-UX).
+
+            (In addition in VMS,  sharing is only  between users in  the
+            same group unless the procedure sys_install_image is used to
+            make the image globally  shareable, see below. Don't  make a
+            VMS image shared unless it really needs to be, i.e. will  be
+            used concurrently by several users on a regular basis, since
+            shared images consume VMS system resources.)
+
+        (5) In VMS, see also Note on VMS Saved Images below.
+
+
+sys_writeable_prop(item) -> status                           [procedure]
+status -> sys_writeable_prop(item)
+        This is  a  temporary  property whose  entries  are  scanned  by
+        sys_lock_system   (and    Popc   compilation)    to    determine
+        writability/non-writability  for  individual  structures  (after
+        which the property is cleared).
+
+        If an entry exists for a given item, its status value must  be a
+        boolean, true meaning writeable, false meaning nonwriteable (the
+        default value of the property, when no entry exists, is the word
+        "undef").
+
+        N.B. Any  entry in  the  property for  a non-heap  structure  or
+        simple object will be ignored.
+
+
+writeable    item -> item                                   [operator 1]
+nonwriteable item -> item                                   [operator 1]
+        These two operators provide a  convenient way of making  entries
+        for individual structures  in sys_writeable_prop,  but doing  so
+        only when sys_lock_system is going  to be used (as indicated  by
+        pop_record_writeable being true).
+
+        If  pop_record_writeable  is  true,  item  is  marked  with   an
+        appropriate entry in sys_writeable_prop, true for writeable  and
+        false for nonwriteable. However, there are two special cases:
+
+            # If item is  a pair whose  back is another  pair, then  the
+              back pair is also marked (and so on recursively,  allowing
+              all pairs in a list to be marked writeable/nonwriteable);
+
+            # If item is  an array  procedure, then  the arrayvector  of
+              item is marked, not item  itself (since this is what  will
+              actually be updated if the array is assigned to).
+
+        In any event, both operators return the argument item as result.
+        This allows  them  to  be  used e.g.  in  front  of  constructor
+        expressions like
+
+                constant list = writeable [%1, 2, 3, 4%];
+
+        etc.
+
+
+pop_record_writeable -> bool                                  [variable]
+bool -> pop_record_writeable
+        Unless sys_lock_system  is going  to be  used, entries  made  in
+        sys_writeable_prop  are  wasted  space.  This  variable   allows
+        writeable  and  nonwriteable  to  be  used  freely  in  programs
+        (including system  and  library  code),  while  preventing  them
+        making sys_writeable_prop entries except when necessary.
+
+        Since its default value is false, it should usually be set  true
+        before commencing  compilation of  a program  to be  saved  with
+        sys_lock_system.  (It   is   automatically   set   true   during
+        compilation of a file with  Popc.) sys_lock_system will in  fact
+        mishap if any necessary call  to writeable was ignored owing  to
+        pop_record_writeable   being   false    (see   Note   1    under
+        * sys_lock_system above).
+
+
+sys_install_image(filename, install)                         [procedure]
+        This procedure is  currently available only  in VMS systems.  In
+        VMS, the nonwriteable part of a shareable saved image created by
+        sys_lock_system is by default shared  only between users in  the
+        same group; this  procedure enables or  disables its sharing  by
+        all users in the system. To operate, however, the Poplog process
+        running the procedure must have the privileges
+
+            SYSGBL (create/delete system global section)
+            PRMGBL (create/delete permanent global section)
+
+        If the boolean argument install is true, the image specified  by
+        filename is 'installed', i.e.  made shareable system-wide.  (The
+        blocks comprising  the nonwriteable  area are  made a  permanent
+        system global section.)
+
+        If install is false, filename is de-installed and will revert to
+        group sharing. (An existing permanent system global section  for
+        filename is deleted.)
+
+
+
+10.2  Note on VMS Saved Images
+------------------------------
+Poplog, in common with  other VMS programs,  uses VMS shareable  images.
+Certain standard shareable images are already in use in the basic Poplog
+system (popsys:basepop11.exe), and others may be externally loaded while
+the system is running (see REF * EXTERNAL). In both cases, the shareable
+images reside in  fixed size  memory areas  inside Poplog,  and this  is
+reflected  in   the  saved   images  produced   by  both   syssave   and
+sys_lock_system: when a  saved image is  restored, the shareable  images
+are activated and mapped into their appropriate areas.
+
+    However, in new releases of VMS, standard shareable images can  grow
+in size (through addition  of new facilities  or extensions to  existing
+ones). If the total  growth in a  new release is too  much, one or  more
+images may overflow the area Poplog  had allowed for them at the  time a
+saved image was  created, and in  this event the  saved image cannot  be
+restored. (Thus a saved image may work  in the VMS release in which  was
+created, but fail  to work  in a later  release.) If  this happens,  the
+mishap
+
+    crsv: CAN'T RESTORE - VMS SHAREABLE IMAGES HAVE EXPANDED,
+            NEED TO REBUILD SAVED IMAGE
+
+occurs.
+
+    Although there is no complete  solution to this problem, the  system
+does allow you to  control the `safety margin'  of space it leaves  free
+for shareable image expansion. This  is specified by giving the  logical
+name
+
+    pop_shrim_margin
+
+an integer percentage value; the system will then leave that percent  of
+the shareable  images' size  free for  expansion. For  example, the  DCL
+command
+
+    $ define pop_shrim_margin 20
+
+will allow 20%  for expansion.  (If "pop_shrim_margin" is  not set,  the
+default is 10%.)
+
+The mishap above also  tries to be helpful  in this respect by  printing
+out
+
+    INVOLVING: 'expansion margin allowed A%, needed N%'
+
+where A was the  expansion margin allowed for  when the saved image  was
+built, and  N is  the (minimum)  margin that  would have  actually  been
+needed for the saved image to restore successfully.
+
+    Note that as regards  those shareable images already  in use in  the
+basic Poplog  executable,  "pop_shrim_margin" is  only  effective  for a
+saved image created directly on top of basic Poplog. For example, if you
+are creating a saved  image on top of  the standard Prolog saved  image,
+and you wish to give  it a bigger safety  margin, you must first  remake
+the standard Prolog image  with "pop_shrim_margin" set accordingly  (and
+then rebuild your image on  top -- for which "pop_shrim_margin"  becomes
+irrelevant  unless   your  program   involves  other   externally-loaded
+shareable images).
+
+    Unfortunately, there is no way  of predicting by how much  shareable
+images will expand in any given  release of VMS. A 10% expansion  margin
+is probably  sufficient to  cope  with at  least  one new  release,  and
+possibly two or three, but this cannot be guaranteed.
+
+...  Alpha VMS
+--------------
+In Alpha VMS, "pop_shrim_margin" applies only to those shareable  images
+used by the basic Poplog executable popsys:basepop11.exe (at least,  for
+`proper' saved images created with %nort).
+
+This is because when compiling  code to create a  saved image on top  of
+another Poplog image started with %nort, a request to  externally-load a
+new shareable  image  does  not  actually result  in  that  image  being
+activated; rather,  the  shareable  image is  only  activated  when  the
+created saved image is run (i.e, run without %nort).
+
+Hence the externally-loaded shareable image  does not occupy any  memory
+locations in the  saved image, and  the "pop_shrim_margin" problem  does
+not occur.
+
+
+
+
+--------------------------------
+11  Incremental Save and Restore
+--------------------------------
+
+(Note that the procedures in this section are defective, in that they do
+not cope with Pop-11 sections and a number of other things. Their use is
+therefore deprecated.)
+
+syssaveincr(filename, item)                                  [procedure]
+        Saves, in a file called filename, all structures that can traced
+        from  the  item  item,  i.e.  item,  all  structures  that  item
+        references, that those structures reference, and so on.
+
+        However, although references to any  structure which is part  of
+        the  system  are  saved,  anything  referenced  BY  that  system
+        structure will not be saved. Thus, for example, if cucharout has
+        been given a particular value, this value will not be saved.  To
+        obviate this  problem, if  item  is a  list then  the  following
+        happens: item  and  all structures  traceable  from it  will  be
+        saved, but in  addition, permanent  identifiers associated  with
+        any system  words occurring  in item  will also  be saved.  Thus
+        every system  word  required  to  be  saved  must  be  mentioned
+        explicitly in the list item.
+
+        See sysrestoreincr for what happens  when the file is  restored.
+        Example:
+
+            vars list = [1 2 3 4];
+            syssaveincr("save", "list");
+
+        saves the word "list", its identifier and the list it  contains,
+        in a file called 'save.psi'.
+
+        filename may be either a word or a string: if a word, '.psi'  is
+        appended.
+
+
+sysrestoreincr(filename)                                     [procedure]
+sysrestoreincr(filename, mode)
+        Restores all the structures saved  with syssaveincr in the  file
+        filename. Any words that were in  the dictionary at the time  of
+        saving are  restored to  the dictionary  if not  already  there,
+        associated  permanent  identifiers  being  set  to  their  saved
+        values. Any system words  explicitly saved also have  associated
+        permanent identifiers restored. E.g. restoring the example given
+        in syssaveincr:
+
+            sysrestoreincr("save");
+            list =>
+            ** [1 2 3 4]
+
+        restores the file called 'save.psi',  i.e. the word "list",  its
+        identifier and the list it contains.
+
+        filename may be either a word or a string: if a word, '.psi'  is
+        appended.
+
+        The optional mode argument is the same as for sysrestore, qv.
+
+
+
+
+-------------------------
+12  System Identification
+-------------------------
+
+12.1  Poplog Version
+--------------------
+
+pop_internal_version -> int                                   [constant]
+        This is  a simple  integer defining  the version  of the  Poplog
+        system in use, in the form
+
+            (major * 10000) + minor
+
+        where major  is the  major version  number and  minor the  minor
+        version number within the former.
+
+
+popversion -> string                                [protected variable]
+        Contains an identification string giving the version number  and
+        creation date of this Poplog system, e.g.
+
+            '(Version 12.3 Thu Nov 20 20:54:11 GMT 1987)'
+
+        Note that the version number appearing in this string is derived
+        as
+
+            pop_internal_version/10000.0
+
+
+pop_system_version -> string                        [protected variable]
+        Contains the identification  string for the  current system  and
+        version, used  by  syssave  and sys_lock_system  to  record  the
+        identity of the system in which a saved image is being  created,
+        and by sysrestore  to check that  identity when restoring.  Only
+        sys_lock_system alters this variable; in the base Poplog system,
+        it has the same value as popversion.
+
+
+popheader -> string                                           [variable]
+string -> popheader
+        This is a banner string, normally printed out when Poplog starts
+        up in normal mode  (i.e. when not  invoked with arguments),  and
+        thereafter made  false  to indicate  that  the banner  has  been
+        printed. The string is constructed as
+
+            'Sussex Poplog ' <> popversion
+
+        e.g.
+
+           'Sussex Poplog (Version 12.3 Thu Nov 20 20:54:11 GMT 1986)'
+
+
+popcopyright -> string                                        [constant]
+        The Poplog copyright string, printed after the banner.
+
+
+
+12.2  Machine & Operating System
+--------------------------------
+
+sys_host_id() -> host_id_list                                [procedure]
+        Returns a  list  of  one  or more  items  identifying  the  host
+        machine, or false if this cannot be determined.
+
+        Under Unix System V  Release 4, the result  is a 1-element  list
+        containing the result returned by a call to UNIX * sysinfo  with
+        command SI_HW_SERIAL.  In general  this will  be a  string,  but
+        where the string consists only of decimal digits it is converted
+        to a (big)integer before being returned.
+
+        On Berkeley  Unix  systems,  the  result  is  a  1-element  list
+        containing the integer returned  by the UNIX * gethostid  system
+        call; on  the  HP  Bobcat,  the result  is  false  (since  HP-UX
+        currently has no gethostid call).
+
+        On VMS, the result is  a 2-element list containing the  integers
+        returned by the sys$getsyi system service for the function codes
+        SYI$_SID (System Identification) and SYI$_CPU (CPU type).
+
+
+sys_host_name() -> host_name                                 [procedure]
+        Returns the name of  the host machine as  a string, or false  if
+        this cannot be determined.
+
+        Under Unix System V Release 4, this procedure returns the result
+        of a call to UNIX * sysinfo with command SI_HOSTNAME.
+
+        On Berkeley Unix systems (including  the HP Bobcat), it  returns
+        the result of the UNIX * gethostname system call.
+
+        On  VMS,  it  returns  the  translation  of  the  logical   name
+        "sys$node".
+
+
+sys_machine_type -> list                                      [constant]
+        This is  a list  of  words and  numbers describing  the  generic
+        machine type on which Poplog is running. Current possible values
+        are:
+
+            [vax]
+            [sun3]
+            [sun4]
+            [hp9000 300]
+            [hp9000 700]
+            [iris]
+            [decstation]
+            [alpha]
+
+
+sys_os_type -> list                                           [constant]
+        This is a  list of words  and numbers giving  attributes of  the
+        operating system under which Poplog is running. Current possible
+        values for the start of this list are:
+
+            [vms 5.5]                 ;;; VMS VAXs
+            [vms 6.1]                 ;;; VMS Alphas/VAXs
+            [unix sunos 4.1  ...]     ;;; Sun workstations
+            [unix sunos 5.3  ...]     ;;; Sun workstations (Solaris 2.3)
+            [unix hpux 9.0   ...]     ;;; Hewlett-Packard 9000
+            [unix irix 4.0   ...]     ;;; Silicon Graphics IRIS
+            [unix ultrix 4.3 ...]     ;;; DEC RISC
+            [unix osf1 3.0   ...]     ;;; Alpha OSF1
+
+        In Unix systems,  the list also  contains another two  elements,
+        viz
+
+            [... posix vector]
+
+        where vector  is a  full  vector whose  N-th element  gives  the
+        revision date of the POSIX-N standard available on this platform
+        (or false if POSIX-N is not available). For example:
+
+            [unix sunos 5.3 posix {199309}]
+            [unix osf1 3.0  posix {199009 199209}]
+
+        (Note that  vector  is  only  as  long  as  its  last  non-false
+        element.)
+
+        You should  be  careful  when  making  comparisons  against  the
+        floating-point  version  number  which  appears  in  this  list:
+        representation and rounding errors mean that the = operator will
+        not always return true for numbers which appear to be equal. The
+        secure method for doing comparisons is by using the macro  DEFV:
+        see HELP * DEFV.
+
+        (You should  also be  careful  not to  assume the  current  last
+        element of the list will always be last, since further  elements
+        may be added in the future.)
+
+
+sys_processor_type -> list                                    [constant]
+        This is a list of words and numbers describing the processor  on
+        which Poplog is running. Current possible values are:
+
+            [vax]
+            [sparc]
+            [mips]
+            [hppa]
+            [68020]
+            [68010]
+            [68000]
+            [80386]
+            [alpha]
+
+
+pophost(word) -> attribute                                   [procedure]
+        This  procedure  is  a  property  that  supplies  more  complete
+        information about  the  underlying  system on  which  Poplog  is
+        running    than    do    sys_machine_type,    sys_os_type    and
+        sys_processor_type.  Currently,  there   are  entries  in   this
+        property for the following keywords:
+
+            Keyword               Meaning
+            -------               -------
+            os                    operating system name
+            osversion             operating system version
+            machine               host machine
+            machinetype           generic machine type (eg 'vax')
+            systemname            the local name of the machine
+            memory                approximate amount of memory
+            machineserialnumber   serial number of machine
+            site                  where the machine is
+            sitemailname          electronic mail address for site
+            fullsitename          official site address
+
+        All attribute  values  are  strings  or  numbers,  generally  in
+        lowercase only, with  the default for  entries being false.  You
+        should examine  the  library  file that  defines  this  property
+        (LIB * POPHOST) to  find  the  format  of  the  information  you
+        require before writing programs to use it.
+
+
+
+
+--- C.all/ref/system
+--- Copyright University of Sussex 1995. All rights reserved.

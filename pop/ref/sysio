@@ -1,0 +1,1299 @@
+REF SYSIO                                           John Gibson Apr 1996
+                                            Revised John Gibson Apr 1999
+
+        COPYRIGHT University of Sussex 1999. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<    DEVICES AND SYSTEM       >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<     INPUT AND OUTPUT        >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<        PROCEDURES           >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+This file describes the most basic level of input and output  facilities
+in  Poplog,   namely  input   and  output   via  device   records.   For
+character-stream input and output procedures, see REF * CHARIO.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+      1.1   System vs User Devices
+
+  2   Opening System Devices
+
+  3   Reading Devices
+
+  4   Writing Devices
+
+  5   Line Repeaters and Consumers
+
+  6   File Control Operations
+
+  7   File Information
+
+  8   Predicates on Devices
+
+  9   Device Information
+
+ 10   Standard Devices
+
+ 11   Constructing User Devices
+
+ 12   Miscellaneous
+
+
+
+---------------
+1  Introduction
+---------------
+
+This file describes the most basic level of input and output  facilities
+in  Poplog,   namely  input   and  output   via  device   records.   For
+character-stream input/output procedures, see REF * CHARIO.
+
+    System  device  records  are  created  for  files  with  sysopen  or
+syscreate (also  syspipe in  Unix  and sysmailbox  in  VMS). As  far  as
+possible, the device input and  output facilities have been designed  to
+provide a Unix style interface (i.e. the ability to read/write any  file
+as  a  stream  of  bytes),  but  with  extensions  where  necessary;  in
+particular, the  above  device-creating procedures  take  an  additional
+argument to their Unix counterparts, which specifies the  `organisation'
+of the file (and allows compatibility between Unix and VMS Poplog).
+
+    (As part  of  this  in  Unix  Poplog,  every  device  representing a
+terminal maintains a full  set of terminal parameters  which are set  on
+the terminal whenever that device is used (unless it is already set  for
+that  device).   In   this   way   multiple   devices   with   different
+characteristics can be made  to work for  the same underlying  terminal,
+with automatic switching between different settings as appropriate.  See
+sys_io_control below for more information.)
+
+    Interfaces  to  operating  system  I/O  calls  are  provided   where
+appropriate, wherever possible  in a  form that can  be made  compatible
+across   all   Poplog    implementations.   Various   other    operating
+system-related facilities (e.g. filename  processing) are dealt with  in
+REF * SYSUTIL.
+
+In Unix systems, see also REF * SOCKETS, which provides an interface  to
+the Berkeley Unix socket facilities for network communications.
+
+
+1.1  System vs User Devices
+---------------------------
+In addition to the system devices created by sysopen, etc, there is also
+a facility for creating user devices (with consdevice). User devices can
+specify arbitrary procedures to deal  with I/O requests from  procedures
+like sysread  and syswrite  applied to  them, and  can thus  be used  to
+implement simulated I/O channels. (For example, this facility is used in
+the Ved editor to allow device I/O on Ved buffers).
+
+Note that in  the descriptions  that follow,  sdev is  used to  denote a
+system device, udev a user device, and dev either kind.
+
+
+
+
+-------------------------
+2  Opening System Devices
+-------------------------
+
+The procedures  sysopen,  syscreate, syspipe  and  sysmailbox  described
+below all take an  argument org to specify  the organisation of a  file.
+This argument can currently take the  following values (which are by  no
+means satisfactory, and will hopefully be improved in the future):
+
+false
+    For terminals, this gives normal interactive line mode, with prompts
+    given by popprompt.
+
+    For terminals and  other Unix 'interactive'  devices (such as  pipes
+    and sockets), this value  means that a sysread  of N bytes will  not
+    attempt to read  the full N  bytes if less  are available, i.e.  the
+    call may return less than N.
+
+    For  Unix  disk  files,  the  full  N  bytes  are  read  except   at
+    end-of-file.
+
+    For VMS disk files and  mailboxes, this value means  record-oriented
+    processing, i.e.  the file  is a  sequence of  records (lines)  each
+    (possibly) ending with either an explicit newline or implicit one as
+    specified by the "Implicit C/R"  attribute of a file.  Newly-created
+    disk files  are  given "Implicit  C/R"  attribute. In  reading,  the
+    newlines are inserted by the  system where necessary; in  writing, a
+    newline is taken as end of  record. The file is then considered  (in
+    Unix fashion) as a byte-stream.
+
+    However,  VMS   terminals  and   mailboxes   behave  as   for   Unix
+    'interactive' devices, i.e. a sysread of N bytes will not attempt to
+    read the full N bytes if  the current record contains less; for  VMS
+    files, N  will be  supplied even  though a  record boundary  may  be
+    crossed. (Similarily, one syswrite can actually write the characters
+    of more than one record at a time.)
+
+the word "line"
+    For all kinds of  device, this value will  mean that a sysread  of N
+    bytes from  the  device  will  only read  up  to  the  next  newline
+    character, e.g. sysread(dev, buff, 512) will read the next line  and
+    return the number of characters read.
+
+    In VMS, the characters of adjoining records are never conflated in a
+    single read or write operation; in other respects, this is the  same
+    as false.
+
+the word "record"
+    In Unix, this  is the same  as "line". In  VMS however, "record"  is
+    different from "line"  in that  newlines are not  appended to  input
+    records, nor  stripped  from output  records  (as with  "line",  the
+    characters of adjoining records are never conflated in a single read
+    or write  operation).  An  output  disk file  is  not  created  with
+    `Implicit C/R' attribute.
+
+true
+    For Unix terminals, the device is  initially set up for `rare'  mode
+    (i.e. cbreak, -echo, -nl,  -tabs) and no prompt  is output for  read
+    operations (see sys_io_control below.). VMS terminals give a similar
+    mode, i.e.  no  echoing,  no prompts,  all  characters  are  `break'
+    characters, no formatting of output, etc.
+
+    For other Unix 'interactive' devices (such as pipes and  sockets), a
+    sysread of N  bytes will always  attempt to read  the full N  bytes,
+    i.e. the call can only return less than N at end-of-file.
+
+    For Unix disk files, true is the same as false.
+
+    For VMS disk or  tape files this implies  block I/O, i.e. the  bytes
+    from the virtual blocks of the file are supplied neat, with  nothing
+    added, and there  are no  record boundaries. Output  disk files  are
+    created as fixed-length, 512 byte records.
+
+The following table summarises the intended uses of each org value:
+
+        org         Use For
+        ---         -------
+        false       Character-stream  I/O   on   'interactive'   devices
+                    (terminals, pipes,  sockets,  mailboxes),  and  text
+                    files.
+
+        "line"      Line I/O on 'interactive' devices and text files.
+
+        "record"    VMS record  I/O  on any  kind  of  record-orientated
+                    files (in Unix, same as "line").
+
+        true        `Raw' mode I/O on  terminals; I/O on non-text  files
+                    (including block mode in VMS).
+
+Note that all the procedures below which take a filename argument  first
+translate the given name with sysfileok (see REF * SYSUTIL).
+
+
+sysopen(filename, access_mode, org)           -> sdev        [procedure]
+sysopen(filename, access_mode, org, err_char) -> sdev
+        Returns a  system  device  record  sdev  for  the  filename  (or
+        operating system  device, etc)  named  by the  string  filename,
+        opened  for  access  mode  access_mode  with  organisation  org.
+        Permissible values of access_mode are
+
+                0   Read only
+                1   Write only
+                2   Read and Write
+
+        Permissible values for org are as described above.
+
+        The optional  err_char argument  is  an integer  character  code
+        specifying whether to  return false (as  opposed to  producing a
+        mishap) if  the  file  cannot  be  opened.  This  can  take  the
+        following values:
+
+           Value    Action
+           -----    ------
+            `A`     Return false for any  error concerned with  filename
+                    or its existence/accessibility.
+
+            `D`     Return false for a non-existent directory or file.
+
+            `F`     Return false if the  directory exists, but the  file
+                    doesn't. This is the default if err_char is omitted.
+
+            `N`     Never return false (i.e. mishap for any error).
+
+        (Note that for  `A`, a  mishap can  still occur  for errors  not
+        concerned directly with filename, e.g. the file can't be  opened
+        because the operating system's limit on the number of open files
+        has been reached.)
+
+
+readable(filename) -> sdev                                   [procedure]
+        This procedure is the same as
+
+               sysopen(filename, 0, false, `A`) -> sdev
+
+        i.e. filename opened  for reading with  org argument false  (and
+        false returned for any open errors).
+
+
+syscreate(filename, access_mode, org)           -> sdev      [procedure]
+syscreate(filename, access_mode, org, err_char) -> sdev
+        Returns a system  device record sdev  for filename, created  for
+        access mode  access_mode with  organisation org.  The values  of
+        access_mode and org are as for sysopen. A mishap results if  for
+        any reason the file cannot be created.
+
+        The optional  err_char argument  is  an integer  character  code
+        allowing special behaviour in one case:
+
+           Value    Action
+           -----    ------
+            `F`     If the file already exists,  treat this as an  error
+                    and return false (note  the difference between  this
+                    and `F` for sysopen).  The operation of testing  for
+                    the file's presence  and creating it  if it  doesn't
+                    exist is guaranteed to be atomic, i.e. no other  O/S
+                    process can create the file in between (`F` is  thus
+                    suitable for creating lockfiles).
+
+            `N`     Never  return  false  --  this  is  the  default  if
+                    err_char is omitted.
+
+
+pop_file_mode -> int                                          [variable]
+int -> pop_file_mode
+        (Unix  ONLY)   This  integer   variable  supplies   the   access
+        permissions  mode  given  to  the  Unix  creat  system  call  by
+        syscreate. (See  chmod(2) in  the  Unix Programmers  Manual  for
+        possible values; the default value is 8:664, i.e. read and write
+        by owner and group, read only for world.)
+
+        Note that this variable is only used by syscreate when  creating
+        a NEW file: if a file exists already, its access permissions are
+        left unchanged.
+
+
+pop_file_versions -> int_or_false                             [variable]
+int_or_false -> pop_file_versions
+        In Unix, this integer variable  controls the creation of  `back'
+        file versions by syscreate. Poplog uses a convention that `back'
+        versions of a disk file are named by suffixing the original file
+        name with one or more `-` characters (i.e. the most recent  back
+        file of 'foo' is 'foo-', the next most recent is 'foo--', and so
+        on).
+
+        The  action  of  syscreate  is  therefore  to  try  to  maintain
+        pop_file_versions of a file (e.g. 2 means the original file plus
+        1 back version, 3 means the original plus 2 back versions, etc).
+        This is  done  by 'moving  back'  all existing  versions  up  to
+        pop_file_versions, the oldest one being deleted.
+
+        The exact operation of 'moving  back' a file depends on  whether
+        the file has only 1 link, or more than 1: in the former case the
+        file is simply renamed as the  'back' name, while in the  latter
+        case (to preserve the links), the file is copied to a new one of
+        that name.
+
+        The procedure  sysdelete  (see  REF * SYSUTIL)  also  uses  this
+        variable to 'move  forward' old versions  when deleting a  file.
+        That  is,  if  back  versions  of  the  file  within  the  range
+        pop_file_versions exist, then the  above process is reversed  to
+        bring the back versions forward. (In order to suppress this make
+        pop_file_versions locally false.)
+
+        Setting pop_file_versions  to  false  in Unix  is  the  same  as
+        setting it to 1 (i.e. disable the back file mechanism).
+
+        In  VMS,  pop_file_versions   contains  false   or  an   integer
+        specifying the  number  of versions  of  a file  that  syscreate
+        should maintain, i.e.  a value  of 2 means  maintain the  latest
+        version and one  old version, etc.  If the value  is false  (the
+        default)  then  Poplog  just  allows  the  normal  VMS   version
+        mechanisms to  operate (and  hence any  limit on  the number  of
+        versions   is   imposed   by   VMS   settings).   Unlike   Unix,
+        pop_file_versions has no affect on sysdelete in VMS.
+
+
+syspipe(org) -> (out_sdev, in_sdev)                          [procedure]
+        (Unix Only) Creates  a Unix  pipe and returns  input and  output
+        system devices  for  it.  Permissible  values  for  org  are  as
+        described above.
+
+
+sysmailbox(logname, access_mode, org) -> sdev                [procedure]
+        (VMS Only) Returns a system  device for a temporary VMS  mailbox
+        (i.e. a virtual device that can be used to send data between VMS
+        processes). When  a mailbox  is created,  it is  given a  'real'
+        device name which is something  like 'MBAxx', but access to  the
+        mailbox is usually through a  logical name whose translation  is
+        the real name.
+
+        The string  logname is  the  logical name  of the  mailbox;  two
+        situations can occur:
+
+            (a) logname already translates to a mailbox name -- in this
+                case that mailbox is simply opened;
+
+            (b) logname has no translation, in which case a mailbox is
+                created and opened, logname being entered into the job
+                logical name table with translation the real name of
+                the mailbox (i.e. MBAxx or whatever).
+
+        The access  mode access_mode  and the  org argument  are as  for
+        syscreate, except  that  org may  only  have the  values  false,
+        "line" or "record". If false, newline is taken as end of record;
+        if "line"  or  "record",  every syswrite  to  the  mailbox  is a
+        separate record.
+
+        VMS mailboxes support special `end of file' records. In  Poplog,
+        these are read as 0-byte records (i.e. a sysread returns 0,  and
+        a character  repeater for  the  mailbox returns  termin).  For a
+        mailbox open for writing, an end of file record is written  when
+        the device is closed (and can also be written by a syswrite  for
+        0 bytes).
+
+        (Note that a temporary mailbox exists only while one or more VMS
+        processes have it open -- if  all processes have closed it,  the
+        mailbox will be deleted along with the entry in the job  logical
+        name table.)
+
+
+sysclose(dev)                                                [procedure]
+        Closes the (system or  user) device dev  (note that all  garbage
+        collected system device records are closed automatically, as are
+        all system devices on system exit).
+
+
+
+
+------------------
+3  Reading Devices
+------------------
+
+sysread(dev, bsub, bytestruct, nbytes) -> nread              [procedure]
+sysread(dev, bytestruct, nbytes) -> nread
+        Reads up to nbytes bytes from the device dev into the  structure
+        bytestruct starting  at  byte  subscript bsub,  and  returns  as
+        result the actual number nread of bytes read.
+
+        In general, nread will be nbytes for disk/tape (except  possibly
+        near or at  end-of-file); for terminals  and pipes/mailboxes  it
+        will be whatever is available, depending on the value of the org
+        argument when the device  was opened. A result  of 0 bytes  read
+        indicates end-of-file.
+
+        The structure bytestruct must be  'byte accessible', for a  full
+        explanation of which see REF * DATA. The bytes are read into the
+        structure bytestruct starting at byte subscript bsub, the  first
+        applicable byte of  the structure having  subscript 1 (which  as
+        explained in REF * DATA  is the  first byte  at the  structure's
+        pointer).
+
+        This means  that if  bytestruct is  any kind  of vector  (like a
+        string), the bytes are read in starting at the 1st component; if
+        bytestruct is a  record the  bytes will occupy  fields from  the
+        pointer position onwards.  In all cases,  the structure must  be
+        large enough to contain all bytes read.
+
+        The second form of the call with bsub omitted is the same as
+
+           sysread(dev, 1, bytestruct, nbytes)
+
+        i.e. bsub defaults to 1.
+
+
+getc(dev) -> char                                            [procedure]
+        Uses sysread to  read a single  byte char from  the device  dev,
+        which must be  open for reading.  termin is returned  at end  of
+        file.
+
+
+sys_read_lines(file, l1, l2)                                 [procedure]
+                          -> (line_l1, ..., line_l2, nread)
+sys_read_lines(file, l1, l2, bool)
+                          -> (line_l1, ..., line_l2, nread)
+        Extracts the lines numbered  l1 through l2  from the file  file,
+        which should either be  the name of a  file, or a device  record
+        opened for reading (with org  false or "line"). If the  optional
+        boolean argument  bool  is  supplied  and  true,  the  procedure
+        vedfile_line_repeater is  used  to  read  the  specified  lines,
+        otherwise the  lines  are  read  with  sysread.  The  lines  are
+        returned as strings  on the stack  (without terminating  newline
+        characters), followed  by  an  integer  (nread)  signifying  the
+        number of lines read (which should be equal to l2 - l1 + 1).  An
+        error is signalled if there are too few lines in the file.
+
+        Note that sys_read_lines uses an internal buffer of size 255, so
+        file should not contain lines longer than this.
+
+        See also  REF * line_repeater, REF * vedfile_line_repeater,  and
+        REF * vedreadin.
+
+
+popprompt -> string_or_p                                      [variable]
+string_or_p -> popprompt
+        The value  of this  variable  determines the  prompt  characters
+        output by sysread when  reading from a  terminal in normal  line
+        mode (i.e. device  opened with  org argument false).  It may  be
+        either an actual prompt string, or a procedure p of no arguments
+        returning one, i.e.
+
+                p() -> string
+
+
+pop_timeout_secs -> false_or_int                              [variable]
+false_or_int -> pop_timeout_secs
+        Holds an integer or false, to control timing-out of all terminal
+        read requests with sysread. If the value is a integer >= 0, then
+        any terminal read operation will be timed-out after that  number
+        of seconds, the variable procedure pop_timeout being called when
+        this happens. (Default value false.)
+
+
+pop_timeout()                                       [procedure variable]
+        The procedure in  this variable  is called  whenever a  terminal
+        read operation is timed-out with pop_timeout_secs. The procedure
+        is called  inside  sysread; if  it  returns normally,  the  read
+        operation is restarted. (Default value identfn).
+
+
+sys_input_waiting(dev) -> N_or_false                         [procedure]
+sys_input_waiting(dev_list1) -> dev_list2   (Unix Only)
+        For a readable `interactive'-type  device (i.e. a terminal  or a
+        pipe/mailbox), returns an integer count N of the number of input
+        characters currently available to be  read on the given  device;
+        false is  returned if  none are  available (and  a read  on  the
+        device would hang waiting for input).
+
+        For all other kinds  of input device (which  can't hang up  on a
+        read), returns the  number of characters  currently in  Poplog's
+        input buffer for the device (which could be 0).
+
+        The second (Unix only) form is the same as
+
+          sys_device_wait(dev_list1, [], [], false) -> (dev_list2, , );
+
+        i.e. takes a  list of  readable devices  and returns  a list  of
+        those  for  which  input  is  available  (see  * sys_device_wait
+        below).
+
+
+sys_clear_input(dev)                                         [procedure]
+        For  a   readable   `interactive'-type   device   (terminal   or
+        pipe/mailbox), clears any  input characters currently  available
+        to  be  read  on  the  device  (e.g.  including  typeahead  on a
+        terminal). If  dev is  also writeable,  any buffered  output  is
+        written out first.
+
+        For all other  kinds of  input device,  it just  writes out  any
+        buffered output (if the device is also writeable).
+
+
+
+
+------------------
+4  Writing Devices
+------------------
+
+syswrite(dev, bsub, bytestruct, nbytes)                      [procedure]
+syswrite(dev, bytestruct, nbytes)
+        Writes nbytes bytes from the structure bytestruct to the  device
+        dev, starting at byte bsub after the structure's key, or  byte 1
+        if bsub is  absent Thus  syswrite is similar  to sysread  except
+        that bytes  are  written rather  than  read, and  no  result  is
+        returned.
+
+        In addition for syswrite, the bytestruct argument may be a word:
+        in this case, bytes are written out from the string held in  the
+        word record.
+
+
+pop_buffer_charout -> bool                                    [variable]
+bool -> pop_buffer_charout
+        This boolean  variable  (default true)  controls  whether  write
+        operations to  normal  line-mode  terminals  or  pipes/mailboxes
+        (i.e. device opened  with org argument  false) are buffered.  If
+        true, then  characters  are  only actually  written  out  when a
+        control  character  (ASCII   value  <  32,   e.g.  newline)   is
+        encountered;  otherwise,   all   characters  are   written   out
+        immediately. (Note  that  all  other  devices  are  buffered  by
+        default -- use sysflush to force data to be written out.)
+
+
+sysflush(dev)                                                [procedure]
+sysflush(dev, sync_file)
+        For any  writeable device  dev, flushes  (i.e. writes  out)  any
+        bytes outstanding in Poplog's buffer.
+
+        sync_file is an optional boolean  argument (which is ignored  in
+        VMS). For a disk  file in Unix, this  argument being true  means
+        'sync' the file, i.e. force  any data buffered by the  operating
+        system to be written to disk  (if sync_file is absent or  false,
+        the current  state  of the  file  is therefore  not  necessarily
+        reflected on disk).
+
+
+pop_file_write_error(dev)                           [procedure variable]
+        If a write error occurs while  writing to a disk or tape  device
+        with syswrite (usually, with disk files,  due to a full disk  or
+        exceeded quota), the device is immediately closed. The device is
+        then given as argument to this variable procedure, which  should
+        take appropriate  action  with  the  partly-written  file  (e.g.
+        delete  it  with  sysdelete(device_full_name(dev))  ).  (Default
+        value erase).
+
+
+
+
+-------------------------------
+5  Line Repeaters and Consumers
+-------------------------------
+
+The following utility procedures operate on files at a line level:
+
+line_repeater(file, int_or_string) -> line_rep               [procedure]
+        Returns a  `line  repeater' procedure  for  the file.  The  file
+        argument can  be a  file name,  or a  device record  opened  for
+        reading (with org false or "line"). If the second argument is an
+        integer it is  taken as the  maximum length of  any line in  the
+        file; if a string,  it is used as  the input buffer for  sysread
+        (the string length should be one more than the expected  maximum
+        line length).
+
+        line_rep is a procedure of the form:
+
+            line_rep() -> string_or_termin
+
+        i.e. each time line_rep is called it returns the next line  from
+        the  file  (without  the  terminating  newline  character),   or
+        termin if it has reached end of file.
+
+        See also REF * sys_read_lines, * vedfile_line_repeater.
+
+
+postscript_line_consumer(file)           -> line_cons        [procedure]
+postscript_line_consumer(file, arg_list) -> line_cons
+postscript_line_consumer(file, arg_list, font_name, font_height,
+                        font_pixel_height, line_pixel_height,
+                        colour_vec, X_width_p) -> line_cons
+        Takes a  filename or  output  device file,  and returns  a  line
+        consumer, i.e. a procedure which takes strings and dstrings (see
+        Display Strings  in  REF * STRINGS)  and  writes  them  to  file
+        encoded as ASCII PostScript  instructions suitable for  printing
+        on PostScript printers.
+
+        file is given to  * discout to create an  output device, and  so
+        can be any argument suitable for that procedure.
+
+        The returned line_cons is a procedure of the form
+
+            line_cons(string_or_termin)
+
+        which each time it  is called with a  string as argument  writes
+        the PostScript code for printing the string to file. Each string
+        is a separate line. If the given string is a dstring,  line_cons
+        generates the appropriate  PostScript code to  print the  string
+        using its character  attributes. Calling line_cons(termin)  will
+        generate the PostScript code to eject the current page, and also
+        closes the device (either the one supplied or the one created).
+
+        All  Ved  character  attributes  are  translated  appropriately,
+        including bold, italic,  underline etc. For  coloured text,  the
+        consumer  will  print  foreground   and  background  using   the
+        following grey-levels (0% = black, 100% = white):
+
+            Colour   Fg   Bg      Colour   Fg   Bg
+            ------   --   --      ------   --   --
+               0      0  100         1    100    0
+               2     50  100         3      0   80
+               4     70  100         5    100   30
+               6     30  100         7     30   80
+
+        The following Ved extended characters  are also dealt with  (See
+        REF * ITEMISE):
+
+            Ved Graphics Characters
+            Ved Special Space Characters
+            ISOLatin1 characters
+
+        Optional Arguments
+        If supplied, arg_list must be a list of argument strings of the
+        form
+
+            'keyword=value'
+
+        where the following keywords are allowed:
+
+            font    Controls the  set of  fonts and  the font  and  line
+                    heights. value must be of the form
+
+                        font_name:font_height:line_height
+
+                    where font_name selects the set of fonts to be used,
+                    font_height is the height to be used for the  actual
+                    characters, and line_height  is the  height of  each
+                    line. Both heights are  measured in points, and  may
+                    be either an  integer or a  float. The  :line_height
+                    part may be  omitted, in which  case it defaults  to
+                    11/10 * font_height. For example
+
+                        font=helvetica:14.2
+
+                    The default is
+
+                        font=courier:11
+
+                    (i.e. 11 point courier, with 12.1 line height).  See
+                    LIB * postscript_line_consumer for  a  list  of  the
+                    possible font names  (but note that  courier is  the
+                    only fixed-width font available).
+
+            paper   Specifies the paper size -- possible values are  a3,
+                    a4, a5, a6 and letter. The default is 'paper=a4'.
+
+            hmargin Point size for the  horizontal margins. The  default
+                    is 'hmargin=25'.
+
+            vmargin Point size for the vertical margins. The default  is
+                    'vmargin=25'.
+
+            margin  Point size for both vertical and horizontal margins.
+
+        (N.B. 1 point is approximately 1/72 of an inch.)
+
+        The last  form  of the  call  includes another  6  arguments  in
+        addition to arg_list.  These are used  by * ved_print to  enable
+        text to be laid  out identically to an  XVed window in  variable
+        width mode (including replication of the window colours).
+
+        See also * vedfile_line_consumer and HELP * ved_print.
+
+
+
+
+--------------------------
+6  File Control Operations
+--------------------------
+
+sysseek(dev, fileptr, mode, true) -> pos                     [procedure]
+sysseek(dev, fileptr, mode)
+        For a device dev,  controls at which byte  in the file the  next
+        read or write  will operate, dependent  on the integers  fileptr
+        and mode as follows:
+
+            Mode    Meaning
+            ----    -------
+             0      fileptr is an absolute byte position within the file
+                    (1st byte = 0)
+
+             1      fileptr  is  a   byte  offset  (possibly   negative)
+                    relative to the current byte (i.e. the next one that
+                    would be read or written).
+
+             2      fileptr is  a  byte  offset  relative  to  the  byte
+                    immediately after the last byte in the file.
+
+        With an  optional  4th argument  of  true, sysseek  returns  the
+        absolute byte position pos within the file after the seek.
+
+        (In VMS, sysseek can only be used on files opened for block I/O,
+        i.e. with org argument true.)
+
+
+sys_io_control(sdev, request, bytestruct) -> bool            [procedure]
+sys_io_control(sdev, request) -> bool
+        (Unix ONLY) This  procedure provides  an interface  to the  Unix
+        ioctl system call, and has essentially the same arguments as the
+        latter.  sdev  is  a  system  device,  request  is  an   integer
+        specifying the desired operation to be performed, and bytestruct
+        is an  (optional)  byte-accessible  structure  argument  through
+        which  data  is  passed   or  returned  (see  REF * DATA   for a
+        definition of byte-accessible structures).
+
+        In all cases, a call of sys_io_control performs a straight ioctl
+        system call  for the  file descriptor  allocated to  sdev,  with
+        request value  as supplied  and with  bytestruct passed  as  the
+        address of its byte  data (or 0 if  bytestruct is omitted).  The
+        result bool is true if the call succeeds, false if not.
+
+        For terminal  devices, sys_io_control  does additional  work  to
+        keep the  stored device  parameters in  step with  the  terminal
+        state. Every device representing a terminal in Poplog  maintains
+        a full set of terminal parameters which are set on the  terminal
+        whenever that device is used (unless it is already set for  that
+        device).  In   this   way  multiple   devices   with   different
+        characteristics can  be made  to work  for the  same  underlying
+        terminal, with automatic switching between different settings as
+        appropriate. To maintain this relationship, sys_io_control  sets
+        the terminal  state according  to the  stored device  parameters
+        before the  ioctl system  call  is made,  and then  updates  the
+        device parameters from the (possibly changed) terminal state  if
+        the call returns successfully. The  new parameters will then  be
+        set automatically on any subsequent use of the device.
+
+
+sys_link_tty_params(dev_list)                                [procedure]
+        (Unix Only) This procedure is used  to make two or more  devices
+        which  represent  the  same   actual  terminal  share   terminal
+        parameters, so that changing any one of them with sys_io_control
+        automatically affects the other(s).
+
+        The argument dev_list  is a  list of  devices; for  each set  of
+        system devices  in  the list  which  represent the  same  actual
+        terminal, all members of that set are changed permanently to use
+        the parameter  structure of  the first-occurring  member of  the
+        set. Non-terminal (or user) devices in the list are ignored.
+
+
+set_process_entry_term()                                     [procedure]
+        (Unix Only) If  the standard  input of the  Poplog process  is a
+        terminal, resets the  terminal characteristics to  be what  they
+        were on entry to the Poplog system (otherwise, does nothing).
+
+
+
+
+-------------------
+7  File Information
+-------------------
+
+sys_file_stat(file, fvec) -> fvec                            [procedure]
+sys_file_stat(file, fvec, follow_symlinks) -> fvec
+        Where file is either a string naming a file, or a system  device
+        record for an open file, puts information about the file in  the
+        standard full vector fvec, returning  fvec as the result;  false
+        is returned if the file is nonexistent or is not a disk or  tape
+        file, or cannot be opened due to a protection violation.
+
+        The optional  boolean  argument follow_symlinks  says  whether a
+        named file should be dereferenced if it is a Unix symbolic  link
+        (default true). (This argument is ignored in VMS.)
+
+        For Unix  Poplog, the  information  returned in  each  subscript
+        position of  the  vector fvec  is  as follows  (UNIX * stat  for
+        further details):
+
+            Subscript   Information Returned
+            ---------   --------------------
+                1       Size of file in bytes
+                2       Last modified time (MTIME)
+                3       Group id of owner
+                4       User id of owner
+                5       Mode flags
+                6       Number of links
+                7       Major/minor device
+                8       I-node number
+                9       Last accessed time (ATIME)
+               10       Last status change time (CTIME)
+
+        In VMS Poplog, the information returned is
+
+            Subscript   Information Returned
+            ---------   --------------------
+                1       Size of file in bytes
+                2       Creation date
+                3       Group number of owner
+                4       Member number of owner
+                5       Protection bits
+
+        Note that  for compatibility  with Unix  Poplog, fvec(2)  is  an
+        integer in  Unix time,  i.e.  a number  of seconds  since  00:00
+        January 1 1970. (This can be  converted to an ASCII string  date
+        with
+
+                sys_convert_date(fvec(2), true)
+
+        See REF * TIMES.)
+
+        All values returned  in fvec are  integers or bigintegers.  fvec
+        may be any length (including 0); if its length is less than  the
+        maximum, only the information that will fit in is given, e.g. if
+        the length is 1 only the size,  if 2 then the size and the  last
+        modified time/creation date, etc.
+
+
+sys_file_exists(file) -> bool                                [procedure]
+        Returns true  if  the  file  named by  file  exists,  and  false
+        otherwise. Uses sys_file_stat.
+
+
+sysfilesize(file) -> nbytes                                  [procedure]
+        Returns the size in bytes nbytes of the file represented by  the
+        system device or file name  string file (which must be  either a
+        disk or tape file). Same as fvec(1) from sys_file_stat.
+
+
+sysmodtime(file) -> modtime                                  [procedure]
+        Returns the Unix last-modified time or VMS creation date of  the
+        file represented by the system  device or file name string  file
+        (which must be either a disk or tape file). Same as fvec(2) from
+        sys_file_stat.
+
+
+sysfileowner(file) -> uid                                    [procedure]
+uid -> sysfileowner(file)
+        Returns an integer denoting the user id (Unix) or member  number
+        (VMS) of the owner  of file. The updater  can be used to  change
+        the ownership  of  file  (subject  to  normal  operating  system
+        restrictions). Unix users can use sysgetpasswdentry to convert a
+        user id to a user name string.
+
+
+sysfileinode(file) -> inode                                  [procedure]
+        (Unix ONLY) Returns the inode  number of file. If  inaccessible,
+        returns false. Same as fvec(8) from sys_file_stat.
+
+
+
+
+------------------------
+8  Predicates on Devices
+------------------------
+
+isdevice(item) -> bool                                       [procedure]
+        Returns true if item is a device, false if not.
+
+
+systrmdev(dev) -> bool                                       [procedure]
+        Returns true if  the device  dev is a  terminal (including  user
+        `logical terminal' devices), false if not.
+
+        In Berkeley Unix, termin is returned  if the device is a  (real)
+        terminal, but the Poplog process is backgrounded with respect to
+        it (i.e. an attempt  to read from it  will cause the process  to
+        stop).
+
+
+isclosed(dev_or_char_rep) -> bool                            [procedure]
+        For dev_or_char_rep  a device,  returns true  if the  device  is
+        closed (i.e. has  had sysclose applied  to it), false  if it  is
+        still open.  This  procedure  is also  applicable  to  character
+        repeaters produced by discin, see REF * CHARIO.
+
+
+
+
+---------------------
+9  Device Information
+---------------------
+
+device_open_name(dev) -> string                              [procedure]
+        Returns the open name  string of the device  dev, i.e. the  name
+        with which the device was opened/created.
+
+
+device_full_name(dev) -> full_name                           [procedure]
+full_name -> device_full_name(dev)
+        Returns or updates the `full  name' of the device dev.  Updating
+        is only allowed for user devices.
+
+        For a  device  produced  by syspipe,  device_full_name  will  be
+        false, but for all  other kinds of system  devices it is a  full
+        absolute pathname string, with any environment  variable/logical
+        name components  etc translated  (and  in Unix,  symbolic  links
+        dereferenced).
+
+        If dev is a user device, full_name is whatever was given to  the
+        call of consdevice that created it, or whatever was assigned  to
+        it with device_full_name.
+
+
+device_os_channel(dev) -> int_or_false                       [procedure]
+        For a system  device dev, returns  the Unix file  descriptor/VMS
+        channel number  associated with  dev (an  integer). For  a  user
+        device, returns false.
+
+
+device_user_data(dev) -> user_data_or_false                  [procedure]
+        For a  system device  dev,  returns false.  For a  user  device,
+        returns the user_data argument  supplied to consdevice when  the
+        device was  constructed.  (Note  that since  a  user_data  value
+        cannot be false, the truthvalue of device_user_data can be  used
+        to distinguish user and system devices.)
+
+
+
+
+--------------------
+10  Standard Devices
+--------------------
+
+pop_charin_device -> dev                                      [variable]
+dev -> pop_charin_device
+pop_charout_device -> dev                                     [variable]
+dev -> pop_charout_device
+pop_charerr_device -> dev                                     [variable]
+dev -> pop_charerr_device
+        The devices  held  by  these (active)  variables  represent  the
+        current `logical' standard input, output and error channels, and
+        are  used  by  the   procedures  charin,  charout  and   charerr
+        respectively to perform character stream I/O (see REF * CHARIO).
+
+        Depending on the context, they may contain either system or user
+        devices. On system  startup, they  contain the  same devices  as
+        popdevin,  popdevout  and   popdeverr  respectively  (i.e.   the
+        standard input, output and error of the Poplog process). In  the
+        Ved editor,  e.g. during  compilation and  in `immediate  mode',
+        they contain  user  devices which  read  from or  write  to  Ved
+        buffers.
+
+        Always use  these devices  rather  than popdevin,  popdevout  or
+        popdeverr unless your  program specifically wants  to deal  with
+        the standard I/O of the  Poplog process (i.e. where  interaction
+        with the operating system is involved).
+
+
+poprawdevin -> dev                                            [variable]
+dev -> poprawdevin
+poprawdevout -> dev                                           [variable]
+dev -> poprawdevout
+        When either the standard input or standard output of the  Poplog
+        process is  a  terminal, these  (active)  variables are  set  up
+        initially to hold reading  and writing devices respectively  for
+        that terminal, opened with org  argument true, to give  terminal
+        input and output in `raw'  mode (as described above). (In  Unix,
+        the  two  devices  have  their  terminal  parameters  linked  by
+        sys_link_tty_params, see above.)
+
+        If neither standard  channel is  a terminal, the  value of  both
+        these variables  is an  undef  record, <undef  poprawdevin>  and
+        <undef poprawdevout>  (which  will produce  the  mishap  'DEVICE
+        NEEDED' if  an attempt  is made  to  use them  for I/O).  It  is
+        therefore advisable to test with isdevice first if your  program
+        might attempt to use them in this situation.
+
+        poprawdevin is used  by rawcharin, and  poprawdevout is used  by
+        rawcharout and rawsubstringout, which procedures are used by the
+        Ved editor for screen I/O. See REF * CHARIO.
+
+
+popdevin -> sdev                                              [variable]
+sdev -> popdevin
+popdevout -> sdev                                             [variable]
+sdev -> popdevout
+popdeverr -> sdev                                             [variable]
+sdev -> popdeverr
+        These (active)  variables hold  system  device records  for  the
+        standard input, output  and error channels  respectively of  the
+        operating-system Poplog  process  (corresponding  to  Unix  file
+        descriptors 0,  1,  and  2,  or  VMS  logical  names  sys$input,
+        sys$output, sys$error).
+
+        The devices are opened initially with org argument false, giving
+        normal line mode I/O for terminals, etc. (In Unix, when any  two
+        or all three of these devices represent the same terminal, their
+        terminal parameters are linked together with sys_link_tty_params
+        (see above), which  means that changing  the characteristics  of
+        one automatically affects the other(s).)
+
+        You can only assign system devices to these variables, not  user
+        ones; in  Unix,  assigning  a  new system  device  to  one  will
+        redirect the standard channel for the Poplog process (this could
+        be done e.g. after a sys_fork, see REF * SYSUTIL).
+
+        You should  only use  these  variables at  all if  your  program
+        specifically wants to deal with  the standard I/O of the  Poplog
+        process, i.e.  where interaction  with the  operating system  is
+        involved. When  this is  not  the case,  use  pop_charin_device,
+        pop_charout_device or pop_charerr_device instead.
+
+
+pop_null_device -> dev                                        [constant]
+        The standard "null" device. If  read, always at EOF. If  written
+        to, output is  discarded. Other device  operations (test  input,
+        clear input, flush, seek, and close) have no effect. Useful  for
+        programs that wish to temporarily disable terminal i/o.
+
+
+
+
+-----------------------------
+11  Constructing User Devices
+-----------------------------
+
+consdevice(open_name, full_name, user_data, flags,           [procedure]
+                                       methods_vec) -> udev
+        Constructs and returns a user device udev. The arguments to this
+        procedure are as follows:
+
+        open_name
+            A  string  giving  the  name  under  which  the  device  was
+            `opened'; it is returned by device_open_name applied to  the
+            device.
+
+        full_name
+            This is supposed to  be the `full name'  of the device,  but
+            can actually be anything; it is returned by device_full_name
+            applied to  the  device.  (Note that  the  class_print  of a
+            device record prints it as <device item>, where item is  its
+            device_full_name   if    this   is    non-false,   or    its
+            device_open_name otherwise.)
+
+        user_data
+            This  argument   allows  any   necessary  user   information
+            pertaining to the `internal state' of the device to be  held
+            in  the  record,  and  can   be  accessed  from  udev   with
+            device_user_data. It  may be  anything except  false,  since
+            false is  returned  by device_user_data  when  applied  to a
+            system device. (Note  that user_data  should generally  be a
+            structure; device_user_data does not have an updater on  the
+            assumption that you will update information in the user_data
+            structure, not the device_user_data field itself.)
+
+        flags
+            An integer, the bits in which specify special attributes for
+            the device. Currently, only bit 0 (flags = 1) is meaningful:
+
+                Bit     Meaning
+                ---     -------
+                 0      If set, the device  is a logically a  `terminal'
+                        (i.e. interfaces to a human user), and systrmdev
+                        will return true for it.
+
+        methods_vec
+            A full vector giving the  `methods' (procedures) to be  used
+            by the  relevant  system  procedures  when  applied  to  the
+            device. Currently this has 4 elements,
+
+                read_vec, write_vec, seek_p, close_p
+
+            where  each  element  may  be  either  false,  or  a  single
+            procedure/vector of procedures, as follows:
+
+            read_vec
+                A full vector  of `read'  methods for  a readable  (i.e.
+                input) device, or false if  the device is not  readable.
+                If a vector, it must contain 3 procedures, namely
+
+                    read_p, test_input_p, clear_input_p
+
+                read_p
+                    This procedure will  be called by  a sysread on  the
+                    device, as
+
+                        read_p(udev, bsub, bytestruct, nbytes) -> nread
+
+                    It  should  read  up  to  nbytes  into  the   buffer
+                    bytestruct starting  at  byte  subscript  bsub,  and
+                    return nread, the number  of bytes actually read  (a
+                    zero return indicates end of file).
+
+                test_input_p
+                    This procedure will be called by a sys_input_waiting
+                    on the device, as follows
+
+                        test_input_p(udev) -> n_or_false
+
+                    It should return  false if a  sysread on the  device
+                    would  `block',  i.e.  hang-up  waiting  for  input.
+                    Otherwise, the  result must  be  an integer  N  >= 0
+                    indicating how many bytes  are available to read  (0
+                    if the actual number is not known, or not relevant).
+
+                clear_input_p
+                    This procedure will be  called by a  sys_clear_input
+                    on the device, i.e.
+
+                        clear_input_p(udev)
+
+                    It  should  discard  any  `buffered'  input  on  the
+                    device, as appropriate.
+
+            write_vec
+                A full vector of `write'  methods for a writeable  (i.e.
+                output) device, or false if the device is not writeable.
+                If a vector, it must contain 2 procedures, namely
+
+                    write_p, flush_p
+
+                write_p
+                    This procedure will be called  by a syswrite on  the
+                    device, as
+
+                        write_p(udev, bsub, bytestruct, nbytes)
+
+                    It should write out nbytes bytes from the bytestruct
+                    buffer starting at byte subscript bsub.
+
+                flush_p
+                    This procedure will be called  by a sysflush on  the
+                    device, as
+
+                        flush_p(udev)
+
+                    It should  write out  any `buffered'  output on  the
+                    device, as appropriate.
+
+            seek_p
+                A procedure for  a `seekable'  device, or  false if  the
+                device is  not  seekable. If  a  procedure, it  will  be
+                called by a sysseek on the device as
+
+                    seek_p(udev, fileptr, mode) -> pos
+
+                See sysseek above  for an explanation  of the  arguments
+                (note that unlike sysseek itself, seek_p always  takes 3
+                arguments and must return the pos result).
+
+            close_p
+                A procedure to be called by a sysclose on the device, or
+                false  if  no  action  is  required  on  closing.   If a
+                procedure, it will be called as
+
+                    close_p(udev)
+
+                (Note that unlike system  devices, user devices are  NOT
+                closed automatically  when  garbage  collected.  If  you
+                require this, you should set up a destroy action on  the
+                device after creating it, e.g.
+
+                    sysclose -> sys_destroy_action(udev)
+
+                See REF * PROPS.)
+
+
+
+
+-----------------
+12  Miscellaneous
+-----------------
+
+sys_device_wait(in_devs, out_devs, except_devs, wait)        [procedure]
+                    -> (in_ready, out_ready, except_ready)
+        (Unix Only) Provides an interface to the Unix select system call
+        for multiplexing device I/O.
+
+        Each of  in_devs, out_devs  and  except_devs are  either  single
+        devices  or  lists  of  them  (possibly  []).  All  in_devs  and
+        except_devs devices must be  readable, and all out_devs  devices
+        writeable.
+
+        sys_device_wait returns  three results  in_ready, out_ready  and
+        except_ready, indicating  which devices  are respectively  ready
+        for reading,  writing, or  have an  exception condition  pending
+        (the last applies only to out-of-band data on sockets).
+
+        Each result is either [], a single device, or a list of  them; a
+        single device is returned only if the corresponding argument was
+        one. (I.e, a list  argument will always give  a list result.  To
+        avoid  creating  unnecessary  garbage,   list  results  may   be
+        reclaimed with * sys_grbg_list when no longer required.)
+
+        How  long  sys_device_wait   waits  for   ready  conditions   is
+        controlled by the  wait argument, which  can take the  following
+        values:
+
+          # false, meaning  don't wait.  Return  is immediate  with  the
+            three results reflecting which devices are ready now.
+
+          # true, meaning wait until one or more devices are ready.
+
+          # An integer timeout value usec in microseconds. If no devices
+            are   ready   after   usec   microseconds   have    elapsed,
+            sys_device_wait  returns,  but  with  false  for  all  three
+            results to indicate timeout.
+
+        (Note that all  three device  arguments may be  []. With  wait a
+        timeout this is  equivalent to  a syssleep for  the given  time;
+        with wait true it is equivalent to
+
+                repeat syshibernate() endrepeat;
+
+        i.e. the system just processes interrupts, X events etc.)
+
+
+sys_async_io(sdev, condition) -> ast_p_or_false              [procedure]
+ast_p_or_false -> sys_async_io(sdev, condition)
+        This procedure allows  the association of  an asynchronous  trap
+        procedure ast_p with a  device sdev to  handle a specified  'I/O
+        ready' condition on the device.
+
+        Possible condition  values (corresponding  to the  three  device
+        arguments to sys_device_wait) are:
+
+            condition   Meaning
+            ---------   -------
+                0       Input waiting
+                1       Output possible
+                2       Exception condition pending (applies only to
+                        out-of-band data on sockets)
+
+        (Note however that VMS Poplog currently supports only the  value
+        of 0 for condition, i.e. input waiting.)
+
+        If ast_p_or_false  is  not  false,  asynchronous  processing  is
+        enabled; if  false, asynchronous  processing is  disabled.  When
+        enabled, the  ast_p  procedure is  called  asynchronously  (i.e.
+        inside  whatever  other   procedures  the   system  is   current
+        executing)   when   the   specified   condition   occurs.   (See
+        Asynchronous Trap Procedures in REF * ASYNC for full details  of
+        the ast_p argument, which may also be a pair whose front is  the
+        procedure.)
+
+        Input Waiting
+        A trap procedure for  condition 0 is  called when input  becomes
+        available on sdev and  there is no  outstanding sysread for  it.
+        This happens at  most once  between reads, i.e.  once ast_p  has
+        been called, it will not be invoked again until after a  sysread
+        on the device.
+
+        A trap procedure will normally  read and process input from  the
+        device. Note  that to  avoid unwanted  interactions which  could
+        lead to the  procedure being  called when no  input is  actually
+        available,  it   is   sensible   to  guard   the   read   with a
+        sys_input_waiting test. Moreover,  the mechanism for  activating
+        trap procedures  does not  take  into account  buffering  inside
+        Poplog devices, so that it may  also be sensible to process  all
+        available input  each time  the procedure  is called,  i.e.  the
+        ast_p procedure should contain something like
+
+            while sys_input_waiting(sdev) do
+                 sysread(sdev, ...)
+                 ...
+            endwhile;
+
+        etc.
+
+        Output possible
+        A trap procedure for condition  1 is called when output  becomes
+        possible on sdev after a blocking condition (i.e. after the  O/S
+        output buffer was full). Thus the ast_p procedure should contain
+        something like
+
+            while have-data-to-output and output_possible(sdev) do
+                 syswrite(sdev, ...)
+                 ...
+            endwhile;
+
+        where have-data-to-output is some  appropriate test for  whether
+        the program has data to write to the device, and output_possible
+        is defined as
+
+            define lconstant output_possible(dev);
+                lvars dev, ready;
+                sys_device_wait([], dev, [], false) -> (, ready, );
+                return(ready /== []);
+            enddefine;
+
+        The program  itself  must call  ast_p  when  have-data-to-output
+        first becomes  true;  thereafter,  if output  is  blocked  (i.e.
+        output_possible returns  false),  the ast_p  procedure  will  be
+        called asynchronously when the blocking is removed.
+
+
+sysstring -> string                                           [constant]
+sysstringlen -> int                                           [constant]
+        sysstring is a  string of length  sysstringlen, which  libraries
+        and other programs  can use  as a  character buffer  to give  to
+        routines   such   as   sysread   and   syswrite   (set   up   in
+        LIB * SYSSTRING).
+
+
+device_key -> key                                             [constant]
+        This constant holds  the key structure  for device records  (see
+        REF * KEYS).
+
+
+Additional facilities,  notably  pipein  and pipeout  are  described  in
+HELP * PIPEUTILS.
+
+
+
+--- C.all/ref/sysio
+--- Copyright University of Sussex 1999. All rights reserved.

@@ -1,0 +1,1283 @@
+REF KEYS                                            John Gibson May 1995
+
+        COPYRIGHT University of Sussex 1995. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<       STRUCTURE KEYS        >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+This file describes the various predicates  for use with keys and  those
+used to define and manipulate new classes of object defined by the user.
+Two distinct kinds of new object class can be constructed:  record-class
+and vector-class.  In  addition,  the  specification  of  various  other
+special attributes for a class is dealt with.
+    This file also describes the production of procedures to access data
+in external structures via external pointer-class records.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+      1.1   Classes of Object
+      1.2   Accessing Keys of Items
+      1.3   External Structures
+
+  2   Predicates on Keys
+
+  3   Accessing Key Fields
+      3.1   Fields Applicable to All Keys
+      3.2   Record and Vector-type Key Fields
+            ... General
+            ... Record-only
+            ... Vector-only
+
+  4   Constructing New Keys
+
+  5   Field Specifiers for Poplog Data
+      5.1   Notes on Allocation of Fields in Records
+
+  6   Examples of Key Construction
+
+  7   Constructing External Access Procedures
+
+  8   Fields in External Structures
+
+  9   Additional Field Specifiers for External Data
+
+ 10   Miscellaneous
+
+
+
+---------------
+1  Introduction
+---------------
+
+Every structure in the Poplog system has within it a field  containing a
+pointer to a key structure, which identifies the class of the structure,
+e.g. vectors contain a  pointer to vector_key,  procedures a pointer  to
+procedure_key, and so  on. Keys  themselves are structures,  and so  are
+also identified by a key (key_key). So for every structure class in  the
+Poplog system (see REF * DATA), there  is an identifying key  structure.
+For completeness, there are also  key structures for the simple  integer
+and decimal data types.
+
+    As well as identifying the class  of any object to the system,  keys
+also serve as a  means of holding various  information about the  class,
+e.g. which  procedure is  used  to print  objects  in the  class,  which
+procedure is to be used by the operation = in comparing them, and  which
+procedures are used to manipulate fields in the structure.
+
+    The latter is, in particular,  the means of providing procedures  to
+manipulate new classes of object defined by the user. The basic  process
+of defining a new class of object consists of creating a new key for the
+class with  the  procedure  conskey  described  below;  the  appropriate
+procedures  to  construct  and  manipulate  the  new  objects  are  then
+available from the key via the class_ procedures (also described later).
+
+
+1.1  Classes of Object
+----------------------
+Two distinct kinds of new object class can be constructed:  record-class
+and vector-class. A record is a  structure containing a fixed number  of
+distinct and possibly different fields,  whereas a vector consists  of a
+variable  number  of   similar  fields.  (For   example:  a  pair   is a
+record-class, whereas vectors and strings are vector-types. The built-in
+classes in the system  also include other types  which do not fall  into
+these  categories  and   which  cannot  be   user-defined,  e.g.   keys,
+procedures, processes, etc.)
+
+    In addition to the record/vector distinction, various other  special
+attributes may be specified for  a class. These include the  'writeable'
+and 'nonwriteable'  attributes (referring  to  the class'  treatment  by
+sys_lock_system),  and  (for  records  only),  "external_ptr"  attribute
+(which enables  records of  suitable  format to  behave as  pointers  to
+external data).
+
+    Finally on Poplog structures,  note that the  basic method of  class
+construction using conskey as described here is not very convenient  for
+most normal  programming  contexts;  a much  more  convenient  interface
+(which enables  keys  to be  specified,  constructed, and  their  class_
+procedures automatically  assigned to  identifiers) is  provided by  the
+syntax construct * defclass. This is described in REF * DEFSTRUCT.
+
+
+1.2  Accessing Keys of Items
+----------------------------
+The key of any object is  accessed with the procedure datakey (or,  from
+an object's dataword, with key_of_dataword). See REF * DATA.
+
+Note that  for  each built-in  data-type  there is  a  global  permanent
+constant whose name  starts with the  dataword and ends  with _key,  and
+whose value  is the  key  for that  type, e.g.  integer_key,  ratio_key,
+biginteger_key, device_key etc.
+
+
+1.3  External Structures
+------------------------
+This file also describes the production of procedures to access data  in
+external  structures  via  external  pointer-class  records.  The  basic
+procedure for this is cons_access, although as with Poplog structures, a
+more  convenient  programming  interface  is  provided  by  the   syntax
+construct defexacc, also described in REF * DEFSTRUCT.
+
+
+
+
+---------------------
+2  Predicates on Keys
+---------------------
+
+(See also class_attribute for determining special attributes of keys.)
+
+iskey(item) -> bool                                          [procedure]
+        Returns true if item is a key, false otherwise.
+
+
+
+
+-----------------------
+3  Accessing Key Fields
+-----------------------
+
+The following procedures can be divided into those which are  applicable
+to all key fields  and those only applicable  to record and  vector-type
+key fields only.
+
+
+3.1  Fields Applicable to All Keys
+----------------------------------
+class_=(key) -> equal_p                                      [procedure]
+equal_p -> class_=(key)
+        For any class key key, returns or updates the procedure used  by
+        = in  comparing  items of  the  class represented  by  key.
+
+        The default value for any key is the procedure run by sys_=. For
+        the updater, if sys_=  is supplied as  equal_p then the  default
+        procedure is restored. See REF * DATA.
+
+
+class_apply(key) -> apply_p                                  [procedure]
+apply_p -> class_apply(key)
+        Returns the apply procedure for the class key key. If an  object
+        X of the  class is  applied (as if  it were  a procedure),  what
+        happens is that apply_p is  called instead, with X as  argument.
+        E.g. if the variable  X contains a structure  of class key  then
+        the call  X()  will  turn into  apply_p(X).  Similarily  for  an
+        updater call, i.e.-> X() will result in -> apply_p(X).
+            The updater of class_apply assigns the procedure apply_p  to
+        be the apply procedure  for the class  key key. (This  mechanism
+        will NOT  change  what  happens  when  an  actual  procedure  is
+        applied, i.e. assigning to the class_apply of the procedure  key
+        has no effect.)
+
+        WARNING: class_apply is  the means by  which array-type  indexed
+        access on lists, words, vectors and strings is implemented, i.e.
+        the facility to  use ITEM(N) for  subscrX(N, ITEM). In  general,
+        the class_apply for these data types is a procedure like
+
+                procedure(item);
+                    if stacklength() /== 0 and isinteger(dup()) then
+                        subscrX(item)
+                    else
+                        mishap(item, 1, 'EXECUTING NON-PROCEDURE')
+                    endif
+                endprocedure;
+
+        and similarily for  the updaters.  Since this  facility is  used
+        WIDELY in both  system and  library procedures,  you can  expect
+        trouble if you redefine class_apply for any of these data types.
+
+
+class_dataword(key) -> word                                  [procedure]
+        Returns the dataword of the class key key.
+
+
+class_hash(key) -> hash_p                                    [procedure]
+hash_p -> class_hash(key)
+        For any class key key  returns or updates the hashing  procedure
+        for objects  of  class  key, invoked  by  syshash.  The  hashing
+        procedure takes  an  object of  the  class key  and  returns  an
+        integer determined  by the  object, subject  to the  constraints
+        that if two objects are = then they should be assigned the  same
+        value by the hashing  procedure. The default hashing  procedures
+        are described in REF * PROPS.
+
+
+class_print(key) -> print_p                                  [procedure]
+print_p -> class_print(key)
+        For any class key key, returns or updates the procedure used  by
+        syspr to print an item in that class, the default value for  any
+        key being sys_syspr. See REF * PRINT.
+
+
+class_recognise(key) -> recognise_p                          [procedure]
+        Returns the recogniser  procedure of the  class key key,  i.e. a
+        procedure which returns  true when  applied to a  member of  the
+        class, false when applied to anything else.
+
+
+class_field_spec(key) -> spec                                [procedure]
+        Returns the specification  of the  class key key.  For a  vector
+        class this is a single field specifier, for a record class it is
+        a list of them (see Field Specifiers for Poplog Structures below
+        for a description of  field specifiers). For  any other type  it
+        returns false.
+
+        (Thus the correct test for a record class is islist(spec);  note
+        however that the length of its spec list is NOT the correct  way
+        to determine how many fields are in the record;  datalength(key)
+        should be used for this.)
+
+
+class_attribute(key, attribute) -> info                      [procedure]
+class_attribute(key) -> attribute_list
+        Requests information about the attributes of the class key key.
+
+        In the first form,  attribute may be one  of the following  (see
+        conskey below for more details on some of these attributes):
+
+            "byte_access"
+                Returns  true   if   structures  of   this   class   are
+                byte-accessible, false  otherwise  (see  Byte-Accessible
+                Structures in REF * DATA).
+
+            "external_deref"
+                Returns true if this an external dereference class  key,
+                false otherwise.
+
+            "external_ptr"
+                Returns true  if  this an  external  pointer-class  key,
+                false   otherwise   (this    attribute   also    implies
+                "external_deref").
+
+            "external_noconv"
+                Returns  true  if  objects  of  this  class  undergo  no
+                conversion when passed externally  (or assigned into  an
+                "exval"  field),  false  otherwise.  That  is,  true  is
+                returned  for  anything  which  is  not  "external_ptr",
+                "external_deref", (big)integer or (d)decimal.
+
+            "external_ptr_props"
+                Returns true  if  this  an  external  pointer-class  key
+                having the additional property that external_ptr_props
+                can be applied to records of the class, false otherwise.
+
+            "writeable"
+                Returns true  if this  class  of structures  are  always
+                writeable by default, false  if always non-writeable  by
+                default, and "undef" otherwise.
+
+            "prop_entry"
+                For a  property entry  key, returns  the property  entry
+                gc_type (see REF * PROPS), or false otherwise.
+
+        In the second  form with  just a  key argument,  class_attribute
+        returns the list of attributes that would be given to conskey to
+        produce this key. That  is, the list contains  one or other  (or
+        neither) of "writeable" or "nonwriteable", and one or other  (or
+        neither) of "external_ptr" or "external_deref".
+
+
+class_spec(key) -> spec                                      [procedure]
+class_spec(key, attribute) -> info
+        This  is  an  old  combined  version  of  class_field_spec   and
+        class_attribute.
+
+        In the  first  form  it returns  the  class_field_spec  of  key.
+        However, to  maintain  upward  compatibility  with  versions  of
+        Poplog prior to 14,  when applied to a  vector class it  returns
+        not the  actual field  specifier but  the value_spec  result  of
+        field_spec_info applied to it, i.e.
+
+            field_spec_info(class_field_spec(key)) -> (value_spec, );
+
+        (This means for example that class_spec(string_key) is 8  rather
+        than "byte".) For a recordclass or any other kind of key, it  is
+        identical to class_field_spec.
+
+        The second form is the same as class_attribute(key, attribute).
+
+
+
+3.2  Record and Vector-type Key Fields
+--------------------------------------
+The following procedures can be divided  into those which apply to  both
+types of key fields, and those which apply to record or vector-type  key
+fields only.
+
+
+...  General
+------------
+class_cons(key) -> cons_p                                    [procedure]
+        For  a  record  or  vector-type  class  key  key,  returns   the
+        constructor procedure for that  class. For a record-type  class,
+        this procedure takes N arguments, where  N is the the number  of
+        fields in  the record;  for  a vector-type  class, it  takes  an
+        argument N and  constructs a  vector of  length N  with N  items
+        taken off  the stack  (cf conspair  for records,  consvector  or
+        consstring for vectors).
+
+
+class_dest(key) -> dest_p                                    [procedure]
+        For  a  record  or  vector-type  class  key  key,  returns   the
+        destructor procedure for  that class (cf  destpair for  records,
+        destvector or deststring for vectors).
+
+
+...  Record-only
+----------------
+class_access(n, rec_key) -> access_p                         [procedure]
+        For  a  record-type  class  key  rec_key,  returns  the   access
+        procedure for  the n-th  field of  that record  class, i.e.  the
+        procedure that returns or updates the n-th field.
+
+        Since class_access is the class_apply of keys, this may also  be
+        called as
+
+                rec_key(n) -> access_p
+
+        See also class_fast_access (below).
+
+
+class_fast_access(n, rec_key) -> access_p                    [procedure]
+        Uses  cons_access   to  create   a  non-checking   access/update
+        procedure for  the  n-th  field  of  data  structures  with  key
+        rec_key. See also class_access (above).
+
+
+class_datasize(rec_key) -> n                                 [procedure]
+        For a record-type class key rec_key, returns the length in words
+        of the record.
+
+
+...  Vector-only
+----------------
+class_init(vec_key) -> init_p                                [procedure]
+        For a  vector-type class  key vec_key,  returns the  initialiser
+        procedure for that class, i.e. a procedure that takes an integer
+        N and constructs a new vector of length N (i.e. initv or  inits,
+        etc). This has its components initialised to "undef" for a  full
+        vector, zero for  a non-full one.  (See also initvectorclass  in
+        REF * DATA, which initialises  a vector for  a given class  key,
+        but with a specified initialising value.)
+
+
+class_subscr(vec_key) -> subscr_p                            [procedure]
+        For a  vector-type class  key vec_key,  returns the  subcripting
+        procedure subscr_p for that class, i.e. a procedure with updater
+        of the form
+
+                subscr_p(N, vec) -> element
+                element -> subscr_p(N, vec)
+
+        which returns or updates  the N-th element of  a vector in  that
+        class (cf subscrv, subscrs).
+            Note that since the class_subscr procedure of a  vectorclass
+        is by default its class_apply, a vector of the class can also be
+        subscripted by
+
+                vec(N) -> element
+                element -> vec(N)
+
+
+class_fast_subscr(vec_key) -> subscr_p                       [procedure]
+        Like class_subscr, but  subscr_p is  a non-checking  subscriptor
+        procedure.
+
+
+
+
+------------------------
+4  Constructing New Keys
+------------------------
+
+conskey(word, spec)                -> vec_key                [procedure]
+conskey(word, spec, attribute_vec) -> vec_key
+conskey(word, spec_list)                -> rec_key
+conskey(word, spec_list, attribute_vec) -> rec_key
+        Constructs and returns a key for a new record or vector class of
+        structures, with  dataword word  and specification  as given  by
+        spec or  spec_list.  The  optional  attribute_vec  argument,  if
+        present, is  a  vector  of attribute  names  (words)  specifying
+        additional information about the new class of structures.
+
+        For a  vector  class, spec  is  a single  field  specifier  (all
+        elements of a vector having the same specification).
+
+        For a record  class, spec_list  is a list  of field  specifiers,
+        where each specifier  in the  list refers  to one  field in  the
+        record,  i.e.  the  record  has  length(spec_list)  fields.  (An
+        exception to this is when  spec_list contains the 'dummy'  field
+        specifier  ">->";   in  this   case,   the  record   will   have
+        length(spec_list)-1 fields.)
+
+        Permissible field specifiers in either case are described  below
+        under Field Specifiers for Poplog Structures.
+
+        Additional attributes for the key that can be specified by words
+        in the attribute_vec argument are (currently) as follows:
+
+            writeable, nonwriteable
+                Sets the default treatment by sys_lock_system (and  also
+                Popc compilation)  for  the  new  class  of  structures:
+                "writeable" means always  keep in  writeable memory  (so
+                fields can  be  updated), "nonwriteable"  means  put  in
+                write-protected memory (so no updating is possible).
+                    Note that when neither is specified for a class, the
+                general default given  to sys_lock_system  or Popc  will
+                apply. See REF * SYSTEM.
+
+            external_deref (Records Only)
+                To have  this  attribute,  a record  class  must  have a
+                "word"-sized field at the  pointer position (see  Format
+                of Data Structures in REF * DATA). When a record of  the
+                class is  passed to  an external  function (or  assigned
+                into an "exval" field), the value of that word field  is
+                used in its place. See REF * EXTERNAL.
+
+            external_ptr (Records Only)
+                To have  this attribute,  a record  class must  have  an
+                "exptr" field  at the  pointer position  (see Format  of
+                Data Structures in REF * DATA); records of the class are
+                then deemed to  be pointers  to external  data via  that
+                field.  This  means   that  external  structure   access
+                procedures can be used on them, or they can be  assigned
+                into "exptr" or "exval" fields in other structures (they
+                are  also  recognised   by  isexternal_ptr_class).   See
+                REF * EXTERNAL_DATA.
+                    This attribute also implies "external_deref", i.e. a
+                records's "exptr"  field is  passed  in its  place  when
+                given as argument to an external function.
+                    (Note also that  if the record  class starts  with a
+                "full" field, i.e. its spec_list begins
+
+                     [full exptr ... ]
+
+                etc, then external_ptr_props can  be applied to  records
+                of  the   class,   and  accesses   the   "full"   field.
+                class_attribute can be used to test for this property on
+                a given key.)
+
+        (The values of  the above  attributes for existing  keys can  be
+        determined with class_attribute, see above.)
+
+
+
+
+-----------------------------------
+5  Field Specifiers for Poplog Data
+-----------------------------------
+
+This section  lists the  permissible field  type specifiers  for  Poplog
+data, i.e. that can appear in the spec or spec_list argument to  conskey
+(spec_list is a list of type specifiers for a record class, and spec  is
+a single one for a vector class).
+
+Full Poplog Item
+    This is  the quickest  field  type to  access  or update,  since  it
+    requires no conversion  to and  from Poplog  representation, and  no
+    check on values assigned into it, etc (see Representation of Data in
+    Poplog in REF * DATA).
+
+        Type        Meaning
+        ----        -------
+        "full"      Holds  a  single  Poplog  item,  and  occupies   one
+                    'natural' machine word (64 bits in Alpha OSF, 32  in
+                    all other current implementations).
+
+'Packed' Integers
+    These fields can contain integers  only, either signed or  unsigned,
+    represented in a fixed number of binary bits.
+        When accessed, such a field produces a Poplog simple integer  or
+    a biginteger if the field value  is too large for a simple  integer.
+    Similarily, a simple integer or biginteger within the range  allowed
+    can be assigned into the field.
+        The named types correspond to standard sizes on the host machine
+    (and are always aligned on appropriate boundaries to be  efficiently
+    accessible), whereas fields specified as  a specific number of  bits
+    (i.e.  N  or  -N)  are  'bitfields'  and  are  generally  slower  to
+    access/update (and in a structure, simply occupy the next N bits).
+
+        Type        Meaning
+        ----        -------
+        "longlong"  Signed integer, as C  compiler type 'long long'  (64
+                    bits in all current implementations). Range
+                            -2**63 <= I < 2**63
+
+        "ulonglong" Unsigned integer, as C compiler type 'unsigned  long
+                    long' (64  bits  in  all  current  implementations).
+                    Range
+                            0 <= I < 2**64
+
+        "word"      Signed integer the size of a Poplog word (64 bits in
+                    Alpha OSF, 32 in all other current implementations).
+                    Range
+                            -2**63 <= I < 2**63     (Alpha OSF)
+                            -2**31 <= I < 2**31     (others)
+
+        "uword"     Unsigned integer the size of a Poplog word (64  bits
+                    in   Alpha   OSF,   32   in   all   other    current
+                    implementations). Range
+                            0 <= I < 2**64          (Alpha OSF)
+                            0 <= I < 2**32          (others)
+
+        "long"      Signed integer, as C  compiler type 'long' (64  bits
+                    in   Alpha   OSF,   32   in   all   other    current
+                    implementations). Range
+                            -2**63 <= I < 2**63     (Alpha OSF)
+                            -2**31 <= I < 2**31     (others)
+
+        "ulong"     Unsigned integer, as C compiler type 'unsigned long'
+                    (64 bits  in  Alpha OSF,  32  in all  other  current
+                    implementations). Range
+                            0 <= I < 2**64          (Alpha OSF)
+                            0 <= I < 2**32          (others)
+
+        "int"       Signed integer, as C compiler type 'int' (32 bits in
+                    all current implementations). Range
+                            -2**31 <= I < 2**31
+
+        "uint"      Unsigned integer, as C compiler type 'unsigned  int'
+                    (32 bits in all current implementations). Range
+                            0 <= I < 2**32
+
+        "short"     Signed integer, as C compiler type 'short' (16  bits
+                    in all current implementations). Range
+                            -2**15 <= I < 2**15
+
+        "ushort"    Unsigned  integer,  as  C  compiler  type  'unsigned
+                    short' (16  bits  in all  current  implementations).
+                    Range
+                            0 <= I < 2**16
+
+        "sbyte"     Signed byte (8 bits in all current implementations).
+                    Range
+                            -2**7 <= I < 2**7
+
+        "byte"      Unsigned   byte    (8    bits   in    all    current
+                    implementations). Range
+                            0 <= I < 2**8
+
+        -N          Signed bitfield of N bits, where 1 <= N <= 32. Range
+                            -2**(N-1) < = I < 2**(N-1))
+
+        N           Unsigned bitfield of  N bits,  where 1 <=  N <=  32.
+                    Range
+                            0 <= I < 2**N
+
+        "pint"      Same as "word",  but declares the  field as  holding
+                    only values  within the  range  of a  Poplog  simple
+                    integer (pop_min_int <= I <= pop_max_int). When this
+                    is known for  a "word" field,  using "pint"  instead
+                    gives faster access/update.
+
+    (N.B. All vector classes constructed on the types "byte" and "sbyte"
+    are special insofar  as they are  guaranteed to be  null-terminated,
+    i.e. to have a 0 byte following the last actual byte of the  vector.
+    This costs on average an extra byte per vector, but allows data such
+    as standard strings  to be  passed to external  C functions  without
+    modification.)
+
+Floating-Point
+    Any non-complex  number,  including  integers  and  ratios,  can  be
+    assigned into these  fields, conversion and/or  rounding being  done
+    where necessary  (but a  mishap will  occur if  the input  value  is
+    outside the range of the field).
+        Accessing an "sfloat" or "float" field always produces a  Poplog
+    decimal;  accessing  a   "dfloat"  field  produces   a  decimal   if
+    popdprecision is false  and a  decimal can contain  the value,  or a
+    ddecimal otherwise (see REF * popdprecision).
+
+        Type        Meaning
+        ----        -------
+        "dfloat"    A double-length  floating-point  number  in  machine
+                    format (64 bits in all current implementations).
+
+        "sfloat"    A single-length  floating-point  number  in  machine
+                    format, (32 bits in all current implementations).
+
+        "float"     Identical to "sfloat", EXCEPT  when specified as  an
+                    external function  result  -- see  Additional  Field
+                    Specifiers for External Data below.
+
+External Data & Pointers
+    There are two fields  of this type: "exptr"  and "exval". The  first
+    holds a raw pointer value  derived from some external source,  while
+    the second  holds any  external value  (which may  or may  not  be a
+    pointer).
+        On accessing the field, the  value (pointer or not) is  returned
+    inside an external pointer record.  This record will be  constructed
+    anew each time  the field is  accessed, EXCEPT when  the "exptr"  or
+    "exval" spec is the sub_spec of a conversion procedure (see  below),
+    or, for "exptr", the sub_spec  of an implicit access procedure  (see
+    Additional Field  Specifiers  for  External Data  below).  In  these
+    cases, a fixed record is used (avoiding the creation of  unnecessary
+    garbage when the (pointer) value is being passed directly to  such a
+    procedure -- 'fixed' here means that the same record is always  used
+    for one particular field, but not the same one for all fields).
+        When updating, either  type of  field allows  the pointer  value
+    from any external pointer-class record to be assigned in.
+        However, for "exval"  only, any  Poplog object  can be  assigned
+    into the field. The actual value  inserted is got by processing  the
+    object as if it were an  argument to an external function call  (see
+    Calling External Functions, External Function Argument Processing in
+    REF * EXTERNAL for full details). Note, however, that there are  two
+    differences from the latter: (1)  (d)decimals are always coerced  to
+    single float (since  the field only  occupies 1 word),  and (2)  Pop
+    data structures  whose direct  address  will be  the value  MUST  be
+    fixed-address (that is, any item for which
+
+        class_attribute(datakey(item), "external_noconv")
+
+    is true).
+
+        Type      Meaning
+        ----      -------
+        "exptr"   A pointer to  external data,  occupying one  'natural'
+                  machine word (64 bits  in Alpha OSF,  32 in all  other
+                  current implementations).
+
+        "exval"   Some external  data, occupying  one 'natural'  machine
+                  word (64 bits in  Alpha OSF, 32  in all other  current
+                  implementations).
+
+    See also REF * EXTERNAL_DATA.
+
+Conversion Procedure on Field
+    This specifies  a field  with  an automatic  'conversion'  procedure
+    built on top of it. The specifier itself is a closure of the form
+
+        conv_p(% sub_spec, true %)
+
+    where  conv_p  is  the  conversion  procedure  (with  updater),  and
+    sub_spec is the type specifier  for the underlying field (which  may
+    be anything described in this section, including another  conversion
+    procedure). (The true frozval  distinguishes a conversion  procedure
+    spec from an implicit access  procedure spec, which is only  allowed
+    for the external access types described later in this file.)
+
+    On accessing the field, its value is
+
+        conv_p( <underlying field value> ) -> <converted field value>
+
+    that is, conv_p  applied to the  value of the  underlying field;  on
+    updating, the field must  have a converted  value assigned into  it,
+    and the updater  of conv_p is  expected to convert  this back to  an
+    underlying field value, i.e.
+
+       -> conv_p( <converted field value> ) -> <underlying field value>
+
+    (N.B. In compiling  code for  a conversion  procedure (and  external
+    implicit access procedures), the  system guarantees to optimise  out
+    calls to both identfn itself and closures of identfn of no arguments
+    (identfn(%%)). This is of particular relevance to using a conversion
+    procedure to type-check assignments  into "full" fields; the  access
+    side of such a procedure can simply be identfn(%%), resulting in  no
+    overhead on accessing the field.)
+
+
+
+5.1  Notes on Allocation of Fields in Records
+---------------------------------------------
+In a record class,  fields are allocated space  in the order  specified,
+treating the  record as  a sequence  of  bits, and  starting at  bit  0.
+However, as described in  Format of Data  Structures in REF * DATA,  the
+key field  occupies  the second  word  of any  structure  (the  relevant
+diagram from REF * DATA is reproduced below):
+
+              -  --------------
+              |  |  field(s)  |   word 1
+       header |  |------------|
+              |  |    key     |   word 2
+              -  |------------|
+             >-> |            |   word 3
+                 |  remaining |
+                 |  field(s)  |
+
+Therefore, if a  field would  straddle the key  (i.e. start  in the  the
+first word  and finish  in the  second), it  is instead  started at  the
+third. (Thus for example, the record spec_list
+
+        [byte short byte int]
+
+is preferable to
+
+        [byte short int byte]
+
+since it occupies 1 less word.)
+
+    Also (as shown  in the diagram  by ">->"), pointers  to a  structure
+actually point to the third word, not  the first; this is to allow  e.g.
+an externally-processed  structure  to appear  to  consist only  of  the
+contiguous  set  of   fields  from   its  pointer   onwards.  For   such
+applications, it may be  necessary to prevent some  or any fields  being
+allocated in the first word.
+
+    This is  achieved by  including the  'dummy' field  spec ">->"  in a
+record spec_list,  which  causes the  following  field to  skip  to  the
+pointer position, i.e. the third word  (it is an error if this  position
+has already been passed when ">->" is encountered). E.g.
+
+        [>-> byte short byte int]
+
+starts the first "byte" field  at the pointer (and  makes no use of  the
+first word).
+
+    Whereas a  bitfield of  N bits  (specified  with N  or -N)  is  just
+allocated to the  next N bits,  all other named  field types imply  some
+sort of alignment appropriate to the  type; for example, a "full"  field
+is always started at  the next word boundary,  and other named types  at
+least at the next byte boundary.  (The actual alignments are such as  to
+be consistent with "struct"  definitions in the C  language on the  host
+machine.)
+
+    Finally, note that the length of a record is always rounded up to an
+exact number of words.
+
+
+
+
+-------------------------------
+6  Examples of Key Construction
+-------------------------------
+
+The following defines a new user vector-type class whose components  are
+unsigned short integers:
+
+        conskey("ushort", "ushort") -> ushort_key;
+        class_cons(ushort_key) -> consushort;
+        consushort(32, 64, 128, 3) -> a_ushort;
+        a_ushort =>
+        ** <ushort 32 64 128>
+
+This corresponds to the defclass definition (see REF * DEFSTRUCT)
+
+        defclass ushort :ushort;
+
+etc.
+
+    The next  example  defines  a  new  user  record-type  class  with 4
+different fields, representing a person's name, address, age and a field
+to indicate sex (0=male, 1=female):
+
+        conskey("person", [full full byte 1]) -> person_key;
+        class_cons(person_key) -> consperson;
+        ;;; get the access procedures for each field
+        person_key(1) -> person_name;
+        person_key(2) -> person_address;
+        person_key(3) -> person_age;
+        person_key(4) -> person_sex;
+
+        consperson('Fred Bloggs', 'No fixed abode', 99, 0) -> fred;
+        person_name(fred) =>
+        ** Fred Bloggs
+        person_age(fred) =>
+        ** 99
+
+This corresponds to the defclass example given in REF * DEFSTRUCT:
+
+        defclass person
+            {   person_name,
+                person_address,
+                person_age :byte,
+                person_sex :1
+            };
+
+
+
+
+------------------------------------------
+7  Constructing External Access Procedures
+------------------------------------------
+
+External structures are  data maintained  in memory  outside the  Poplog
+system proper by external procedures,  i.e. those written in  non-Poplog
+languages. Such data  is represented  and manipulated  inside Poplog  by
+'external  pointer-class'   structures,   which  are   ordinary   Poplog
+structures having  an  "exptr" field  at  the pointer  position;  access
+procedures constructed  by  cons_access below  can  be applied  to  such
+structures to extract or update  external data via their pointers.  (See
+REF * EXTERNAL_DATA for  a full  explanation of  external  pointer-class
+structures.)
+
+    As a special case, an external function or procedure can be  thought
+of as a data  structure, where 'accessing'  the structure means  calling
+the function  to produce  its  result (if  any). Thus  cons_access  also
+constructs 'apply' procedures to call  functions pointed to by  external
+pointers.
+
+    Because external structures  (a) do not  have to be  made by  Poplog
+-style constructor procedures, (b) are not relocatable and always reside
+in fixed memory  locations, and  (c) are  not processed  by the  garbage
+collector, they allow  a greater range  of field types  than for  native
+Poplog structures.  The additional  field  types allowed  are  described
+below under Additional Field Specifiers for External Data; these include
+fields which  are sub-structures  or  arrays, as  well as  fields  which
+provide automatic access through pointers to underlying data.
+
+    cons_access allows a  want or  want_list argument  to specify  which
+procedure(s) and  their  updaters are  actually  wanted. A  single  want
+argument has the following values:
+
+      Value               Meaning
+      -----               -------
+      false or a          No procedure (false is returned instead)
+      reference
+      containing false
+
+      A reference         A procedure without an updater
+      containing a
+      non-false value
+
+      Anything else       A procedure with an updater (if it can have
+                          one)
+
+A want_list argument is a  then list of wants,  one for each field  in a
+record or external structure.
+
+    Note that cons_access  can also  be used to  construct 'fast'  (i.e.
+non-checking) access procedures for  Poplog structures. (Also note  that
+in-line code corresponding to the procedures produced by cons_access can
+be  generated  by  the  Poplog  Virtual  Machine  instruction  sysFIELD,
+described in REF * VMCODE.)
+
+
+cons_access(want_list, spec_list, check, mode) -> p_vec      [procedure]
+cons_access(want,      spec_pair, check, mode) -> subscr_p
+cons_access(want,      spec_vec,  check, mode) -> apply_p
+cons_access(want,      spec,      check, mode) -> access_p
+        This procedure constructs
+
+            # field access procedures for external structures or Poplog
+              records (first form);
+
+            # a single subscriptor procedure for external arrays or
+              Poplog vectors (second form);
+
+            # a single apply procedure for external functions (third
+              form);
+
+            # a single access procedure for an external data type (last
+              form).
+
+        Which form is  applicable is  determined by  whether the  second
+        argument is a list, a pair, a vector, or anything else.
+
+        The mode argument
+        This is an integer, the bits of which control the type of access
+        as follows:
+
+            Bits    Meaning
+            ----    -------
+            0 - 7   An integer 0  - 255, specifying  how many levels  of
+                    external pointer need  to be  dereferenced to  reach
+                    the  data.   A   value   of   0   indicates   Poplog
+                    record/vector accessing; a non-zero value  (normally
+                    1) indicates external accessing.
+
+            8       If  set,  then  any  access  (external  or   Poplog)
+                    producing an external pointer as result will produce
+                    a fixed record  every time. See  the description  of
+                    the "exptr" field  specifier under Field  Specifiers
+                    for Poplog Structures above.
+
+            9       External `address' mode:  If set,  then an  external
+                    access returns a pointer to the data rather than the
+                    data itself; that is, an access to a structure field
+                    or array  element  will  return  a  pointer  to  the
+                    component, etc. (This bit must be 0 for an  external
+                    function call.)
+
+            10      Like  bit  8,  but  only  applies  to  accesses  for
+                    external compound  fields,  i.e.  fields  which  are
+                    structures or  arrays  (where the  access  procedure
+                    result is always an  external pointer for the  field
+                    address).
+
+        For Poplog record/vector accessing,  the mode argument may  also
+        be false -- this is the same as 0.
+
+        The check argument
+        A boolean  specifying  in the  external  case only  whether  the
+        procedure(s) constructed  should  be fast  (false)  or  checking
+        (true); in the  latter case, all  procedure(s) will check  their
+        pointer argument  to  be  an  external  pointer-class  record, a
+        subscriptor procedure  will  check its  array  subscript,  and a
+        variadic function  call  procedure  will  check  its  number  of
+        arguments. (In the  Poplog case  this argument  is ignored,  all
+        procedure(s) being non-checking.)
+
+        First Form (Field Access Procedures)
+        For field  access  procedures,  spec_list is  a  list  of  field
+        specifiers, allowable specifiers for Poplog records being as for
+        conskey (i.e.  as described  above  under Field  Specifiers  for
+        Poplog Structures).  For  external  structures,  all  these  are
+        allowed plus those described in Additional Field Specifiers  for
+        External Data below.  In the external  case, the structure  MUST
+        also 'start at the pointer', that is, begin with the dummy field
+        spec ">->".
+
+        The want_list argument is  a list of  want values (as  described
+        above), one  for for  each field  in the  structure/record;  the
+        result p_vec is then a vector  of the same length as  want_list,
+        containing either a procedure or false in each element.
+
+        Second Form (Subscriptor Procedure)
+        For a subscriptor procedure, spec_pair is a pair of the form
+
+                 conspair(element_spec, N)
+
+        where element_spec is a single  field spec for the element  type
+        of the external array or Poplog vector (allowable values in each
+        case as  before). The  N  value is  just  ignored for  a  Poplog
+        vector, but for  external, N  is either  an integer  >= 0  for a
+        sized array (of  N elements), or  false for an  unsized one.  As
+        with vectors,  the  first  element  of  an  external  array  has
+        subscript 1; thus  in the unsized  case, a checking  subscriptor
+        procedure just checks its subscript >= 1, but in the sized  case
+        <= N as well.
+
+        The result subscr_p  is then a  subscriptor procedure or  false,
+        depending on the want argument (as described above).
+
+        Third Form (External Apply  Procedure)
+        For  an  external  function   apply  procedure,  spec_vec   is a
+        2-element full vector of the form
+
+                 consvector(N, result_spec, 2)
+
+        where (for a class of external functions with the same arguments
+        and result), N specifies the number of arguments and result_spec
+        the result type. (In this case, bits 0 - 7 of the mode  argument
+        must be 1, and `address mode' must be clear.)
+
+        N is either an integer  >= 0 for a  function of N arguments,  or
+        false  for  a  variadic  function.  If  exptr  is  an   external
+        pointer-class record  for the  external function,  then  apply_p
+        will have the form
+
+                apply_p(arg1, ..., argN, exptr)
+
+        for fixed N, and
+
+                apply_p(arg1, ..., argN, N, exptr)
+
+        for the  variadic case  (i.e. the  number of  arguments must  be
+        supplied as an additional last argument).
+
+        See REF * EXTERNAL  for  a  description  of  how  arguments  are
+        processed when passed to external functions. From Version 14.2+,
+        the first element of spec_vec may also be a pair of the form
+
+                conspair(N, fltsingle)
+
+        where N is as  above, and fltsingle is  a (big)integer in  which
+        bit B controls  whether a (d)decimal  supplied for the  (B+1)-th
+        argument is passed  as a  machine single  float (bit  = 1)  or a
+        double float (bit = 0). If spec_vec(1) is not a pair,  fltsingle
+        defaults to 0.
+
+        result_spec may be  any non-compound type  (i.e. structures  and
+        arrays are excluded), or  "void" or false  if the function  does
+        not return a result.
+
+        The  result  apply_p  is  then  an  apply  procedure  or  false,
+        depending on the want argument (as described above).
+
+        Last Form (Type Access Procedure)
+        For a single access procedure for an external data type, spec is
+        the specifier for the type, and  the result access_p is then  an
+        access procedure for that type  or false, depending on the  want
+        argument (as described above).
+
+
+
+
+--------------------------------
+8  Fields in External Structures
+--------------------------------
+
+As with Poplog records, an external structure is specified by a list  of
+field specifiers; this may occur either as the direct spec_list argument
+to cons_access, or as a structure field in an outer structure or  array,
+etc. In either  case, the structure  must `start at  the pointer',  i.e.
+begin with the dummy field specifier ">->". For example,
+
+        [>-> byte short byte int]
+
+    Fields in an external structure  are allocated (and where  necessary
+aligned) in the same way as  described in Notes on Allocation of  Fields
+in Records above, but starting at 0 offset (as indicated by ">->").  The
+overall size of a structure is  then obtained by rounding the  finishing
+offset to a multiple of the structure's alignment, that is, the greatest
+alignment required by any of its fields. (This rounding ensures that the
+correct alignment will be maintained throughout an array of structures.)
+A structure can also be unsized, i.e. have as its last field an  unsized
+array (or other unsized structure).
+
+    To allow alternate  versions of structures  (i.e. like C  `unions'),
+the dummy field  specifier "|"  may appear  anywhere in  the list.  This
+resets the process of field allocation `back to the beginning', and must
+always be followed by  another ">->" to re-establish  0 offset from  the
+pointer, e.g.
+
+        [>-> byte short byte int | >-> dfloat int]
+
+Thus the different alternatives overlay each other, and the size of  the
+structure  is  determined  by  the  greatest  finishing  offset  of  any
+alternative. (if any alternative is unsized, then the whole structure is
+too). Similarily, the structure's alignment is the greatest required  by
+any alternative.
+
+
+
+
+------------------------------------------------
+9  Additional Field Specifiers for External Data
+------------------------------------------------
+
+This section lists  the additional  field type  specifiers for  external
+data, i.e. that can appear in the spec_list, element_spec,  result_spec,
+or spec  argument  to  cons_access  with  mode  argument  specifying  an
+external access.
+
+    All  specifiers  described   under  Field   Specifiers  for   Poplog
+Structures are  allowed  as  well,  of  course.  However,  there  is  an
+important point regarding "full" fields in external data: these must  be
+used with EXTREME caution. Unlike a record or vector class (which  has a
+key  structure  describing  itself,   used  by  garbage  collection   in
+determining the position  of "full" fields  containing Poplog  structure
+pointers), external pointers contain no  description of what they  point
+to. Thus a "full" field in  an external data structure is NOT  processed
+by the garbage collector, and the assignment of a Poplog structure  into
+such a field may result in it containing junk after a garbage collection
+-- this will certainly be the case if the structure is not fixed-address
+(see   Fixed-Address   Poplog   Structures    for   External   Use    in
+REF * EXTERNAL_DATA). In an  attempt to  guard against  this, an  access
+procedure for  such  a field  mishaps  if  its value  does  not  satisfy
+is_poplog_item (which is by no means guaranteed to pick up all errors).
+
+Array Field
+    As  with  the  outer  spec_pair argument  to cons_access,  an  array
+    field is specified by a pair of the form
+
+        conspair(element_spec, N)
+
+    where element_spec gives  the element type  of the array,  and N  is
+    either an integer >= 0 for a  sized array (of N elements), or  false
+    for an unsized one.
+
+    Note that only the base field type of element_spec is relevant (that
+    is, any implicit access or conversion procedures are stripped  off);
+    moreover, the base field type must be sized (i.e. it must not be  an
+    unsized array, or a structure ending with one, etc). The field  as a
+    whole then has size <base type size> *  N if N is an integer, or  is
+    unsized if N is false .
+
+    Within a structure, an array field  will be aligned so as to  accord
+    with the  alignment (if  any) necessary  for its  element type  (see
+    Notes on  Allocation of  Fields  in Records  above). (Note  that  an
+    unsized array can only appear as  the LAST field in a structure,  in
+    which case that structure itself is unsized.)
+
+    On accessing an array field, its value is an external pointer record
+    pointing to the first element (which record is newly-constructed  or
+    fixed in the same way as for  an "exptr" field, qv). An array  field
+    cannot  be  updated  (thus   an  access  procedure  constructed   by
+    cons_access for a field of this type never has an updater).
+
+Structure Field
+    A structure field is  specified by a list  of field type  specifiers
+    as described in Fields in External Structures above.
+
+    Within an (outer) structure or array, the size of a structure  field
+    is that (sub-) structure's  size, and its  alignment is that  (sub-)
+    structure's alignment. (An unsized  structure field can only  appear
+    as the last  field in an  outer structure, in  which case the  outer
+    structure is itself unsized.)
+
+    On accessing a  structure field,  its value is  an external  pointer
+    record pointing to the start  of the sub-structure (which record  is
+    newly-constructed or fixed in the same way as for an "exptr"  field,
+    qv). A structure field cannot  be updated (thus an access  procedure
+    constructed by cons_access for a field  of this type never has  an
+    updater).
+
+External Function
+    As with  the outer  spec_vec argument  to cons_access,  an  external
+    function (or more  properly, a  set of possible  functions with  the
+    same number of arguments  and same result  type), is specified  by a
+    full vector of the form
+
+        consvector(N, result_spec, 2)
+
+    or
+
+        consvector(conspair(N, fltsingle), result_spec, 2)
+
+    Here N is the number of arguments, or false for a variadic  function
+    (i.e. where the  number of  arguments is supplied  as an  additional
+    last argument).
+
+    fltsingle (defaulting to 0 in the  first form) is a (big)integer  in
+    which bit B controls whether a (d)decimal supplied for the  (B+1)-th
+    argument is actually passed as a single float (bit = 1) or a  double
+    float (bit = 0).
+
+    result_spec is  the result  type: it  may be  any non-compound  type
+    (i.e. structures and arrays are excluded), or "void" or false for no
+    result.
+
+    Note that IN THIS  CONTEXT ONLY (i.e. as  a result_spec), the  field
+    specifier "float"  behaves differently  from "sfloat".  Whereas  the
+    latter assumes the  result is always  a single-float datum,  "float"
+    assumes a  result as  returned by  a "float"  function in  C.  (This
+    distinction is necessary  because on  some systems,  e.g. Suns,  a C
+    "float" result  is actually  returned as  a double.  When  calling C
+    functions, always use "float" rather than "sfloat".)
+
+    Aside from the outer argument  to cons_access, an external  function
+    can only appear as the spec in an implicit type access as  described
+    below (that is, always specifying a POINTER to a function, never  an
+    actual function).
+
+Implicit Access Procedure on Pointer Field
+    This specifies a  pointer field with  an automatic access  procedure
+    built on top of it. The specifier itself is a closure of the form
+
+        acc_p(% sub_spec, false %)
+
+    where acc_p  is  the access  procedure,  and sub_spec  is  the  type
+    specifier for the underlying field (the false frozval  distinguishes
+    an implicit access procedure from a conversion procedure).
+
+    The type specifier sub_spec must be something producing an  external
+    pointer, i.e.  an "exptr"  field,  a structure  or array  field,  or
+    another implicit access producing a pointer. (Note that it cannot be
+    an "exval" field.)
+
+    On accessing the field, its output value is
+
+        acc_p( <underlying field pointer> ) -> <value>
+
+    that is,  whatever  results  from  applying  acc_p  to  the  pointer
+    produced from the underlying field. The field is updateable ONLY  if
+    acc_p possesses an updater;  in this case, the  field is updated  by
+    applying the updater  of acc_p to  the input value  and the  pointer
+    from the underlying field, i.e.
+
+        <value> -> acc_p( <underlying field pointer> )
+
+    (If acc_p has  no updater  then an access  procedure constructed  by
+    cons_access for the field will not have one either).
+
+Implicit Type Access on Pointer Field
+    A  special   kind  of   implicit  access   'procedure'  allows   the
+    access/update code for  any type to  be generated directly  (without
+    the overhead of having it as a separate procedure call). When  acc_p
+    is a closure of the form
+
+        identfn(% ":", spec %)
+
+    (that is, the field specifier as a whole consists of
+
+        identfn(% ":", spec %)(% sub_spec, false %)
+
+    ), it  specifies an  implicit (or  'indirect') access  for the  type
+    given by  spec  (which can  be  anything). In  this  case,  however,
+    sub_spec can  be only  an  "exptr" field  or another  implicit  type
+    access leading to  an "exptr" field  value (that is,  a type  access
+    cannot be applied to anything producing a structure or array, or the
+    output of an ordinary access procedure).
+
+    The value of the  field is then whatever  results from an access  of
+    the type spec through the  pointer produced by the underlying  field
+    sub_spec, i.e. (treating the access code for spec as a 'procedure')
+
+        <access code for spec>( <underlying field pointer> ) -> <value>
+
+    Similarily, assigning to the field updates the type spec through the
+    pointer from the underlying field
+
+        <value> -> <access code for spec>( <underlying field pointer> )
+
+    (thus the field is updateable if and only if type spec is, etc).
+
+    Note, however, that a  special case arises when  spec is a  compound
+    type (i.e. array, structure  or function). Since  in these cases  an
+    access for spec  gives the address  of the field,  this is just  the
+    same as returning the underlying field pointer (i.e. the access code
+    for spec does nothing, and the value is the same as sub_spec alone).
+    The whole field specifier  is therefore treated as  if it WERE  just
+    sub_spec, i.e. spec is simply taken to be typing information on  the
+    external pointer field given by sub_spec, and is otherwise  ignored.
+    Consequently, a field  of this  type is updateable  (where a  direct
+    compound type in a structure or array would not be), since  updating
+    the address  of the  object is  the same  as updating  the  external
+    pointer field sub_spec.
+
+Pointer Value as Data
+    This specifier enables the pointer  value of an external pointer  to
+    be accessed as data in its own right. It consists of a reference  of
+    the form
+
+        consref(data_spec)
+
+    where data_spec  is  restricted  to  being  a  packed  integer  spec
+    ("word", "int", etc), "sfloat" or "full".
+
+    This  specifier  may   only  appear  as   the  direct  argument   to
+    cons_access, or as the spec of  an implicit type access; its  effect
+    is to `back off' by one level of pointer, and then access or  update
+    through a pointer to the pointer value according to data_spec. (Note
+    that specifying a type smaller than  a pointer is taken to mean  the
+    low-order   part   of   the   value,   e.g.   "byte"   returns   the
+    least-significant byte of the pointer value.)
+
+
+
+
+-----------------
+10  Miscellaneous
+-----------------
+
+field_spec_info(spec) -> (value_spec, bitsize)               [procedure]
+        Given  any  field  type  specifier  spec  (EXCEPT  an   external
+        function, i.e. a  vector), returns  the number  of bits  bitsize
+        occupied by the field; this is false for an unsized structure or
+        array. The value_spec result indicates what the field value will
+        be when accessed.
+
+        If spec contains any  implicit access or conversion  procedures,
+        then value_spec is false (since the system can't determine  what
+        the field will produce).
+
+        If spec is  for a compound  type (i.e. structure  list or  array
+        pair) then value_spec = spec (which means "exptr" as far as  the
+        field value is  concerned, but  spec is  returned to  indicate a
+        non-updateable pointer).
+
+        Otherwise, value_spec is as follows:
+
+            value_spec    Meaning
+            ----------    -------
+            "full"        Any Poplog item
+            N             Unsigned integer 0 <= I < 2**N
+            -N            Signed integer -2**(N-1) <= I < 2**(N-1)
+            "decimal"     Decimal
+            "ddecimal"    Ddecimal (or decimal, see * popdprecision)
+            "exptr"       External pointer
+            "exval"       External pointer or value
+
+        Note in particular  that the value_spec  returned for "pint"  is
+        -(number of bits in a simple integer).
+
+
+key_key -> key                                                [constant]
+        The constant key structure for key structures themselves.
+
+
+
+--- C.all/ref/keys
+--- Copyright University of Sussex 1995. All rights reserved.

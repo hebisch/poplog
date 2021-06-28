@@ -1,0 +1,522 @@
+REF FASTPROCS                                        A. Sloman May 1990
+
+        COPYRIGHT University of Sussex 1990. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<      FAST PROCEDURES        >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+This REF file documents several fast procedures which do no checking  of
+types or bounds.  See HELP * EFFICIENCY for  hints on optimising  Pop-11
+programs.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Warning
+
+  2   General Fast Structure Accessing Procedures
+
+  3   Planting code for non-checking field access
+
+  4   Fast Iteration
+
+  5   Procedures to Reduce Garbage Collection on Lists
+
+  6   Fast Operations on Properties
+
+  7   Fast Prolog Operations
+
+  8   Fast Integer Operators
+
+  9   Fast Bit-wise Logical Operations on Simple Integers
+
+ 10   Fast Integer Vector Accessing
+
+ 11   Fast I/O Operations
+
+ 12   Fast Calling and Chaining Procedures
+
+ 13   Fast System Exit
+
+ 14   Repeated Warning
+
+
+
+----------
+1  Warning
+----------
+
+These "fast"  procedures are  used at  the risk  of the  user. They  are
+potentially dangerous and can lead to spurious fault reports if misused.
+They cannot be used on dynamic lists or on numbers other than  integers.
+Fault reports involving the use of these procedures may be discounted if
+the fault cannot be replicated using the non-fast alternatives which  do
+type checking.
+
+
+
+----------------------------------------------
+2  General Fast Structure Accessing Procedures
+----------------------------------------------
+
+class_fast_subscr(vec_key) -> subscr_p                       [procedure]
+        Returns non-checking subscriptor procedure for the class.
+
+
+fast_cont(ref) -> item                                       [procedure]
+item -> fast_cont(ref)
+        For accessing or updating the contents of references.
+
+
+fast_deref(ref) -> ref                                       [procedure]
+        While ref is a reference with non-false cont, do
+
+                cont(ref) -> ref
+
+        If the contents are false return the reference.
+
+
+fast_front(pair) -> item                                     [procedure]
+item -> fast_front(pair)
+        For accessing or updating the first element of a pair.
+
+
+fast_back(pair) -> item                                      [procedure]
+item -> fast_back(pair)
+        For accessing or updating the second element of a pair.
+
+
+fast_destpair(pair) -> back -> front                         [procedure]
+        Equivalent to a call of fast_front then fast_back.
+
+
+fast_flatten(list_1) -> list_2                               [procedure]
+        Flatten a list using fast_front and fast_back.
+
+
+fast_idval(ident) -> item                                    [procedure]
+item -> fast_idval(ident)
+        For accessing or updating  the value of  an identifier (same  as
+        nonactive_idval in respect of active variables).
+
+
+fast_lmember(item, list) -> sub_list                         [procedure]
+        For finding an element in a list, testing with ==.
+
+
+fast_member(item, list) -> bool                              [procedure]
+        For finding an element in a list, testing with =.
+
+
+fast_ncdelete(item, list_1)          -> list_2               [procedure]
+fast_ncdelete(item, list_1, eq_p)    -> list_2
+fast_ncdelete(item, list_1, n)       -> list_2
+fast_ncdelete(item, list_1, eq_p, n) -> list_2
+        Fast version of ncdelete,  which destructively deletes  matching
+        occurrences of item from list_1. See REF * ncdelete.
+
+
+fast_ncrev(list_1) -> list_2                                 [procedure]
+        For reversing a list using existing list links.
+
+
+fast_subscrs(n, string) -> char                              [procedure]
+char -> fast_subscrs(n, string)
+        For accessing or updating the n'th string element. Identical  to
+        fsub_b (see below).
+
+
+fast_subscrdstring(n, dstring) -> char                       [procedure]
+char -> fast_subscrdstring(n, dstring)
+        For accessing  or updating  the n'th  dstring element  (same  as
+        fast_subscrs on ordinary strings).
+
+
+fast_subscrvedstring(n, vstring) -> char                     [procedure]
+char -> fast_subscrvedstring(n, vstring)
+        For accessing  or updating  the n'th  vstring element.
+
+
+fast_subscrintvec(n, intvec) -> int                          [procedure]
+int -> fast_subscrintvec(n, intvec)
+        For accessing or updating  the n'th integral  in an intvec  (see
+        REF * INTVEC). Identical to fsub_si (see below)
+
+
+fast_subscrshortvec(n, shortvec) -> int                      [procedure]
+int -> fast_subscrshortvec(n, shortvec)
+        For accessing or updating the  n'th integer in a shortvec  (see
+        REF * INTVEC). Identical to fsub_ss (see below).
+
+
+fast_subscrv(n, fvec) -> item                                [procedure]
+item -> fast_subscrv(n, fvec)
+        For accessing or updating the n'th element of a full vector.
+
+
+fast_subscrw(n, word) -> char                                [procedure]
+        For accessing  the n'th  character of  a word.  Updating is  not
+        allowed.
+
+
+fast_subscrl(n, list) -> item                                [procedure]
+item -> fast_subscrl(n, list)
+        A fast version of * subscrl  for accessing or updating the  n'th
+        element of a  list (this  procedure does NOT  work with  dynamic
+        lists).
+
+
+fast_word_string(word) -> string                             [procedure]
+        Returns the actual string of  characters of the word word  (i.e.
+        without copying it, as word_string does). string must never have
+        its characters updated, or the dictionary will be corrupted.
+
+
+fast_frozval(n, clos) -> item                                [procedure]
+item -> fast_frozval(n, clos)
+        For accessing or updating the n'th frozen value of a closure.
+
+
+The procedure cons_access, described in REF * KEYS makes it possible  to
+create fast accessing procedures for a variety of data types.
+
+
+
+----------------------------------------------
+3  Planting code for non-checking field access
+----------------------------------------------
+
+See REF * sysFIELD.
+
+
+
+-----------------
+4  Fast Iteration
+-----------------
+
+fast_for                                                        [syntax]
+endfast_for                                                     [syntax]
+        For fast, non-type-checking  iteration over  lists or  integers.
+        Formats are the same  as for, except that  the keyword step  may
+        not be used, and non-integer numbers may not be used as  initial
+        value, increment or final value. Dynamic lists may not be  used.
+        May be terminated by endfor or endfast_for. See  REF * POPSYNTAX
+        and HELP * FOR for formats.
+
+
+fast_repeat                                                     [syntax]
+endfast_repeat                                                  [syntax]
+        A fast  non-type-checking version  of  repeat when  used  with a
+        times clause on simple integer  values (without a times  clause,
+        repeat and fast_repeat are the same).
+
+
+
+---------------------------------------------------
+5  Procedures to Reduce Garbage Collection on Lists
+---------------------------------------------------
+
+Two procedures are provided  that enable list links  to be re-used  when
+they are no longer needed. Use of these procedures can be very dangerous
+unless you know exactly what you are doing, and make sure that there are
+no other pointers to the links (pairs).
+
+
+sys_grbg_list(list)                                          [procedure]
+        All the pairs  in the  list are chained  onto a  "free list"  of
+        pairs, used by conspair.
+
+
+sys_grbg_destpair(pair) -> back -> front                     [procedure]
+        This, like destpair and fast_destpair takes a pair and puts  the
+        front and the back of the pair on the stack. It also returns the
+        pair itself  to  the  free  list,  unlike  sys_grbg_list,  which
+        returns a whole chain of pairs to the free list.
+
+
+The unfortunate abbreviation  'grbg' is  used rather  than 'garbage'  to
+keep any corresponding file  names short enough  to be discriminated  in
+Unix System V.
+
+
+
+--------------------------------
+6  Fast Operations on Properties
+--------------------------------
+
+fast_appproperty(prop, p)                                    [procedure]
+        For procedures which do  not attempt to  update the property  in
+        any way. Normal appproperty copies  the item/value pairs out  of
+        the property into a vector first and then calls the procedure on
+        each item and corresponding value. fast_appproperty applies  the
+        procedure on the pairs directly in the property table.
+
+
+fast_get_prop_entry(item, prop) -> prop_entry                [procedure]
+        Enables a property entry data structure associating an item item
+        and its value in a property to be accessed. If there is no  such
+        entry, <false>  is  returned. Having  got  the entry,  the  next
+        procedure can be used to access or update the value.
+
+
+fast_prop_entry_value(prop_entry) -> value_item              [procedure]
+value_item -> fast_prop_entry_value(prop_entry)
+        This procedure can be used to access or update the value cell of
+        a  property  entry  obtained  using  fast_get_prop_entry.   E.g.
+        assuming that an  entry for  item exists in  the property  prop,
+        then the  following instruction  can be  used to  increment  the
+        value of prop(item) by amount x:
+
+            prop(item) + x -> prop(item)
+
+        However, this requires looking up the entry for item twice over,
+        if it  already  exists.  Something  like  the  following  should
+        therefore be much faster:
+
+            lvars prop_entry = fast_get_prop_entry(item, prop);
+
+            fast_prop_entry_value(prop_entry) + x
+                -> fast_prop_entry_value(prop_entry)
+
+        N.B: the above two procedures  do not check their arguments,  so
+        they must be used with caution.
+
+
+fast_prop_entry_arg(prop_entry) -> item                      [procedure]
+        This procedure can be used to access the arg cell of a  property
+        entry obtained using fast_get_prop_entry. It has no updater  for
+        obvious reasons. See HELP * FOR_FORM/on_property for a  possible
+        usage.
+
+
+fast_kill_prop_entry(item, prop) -> bool                     [procedure]
+        Removes, if present, the entry  associated with item from  prop;
+        returning <true> if an entry was removed, and <false> otherwise.
+
+
+
+-------------------------
+7  Fast Prolog Operations
+-------------------------
+
+See REF * PROLOG. These procedures work only on prologterms (not pairs),
+and do not dereference their arguments.
+
+
+fast_prolog_arity(term) -> n                                 [procedure]
+        Returns the arity of the prologterm term.
+
+
+fast_prolog_functor(term) -> item                            [procedure]
+item -> fast_prolog_functor(term)
+        Returns or updates the functor item of the prologterm term.
+
+
+fast_prolog_arg(n, term) -> item                             [procedure]
+item -> fast_prolog_arg(n, term)
+        Returns or updates the n-th argument of the prologterm term.
+
+
+
+-------------------------
+8  Fast Integer Operators
+-------------------------
+
+See REF * NUMBERS for the corresponding checking procedures.
+
+
+i  fi_<   j -> bool                                         [operator 6]
+i  fi_<=  j -> bool                                         [operator 6]
+i  fi_>   j -> bool                                         [operator 6]
+i  fi_>=  j -> bool                                         [operator 6]
+        Fast less than, less than  or equal, greater than, greater  than
+        or equal on two simple integers.
+
+
+i  fi_+  j  -> k                                            [operator 5]
+i  fi_-  j  -> k                                            [operator 5]
+i  fi_*  j  -> k                                            [operator 4]
+        Add/subtract/multiply two simple integers without checking.
+
+
+i  fi_//   j  -> quot -> rem                                [operator 4]
+i  fi_div  j  -> quot                                       [operator 2]
+i  fi_rem  j  -> rem                                        [operator 2]
+        Divide two simple  integers to give  remainder and quotient,  or
+        either separately.
+
+
+i  fi_mod  j                                                [operator 2]
+        j modulo i.
+
+
+fi_negate(i)                                                 [procedure]
+        Negation of i.
+
+
+fi_max(i, j) -> greatest                                     [procedure]
+fi_min(i, j) -> least                                        [procedure]
+        Greatest and least of two simple integers.
+
+
+fi_check(item, low_int, hi_int) -> item                      [procedure]
+        Checks item to be an integer within the range specified by lower
+        bound low_int and upper bound hi_int (inclusive). Either or both
+        bounds may be <false>  to indicate no upper  or lower limit.  If
+        all conditions are satisfied  the procedure returns the  integer
+        otherwise a mishap  occurs. This procedure  does not check  that
+        low_int  and  hi_int   are  integers   if  non-false.   (Compare
+        * checkinteger)
+
+
+
+------------------------------------------------------
+9  Fast Bit-wise Logical Operations on Simple Integers
+------------------------------------------------------
+
+i  fi_&&  j  -> k                                           [operator 4]
+        Logical AND of two simple integers.
+
+
+i  fi_&&~~  j -> k                                          [operator 4]
+        AND  complement of two simple integers.
+
+
+i  fi_||  j  -> k                                           [operator 4]
+        Inclusive OR of two simple integers.
+
+
+i  fi_||/&  j -> k                                          [operator 4]
+        Exclusive OR of two simple integers.
+
+
+fi_~~  i  -> j                                              [operator 4]
+        Logical NOT of simple integer.
+
+
+i  fi_<<  n                                                 [operator 4]
+i  fi_>>  n                                                 [operator 4]
+        Logical shift simple integer i left and right by n bits.
+
+
+
+---------------------------------
+10  Fast Integer Vector Accessing
+---------------------------------
+
+These procedures are provided to allow a consistent method of  accessing
+vectors of integers of  various sizes. They  are all fast,  non-checking
+functions, so they can be used on  any data types. Their primary use  is
+for accessing  signed integer  vectors as  unsigned integers  (and  vice
+versa), and  for  extreme cases  where  record-type structures  are  not
+appropriate. For  example,  when  dealing with  disk  files  in  strange
+formats, it is sometimes necessary to interpret the contents of the byte
+addressable i/o buffer as holding an int (4 bytes) or short (2 bytes).
+
+
+fsub_i(n, vec) -> int                                        [procedure]
+int -> fsub_i(n, vec)
+        Access/update the n'th  unsigned 32  bit integer  of the  vector
+        vec.
+
+
+fsub_si(n, vec) -> int                                       [procedure]
+int -> fsub_si(n, vec)
+        Access/update the n'th signed 32 bit integer of the vector vec.
+
+
+fsub_s(n, vec) -> int                                        [procedure]
+int -> fsub_s(n, vec)
+        Access/update the n'th  unsigned 16  bit integer  of the  vector
+        vec.
+
+
+fsub_ss(n, vec) -> int                                       [procedure]
+int -> fsub_ss(n, vec)
+        Access/update the n'th signed 16 bit integer of the vector vec.
+
+
+fsub_b(n, vec) -> int                                        [procedure]
+int -> fsub_b(n, vec)
+        Access/update the n'th unsigned 8 bit integer of the vector vec.
+
+
+fsub_sb(n, vec) -> int                                       [procedure]
+int -> fsub_sb(n, vec)
+        Access (update) the n'th signed 8 bit integer of the vector vec.
+
+
+
+-----------------------
+11  Fast I/O Operations
+-----------------------
+
+fast_sysread(dev, bsub, bytestruct, nbytes) -> nread         [procedure]
+fast_syswrite(dev, bsub, bytestruct, nbytes)                 [procedure]
+        Same as sysread and syswrite  (see REF * SYSIO), except that  no
+        checks are performed on any of the arguments. (Note that, unlike
+        sysread and syswrite, the bsub  argument to these procedures  is
+        not optional.)
+
+
+
+----------------------------------------
+12  Fast Calling and Chaining Procedures
+----------------------------------------
+
+fast_apply(p)                                                [procedure]
+-> fast_apply(p)
+        Executes the procedure p; the  update form executes the  updater
+        of p. Neither form checks that p is a procedure (but the  update
+        form does check that p has an updater).
+
+        This procedure differs from the checking version, apply, in that
+        it does not represent a stack frame, i.e. p is applied  directly
+        inside the calling procedure.
+
+
+fast_chain(p)                                                [procedure]
+        Exits the current  procedure, restoring the  environment of  its
+        caller, and then executes the procedure p without checking it to
+        be a procedure.
+
+
+
+--------------------
+13  Fast System Exit
+--------------------
+
+fast_sysexit()                                               [procedure]
+        Exits the Poplog system without doing any tidying actions.  That
+        is, it does not  flush internal buffers,  does not call  popexit
+        and does  not write  unwritten Ved  files. Its  main use  is  in
+        forked child processes.
+
+
+
+--------------------
+14  Repeated Warning
+--------------------
+
+These fast procedures do no checking. For instance, there is no checking
+of bounds of a string  or vector, or even that  object is a string  or a
+vector. If  you  update  something which  you  shouldn't  the  resulting
+behaviour will be totally undefined. Dynamic lists are not expanded.
+
+    YOU USE THESE PROCEDURES AT YOUR  OWN RISK.
+
+No help can be expected if any bugs occur whilst these procedures are in
+use. The only aid available is LIB * SLOWPROCS which attempts to  change
+all the fast  procedures into  their respective  checking versions.  For
+LIB * SLOWPROCS to work  correctly it  must be loaded  before the  users
+program is  compiled (recompile  after the  library has  been loaded  if
+necessary). All  the fast  procedures in  (auto)loadable libraries  will
+also need to be loaded before the  library is compiled if it is to  work
+correctly.
+
+
+
+--- C.all/ref/fastprocs
+--- Copyright University of Sussex 1990. All rights reserved.

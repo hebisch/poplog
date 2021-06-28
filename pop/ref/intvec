@@ -1,0 +1,213 @@
+REF INTVEC                                          Aled Morris Sep 1986
+
+       COPYRIGHT University of Sussex 1990. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<    SIGNED INTEGER VECTORS   >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+This REF file deals with the procedures for constructing, and  accessing
+intvecs and shortvecs  which are  the other two  other 'packed  integer'
+vector-types besides strings which are predefined in Poplog.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+
+  2   Predicates On Integer Vectors
+
+  3   Constructing Intvecs
+
+  4   Accessing Integer Vector Elements
+
+  5   Generic Datastructure/Vector Procedures on Intvecs
+
+  6   Miscellaneous
+
+  7   Example
+
+
+
+---------------
+1  Introduction
+---------------
+
+Along with strings, Poplog has  two other 'packed integer'  vector-types
+predefined:  these  are  the  "intvec"  and  the  "shortvec".  Both  are
+indexable 1-dimensional arrays  where each element  is a signed  integer
+(unlike strings, where each element  is an unsigned byte). The  elements
+are numbered in  the same way  as all Pop-11  vector types, i.e.  from 1
+upwards.
+
+    Elements of these vectors are the same as C "int" and "short"  sizes
+respectively, so the actual range  of integers permitted will depend  on
+the implementation (in all current implementations, intvecs are 32 bits,
+and shortvecs are 16 bits). The  datawords of intvecs and shortvecs  are
+"intvec" and "shortvec" respectively.
+
+    Packed integer vectors are  an example of the  class of vector  type
+objects which can be constructed with the defclass syntax construct  (or
+with  the  procedure  conskey);  see  REF * DEFSTRUCT  and   REF * KEYS.
+REF * DATA lists the procedures  applicable to all vector-type  objects.
+REF * VECTORS gives  full  details  of standard  full  vectors,  another
+Pop-11 built-in datatype, and REF * STRINGS details the handling of byte
+vectors.
+
+
+
+
+--------------------------------
+2  Predicates On Integer Vectors
+--------------------------------
+
+isintvec(item) -> bool                                       [procedure]
+isshortvec(item) -> bool                                     [procedure]
+        Returns true if  item is  an integer vector  of the  appropriate
+        type, false if not.
+
+
+
+
+-----------------------
+3  Constructing Intvecs
+-----------------------
+
+consintvec(int1, int2, ..., intN, N) -> intvec               [procedure]
+consshortvec(int1, int2, ..., intN, N) -> shortvec           [procedure]
+        Construct and return an integer  vector with its elements  taken
+        from the next N integers on the user stack, where the first item
+        on the stack will be at the highest subscript value. E.g.
+
+                vars v = consintvec(100, 101, 102, 3);
+                v =>
+                ** <intvec 100 101 102>
+
+
+initintvec(n) -> intvec                                      [procedure]
+initshortvec(n) -> shortvec                                  [procedure]
+        Constructs and returns an integer vector (intvec or shortvec) of
+        length n  whose  elements are  all  initialised to  the  value 0
+        (zero). (see also initvectorclass in REF * DATA.)
+
+
+
+
+------------------------------------
+4  Accessing Integer Vector Elements
+------------------------------------
+
+destintvec(intvec) -> (int1, int2, ..., intN, N)             [procedure]
+destshortvec(shortvec) -> (int1, int2, ..., intN, N)         [procedure]
+        Destruct the  given integer  vector (intvec  or shortvec),  i.e.
+        puts all its elements on the stack, together with its length (in
+        other words, does the opposite of consintvec and  consshortvec).
+        E.g.
+
+                destintvec(v) =>
+                ** 100 101 102 3
+
+
+subscrintvec(n, intvec) -> int                               [procedure]
+int -> subscrintvec(n, intvec)
+subscrshortvec(n, shortvec) -> int                           [procedure]
+int -> subscrshortvec(n, shortvec)
+        Returns or updates the n-th element of the integer vector intvec
+        or shortvec. Since subscrintvec  is the class_apply of  intvecs,
+        and  subscrshortvec  is  the   class_apply  of  shortvecs   (see
+        REF * KEYS), these can also be called as
+
+                intvec(n) -> int
+                int -> intvec(n) or
+                shortvec(n) -> int
+                n -> shortvec(n)
+
+
+
+
+-----------------------------------------------------
+5  Generic Datastructure/Vector Procedures on Intvecs
+-----------------------------------------------------
+
+The   generic   datastructure   procedures   described   in   REF * DATA
+(datalength, appdata, explode,  fill, copy, etc)  are all applicable  to
+integer vectors, as are the generic vector procedures (initvectorclass-,
+move_subvector, sysanyvecons, etc) also described in that file.
+
+
+
+
+----------------
+6  Miscellaneous
+----------------
+
+intvec_key -> key                                             [constant]
+shortvec_key -> key                                           [constant]
+        Hold  the  key   structures  for  both   integer  vectors   (see
+        REF * KEYS).
+
+
+
+
+----------
+7  Example
+----------
+
+In all implementations  of Poplog the  integer size used  in intvecs  is
+equivalent to the C language "int"  storage class on those machines  (ie
+32 bit  signed quantities).  It  is possible,  therefore, to  pass  such
+vectors to C programs as an argument for returning multiple values.  See
+REF * EXTERNAL for information on invoking external functions.
+
+Here is an  example of a  C function  which demonstrates the  use of  an
+integer vector  to  return values.  The  function computes  the  first n
+numbers of the Fibonacci series, which are deposited in the given  array
+of integers v:
+
+        void fib(n, v)
+        int n, v[];
+        {
+            int i;
+
+            v[0] = 0;   /* the first two numbers in the Fibonacci */
+            v[1] = 1;   /* series are 0 and 1                     */
+
+            for (i = 2; i < n; i++)
+            {
+                v[i] = v[i - 2] + v[i - 1];
+            }
+        }
+
+Linking this function into Poplog involves using the exload syntax form:
+
+        exload 'testload'
+            [fib]      ;;; object file containing fib
+            fib(2)     ;;; declares fib as having 2 arguments, no result
+        endexload;
+
+In order to call the function we must construct an intvec:
+
+        vars iv = initintvec(15);
+
+We now have a vector which corresponds  to the C array of integers,  and
+we can call the function with the syntax word exacc:
+
+        exacc fib(15, iv);
+
+The vector iv is now filled with  the first 15 numbers of the  Fibonacci
+series:
+
+        iv =>
+        ** <intvec 0 1 1 2 3 5 8 13 21 34 55 89 144 233 377>
+
+Shortvecs can be  used in the  above example if  the declaration of  the
+parameter "v" to the C function "fib" were changed to
+
+        short v[];
+
+
+
+
+--- C.all/ref/intvec
+--- Copyright University of Sussex 1990. All rights reserved.

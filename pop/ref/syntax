@@ -1,0 +1,896 @@
+REF SYNTAX                                          John Gibson Jan 1995
+
+      COPYRIGHT University of Sussex 1995. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<    AN ALPHABETICAL LIST     >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<    OF POP-11 SYNTAX WORDS   >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+This file describes built-in Pop-11  syntax words: individual items  are
+detailed more fully in separate HELP or REF files where indicated.  Full
+syntax diagrams  for Pop-11  can be  found in  REF * POPSYNTAX.  (Pop-11
+syntax may  be extended  by users  in order  to define  special  purpose
+constructs; mechanisms for doing this are described in  REF * POPCOMPILE
+and REF * VMCODE.)
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Alphabetical Listing of Syntax Words
+
+  2   Associated Variables
+
+  3   Related Documentation
+
+
+
+---------------------------------------
+1  Alphabetical Listing of Syntax Words
+---------------------------------------
+
+"                                                               [syntax]
+        Begins and ends a quoted word constant, e.g.
+
+            "word" -> foo;
+
+        assigns the word  word  to be  the value of the identifier  foo.
+        To include  characters  that do  not  follow the  usual  lexical
+        syntax for a word, a quoted string may appear inside the  double
+        quotes, e.g.
+
+            "'1234xyz'"
+
+        " may also be  used to get the  word-identifier for a  permanent
+        identifier, by following it with ident and the identifier  name,
+        e.g.
+
+            "ident foo" -> baz;
+            "ident $-mysect$-xxxx" -> wordid;
+
+        etc (see * word_identifier).
+
+
+#|                                                              [syntax]
+        Counts the number of items pushed  onto the stack by a  sequence
+        of statements (up to |#), e.g.
+
+                #| "a", "b", "c" |# =>
+                ** a b c 3
+
+
+$-                                                           [syntax -1]
+        Used in section pathnames. See REF * SECTIONS.
+
+
+%                                                               [syntax]
+        Used in structure expressions and partial application. In vector
+        or list expressions formed with the structure brackets {...}  or
+        [....], the form %  ... % is used  to suspend quoting and  cause
+        the enclosed code to be executed.  This is analogous to the  use
+        of ^(...) in such expressions.  Anything left on the stack  will
+        be included in the list or vector.
+
+        Example: create a list of numbers between 2 and 15:
+
+            vars x;
+            [% for x from 2 to 15 do x endfor %] =>
+            ** [2 3 4 5 6 7 8 9 10 11 12 13 14 15]
+
+        See HELP * PERCENT, HELP * LISTS, HELP * VECTORS.
+
+
+(                                                            [syntax -1]
+        Terminated by  ),  and  used  (1)  to  disambiguate  expressions
+        involving operators, (2) to turn an expression sequence into  an
+        single  expression,  and  (3)  after  an  expression  denoting a
+        procedure, to represent procedure application.
+
+
+)                                                               [syntax]
+        Closer for (.
+
+
+,                                                               [syntax]
+        Statement separator/terminator: may be used anywhere ; can be as
+        well as  to  separate  procedure  arguments,  and  variables  in
+        declaration lists. E.g.
+
+            foo(1, 2, 3) -> result;
+            vars x = 5,  y = hd(list), procedure ( p1, p2, p3 );
+
+
+->                                                           [syntax 11]
+        Assignment arrow: assigns an expression to a variable or  causes
+        the updater of following procedure to be called. E.g.
+
+            [A B C D] -> x;
+            33, 44 -> (n, m);
+            `A` -> subscrs(1, string);
+
+
+->>                                                          [syntax 11]
+        'Non-destructive' assignment arrow:  as for  ->, but  duplicates
+        the value on top of the stack before assigning it, so that it is
+        available to be used again. E.g.
+
+            [] ->> list1 ->> list2 -> list3;
+
+
+:                                                            [syntax -1]
+        Flags the  preceding word  as a  label, which  may then  be  the
+        target of a goto. E.g.
+
+            loop:  n + 1 -> n;
+                   ....
+                   goto loop;
+
+
+:*                                                           [syntax -1]
+        Used  for   labels   accessible   via   non-local   jumps.   See
+        REF * VMCODE.
+
+
+;                                                               [syntax]
+        Statement separator/terminator. May be  used anywhere except  to
+        separate arguments to a procedure, or parts of a condition e.g.
+
+            foo(1;2;3)
+
+        is NOT allowable, instead use:
+
+            foo(1,2,3)
+
+        or
+
+            foo ((1;2;3))
+
+        Similarly
+
+            if expression1 ; expression2 then
+
+        is not legal. Instead use:
+
+            if (expression1 ; expression2) then
+
+        Conditions in while or until loops are similarly restricted.
+
+
+=>                                                           [syntax 12]
+        Print arrow. If used at 'top'  level, i.e. not inside any  other
+        statement, then prints and clears everything on the stack, e.g.
+
+                1, 2, 3, 4 =>
+                ** 1 2 3 4
+
+        If not at top level, then prints and removes just one item  from
+        the stack. The print arrow  is syntactically identical to ;  and
+        may be used as a separator/terminator wherever that may be used.
+        E.g.
+
+                if true then 1 => 2 => 3 => endif;
+                ** 1
+                ** 2
+                ** 3
+
+
+==>                                                          [syntax 12]
+        Pretty-print arrow. Like  => except that  it always prints  only
+        ONE item, and in the case  of lists or vectors that would  print
+        over more than one  line attempts to  produce a readable  format
+        with indented substructures.
+
+
+[                                                               [syntax]
+        Opening bracket for a  list expression. May be  used with %,  ^,
+        and ^^.
+
+
+]                                                               [syntax]
+        Closing bracket for a list expression.
+
+
+^                                                               [syntax]
+        Followed by an identifier name or parenthesized expression  in a
+        list  or  vector  expression  will  insert  the  value  of   the
+        identifier or the  results returned  by the  expression at  that
+        point, e.g.
+
+            [ ... ^item ... ]
+            [ ... ^(expression) ...]
+            { ... ^item ... }
+
+        where "..."  represents any  sequence legal  within a  list,  or
+        vector expression. ^( ... ) is equivalent to % ... % in list  or
+        vector expressions.
+
+
+^^                                                              [syntax]
+        Followed  by  an   identifier  name   or  parenthesized   Pop-11
+        expression in a list  or vector expression  will splice all  the
+        elements of the list  or vector contained  in the identifier  or
+        produced by evaluating the expression, e.g.
+
+            [ ... ^^list ... ]
+            [ ... ^^(expression) ...]
+            { ... ^^item .... }
+            { ... ^^(expression) ...}
+
+        where "..." represents any sequence legal within a list, etc. If
+        the value  of  the variable,  or  the last  result  returned  by
+        evaluating the expression is not of the appropriate type, i.e. a
+        list or vector (possibly empty), an error will result.
+
+
+{                                                               [syntax]
+        Opening  bracket  for  a  vector  expression.  Also  used   with
+        cons_with. May be used with %, ^, and ^^.
+
+
+|#                                                              [syntax]
+        Closer for a counted statement sequence #| ... |#.
+
+
+}                                                               [syntax]
+        Closing bracket for a vector expression.
+
+
+active                                                          [syntax]
+        Used in  identifier declarations  to  declare them  active.  See
+        HELP * ACTIVE_VARIABLES.
+
+
+and                                                           [syntax 9]
+        Used for  forming  boolean conditions.  Note  that  the  second
+        argument of and is  not executed unless  the first evaluates  to
+        true, in:
+
+            expression1 and expression2
+
+
+by                                                              [syntax]
+        Forms part of a for statement: the following expression is  used
+        as the increment after each iteration, e.g.
+
+            for x from 0 by 2 to 10 do ... endfor;
+
+
+class_subscr_loop                                            [procedure]
+subscr_loop                                                  [procedure]
+        Built in procedures  for creating new  for loop statements.  See
+        HELP * FOR_FORM for details.
+
+
+cons_with                                                       [syntax]
+        Used to make a vector constructor (i.e. an expression like { ...
+        } )  construct  not  an ordinary  vector  but  any  vector-class
+        structure. The format is
+
+            cons_with expression { ... }
+
+        where expression  is assumed  to produce  a  vector-constructing
+        procedure (like consvector or consstring), which is then used to
+        construct the vector instead  of consvector. E.g. the  following
+        will construct the string 'ABCD':
+
+            cons_with consstring {`A` `B` `C` `D`}
+
+
+constant                                                        [syntax]
+        For declaring constant permanent identifiers.
+
+
+define                                                          [syntax]
+        For defining procedures. See HELP * DEFINE.
+
+
+define_form                                                     [syntax]
+        Used to build new syntactic  constructs, which use a define  ...
+        enddefine format  for easy  integration in  the standard  Pop-11
+        system:
+
+               define :define_form name ; body enddefine;
+
+        name is the name of the new  structure and body, the code to  be
+        executed when the structure is compiled. See HELP * define_form.
+
+
+define_pdr_valof                                                [syntax]
+        Obsolete define_form construct, now replaced by
+
+           define name = expression enddefine;
+
+
+define_define_form                                              [syntax]
+        Used   to    prevent    redefinition   of    define_form.    See
+        HELP * define_form.
+
+
+define_inline                                       [syntax define_form]
+        A define_form that simplifies the definition of macros that look
+        like  procedure  calls.  define  :inline  is  much  like   the C
+        pre-processor directive #define. See HELP * INLINE for details.
+
+
+define_for_extension                                            [syntax]
+        Used to build new for loop constructs. See HELP * FOR_FORM.
+
+
+dlocal                                                          [syntax]
+        Used to make identifier values and other expressions dynamically
+        local to  the  current  procedure (or  the  current  compilation
+        stream). See  HELP * DLOCAL  and Dynamic  Local  Expressions  in
+        REF * VMCODE.
+
+
+dlvars                                                          [syntax]
+        Used for  declaring  restricted  local  lexical  variables.  See
+        HELP * DLVARS, REF * VMCODE/Lexical.
+
+
+do                                                              [syntax]
+        Used after  the condition  in until  or while  loops or  in  for
+        loops.
+
+
+else                                                            [syntax]
+        Default case in conditional statements using if or unless.
+
+
+elseif                                                          [syntax]
+        Part of a conditional statement, using if or unless.
+
+
+elseunless                                                      [syntax]
+        Part of a conditional statement, using if or unless.
+
+
+enddefine                                                       [syntax]
+        Ends a define procedure definition.
+
+
+endfor                                                          [syntax]
+        End of a for loop.
+
+
+endforeach                                                      [syntax]
+        End of a foreach loop.
+
+
+endforevery                                            [variable syntax]
+        End of a forevery loop.
+
+
+endgo_on                                                        [syntax]
+        End of (one form of) a go_on statement.
+
+
+endif                                                           [syntax]
+        Ends an if statement.
+
+
+endlblock                                                       [syntax]
+        Terminates the lexical scope establishes by the matching  lblock
+        which preceded it. See REF * VMCODE.
+
+
+endprocedure                                                    [syntax]
+        Ends a procedure expression.
+
+
+endrepeat                                                       [syntax]
+        Ends a repeat statement.
+
+
+endsection                                                      [syntax]
+        Ends a section statement. See REF * SECTIONS.
+
+
+endunless                                                       [syntax]
+        Ends an unless conditional.
+
+
+enduntil                                                        [syntax]
+        Ends an until loop.
+
+
+endwhile                                                        [syntax]
+        Ends a while loop.
+
+
+for                                                             [syntax]
+        Introduces a variety of looping constructs. See HELP * FOR.
+
+
+foreach                                                [variable syntax]
+        Used to iterate over items of a list matching a given pattern:
+
+           foreach pattern in list-of-lists do actions endforeach
+
+        If the in  list-of-lists clause  is omitted, it  defaults to  in
+        database. See HELP * FOREACH.
+
+
+forever                                                         [syntax]
+        Obsolete keyword in an indefinite repeat statement.
+
+
+forevery                                               [variable syntax]
+        Used to iterate over combinations of successful matches:
+
+            forevery list-of-patterns in list-of-lists do
+                    actions
+            endforevery
+
+        If the  in list-of-lists  clause is  omitted it  defaults to  in
+        database. See HELP * FOREVERY.
+
+
+form                                                            [syntax]
+        Allows easy formation of new syntax words by giving a  mechanism
+        to provide the basic skeleton for the appropriate syntax. A  new
+        syntax word is defined in terms of key words (which puntuate the
+        syntax of the  new word)  and placeholders  (which describe  the
+        types of Pop-11 sequence which can exist in a certain position).
+        See HELP * FORMS.
+
+
+from                                                            [syntax]
+        Used in numerical for loops to indicate initial value.
+
+
+from_repeater                                                   [syntax]
+        Part of a specialised for construct of the form:
+
+              for variable from_repeater procedure do
+
+        This construct  can be  used with  the repeaters  returned  from
+        (e.g) * discin or  * incharitem. Each time  round the loop,  the
+        variable is given the next item returned from the repeater.  The
+        loop exits, without  executing the  body of the  loop, when  the
+        repeater returns * termin.
+
+
+global                                                          [syntax]
+        Used with vars and constant and procedure definitions to  ensure
+        that words are declared as global within the current section.
+
+        (Note that there is a  compile_mode option :pop11 +global  which
+        automatically  makes  all   permanent  identifier   declarations
+        global; this is included in :pop11 +strict.)
+
+        See HELP * GLOBAL, REF * SECTIONS.
+
+
+go_on                                                           [syntax]
+        A go_on statement causes a  jump to a specified label  depending
+        upon a given integer. See HELP * go_on.
+
+
+goto                                                            [syntax]
+        Followed by a label, causes a jump to that label, e.g.
+
+            goto loop;
+
+        where "loop"  labels some  statement  in the  current  procedure
+        definition or an enclosing one, i.e.
+
+            loop: statement
+
+        (For non-local uses of goto see REF * VMCODE).
+
+
+iconstant                                                       [syntax]
+        Declares identifiers as lconstant  in a file being  #_INCLUDE'd,
+        but as global constant when the file is directly compiled.
+
+
+ident                                                           [syntax]
+        Compiles code to push an identifier onto the stack. Its usage is
+
+                ident name
+
+        where name is  a word declared  as any kind  of identifier;  the
+        effect is to push onto the stack the identifier associated  with
+        the word. See REF * IDENT, REF * VMCODE for more details.
+
+
+if                                                              [syntax]
+        The construction takes the form
+
+            if condition then action  endif
+
+        May also be used with elseif, elseunless or else. See HELP * IF.
+
+
+in                                                              [syntax]
+        Used in for statements:
+
+            for variable in list do actions endfor
+
+
+in_array                                                        [syntax]
+in_dstring                                                      [syntax]
+in_list                                                         [syntax]
+in_property                                                     [syntax]
+in_region                                                       [syntax]
+in_string                                                       [syntax]
+in_subscripted                                                  [syntax]
+in_vector                                                       [syntax]
+in_vectorclass                                                  [syntax]
+        Used in specialised forms of for statement. See  HELP * FOR_FORM
+        for precise details of each.
+
+
+lblock                                                          [syntax]
+        Establishes a new scope  for lexical identifiers, terminated  by
+        endlblock. See HELP * LEXICAL, REF * VMCODE/Lexical.
+
+
+lconstant                                                       [syntax]
+        Provides  lexically   scoped  constants.   See   HELP * LEXICAL,
+        REF * VMCODE.
+
+
+lvars                                                           [syntax]
+        Provides lexically  scoped  local variables.  See  HELP * LVARS,
+        HELP * LEXICAL, REF * VMCODE.
+
+
+macro                                                           [syntax]
+        Used to  declare an  identifier as  a macro  in define  and  any
+        identifier declaration,
+
+            define macro swap x y;
+                ;;; read in two identifiers and create Pop-11
+                ;;; instructions to exchange their values
+                x, ",", y, "->", x, "->", y
+            enddefine;
+
+            vars macro billy = "Silly";
+            vars macro exit = [return endif];
+
+        Note that if  a word  is declared as  a macro  in an  identifier
+        declaration (as in the vars examples above), then either a word,
+        a list or some  procedure must be assigned  to the value of  the
+        word, otherwise a mishap will result when an attempt is made  to
+        expand the macro. See HELP * MACRO and REF * itemread.
+
+
+nextif                                                          [syntax]
+        The form
+
+            nextif ( condition ) ( N )
+
+        is equivalent to
+
+            if condition then nextloop(N) endif
+
+        where N defaults to 1. See HELP * NEXTLOOP.
+
+
+nextloop                                                        [syntax]
+        nextloop(N) means restart the  N'th enclosing loop (until,  for,
+        while, repeat, etc.) N must be a constant integer. If no integer
+        is given it defaults to 1. See also quitloop.
+
+
+nextunless                                                      [syntax]
+        The form
+
+            nextunless ( condition ) ( N )
+
+        is equivalent to
+
+            unless condition then nextloop(N) endunless
+
+        where N defaults to 1.
+
+
+nonglobal                                                       [syntax]
+        Used with vars and constant and procedure definitions to prevent
+        words being declared as global within the current section  (this
+        is only necessary when  the compile_mode options :pop11  +global
+        or :pop11 +strict are in effect).
+
+
+nonactive                                                       [syntax]
+        Followed by an  active identifier, causes  the identifier to  be
+        treated as normal rather than as active, e.g.
+
+                nonactive pop_callstack_lim -> p;
+
+        assigns the non-active  procedure value of  the active  variable
+        pop_callstack_lim to p. See HELP * ACTIVE_VARIABLES.
+
+
+nonop                                                           [syntax]
+        Followed by an operation identifier, causes the identifier to be
+        treated as a variable rather than as an operation, e.g.
+
+            nonop + -> plus;
+
+        assigns the procedure "+" to plus.
+
+
+nonsyntax                                                       [syntax]
+        Followed by a  syntax identifier,  causes the  identifier to  be
+        treated as an  ordinary variable, rather  than being taken  as a
+        syntax word, e.g.
+
+            nonsyntax [ -> read_list;
+
+        assigns the list-constructor procedure to read_list.
+
+
+of_dimension                                                    [syntax]
+        Used by  the in_array  and in_region  for-forms to  specify  the
+        number of dimensions  of the iteration  region at  compile-time.
+        See HELP * in_array and HELP * in_region.
+
+
+on                                                              [syntax]
+        Used in a for statement:
+
+            for variable on list do action endfor
+
+
+on_list                                                         [syntax]
+on_property                                                     [syntax]
+        Used in specialised forms of for statement. See  HELP * FOR_FORM
+        for details of each format.
+
+
+or                                                           [syntax 10]
+        Used in boolean conditions. Note that the second argument of  or
+        is not executed  unless the first  argument evaluates to  false,
+        in:
+
+                expression or expression
+
+
+procedure                                                       [syntax]
+        Starts a procedure expression.
+
+
+quitif                                                          [syntax]
+        The construction
+
+            quitif ( condition ) ( N )
+
+        is equivalent to
+
+            if condition then quitloop(N) endif
+
+        where N defaults to 1.
+
+
+quitloop                                                        [syntax]
+        quitloop(n) jumps  to  immediately after  the  end  of  the  nth
+        enclosing loop.  n must  be a  constant integer.  If missing  it
+        defaults to 1. See also nextloop.
+
+
+quitunless                                                      [syntax]
+        The construction
+
+            quitunless ( condition ) ( N )
+
+        is equivalent to
+
+            unless condition then quitloop(N) endunless
+
+        where N defaults to 1.
+
+
+record                                                          [syntax]
+        Usage: record  FILENAME  ;  or  record  in  FILENAME  ;  Records
+        terminal interaction in FILENAME, or 'record.log' if no name  is
+        given. Stop with endrecord. See HELP * RECORD.
+
+
+repeat                                                          [syntax]
+        Used as:
+
+            repeat number times action endrepeat;
+
+        where number is any expression that evaluates to a number.
+
+            repeat action endrepeat;
+
+        causes indefinite iteration. See also * sysrepeat, * applynum.
+
+
+return                                                          [syntax]
+        Jumps to  the end  of the  current procedure.  Can be  given  an
+        argument, in which case the argument is stacked before the jump.
+
+
+returnif                                                        [syntax]
+        The construct
+
+            returnif ( condition ) ( values )
+
+        jumps to the end of the current procedure if condition is  true,
+        stacking values  (which may  be  omitted) before  executing  the
+        jump.
+
+
+returnunless                                                    [syntax]
+        The construct
+
+            returnunless ( condition ) ( values )
+
+        jumps to the end  of the current  procedure unless condition  is
+        true, stacking values  (which may be  omitted) before  executing
+        the jump.
+
+
+section                                                         [syntax]
+        Begins a section header. See REF * SECTIONS.
+
+
+step                                                            [syntax]
+        Used with for. See HELP * FOR.
+
+
+switchon                                                         [macro]
+        See HELP * SWITCHON.
+
+
+syntax                                                          [syntax]
+        Used  to  declare  a  syntax  word  in  define  and   identifier
+        declaration statements, e.g.
+
+            define syntax foo; ... enddefine;
+            vars syntax endfoo;
+
+
+then                                                            [syntax]
+        Used after conditions in if and unless conditional statements.
+
+
+till                                                            [syntax]
+        Used with for ... step .... See HELP * FOR.
+
+
+times                                                           [syntax]
+        Forms part of a repeat statement: the preceding expression gives
+        the number of iterations to be performed, e.g.
+
+            repeat x+3 times ... endrepeat;
+
+
+to                                                              [syntax]
+        Used in for statements and go_on statements (qv).
+
+
+unless                                                          [syntax]
+        The construction takes the form:
+
+            unless condition then action endunless
+
+        May be used with elseif, elseunless and else. See HELP * UNLESS.
+
+
+until                                                           [syntax]
+        The construction takes the form:
+
+            until condition do actions enduntil
+
+        See HELP * UNTIL.
+
+
+updaterof                                                       [syntax]
+        Used in a define statement. See HELP * UPDATEROF, HELP * DEFINE.
+
+
+updating_last                                                   [syntax]
+        Used by the in_array for-form  to allow updating of arrays.  See
+        HELP * in_array.
+
+
+using_subscriptor                                               [syntax]
+        In the expression
+
+            for word in struct using_subscriptor p do ... endfor
+
+        allows iteration  over the  elements of  a struct  other  than a
+        list, by supplying a procedure p which can subscript struct.
+
+
+vars                                                            [syntax]
+        For   declaring   permanent   identifiers.   See    HELP * VARS,
+        REF * VMCODE.
+
+
+while                                                           [syntax]
+        As in the expression:
+
+            while condition do action endwhile
+
+        See HELP * WHILE.
+
+
+with_index                                                      [syntax]
+        Used in specialised forms of for statement. See  HELP * FOR_FORM
+        for precise details.
+
+
+with_nargs                                                      [syntax]
+        Can be used in define or procedure statements to assign a  value
+        to the  pdnargs of  the procedure  being compiled  (the  pdnargs
+        value is normally taken to  be the number of declared  arguments
+        to the procedure), e.g.
+
+            define foo() with_nargs 2;
+                lvars arg1, arg2;
+                -> (arg1, arg2);
+                ...
+            enddefine;
+
+        The integer supplied after "with_nargs" must be >= 0 and <= 254.
+
+        (N.B. The  item after  "with_nargs" is  read with  itemread,  so
+        macros are expanded.)
+
+
+with_props                                                      [syntax]
+        Can be used in define or  procedure statements to assign a  word
+        to the pdprops of the procedure being compiled, e.g.
+
+            define foo(x,y) -> z with_props false; ... enddefine;
+            procedure(x,y) -> z with_props foo; ... endprocedure;
+
+        with_props follows immediately after the input and/or outputs of
+        the procedure; it can be followed  by a single word, which  will
+        then be assigned to the pdprops. The word false is taken to mean
+        the value <false>.
+
+        (N.B. The item after with_props is read with itemread, so macros
+        are expanded.)
+
+
+
+
+-----------------------
+2  Associated Variables
+-----------------------
+
+define_headers -> list                                        [variable]
+list -> define_headers
+        A list of the syntax words that may precede a procedure name  in
+        a  define  statement.   Used  to   integrate  define_form.   See
+        HELP * define_form.
+
+
+define_terminators -> list                                    [variable]
+list -> define_terminators
+        A list of the syntax words that may follow a procedure name in a
+        define   statement.   Used   to   integrate   define_form.   See
+        HELP * define_form.
+
+
+
+
+------------------------
+3  Related Documentation
+------------------------
+
+REF * POPSYNTAX
+    Full syntax diagrams of Pop-11.
+
+REF * ITEMISE
+    The syntax  of  Pop-11 text  items,  including words,  strings,  and
+    numbers.
+
+REF * NUMBERS
+    The syntax  of  expressions  involving  integers,  decimal  numbers,
+    rational numbers, complex numbers.
+
+
+
+
+--- C.all/ref/syntax
+--- Copyright University of Sussex 1995. All rights reserved.

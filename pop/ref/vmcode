@@ -1,0 +1,1611 @@
+REF VMCODE                                          John Gibson Jun 1995
+
+       COPYRIGHT University of Sussex 1995. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<   POPLOG VIRTUAL MACHINE    >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<      INSTRUCTION SET        >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+Compilation of user procedures in  Poplog is effected by  constructing a
+list of Poplog Virtual Machine  (VM) instructions from the source  code,
+and then, when this list is  complete for a single procedure,  compiling
+the list  of VM  code into  machine  code in  a procedure  record.  This
+happens whenever sysENDPROCEDURE is called.
+    The procedures which  plant each  type of VM  instruction are  given
+along with occasional instructions on how to use them (especially on the
+implementation of dynamic scoping).
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+
+  2   Compiler Control Instructions and Variables
+
+  3   Declaring Identifiers
+
+  4   Referencing Identifiers in VM Instructions
+
+  5   Compile-Time Assignment
+
+  6   Dynamic Local Expressions
+
+  7   User Stack Manipulation
+
+  8   Procedure Calling
+
+  9   Labels and Jump Instructions
+
+ 10   Accessing/Updating Data Structures
+
+ 11   Implementation Issues
+      11.1  Lexical Scoping
+      11.2  Non-Local Jumps
+
+ 12   More On Dynamic Local Expressions
+
+
+
+---------------
+1  Introduction
+---------------
+
+Compilers which  use the  following  procedures should  always  commence
+code-planting for a new file or input stream by calling sysCOMPILE  (see
+below).
+
+Planting of  VM  code  can  be 'turned  off'  by  setting  the  variable
+pop_syntax_only to  true  (see below).  Some  other aspects  of  the  VM
+compiler are  controlled  by  flag  bits set  in  the  integer  variable
+pop_vm_flags; these are defined in INCLUDE * VM_FLAGS.
+
+See also  HELP * compile_mode  for the  syntax  construct  compile_mode,
+which enables setting and clearing  of these flags (either  individually
+or in groups) via keyword arguments.
+
+
+
+
+----------------------------------------------
+2  Compiler Control Instructions and Variables
+----------------------------------------------
+
+sysCOMPILE(compile_p)                     [protected procedure variable]
+        This procedure should be called  when compilation of a new  file
+        or input stream is to begin. Its action is to re-initialise  the
+        VM context to  execute level (setting  popexecute to true),  and
+        apply the  procedure  compile_p,  which  should  be  the  user's
+        compilation routine, i.e. the thing which will actually  compile
+        code and plant VM instructions.
+
+        The virtual  machine  compiler  maintains  a  number  of  global
+        variables which record the  current code-planting context  (e.g.
+        the  variable  popexecute,   the  stack   of  procedures   being
+        constructed, the lexical variable context, etc), and  sysCOMPILE
+        has all these variables as locals. By applying compile_p through
+        sysCOMPILE,  nested  compilation   streams  are  thus   properly
+        distinguished, and exiting through  the call of sysCOMPILE  will
+        recover the previous context.
+
+
+sysEXECUTE()                              [protected procedure variable]
+        Executes any instructions  currently planted  at execute  level,
+        i.e. when not  inside any procedures  or non-executing  lblocks,
+        and popexecute is true (a  call of sysCOMPILE establishes a  new
+        execute level).
+
+        (N.B. If there are any lexical constants which are still waiting
+        for an assignment with sysPASSIGN, the code will not actually be
+        executed until these assignments are in.)
+
+        The code  is executed  by  compiling it  into a  procedure,  and
+        applying that with pop_vm_exec_apply (see below).
+
+
+sysEXEC_COMPILE(compile_p, flags)         [protected procedure variable]
+        This procedure enables the code planted by the user  compilation
+        procedure compile_p to  be executed  immediately, regardless  of
+        the current context.
+
+        If popexecute  is  true  (and there  is  no  execute-level  code
+        outstanding, i.e. planted but  not executed), then compile_p  is
+        called, followed by sysEXECUTE.
+
+        Otherwise, compile_p is called  inside a new procedure  context,
+        i.e. preceded by sysPROCEDURE  and followed by  sysENDPROCEDURE,
+        and   the    resulting    procedure    is    applied    (through
+        pop_vm_exec_apply, as for sysEXECUTE).  Note that (unless  bit 1
+        is set in flags) it is an error for the code planted to use  any
+        (non-top-level) lexical  variables  non-locally, or  employ  any
+        non-local jumps, etc.
+
+        flags is an integer flags argument whose bits have the following
+        meanings:
+
+            Bit     Meaning
+            ---     -------
+             0      If set, compile_p is assumed to produce one  result,
+                    and this  is saved  before  executing the  code  and
+                    returned  after  (thus  preventing  it  from   being
+                    obscured on the  stack by anything  produced by  the
+                    code execution).
+
+             1      If set,  then 'delayed'  evaluation is  allowed  for
+                    code that  uses  (non-top-level)  lexical  variables
+                    non-locally,  or  refers  to  (as  yet)   unassigned
+                    lexical constants.
+                        In  this   case,   a   'procedure   compilation'
+                    structure (a closure) is  returned as the result  of
+                    'evaluating' the code:  this structure is  specially
+                    marked so that it will actually be executed (through
+                    pop_vm_exec_apply) only when the outermost procedure
+                    being compiled is finished (when executed, the  code
+                    must produce a single result).
+                        Note, however, that it is still an error for the
+                    code to reference  non-local lexical variables  that
+                    require  runtime  identifiers  (i.e.  type-3s,   see
+                    Implementation of Lexical Scoping below).
+
+        flags may also be a  boolean, where false =  0 and true =  bit 0
+        set.
+
+        (Note also  that  sysEXEC_COMPILE sets  pop_syntax_only  locally
+        false, on  the  assumption  that this  is  always  required  for
+        compile-time execution of code.)
+
+
+sysEXEC_OPTION_COMPILE(compile_p)         [protected procedure variable]
+                            -> executed
+        Like sysEXEC_COMPILE,  but  different  in  that  it  allows  the
+        execution of  the code  planted by  compile_p to  depend on  the
+        result of  that  procedure. That  is,  compile_p is  called  and
+        expected to return a boolean result; if this result is true, the
+        planted code  is executed,  otherwise  not. The  boolean  result
+        executed is true if execution has taken place.
+
+        The main point about this procedure is that when the code is NOT
+        executed, its  context  remains  unaffected,  i.e.  if  inside a
+        procedure then the code  will remain as  part of that  procedure
+        (unlike sysEXEC_COMPILE,  where  prior  allowance  is  made  for
+        executing the code by bundling it into a new procedure, etc).
+
+        Because of the  complexities of untangling  the code planted  by
+        compile_p from  an  enclosing procedure  so  as to  be  able  to
+        execute  it,  execution  works  only  for  simple  cases;   thus
+        sysEXEC_COMPILE is provided when execution is always wanted.
+
+        (N.B. This procedure was previously used by the Pop-11 list  and
+        vector constructors [...] and {...}. These now use sysCONSTRUCT,
+        which is more powerful when building structures.)
+
+
+sysCONSTRUCT(compile_p, type)             [protected procedure variable]
+        This procedure  allows code  to be  compiled for  constructing a
+        structure, with  the  possibility  of  executing  the  code  and
+        producing the structure at compile time. Compile-time  execution
+        will happen if and only if  the structure can be a  compile-time
+        constant, i.e. has a fixed number of elements, each of which  is
+        also a compile-time constant.
+
+        compile_p is a procedure of the form
+
+                compile_p() -> (count_or_false, cons_wordarg)
+
+        It must compile VM code to push the structure elements, and then
+        return
+
+          # a count of the number of  elements, or false if there  are a
+            variable number, and
+
+          # a wordarg argument suitable for sysCALL, which specifies the
+            actual constructor procedure to be called.
+
+        The type argument is an integer specifying four different  types
+        of constructor procedure, as follows:
+
+            type    Meaning
+            ----    -------
+             1      Stackmark:  the  constructor   procedure  given   by
+                    cons_wordarg     is     like     sysconslist      or
+                    sysconslist_onto,  which  requires  popstackmark  to
+                    delineate the extent  of the  structure elements  on
+                    the stack.
+
+             2      Prior stacklength: the constructor procedure is like
+                    sysanyvecons,  which   requires  as   argument   the
+                    stacklength before any elements were pushed.
+
+             3      Counted:   the   constructor   procedure   is   like
+                    consvector or  conslist,  requiring  the  number  of
+                    elements as argument.
+
+             4      Simple: anything else  (e.g. a record  constructor),
+                    which requires no additional arguments.
+
+        Note that in all cases, compile_p  is expected to push only  the
+        structure elements; all other code necessary for the four  types
+        is supplied automatically.
+
+        If the  structure  is  produced at  compile  time,  sysCONSTRUCT
+        replaces itself with a sysPUSHQ  for the structure. For this  to
+        happen, count_or_false must  be a fixed  count, the  constructor
+        procedure given by cons_wordarg must be constant, and all  count
+        structure elements must  be compile-time  constants. This  means
+        that the code planted by compile_p can consist only of
+
+          # sysPUSHQs;
+          # sysPUSHs for (assigned) constants;
+          # sysIDENTs  for   identifiers  other   than  type-3   lexical
+            variables;
+          # recursive calls to  sysCONSTRUCT which in  turn result  in a
+            sysPUSHQ.
+
+        In all other cases, run-time code is planted.
+
+
+sysPROCEDURE(props, nargs)                [protected procedure variable]
+        Start code generation  for a  new procedure, i.e.  stack up  the
+        code list for any procedure currently being compiled,  restoring
+        it after a  sysENDPROCEDURE. popexecute is  set false. When  the
+        procedure record is produced, it will have the item props as its
+        pdprops and the integer nargs as its pdnargs.
+
+        Note  that  pop_vm_compiling_list  is   a  list  of   'procedure
+        compilation'  structures  for  all  procedures  currently  being
+        compiled.
+
+
+sysENDPROCEDURE() -> p                    [protected procedure variable]
+        Causes the procedure for which code is currently being generated
+        to be  produced as  an object  p, with  pdprops and  pdnargs  as
+        specified by the  arguments to  sysPROCEDURE. p  is returned  as
+        result, and the code list stacked up by the last sysPROCEDURE is
+        restored to be the current  codelist. popexecute is restored  to
+        its value before the previous sysPROCEDURE.
+
+        Note that p will  be a normal  executable procedure record  ONLY
+        where the  procedure does  not use  any (non-top-level)  lexical
+        variables non-locally, and does not employ any non-local  jumps.
+        Otherwise it  will be  a  'procedure compilation'  structure  (a
+        closure)  which  must  be  passed  to  sysPASSIGN,  sysPUSHQ  or
+        sysCALLQ (qv).
+
+
+sysLBLOCK(executing)                      [protected procedure variable]
+        Establishes  a  new  scope  for  lexical  identifiers  (and  for
+        symbolic labels, see  Labels and Jump  Instructions below).  All
+        lexical identifier declarations made with sysLVARS, etc, after a
+        call of this procedure are cancelled by the call of the matching
+        sysENDLBLOCK which  terminates  the  scope;  this  applies  both
+        inside procedures and at execute level. (Note that  sysPROCEDURE
+        and sysENDPROCEDURE  also establish  a new  lexical scope,  i.e.
+        they represent  implicit  calls of  sysLBLOCK  and  sysENDLBLOCK
+        respectively.)
+
+        The  boolean  argument  executing   says  whether  this  is   an
+        'executing' lblock or not, i.e. whether sysEXECUTE can be called
+        inside it to execute code BEFORE the block has been  terminated.
+        The difference between executing and non-executing is that
+
+            # An executing lblock  is allowed only  in execute  context,
+              i.e. when popexecute is true,  and not inside a  procedure
+              or non-executing lblock;
+
+            # The first  non-executing  lblock  encountered  in  execute
+              context sets popexecute  false and then  behaves as if  it
+              were a procedure (i.e. as if sysPROCEDURE had been called,
+              although this does  not appear on  pop_vm_compiling_list).
+              The sysENDLBLOCK which terminates the block then plants an
+              implicit sysCALLQ for the 'hidden' procedure.
+
+        Thus lexical  variables  declared  inside  non-executing  blocks
+        behave like  procedure-local  variables --  see  the  discussion
+        under Implementation of Lexical Scoping below.
+
+
+sysENDLBLOCK()                            [protected procedure variable]
+        Cancels  all  lexical  identifier  declarations  (and   symbolic
+        labels) made  since  the call  of  the matching  sysLBLOCK  that
+        preceded it.
+
+
+popexecute -> BOOL                                  [protected variable]
+        This boolean variable is true when the current invocation of the
+        VM through sysCOMPILE is at  execute level, and false when  code
+        is being planted inside a procedure or a non-executing lblock.
+
+
+pop_vm_exec_apply(p)                      [protected procedure variable]
+        This   variable   procedure   is   used   by   sysEXECUTE    and
+        sysEXEC_COMPILE etc to run  procedures produced from  executable
+        code; it  just applies  its  argument p.  Its default  value  is
+        fast_apply.
+
+
+pop_vm_compiling_list -> list                       [protected variable]
+        Holds a list  of 'procedure  compilation' structures  (closures)
+        for all procedures  for which code  is currently being  compiled
+        (i.e. one corresponding to each call of sysPROCEDURE, where  the
+        innnermost procedure is  at the  beginning of the  list and  the
+        outermost at the end, etc). Each closure has pdprops and pdnargs
+        as given to the call of sysPROCEDURE that created it.
+
+        (The  appropriate  test  for   being  inside  compilation   of a
+        procedure is therefore
+
+                pop_vm_compiling_list /== []
+
+        Note  that  in   previous  versions  of   the  system,   testing
+        not(popexecute) would have been equivalent to this, but with the
+        introduction of 'non-executing'  lblocks this is  no longer  the
+        case since popexecute will be false inside such an lblock,  even
+        though pop_vm_compiling_list may be empty.)
+
+
+pop_vm_flags -> int                                           [variable]
+int -> pop_vm_flags
+        Flag bits in  this integer variable  control certain aspects  of
+        the virtual machine's operation. These are defined and described
+        in
+
+            UNIX: $usepop/pop/lib/include/vm_flags.ph
+            VMS:  usepop:[pop.lib.include]vm_flags.ph.
+
+        Note that  the  value  of  pop_vm_flags  is  localised  to  each
+        compilation stream, procedure or lexical block, as delineated by
+        sysCOMPILE, sysPROCEDURE and sysLBLOCK respectively; thus when a
+        given scope is terminated, the value of pop_vm_flags is reset to
+        its value on entry  to that scope. (Note  also that some of  the
+        flags are only effective when pop_debugging is false).
+
+        See   SHOWLIB * COMPILE_MODE    for   the    syntax    construct
+        compile_mode, which enables setting and clearing of these  flags
+        (either individually or in groups) via keyword arguments.
+
+
+pop_syntax_only -> bool                                       [variable]
+bool -> pop_syntax_only
+        If set true, planting of VM  code is turned off, and  procedures
+        which actually  plant instructions  do nothing  (although  those
+        that  return  results  still  do,  e.g.  sysENDPROCEDURE  merely
+        returns identfn). Permanent declarations  (e.g. as performed  by
+        sysSYNTAX) as also disabled;  however, lexical declarations  are
+        still effective. The procedure sys_use_current_ident will return
+        a dummy  lexical identifier  for any  undeclared name.  (Default
+        value is false.)
+
+
+pop_debugging -> bool                                         [variable]
+bool -> pop_debugging
+        This variable (default true) is intended as a general indication
+        to various parts of the system (but principally the VM)  whether
+        programs are  being compiled  in  debugging mode  or  'real-use'
+        mode. Note that  pop_debugging is  NOT localised  by any  system
+        procedure.
+
+        With one  exception,  all parts  of  the system  that  use  this
+        variable simply test  it to have  a false/non-false value,  i.e.
+        'if pop_debugging ...'  or 'unless pop_debugging  ...' etc.
+
+        The exception is the test made by sysPUSH, sysCALL and sysUCALL.
+        When given a  user-defined permanent constant  as argument,  and
+        pop_debugging  has  the  value   true  (as  opposed  to   merely
+        non-false), such  a constant  is treated  as a  variable.  (This
+        allows tracing of a constant  user procedure to operate in  code
+        that was compiled before the procedure was traced.)
+
+        Hence setting pop_debugging to  some non-false value other  than
+        true (e.g. the  word "undef")  will enable  compilation of  user
+        constants as  constants, but  without any  of the  effects  of a
+        false value.
+
+        As far as the rest of the VM is concerned, the effect of setting
+        pop_debugging false is  twofold: (1) it  enables those flags  in
+        pop_vm_flags which prevent  the inclusion  of run-time  checking
+        code (which are  ineffective when  pop_debugging is  non-false),
+        and (2) it causes the VM compiler to make extra optimisations in
+        the  code  for   compiled  procedures  (which   may  slow   down
+        compilation a little).  (In particular,  some system  procedures
+        are optimised to in-line code when they would otherwise not  be,
+        because to do  so would  prevent their appearance  in the  DOING
+        list of  mishap messages  caused by  userstack underflow  during
+        their execution.)
+
+
+pop_pas_mode -> bool                                          [variable]
+bool -> pop_pas_mode
+        Used  by  the  system  compiler  Popc  (for  system  use  only).
+        Normally, this active variable is  false; when compiling a  file
+        with Popc, it has the value "popc".
+
+
+
+
+------------------------
+3  Declaring Identifiers
+------------------------
+
+sysSYNTAX(word, idprops, const_mode)      [protected procedure variable]
+        Declares the word word as a permanent identifier with identprops
+        idprops in the current section.
+
+        This procedure calls  ident_declare (see  REF * IDENT) with  the
+        given arguments, and  is identical to  that procedure except  in
+        one  respect:  if  word  is  currently  declared  as  a  lexical
+        identifier, the lexical declaration is cancelled (providing  the
+        lexical declaration is  not local to  the current procedure  and
+        the identifier has not been referenced -- otherwise, the  mishap
+        'ILLEGAL REDECLARATION OF LEXICAL IDENTIFIER' results).
+
+
+sysGLOBAL(word, global)                   [protected procedure variable]
+sysGLOBAL(word)
+        Makes the permanent identifier currently associated with word be
+        either global (global = true) or nonglobal (global = false).  If
+        the boolean global is omitted it defaults to true.
+
+        When global, an  identifier is automatically  imported into  any
+        subsection of a section  in which it  is accessible. (Note  that
+        the term 'global' in this sense is slightly misleading since  so
+        marking an identifier does NOT imply that it is exported to  top
+        or any other level, merely that it will 'sink' down the  section
+        tree from  the highest  level  at which  it is  accessible.  See
+        REF * SECTIONS.)
+
+
+sysVARS(word, idprops)                    [protected procedure variable]
+        Used by the  Pop-11 vars  statement, this  procedure at  execute
+        level is the same as sysSYNTAX(word, idprops, false).
+
+        When not at execute level, it should produce a mishap.  However,
+        for compatibility  with the  old-style  use of  vars  statements
+        inside  Pop-11   procedures   to  simultaneously   declare   and
+        dynamically localise a permanent variable, its effect is roughly
+        similar to
+
+                sysSYNTAX(word, idprops, false);
+                sysLOCAL(word)
+
+        although it is not guaranteed to work properly in all situations
+        (e.g. with active variables). You are  not advised to use it  in
+        this way: if you wish  to declare and/or dynamically  localise a
+        permanent variable, use sysSYNTAX and/or sysLOCAL.
+
+
+sysCONSTANT(word, idprops)                [protected procedure variable]
+        Used by the  Pop-11 constant  statement, this  procedure is  the
+        same as sysSYNTAX(word, idprops, true), but produces the  mishap
+        'CONSTANT DECLARATION INSIDE PROCEDURE' if not at execute level.
+
+
+sysLVARS(word, idprops)                   [protected procedure variable]
+sysDLVARS(word, idprops)                  [protected procedure variable]
+        Declares the word word as a lexically-scoped variable, the scope
+        of which is the current lexical block, the current procedure, or
+        the current compilation stream if not inside any lexical  blocks
+        or procedures.
+
+        For the duration  of the  scope, any  permanent declaration  for
+        word  is   overidden.   The   sysCOMPILE,   sysENDPROCEDURE   or
+        sysENDLBLOCK which terminates the scope cancels the  declaration
+        and no further reference to the variable is possible. word  must
+        not have  been  declared  as  a dynamic  local  of  the  current
+        procedure.
+
+        The  idprops  argument  is  the   same  as  for  sysSYNTAX   and
+        ident_declare (see REF * IDENT), but  with the restriction  that
+        procedure-local syntax, syntax  operator and macro  declarations
+        are not  allowed, i.e.  these are  permissible only  at  execute
+        level. (This is  because procedure local  variables cannot  take
+        compile-time values, and  therefore don't make  sense as  syntax
+        words  or   macros.   The   restriction  does   not   apply   to
+        sysLCONSTANT.)
+
+        Top-level lexical  variables (those  declared at  execute  level
+        either inside or outside of any lexical blocks) are  initialised
+        to a fixed undef  record whose undefword  is false (this  record
+        prints as <undef>).
+
+        Procedure-local  variables,   on  the   other  hand,   are   NOT
+        initialised: on entry to a  procedure (or on starting a  lexical
+        block inside a procedure), their values are undefined.
+
+        Full lexical  scoping  is  supported;  you  can  reference  word
+        anywhere inside its current scope, including non-locally  inside
+        a   nested   procedure.   See   the   discussion   below   under
+        Implementation of Lexical Scoping.
+
+        The  flag  bit  VM_MIX_NONLOCAL_AND_LOCAL_LEX  in   pop_vm_flags
+        controls whether  a  procedure  is  allowed  to  first  access a
+        lexical identifier word while it is non-local and then redeclare
+        it as local. If set then this allowed, and subsequent references
+        to word will get  the local value;  otherwise, attempting to  do
+        this will cause a mishap.  (Note that referencing an  identifier
+        in an outer  lexical block but  in the SAME  procedure does  not
+        count as non-local use.)
+
+        sysDLVARS is identical to sysLVARS, except that the most general
+        mechanism for  implementing  non-local  access  to  the  lexical
+        variable word is disabled.  See under Implementation of  Lexical
+        Scoping below.
+
+
+sysLCONSTANT(word, idprops)               [protected procedure variable]
+        Declares the word word as a lexically-scoped constant, with  the
+        same scope as for a lexical variable.
+
+        The  idprops  argument  is  as   for  sysSYNTAX  (but  with   no
+        restrictions).
+
+        A lexical constant  is assigned  a value  with sysPASSIGN.  This
+        must happen somewhere within its 'own' scope (i.e. NOT  inside a
+        nested scope), but need not be done before referencing it  (e.g.
+        in a sysPUSH, sysCALL, etc).
+
+        Note  that  (unlike   permanent  constants)   it  is   perfectly
+        permissible to have  nested definitions  for lexical  constants,
+        although at  each  level only  one  definition of  each  lexical
+        constant is allowed.
+
+
+sysNEW_LVAR() -> word                     [protected procedure variable]
+        Used to generate  temporary working  local variables.  Returns a
+        word word which is declared as a lexical variable with  sysLVARS
+        in  the  current  lexical   scope  established  by   sysCOMPILE,
+        sysPROCEDURE  or  sysLBLOCK.  and  which  is  guaranteed  to  be
+        different from any other variable declared so far in that  scope
+        and all enclosing ones.
+
+
+pop_new_lvar_list -> list                                     [variable]
+list -> pop_new_lvar_list
+        This is  a dynamic  list that  generates the  words produced  by
+        sysNEW_LVAR.  Making  it  local   to  a  procedure  that   calls
+        sysNEW_LVAR and  plants code  will mean  that on  exit from  the
+        procedure, any temporary variables  generated will be freed  for
+        re-use.
+
+
+
+
+---------------------------------------------
+4  Referencing Identifiers in VM Instructions
+---------------------------------------------
+
+All  code-planting  procedures  which  require  a  word  specifying   an
+identifier  as  argument  use  the  procedure  sys_use_current_ident  to
+extract  the  identifier   from  the  argument   given;  the   procedure
+descriptions that follow refer to this argument as wordarg.
+
+    In addition to being an actual word,  wordarg may also be a pair  of
+the form
+
+            conspair(word, info)
+
+where info specifies additional information about how the identifier  is
+to be interpreted (or, where more than one info is needed, a pair  whose
+front is another pair, e.g.
+
+        conspair(conspair(word, info1), info2)
+
+etc). Currently, possible values for info are:
+
+    "nonactive"
+        For an active  identifier, this constitutes  a reference to  its
+        nonactive value, e.g.
+
+            sysPUSH(conspair(word, "nonactive"))
+
+        will push the  nonactive procedure  value of  word (rather  than
+        turning into a call of that procedure).
+
+    "weakref"
+        This allows for  a 'weak'  reference to  a permanent  identifier
+        which has only a weak declaration (i.e. one for which isdeclared
+        is  true  but  not  isdefined,  see  REF * IDENT).  An  ordinary
+        ('strong') reference to such an identifier causes sysdeclare  to
+        be called.
+
+    {dword1 dword2 ... dwordN}
+        When info is a  full vector of words  dword1, ..., dwordN,  this
+        indicates a weak  reference as for  "weakref", but  additionally
+        declares word as  being dependent  on the  identifiers named  by
+        dword1, ..., dwordN. This means that whenever any member of  the
+        dependency set becomes fully  defined (including the case  where
+        one or more already are), then the dependent identifier word  is
+        forced to be defined also (as if a 'strong' reference to it  had
+        occurred).
+
+    consref("weakref") or consref({dword1 ... dwordN})
+        In the normal interactive system, this behaves as if the cont of
+        the ref alone  had been  given. However,  in Popc  compilatiion,
+        putting the "weakref" or vector argument inside a ref  indicates
+        that this (weak)  reference to  the identifier  word should  not
+        cause a subsequent strong reference  to be treated as an  error.
+        (Popc insists that an identifier must only be referenced  either
+        weakly or  strongly,  but  not  both;  this  facility  enables a
+        'noncommittal' reference to be made.)
+
+If there is no lexical or permanent identifier associated with the  word
+given, sys_use_current_ident calls the procedure sysdeclare on the  word
+to define it:
+
+
+sys_use_current_ident(wordarg) -> (ident, nonactive)         [procedure]
+sys_use_current_ident(wordarg, try_nofast)
+                               -> (ident, nonactive)
+        Given a wordarg argument as described above, returns the lexical
+        or permanent  identifier record  currently associated  with  the
+        word word  specified  by  the  argument. If  there  is  no  such
+        identifier (or if  ident has only  a weak permanent  declaration
+        and the reference is not "weakref"), sysdeclare(word) is called;
+        a mishap occurs if there is still no ident after this.
+
+        The result nonactive  is true if  wordarg contained the  keyword
+        "nonactive", false otherwise.
+
+        The optional boolean argument  try_nofast defaults to false.  If
+        supplied  and  true,   and  the  flag   VM_NO_FAST  is  set   in
+        pop_vm_flags,  then  a   word  with   an  associated   permanent
+        identifier is processed  through the procedure  pop_nofast_trans
+        (see  LIB * pop_nofast_trans).  If  this  returns  a  'non-fast'
+        identifier for  word, that  is returned  instead of  the  'fast'
+        one.
+
+        Note that the  identifier returned is  the compile-time  record,
+        i.e.  for  procedure-local  lexical   variables  it  will   be a
+        "lextoken" identifier  (and  not  necessarily the  same  as  the
+        run-time identifier  that would  be produced  by sysIDENT).  See
+        REF * IDENT.
+
+        (N.B. sysdeclare is  not called if  pop_syntax_only is true.  In
+        this case, a dummy lexical identifier is returned instead.)
+
+
+sys_current_val(wordarg) -> item                             [procedure]
+item -> sys_current_val(wordarg)
+        This procedure accesses or updates the compile-time value of the
+        lexical or permanent  identifier currently  associated with  the
+        word derived  from wordarg.  (It can  be thought  of as  a  more
+        efficient equivalent of
+
+            sysEXEC_COMPILE(wordarg, sysPUSH, false)
+
+        or sysPOP for the updater.)
+
+        It uses  sys_use_current_ident(wordarg) to  get the  identifier,
+        and then (in normal compilation) uses idval to access or  update
+        its value.
+
+        However, in Popc compilation, a separate set of 'shadow'  values
+        is maintained  for  all  permanent identifiers  assigned  to  by
+        execute-level   VM    code;   in    this   context    therefore,
+        sys_current_val accesses or updates the Popc values of permanent
+        identifiers (there is no difference for lexical identifiers).
+
+
+sysdeclare(word)                          [protected procedure variable]
+        Called by sys_use_current_ident as described above. The  default
+        value of this procedure is approximately as follows:
+
+             define vars sysdeclare(word);
+                lvars word;
+                sys_autoload(word) -> ;
+                unless isdefined(word) then
+                    ident_declare(word, 0, false);
+                    sys_raise_exception(word, 1,
+                                {'%DECLARING VARIABLE %P' '' 16:01},
+                                        'vm-ident:name-ref-none', `W`)
+                endunless
+             enddefine;
+
+        That is, first try to  autoload word (see * sys_autoload),  then
+        if this doesn't define it  as a permanent identifier, define  it
+        as a permanent variable and call * sys_raise_exception to  raise
+        the warning 'vm-ident:name-ref-none'.
+
+        sysdeclare  is  user  assignable  if  first  unprotected,  using
+        sysunprotect.
+
+
+sys_current_ident(word) -> ident                             [procedure]
+sys_current_ident(word, try_nofast) -> ident
+        Given a word word, returns  the lexical or permanent  identifier
+        record currently associated  with it  (including weak  permanent
+        declarations), or false if word is not declared.
+
+        The optional boolean argument  try_nofast defaults to false.  If
+        supplied  and  true,   and  the  flag   VM_NO_FAST  is  set   in
+        pop_vm_flags,  then  a   word  with   an  associated   permanent
+        identifier is processed  through the procedure  pop_nofast_trans
+        (see  LIB * pop_nofast_trans).  If  this  returns  a  'non-fast'
+        identifier for  word, that  is returned  instead of  the  'fast'
+        one.
+
+        The identifier  returned is  the compile-time  record, i.e.  for
+        procedure-local  lexical  variables  it  will  be  a  "lextoken"
+        identifier  (and  not  necessarily  the  same  as  the  run-time
+        identifier that would be produced by sysIDENT). See REF * IDENT.
+
+
+pop_vm_dummy_idents -> list                                   [variable]
+list -> pop_vm_dummy_idents
+        This    list    is    used    by    sys_use_current_ident    and
+        sys_current_ident; any word argument  to these procedures  which
+        appears in  the  list  will  have  a  dummy  lexical  identifier
+        returned for  it. (This  mechanism is  used, e.g.  by the  POP11
+        compiler  to   temporarily   'declare'  formal   parameters   to
+        procedures before it knows what their correct declarations are.)
+
+
+
+
+--------------------------
+5  Compile-Time Assignment
+--------------------------
+
+See Referencing Identifiers in VM  Instructions above for a  description
+of the wordarg argument to sysPASSIGN and sysUPASSIGN.
+
+
+sysPASSIGN(item, wordarg)                 [protected procedure variable]
+-> sysPASSIGN(item, wordarg)
+        'Assigns' item to be the  value of the identifier ident  derived
+        from the wordarg argument. The assignment is done as follows:
+
+            (a) If ident is declared as a lexical constant, and this  is
+                not an active  reference (i.e.  ident is  not an  active
+                variable, or wordarg  specifies "nonactive"), then  item
+                is simply assigned to the value of ident. ident must not
+                have been assigned a value previously.
+
+            (b) If popexecute is false, i.e. if a procedure is currently
+                being compiled, then  code is  planted to  pop the  item
+                into ident at run-time, i.e.
+
+                    sysPUSHQ(item), sysPOP(wordarg);
+
+            (c) Otherwise, item  is  simply  assigned  directly  to  the
+                (active/nonactive) value  of  ident,  unless  item  is a
+                procedure and  the current  (active/nonactive) value  of
+                ident is a a procedure Q, in which case:
+
+                    # If Q has an  updater, and item  has not, then  the
+                      updater of  Q is  assigned to  be the  updater  of
+                      item;
+
+                    # If Q is a closure of systrace, i.e. Q is a  traced
+                      procedure,  then  item  replaces  the   previously
+                      traced procedure.
+
+        The  updater  of  this  procedure  is  a  procedure  that  calls
+        sysUPASSIGN (as the latter is variable); in this case item  must
+        be a procedure.
+
+
+sysUPASSIGN(p, wordarg)                   [protected procedure variable]
+        'Assigns' p to  be the updater  of the value  of the  identifier
+        ident derived from the wordarg argument, where p is a  procedure
+        (including a result of sysENDPROCEDURE). The assignment is  done
+        as follows:
+
+            (a) If ident is declared as a lexical constant, and this  is
+                not an active  reference (i.e.  ident is  not an  active
+                variable, or  wordarg  specifies "nonactive"),  then  it
+                must have had  a procedure already  assigned to it  with
+                sysPASSIGN. p is simply made the updater of this.
+
+            (b) Unless  popexecute  is  true,  the  following  code   is
+                generated:
+
+                    sysPUSHQ(p), sysPUSH(wordarg);
+                    sysUCALL("updater");
+
+                Note that this will only produce a proper local  updater
+                if ident is local to the current procedure, and has  had
+                a local  procedure  assigned  to  it  --  otherwise  the
+                updater will be changed non-locally!
+
+            (c) Otherwise, if  the current  (active/nonactive) value  of
+                ident is a procedure Q then p is assigned to the updater
+                of Q, unless Q is  traced (i.e. a closure of  systrace),
+                in which case p  replaces the previously traced  updater
+                of Q.
+
+                If the current value of ident is not a procedure, then a
+                procedure which will produce the mishap
+
+                        'ONLY UPDATER DEFINED'
+
+                when applied  is  made its  value,  and p  is  made  the
+                updater of this.
+
+
+
+
+----------------------------
+6  Dynamic Local Expressions
+----------------------------
+
+sysLOCAL(code_p)                          [protected procedure variable]
+sysLOCAL(wordarg)
+        This procedure  enables the  value, or  values, produced  by  an
+        arbitrary  expression  to  be  made  dynamically  local  to  the
+        procedure for  which code  is currently  being planted  (or,  if
+        called at execute level, to the current compilation stream).
+
+        Dynamically local means that the value(s) of the expression will
+        be saved on each entry to  the procedure and the saved  value(s)
+        restored on each exit (this  applies in all contexts,  including
+        abnormal exits from procedures and the suspension and resumption
+        of processes created with consproc).
+
+        At execute level,  the expression  is added  as an  `on-the-fly'
+        dynamic local of the current call of sysCOMPILE. The value(s) of
+        the expression are  saved immediately when  sysLOCAL is  called;
+        thereafter, they  are  restored and  resaved  on each  exit  and
+        re-entry to the sysCOMPILE call.
+
+        The expression must have an access part and an update part,  the
+        two parts being represented respectively by the base and updater
+        of  the  code-planting  procedure  argument  code_p.  That   is,
+        code_p() is assumed to plant VM code to access the value(s)  and
+        push them on the  stack, while -> code_p()  is assumed to  plant
+        code to update them by popping an equal number of items off  the
+        stack. The number  M of  values produced/updated  is called  the
+        multiplicity of the expression, and is specified by the  pdprops
+        of code_p (an integer in the range 0-255).
+
+        Making the values dynamically local is achieved by incorporating
+        the access code  and update  code at appropriate  points in  the
+        procedure, and by allocating M local lvars in which to save  the
+        values. Effectively this can be thought of as
+
+                access-code -> (save1, save2, ..., saveM)
+
+        on entry to the procedure, and
+
+                (save1, save2, ..., saveM) -> update-code
+
+        on exit  (see  More On  Dynamic  Local Expressions  below  for a
+        fuller description).
+
+        Calling sysLOCAL with a wordarg  argument (for a description  of
+        which see Referencing Identifiers  in VM Instructions above)  is
+        functionally identical to
+
+                sysLOCAL(sysPUSH(% wordarg %))
+
+        with the pdprops  of the sysPUSH  closure set to  1 (or, for  an
+        active variable, to its  multiplicity). That is, the  expression
+        is just the (active/nonactive)  value of the identifier  derived
+        from wordarg.
+
+        However, since  the  dynamic localising  of  simple  identifiers
+        (i.e.  excluding   active  variables)   is  handled   specially,
+        sysLOCAL(wordarg) produces  much more  efficient code  than  the
+        above.
+
+
+dlocal_context -> int                                         [variable]
+int -> dlocal_context
+dlocal_process -> proc                                        [variable]
+proc -> dlocal_process
+        These are two special (active) variables which may only be  used
+        directly inside the code of a dynamic local expression. They are
+        described under More On Dynamic Local Expressions below.
+
+
+
+
+--------------------------
+7  User Stack Manipulation
+--------------------------
+
+See Referencing Identifiers in VM  Instructions above for a  description
+of the wordarg argument to sysPUSH, sysPOP and sysIDENT.
+
+
+sysPUSH(wordarg)                          [protected procedure variable]
+-> sysPUSH(wordarg)
+        Plants  code  to  push  the  value  of  the  (lexical/permanent)
+        identifier derived from wordarg onto the stack. (Note that  this
+        is optimised  to a  sysPUSHQ  for the  value of  an  initialised
+        constant,  except  for  a  non-system  permanent  constant  when
+        pop_debugging == true.)
+
+        If the  identifier  is  active, and  wordarg  does  not  specify
+        "nonactive", then this instruction is equivalent to a sysCALL on
+        the nonactive value of the identifier, i.e.
+
+             sysCALL(conspair(wordarg, "nonactive"))
+
+        The updater of this procedure is a procedure that calls sysPOP.
+
+
+sysPOP(wordarg)                           [protected procedure variable]
+        Plants code to pop the top item  from the stack and store it  in
+        the value of the identifier derived from wordarg.
+
+        If the  identifier  is  active, and  wordarg  does  not  specify
+        "nonactive", then this instruction  is equivalent to a  sysUCALL
+        on the nonactive value of the identifier, i.e.
+
+             sysUCALL(conspair(wordarg, "nonactive"))
+
+
+sysIDENT(wordarg)                         [protected procedure variable]
+        Plants code  to  push  the run-time  identifier  record  of  the
+        identifier derived from wordarg onto  the stack (see note  under
+        sys_use_current_ident  and  Implementation  of  Lexical  Scoping
+        below).
+
+
+sysPUSHQ(item)                            [protected procedure variable]
+        Plants code to push the item item onto the stack.
+
+
+sysPUSHS(dummy)                           [protected procedure variable]
+        Plants code to push the top  item onto the stack onto the  stack
+        again, i.e  duplicate  it.  This  procedure  is  given  a  dummy
+        argument dummy.
+
+
+sysERASE(dummy)                           [protected procedure variable]
+        Plants code to erase the top  item on the stack. This  procedure
+        is given a dummy argument dummy.
+
+
+sysSWAP(N, M)                             [protected procedure variable]
+        Plants code to swap the items at the N-th and M-th positions  on
+        the user stack (where the top  item on the stack is at  position
+        1).
+
+
+
+
+--------------------
+8  Procedure Calling
+--------------------
+
+See Referencing Identifiers in VM  Instructions above for a  description
+of the wordarg argument to sysCALL and sysUCALL.
+
+
+sysCALL(wordarg)                          [protected procedure variable]
+-> sysCALL(wordarg)
+        Plants code  to execute  the  value of  the  (lexical/permanent)
+        identifier derived from wordarg. (Note that this is optimised to
+        a sysCALLQ for the value of an initialised constant, except  for
+        a non-system permanent constant when pop_debugging == true.)
+
+        If the  identifier  is  active, and  wordarg  does  not  specify
+        "nonactive", then this instruction is equivalent to a sysCALL on
+        the nonactive value  of the identifier  followed by a  sysCALLS,
+        i.e.
+
+            sysCALL(conspair(wordarg, "nonactive"));
+            sysCALLS(0);        ;;; (0 dummy arg)
+
+        The  updater  of  this  procedure  is  a  procedure  that  calls
+        sysUCALL.
+
+
+sysUCALL(wordarg)                         [protected procedure variable]
+        Plants  code  to  execute  the  updater  of  the  value  of  the
+        (lexical/permanent) identifier derived from wordarg. (Note  that
+        this is optimised to a sysUCALLQ for the value of an initialised
+        constant,  except  for  a  non-system  permanent  constant  when
+        pop_debugging == true.)
+
+        If the  identifier  is  active, and  wordarg  does  not  specify
+        "nonactive", then this instruction is equivalent to a sysCALL on
+        the nonactive value of the  identifier followed by a  sysUCALLS,
+        i.e.
+
+            sysCALL(conspair(wordarg, "nonactive"));
+            sysUCALLS(0);        ;;; (0 dummy arg)
+
+
+sysCALLQ(item)                            [protected procedure variable]
+-> sysCALLQ(item)
+        Plants code  to  execute the  item  item. The  updater  of  this
+        procedure is a procedure that calls sysUCALLQ.
+
+
+sysUCALLQ(item)                           [protected procedure variable]
+        Plants code to execute the updater  of item, or execute item  in
+        update mode if  a non-procedure  (i.e. call the  updater of  its
+        class_apply, etc).
+
+
+sysCALLS(dummy)                           [protected procedure variable]
+-> sysCALLS(dummy)
+        Plants code to pop and execute the item on top of the stack; the
+        procedure takes  a dummy  argument dummy.  The updater  of  this
+        procedure is a procedure that calls sysUCALLS.
+
+
+sysUCALLS(dummy)                          [protected procedure variable]
+        Plants code to execute the updater  of the item, or execute  the
+        item in update mode, etc;  the procedure takes a dummy  argument
+        dummy.
+
+
+
+
+-------------------------------
+9  Labels and Jump Instructions
+-------------------------------
+
+A label is an object used  for referencing a position within the  stream
+of  VM  code,  and  which  can  be  specified  as  the  target  of  jump
+instructions like GOTO, IFSO, AND, etc;  a label is attached at a  given
+position in the code by calling sysLABEL (or sysDLABEL) at that point.
+
+    A jump instruction may reference  a label anywhere in the  procedure
+for which code is currently being planted (a local jump), or anywhere in
+an outer, enclosing procedure  (a non-local jump).  In the latter  case,
+the effect  is similar  to a  call of  exitto for  the target  procedure
+occurring at the  point of the  jump, followed  by a local  jump to  the
+label (although see  Implementation of  Non-Local Jumps  below for  more
+details on this).
+
+    Labels come in two kinds, symbolic and absolute. Symbolic labels are
+chosen by the user, and are usually words (although they can in fact  be
+any  Poplog   objects   except   pairs);   this   type   of   label   is
+lexically-scoped, meaning that a jump to a label LAB will reference  the
+innermost occurence  of LAB  in the  whole nest  of lexical  blocks  and
+procedures currently  being compiled  (equality of  labels being  tested
+with ==).
+
+    Absolute labels,  on  the  other  hand,  are  unique  items  (pairs)
+generated by sysNEW_LABEL, and are not scoped at all. Jump  instructions
+that refer to an absolute label go to wherever that label is planted, be
+it in the current procedure or an enclosing one.
+
+
+sysNEW_LABEL() -> lab                     [protected procedure variable]
+        Generates a new  absolute label  lab. This can  be planted  with
+        sysLABEL or sysDLABEL at any point  in the code of a  procedure,
+        and referenced as the target of a jump instruction.
+
+
+sysLABEL(lab)                             [protected procedure variable]
+sysDLABEL(lab)                            [protected procedure variable]
+        Plant a label: the label lab will reference the next instruction
+        planted, i.e. that  instruction will  be the target  of a  GOTO,
+        IFSO,  IFNOT,  AND,  OR  or  GO_ON  instruction  using  lab,  as
+        described above.
+
+        sysDLABEL  is  a  special   variant  of  sysLABEL  that   allows
+        optimisation  of  non-local  jumps  --  see  Implementation   of
+        Non-Local Jumps below.
+
+
+sysGOTO(lab)                              [protected procedure variable]
+        Plant a GOTO instruction: this will jump unconditionally to  the
+        label lab.
+
+
+sysIFSO(lab)                              [protected procedure variable]
+        Plant an IFSO instruction:  this will jump to  the label lab  if
+        the top item  on the stack  is not false,  removing it from  the
+        stack whether  the jump  is  taken or  not. See  sysLABEL  for a
+        description of labels.
+
+
+sysIFNOT(lab)                             [protected procedure variable]
+        Plant an IFNOT instruction: this will  jump to the label lab  if
+        the top item on the stack  is false, removing it from the  stack
+        whether the jump is taken or not.
+
+
+sysAND(lab)                               [protected procedure variable]
+        Plant an AND instruction: this will
+
+          # jump to the label lab if the top item on the stack is false,
+            leaving the item on the stack;
+
+          # remove the item from the stack otherwise.
+
+
+sysOR(lab)                                [protected procedure variable]
+        Plant an OR instruction: this will
+
+          # go to the  label lab if  the top  item on the  stack is  not
+            false, leaving the item on the stack;
+
+          # remove the item from the stack otherwise.
+
+
+sysGO_ON(lablist, elselab, base)          [protected procedure variable]
+sysGO_ON(lablist, elselab)
+sysGO_ON(compile_p)
+        Plant a GO_ON instruction: this will
+
+          # Take an integer I off the stack;
+
+          # If base <= I  <= base-1+N, where  N = length(lablist),  then
+            jump to the (I-base+1)-th label in the label list lablist;
+
+          # If I is  not within range  and the 'else'  label elselab  is
+            false then a mishap results, otherwise a jump to elselab  is
+            taken.
+
+        In the second form, the value of base defaults to 1.
+
+        In the last form, compile_p is a procedure which will be  called
+        to compile  code to  follow the  GO_ON instruction,  and  should
+        return the values for lablist, elselab and base, i.e.
+
+                compile_p() -> (lablist, elselab, base)
+
+        (In other words, using compile_p is a way of deferring supplying
+        the values of lablist, elselab and base until some later point.)
+
+        Unless the flag  bit VM_NO_CHECK_GO_ON_INT  in pop_vm_flags  was
+        set when  the  sysGO_ON  was  executed  (and  pop_debugging  was
+        false), then a mishap will result if I is not an integer.
+
+
+
+
+--------------------------------------
+10  Accessing/Updating Data Structures
+--------------------------------------
+
+The VM provides the instructions below for accessing or updating a field
+of a structure; the  code produced by these  corresponds exactly to  the
+code inside the access/update procedures constructed by cons_access. The
+following should therefore be read  in conjunction with the  description
+of field specifiers, etc, and cons_access itself, in REF * KEYS.
+
+
+sysFIELD(N, spec, check, mode)            [protected procedure variable]
+-> sysFIELD(N, spec, check, mode)
+sysUFIELD(N, spec, check, mode)           [protected procedure variable]
+        These procedures respectively generate in-line access or  update
+        code corresponding exactly to  the access and update  procedures
+        produced by  cons_access  (see REF * KEYS).  The  arguments  are
+        identical  to  those  for  cons_access,  except  for  the  first
+        argument N. The updater of sysFIELD just calls sysUFIELD.
+
+            As for  cons_access,  the  spec  argument  may  be  either a
+        spec_list  (access/update  a  Poplog  record/external  structure
+        field), a  spec_pair  (access/update  a  Poplog  vector/external
+        array element), a spec_vec (call  an external function), or  any
+        other spec (access an external data type).
+
+            For external accessing of structure or array components, the
+        mode argument may also specify  that an external pointer to  the
+        component should be returned rather than its value (in this case
+        therefore, "value" in the descriptions below means a pointer  to
+        the value).
+
+            In the spec_list case, N is an integer >= 1, specifying that
+        the N-th field of the  structure is being accessed/updated.  The
+        effect of the instruction is to remove the structure item on top
+        of the stack and either push back on the field value (sysFIELD),
+        or pop the next item off the stack into the field (sysUFIELD).
+
+            In the spec_pair  case, N is  either an integer  >= 1  for a
+        fixed vector/array subscript, or false for a variable  subscript
+        coming off the stack after the vector/array item. The effect  of
+        the instruction is to remove the vector/array item on top of the
+        stack, remove (when N  false) the subscript  next on the  stack,
+        and then either push  back on the  element value (sysFIELD),  or
+        pop the next item off the stack into the element (sysUFIELD).
+
+            The spec_vec case  is allowed  only for  sysFIELD; the  mode
+        argument must specify 1 level  of external dereference, and  the
+        argument N  is ignored.  The  effect of  the instruction  is  to
+        remove the external function pointer from the stack and call it,
+        which will remove  its arguments  (if any) from  the stack,  and
+        push back on its result (if any).
+
+            For any other spec  the N argument  is ignored, and  behaves
+        the same as an external structure  with one field of that  type,
+        i.e. same as the spec_list case with a spec_list of [>->  ^spec]
+        and N = 1.
+
+        Examples:
+
+                sysPUSH("list");
+                sysFIELD(2, [full full], false, false)
+
+        is equivalent to fast_back(list).
+
+                sysPUSH("item");
+                sysPUSH("list");
+                sysUFIELD(2, [full full], false, false);
+
+        is equivalent to item -> fast_back(list).
+
+                sysPUSH("N");
+                sysPUSH("string");
+                sysFIELD(false, conspair("byte", false), false, false);
+
+        is equivalent to fast_subscrs(N, string).
+
+                sysPUSHQ(65);
+                sysPUSH("string");
+                sysUFIELD(2, conspair("byte", false), false, false);
+
+        is equivalent to 65 -> fast_subscrs(2, string).
+
+
+
+
+-------------------------
+11  Implementation Issues
+-------------------------
+
+11.1  Lexical Scoping
+---------------------
+This section  describes  the  way in  which  lexically-scoped  variables
+declared with sysLVARS will actually be implemented in the final  output
+code. Note that (except for 'non-executing' ones outside of procedures),
+lexical blocks created with sysLBLOCK and sysENDLBLOCK have no affect in
+this respect, but merely control the scopes and lifetimes of  variables;
+it is the usage of variables with respect to procedures that  determines
+how they are implemented.
+
+    Dealing first with  execute-level variables (i.e.  those outside  of
+procedures/non-executing lblocks):  these  simply  translate  to  unique
+fixed identifiers, and  are just  like permanent  variables except  with
+lexical scope.
+
+    Otherwise, lexical variables  are those  declared inside  procedures
+(or inside non-executing lblocks not contained in procedures; the latter
+is equivalent  to the  former, since  the outermost  of a  nest of  such
+blocks is treated as a procedure).  A given variable X in a  procedure P
+falls into one of three categories, depending on its usage:
+
+    type-1
+        Used strictly  locally, i.e.  X  is not  referenced  non-locally
+        inside any procedure nested  within P, and is  not pushed as  an
+        identifier with sysIDENT.
+
+    type-2
+        Used non-locally inside a nested procedure Q, but does not cross
+        a 'push'  boundary. This  means  that neither  Q nor  any  other
+        procedure that encloses it inside P  is pushed as a data  object
+        (see below). Also not pushed as an identifier with sysIDENT.
+
+    type-3
+        Used non-locally  inside a  nested procedure,  and does  cross a
+        'push' boundary,  or  directly  pushed  as  an  identifier  with
+        sysIDENT.
+
+A procedure  is 'pushed  as a  data object'  if the  object returned  by
+sysENDPROCEDURE is given to sysPUSHQ, or sysPASSIGNed to any  identifier
+other than a lexical constant. If assigned to a lexical constant, it  is
+also 'pushed' by any  sysPUSH for that constant.  In Pop-11 terms,  this
+means that the only kind of  nested define that does not count  directly
+as a 'push' is 'define lconstant ...'.
+
+    Thus for example, in the following Pop-11 procedure W is of type  1,
+X is of type 2, and Y and Z are of type 3:
+
+        define P();
+            lvars W, X, Y, Z;
+            W =>                        ;;; W only used locally
+
+            define lconstant Q();
+                X =>                    ;;; X used non-locally
+            enddefine;
+            Q();                        ;;; Q is called but not pushed
+
+            define lconstant R();
+                define lconstant S();
+                    Y =>                ;;; Y used non-locally
+                enddefine;
+                S();                    ;;; S is called but not pushed
+            enddefine;
+            R -> W;                     ;;; but R is pushed
+
+            define dlocal T();          ;;; T is pushed by being dlocal
+                Z =>                    ;;; and uses Z non-locally
+            enddefine;
+
+        enddefine;
+
+The  different  variable   types  are  implemented   by  the   following
+mechanisms, given in order of decreasing efficiency:
+
+    #   The first  N  type-1 variables  (in  order of  declaration)  are
+        allocated  to  machine   registers,  where  the   number  N   is
+        implementation dependent. (For example: N  = 11 on DEC  Alpha, 8
+        on SPARC, 6  on HP  PA-RISC, 2 on  VAX/MC680x0, and  0 on  Intel
+        x86.)
+
+    #   The rest of the type-1s are allocated to stack frame cells.
+
+    #   Type-2 variables  are  allocated  to  unique  dynamically  local
+        identifiers.
+
+    #   Type-3's require the runtime construction of identifier  records
+        in the heap  to hold  their values, since  a 'pushed'  procedure
+        that uses  them non-locally  (or the  identifiers themselves  if
+        pushed with sysIDENT) can be passed either
+
+            (a) up and right out of the current lexical environment, or
+
+            (b) down into another invocation of that same environment.
+
+        This type  therefore  uses  type-1 variables  to   hold  runtime
+        identifiers created at appropriate points in the home  procedure
+        (i.e. immediately on entry for variables outside lexical blocks,
+        or at points in the code where lexical blocks start, etc).
+
+        The run-time identifiers  are then passed  down as hidden  extra
+        arguments  to   nested  procedures   that  use   the   variables
+        non-locally. Whenever such a procedure is 'pushed', a closure of
+        the base  procedure with  the run-time  identifier arguments  is
+        created and, in addition, an  auxilary variable is generated  to
+        hold the closure,  ensuring that  it is only  produced once  for
+        each invocation of  the environment. (This  variable itself  may
+        come out as any of the  three types, depending on whether it  is
+        used non-locally or across a push boundary.)
+
+        Similarily,  a  direct  push  of  an  identifier  with  sysIDENT
+        produces the run-time identifier.
+
+In fact, providing neither (a) nor (b) actually happens for a  type-3, a
+unique dynamic variable (as for  type-2 variables) would suffice;  while
+the VM compiler is unable to recognise this, the user may be able to  in
+many situations. For this reason, the sysDLVARS declaration is provided:
+it behaves  exactly  like sysLVARS,  except  that type-3  sysDLVARS  are
+treated as type-2s.
+
+    A typical  use  of  this  in Pop-11  would  be  something  like  the
+following procedure to  count the  number of characters  printed for  an
+object:
+
+        define countchars(x) -> n;
+            lvars x;
+            dlvars n = 0;  ;;; initialise count to 0
+
+            define dlocal cucharout();
+                -> ;        ;;; erase the character
+                n+1 -> n    ;;; increment non-local count
+            enddefine;
+
+            pr(x)
+        enddefine;
+
+On the  other hand,  it may  be known  that an  individual 'push'  for a
+particular procedure (or a push of an identifier with sysIDENT) does not
+necessitate the use of type-3 variables. E.g. in
+
+        applist([1 2 3 4], P)
+
+where P is a  procedure that uses non-locals,  (a) or (b) cannot  happen
+because applist is a system procedure that can never do either with P.
+
+    Where this sort of information is known to the compiler writer,  the
+flag VM_DISCOUNT_LEX_PUSHES in pop_vm_flags can be employed. While  set,
+sysPUSH, sysPUSHQ and sysIDENT  instructions that would otherwise  cause
+variables to be  marked as type-3  will not do  so. (However, any  other
+sysPUSH or sysPUSHQ on the relevant procedure while this flag is NOT set
+will cause the 'damage' to be done, irrevocably.)
+
+    (In fact, the  VM compiler  DOES recognise this  situation when  the
+pushed procedure is the last argument to one of a small number of system
+procedures: currently,  these are  just  the 'app'  procedures  applist,
+maplist, appdata and appproperty. So, the particular example above would
+not (in itself) cause the production of type-3 variables.)
+
+
+
+11.2  Non-Local Jumps
+---------------------
+A non-local jump from a procedure Q to a label in a  lexically-enclosing
+procedure P closely parallels a non-local access to a lexical  variable;
+if the label is thought of as a variable, and the jump instruction as an
+access to it, then what matters from  the point of view of how the  jump
+is implemented is whether the label is 'type-3' or not; that is, whether
+it crosses a push boundary.
+
+    In the case where it  does not, the nested  procedure Q can only  be
+called  directly   from  within   P   or  some   other   directly-called
+sub-procedure of P.  This means  there cannot be  any other  intervening
+call of P between the  call of Q and the  target stack frame; to  unwind
+the call stack to the correct call of P it is therefore sufficient to do
+exitto(P). (Moreover, it can safely be assumed that the target call of P
+is still extant, obviating the  need to run up  the call stack to  check
+this first.)
+
+    When the jump  does cross a  push boundary this  is not  sufficient,
+because Q can now have been passed down into other invocations of P  (or
+indeed right out of P altogether),  and there there could be any  number
+of intervening calls  of P to  be erased before  reaching the  target. A
+means of identifying different invocations  of P is therefore  required,
+and the system does this as follows:
+
+    For each procedure  P that  can be the  target of  a non-local  jump
+across a push boundary, a unique dynamic variable is generated, and made
+a local of  P; on entry  to P, the  value of this  variable is set  to a
+sequentially-generated integer (which  will be unique  for each call  of
+P). The identifying integer is then passed down (like a type-3 lvar)  as
+an extra,  hidden argument  to  pushed sub-procedures  that jump  to  P,
+enabling them to identify which call of P to exit to (by inspecting  the
+current value of the dynamic variable).  In addition, this type of  jump
+has first to inspect the saved values of the variable on the call  stack
+to check that the target call is still extant. It is therefore  slightly
+slower than  the first  type, and  (as with  a type-3  lvar),  pushing a
+sub-procedure that does such a jump requires the creation of a closure.
+
+    Again as with lvars, the user may know that a pushed procedure doing
+a non-local jump  will in practice  require only the  simple case  (i.e.
+target will  always be  extant, and  no intervening  calls of  the  same
+procedure). Analagously  to  sysDLVARS,  the VM  provides  sysDLABEL  to
+specify this: non-local jumps to a label planted with sysDLABEL  (rather
+than sysLABEL)  will  always  use  the  simple  mechanism,  and  pushing
+sub-procedures doing the jumps will not create closures. (In Pop-11, use
+the label syntax
+
+        LABEL:*
+
+rather than LABEL: when sysDLABEL is appropriate.)
+
+
+
+
+-------------------------------------
+12  More On Dynamic Local Expressions
+-------------------------------------
+
+As described  under sysLOCAL,  expression  values are  made  dynamically
+local to a procedure  by incorporating the access  code and update  code
+for the expression at appropriate points, and by the allocation of local
+lvars in which to save the values. This section describes the process in
+detail.
+
+    The access code for an expression is actually incorporated at  three
+places in a procedure, and the update code at four places. As previously
+mentioned, the normal entry code for the procedure contains
+
+            access-code -> (save1, save2, ..., saveM);
+
+(where  save1,  ...,  saveM  are  the  local  lvars  allocated  to   the
+expression), while the normal exit code contains
+
+            (save1, save2, ..., saveM) -> update-code;
+
+However, separate code sections  are used for  abnormal exit (i.e.  when
+the procedure is exited with  chain, chainfrom, exitfrom, etc), and  for
+swapping in and out of  the procedure when it  forms part of a  consproc
+process being resumed or suspended.
+
+For abnormal exit, the  expression code used is  the same as for  normal
+exit, i.e.
+
+            (save1, save2, ..., saveM) -> update-code;
+
+Suspend and resume, on the other hand, are a little different: in  these
+cases dynamic local values  must be exchanged  with their saved  values.
+For process  suspension, the  current value  is swapped  with the  saved
+value in the procedure's stack frame before that stack frame is saved in
+the process record; for resumption the opposite happens, i.e. the values
+are swapped around after restoring the stack frame from the process (and
+thus  putting  everything  back  as  it  was  before  the  process   was
+suspended).
+
+    The code  generated  for each  of  these contexts  is  therefore  an
+interleaving of the code for entry and exit, i.e.
+
+        (access-code, save1, save2, ..., saveM)
+                -> (save1, save2, ..., saveM, update-code);
+
+for suspend, and
+
+        (save1, save2, ..., saveM, access-code)
+                -> (update-code, save1, save2, ..., saveM);
+
+for resume.
+
+    To enable the access or update code to determine in which context it
+is being called, an integer context value  (1 - 4) is available via  the
+special active variable dlocal_context (this variable may be  referenced
+ONLY in local expression code, and nowhere else). The contexts and their
+applicablity are as follows:
+
+        value   context         applies to
+        -----   -------         ----------
+          1     normal entry      access
+                normal exit       update
+
+          2     abnormal exit     update
+
+          3     suspend           access
+                                  update
+
+          4     resume            access
+                                  update
+
+In the case of  suspend and resume, the  current process record is  also
+available to  the code  from the  active variable  dlocal_process  (with
+similar restrictions on its use). The value this returns is defined only
+for contexts  3  and  4, and  is  UNDEFINED  for the  other  two.  Using
+dlocal_process enables  the  access or  update  code to  manipulate  the
+process undergoing suspension  or resumption in  any desired way.  (Note
+that owing to consproc_to, which uses the suspend and resume  mechanisms
+to create a  process from  an existing section  of the  call stack,  the
+process  given  by  dlocal_process  is  not  necessarily  the  same   as
+pop_current_process.)
+
+Having dealt with the code  generated for individual local  expressions,
+we now discuss the overall handling  of a complete set of N  expressions
+in a given procedure, declared with sysLOCAL in the order 1 to N:
+
+    Basically, expressions are executed in declaration order (1 upto  N)
+for 'ingoing' contexts  (normal entry  and resume), and  in the  reverse
+order (N down to  1) for 'outgoing'  contexts (normal/abnormal exit  and
+suspend). However, a  prime constraint is  that the restore/update  code
+for any expression must not be run unless the corresponding  access/save
+code has been executed first (since  the latter must produce the  values
+to be  given to  the former);  because a  procedure can  be  interrupted
+during the execution of the access code for a particular expression  (or
+indeed, before any of the access  code sections have been started),  and
+because such an  interrupt can  lead to an  abnormal exit  or a  process
+suspend, it is incumbent  on the procedure to  provide a mechanism  that
+prevents this constraint being violated.
+
+    To this  end,  the  procedure  maintains a  counter,  or  index,  of
+expressions run. The index is initialised to 0 immediately on entry  and
+before interrupts can be serviced; thereafter, for each ingoing context,
+the index is set to I after completing code for the I-th expression, and
+for each outgoing context to J-1 before starting to produce code for the
+J-th expression. E.g., for normal entry and exit:
+
+            0 -> index;     ;;; before interrupts
+
+            normal entry                normal exit
+            ------------                -----------
+
+            save-expr1;          LabN:  N-1 -> index;
+            1 -> index;                 restore-exprN;
+            save-expr2;                 .
+            2 -> index;                 .
+            .                           .
+            .                    Lab2:  1 -> index;
+            .                           restore-expr2;
+            save-exprN;          Lab1:  0 -> index;
+            N -> index;                 restore-expr1;
+                                 Lab0:
+
+The abnormal exit code is then  similar to that for normal exit,  except
+that it  switches to  LabI, where  I is  the value  of the  index;  this
+prevents expressions being  restored that  have not  been saved.  Notice
+that it also prevents a second or subsequent attempt to chain out of the
+procedure from restoring expressions that have already been restored.
+
+    Suspend and resume are  more complicated. A suspend  at a time  when
+the index has value  I runs the  swap code for  expressions I down  to 1
+(reducing the index  actually saved in  the stack frame  to 0), but  the
+corresponding resume that will follow it must undo only what the suspend
+did and no more, that is, run  the swap code from 1 upto, and  finishing
+at, I. A suspend therefore starts by saving the current index in another
+location: this is  then the  limit value  for a  subsequent resume.  (An
+additional complication  here is  that  both the  suspend code  and  the
+resume code can  themselves be  interrupted by a  recursive suspend  and
+resume under certain conditions, and so the code has to be re-entrant to
+cope with this.)
+
+    Finally, note  that all  local  expression code  is run  inside  the
+normal local-identifier  environment  of a  procedure,  i.e.  expression
+entry code  follows  the creation  of  local  lvars and  the  saving  of
+(non-active)  dynamic  local  identifiers,  and  expression  exit   code
+precedes the unwinding  of this environment.  (Pop-11 users should  also
+note that  access code  for  dlocal expressions  is run  before  popping
+procedure formal arguments from the stack,  and that update code is  run
+after pushing formal result variables, etc.)
+
+
+
+--- C.all/ref/vmcode
+--- Copyright University of Sussex 1995. All rights reserved.

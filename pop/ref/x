@@ -1,0 +1,926 @@
+REF X                                   R. Evans, Adrian Howard Feb 1992
+                                            Revised John Gibson May 1993
+
+        COPYRIGHT University of Sussex 1993. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<  OVERVIEW OF X INTERFACES   >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+X is  a  large and  complicated  emerging standard  for  user  interface
+software on high resolution displays. From V14, Poplog provides specific
+support  for  operation  under  X,  in  particular  (but  not  only)  an
+application programmer's interface to the X Toolkit. This file discusses
+the overall organisation of X facilities, and provides  cross-references
+to more specific documentation of individual packages.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+      1.1   IMPORTANT NOTE
+      1.2   Overview of X
+
+  2   X Clients: Possible Configurations
+      2.1   Generic Support For X Interfaces
+
+  3   Poplog Startup Under X
+      3.1   Generic X Hooks
+
+  4   Generic X libraries: LIB POPXLIB and INCLUDE XDEFS
+
+  5   Poplog Image X Link Specification
+
+  6   Poplog And The X Toolkit
+
+  7   Widget Set Interfaces
+      7.1   The Poplog Widget Set: Xpw
+
+  8   Poplog And Xlib
+
+  9   Ved And X
+      9.1   XVed
+      9.2   Terminal Ved
+
+ 10   Miscellaneous
+      10.1  Poplog And CLX
+      10.2  Prolog And X
+      10.3  Legal Liability
+
+ 11   See Also
+
+
+
+---------------
+1  Introduction
+---------------
+
+1.1  IMPORTANT NOTE
+-------------------
+Many of  the  documentation  cross-references  in  this  file  refer  to
+X-specific REF files.  These will  only be easily  accessible after  you
+have loaded LIB * POPXLIB. If  you are reading this  file from Ved,  you
+are therefore advised  to load this  library now, even  if you are  only
+browsing the documentation. Simply type
+
+         <ENTER> uses popxlib
+
+Note also  that the  addition  of X-related  facilities to  Poplog  have
+increased the need for  mixed-case library and documentation  filenames.
+This  is  somewhat  at  odds  with  previous  conventions  for  filename
+references, which have used all-uppercase  (for prominence in the  text)
+to refer  to all-lowercase  actual filenames.  To retain  compatibility,
+text references  in  all-uppercase  refer to  all-lowercase  files,  but
+mixed-case references should  be taken as  verbatim. This strategy  does
+not  cope  with  all-uppercase  filenames,  and  for  this  reason  such
+filenames have been (and should be by users) avoided.
+
+
+
+1.2  Overview of X
+------------------
+X is a specification for the user-interface component of programs  which
+wish to  use  typical  workstation  hardware  (high  resolution  screen,
+keyboard and mouse.) The idea is to provide facilities for many programs
+to use  the same  screen,  keyboard and  mouse simultaneously,  and  the
+standardisation required to offer a  high degree of portability  between
+different hardware.
+
+An implementation of X  is a software  package typically comprising  two
+main parts. Firstly, software for a self-contained program called an  'X
+server' which maintains complete control  over the screen, keyboard  and
+mouse. Secondly software  libraries designed to  form part of  programs,
+called 'X  clients', which  wish  to make  use of  these  user-interface
+facilities. It  is largely  this latter  component that  is of  interest
+here. The facilities  discussed below  allow Poplog to  operate as  an X
+client of  an  X server  which  is managing  the  actual  user-interface
+hardware.
+
+X was originally developed in a  research project based at MIT.  However
+development involved a number of  major computer manufacturers, and  the
+system is rapidly becoming a standard for user-interface software. It is
+supported by many of the  main workstation producers and in  particular,
+most of the  main Poplog platforms  (including Sun, Hewlett-Packard  and
+DEC workstations). Hence from V14 Poplog includes a range of  facilities
+for interfacing to X at different levels.
+
+
+
+-------------------------------------
+2  X Clients: Possible Configurations
+-------------------------------------
+
+The basis of X  Windows operation is that  all access to  user-interface
+hardware by 'ordinary' user programs is mediated by the X server. So any
+program desiring user-interface facilities obtains them by becoming an X
+client,  that   is,   establishing  a   communication   link   (called a
+'connection') to an X server (or possibly more than one, an X client can
+use more than  one screen.)  X servers and  clients communicate  using a
+byte-stream protocol:  messages between  them  consist of  sequences  of
+bytes, coded to  represent commands, requests  and replies. Examples  of
+messages from  client to  server include  "Create a  new window  on  the
+screen", "Tell  me  what  fonts  are available",  "Write  text  at  this
+location in  this  window", "Display  this  bitmap image".  Examples  of
+messages from server to  client include "The user  just pressed the  'A'
+key in  this window",  "This window  has just  become visible  -  please
+refresh it", "The mouse cursor just entered this window".
+
+In principal, an X client can operate directly at this level, by  simply
+opening a connection to a server, and talking in terms of the low  level
+protocol.  The  advantage  of  this  level  of  interface  is   complete
+independence of all  the design assumptions,  restrictions and  possible
+bugs of  the higher  level support.  The disadvantage  is that  all  the
+client software must  be written  from scratch, and  common ground  with
+other X software is minimal. An example of such an interface is the  CLX
+package, which  provides  Common  Lisp  functions  for  controlling  the
+user-interface, and converts them directly  into X server messages.  CLX
+is available under Poplog Common Lisp (see 'Poplog and CLX' below),  and
+so using these facilities Poplog can operate as a low level X client  of
+this sort.
+
+X offers two  layers of higher  level support as  part of the  standard.
+Both are provided in the form  of C libraries which can be  incorporated
+into other programs.
+
+The lower of these two levels is called 'Xlib', and consists of a  large
+number of procedures,  each roughly  corresponding to  the sending  of a
+protocol message to the server. This level avoids the need to explicitly
+code up  and  dispatch  protocol messages,  and  supports  decoding  and
+queuing of  incoming messages  from  the server.  It provides  a  purely
+procedural interface, but at  about the same  level of functionality  as
+the protocol  language  itself. Thus  it  offers flexible  and  portable
+support for  application programs,  but still  requires substantial  low
+level user-interface programming,  even for  quite simple  applications.
+The Poplog library  LIB * XLIB (see  Poplog and  Xlib below)  provides a
+basic interface to this level, implemented via LIB * NEWEXTERNAL.
+
+The higher level interface  is called the 'X  Toolkit' (or simply  'Xt',
+pronounced EX-TEE). This  is built  on top of  Xlib, and  offers a  high
+level object oriented view of the user interface. It allows programs  to
+be designed in terms of  user-interface objects (called 'widgets')  such
+as menus, scrollbars,  text edit buffers,  confirmation boxes,  graphics
+tablets  etc.,  without  having  to   be  concerned  about  details   of
+implementations (screen appearance,  low level keyboard  interpretation,
+response to server refresh requests etc.).
+
+In fact, the X Toolkit level itself divides into two parts. It  provides
+facilities for  creating new  classes of  user-interface object  (called
+widget classes) --- for example, defining a new kind of scrollbar.  This
+is generally called 'widget class programming' and currently there is no
+specific support for it in Poplog. The Toolkit also provides  facilities
+for using and customising predefined user-interface objects, for example
+setting up a  menu. This is  generally called 'application  programming'
+and is  supported in  Poplog, and  indeed is  the primary  component  of
+Poplog's current X Windows support (see Poplog and the X Toolkit below).
+
+However, application programming using the X Toolkit clearly needs  some
+predefined widget class definitions to  be available to the  programmer.
+The X Toolkit  standard itself  includes only  a few  very basic  widget
+class definitions,  solely  to support  more  sophisticated  definitions
+supplied  independently  by  widget  class  programmers.  Widget   class
+definitions tend to  be grouped  into sets (called  widget sets),  and a
+particular software supplier will supply a widget set (generally in  the
+form of a C library) providing user-interface objects conforming to that
+supplier's look and  feel (that  is, visual  appearance and  conventions
+about keyboard and mouse button usage etc.) Poplog provides support  for
+accessing such externally  defined widget sets  generally, and  detailed
+support for a number of available widget sets (see Widget Set Interfaces
+below.)
+
+In addition, Poplog includes a widget set specifically designed to cover
+some basic interface  needs for  Poplog applications.  This widget  set,
+called Xpw,  takes  the form  of  a  C library  archive  (included  with
+Poplog), and  provides  simple  text  and  graphics  facilities  under X
+Windows (see The Poplog  Widget Set: Xpw  below). These facilities  are
+sufficient for  a wide  range of  common requirements,  allowing  Poplog
+applications to be  constructed without any  externally supplied  widget
+set definitions (see  TEACH * RC_GRAPHIC for examples  using the  Poplog
+widget set).
+
+Finally, in addition to these various direct interfaces to an X  server,
+Poplog can be run  'inside X', but without  actually being an X  client.
+Most X implementations include programs which act as terminal emulators.
+That is, they are X client programs which create a single window on  the
+screen which functions just as if it were an ordinary terminal. Examples
+of such programs include  'xterm', 'cmdtool', 'shelltool' and  'hpterm'.
+Such programs  allow Poplog  to be  run just  as if  it was  run  from a
+terminal. Nevertheless, some aspects of Poplog's operation, most notably
+Ved customisation,  need to  be sensitive  to the  fact that  Poplog  is
+running under X. To accommodate  this, Poplog includes support for  this
+aspect of interaction with X (see Ved and X below).
+
+
+
+2.1  Generic Support For X Interfaces
+-------------------------------------
+It will be clear from the preceding discussion, that there are a  number
+of ways a Poplog system might operate as an X client. Indeed as well  as
+the standard interface layers discussed  above, there are already  other
+defined interfaces and  toolkits (such as  Sun's 'XView' library)  which
+might  be  candidates  for  a  Poplog  interface,  and  doubtless   more
+possibilities will emerge in the future. It is important, therefore,  to
+distinguish between generic  aspects of Poplog's  X interface (that  is,
+the small  number of  facilities intended  to accommodate  any  chosen X
+interface package),  and  aspects which  are  specific to  a  particular
+chosen interface. This is particularly  relevant to discussion of  the X
+Toolkit interface, this is the primary supported interface in Poplog and
+some system hooks (eg sysxsetup, see REF * SYSTEM) assume it by default.
+But it  is just  one possible  interface, and  ultimately the  generic X
+support does not favour it over any other.
+
+Generally  speaking,  the  identifiers   associated  with  the   generic
+facilities contain a lower  case 'x' in  their name. This  distinguishes
+them from other X facilities, for example the X Toolkit identifiers have
+'Xt' or 'Xpt' as a prefix. (REF * XTOOLKIT has a section describing  the
+naming conventions used by the toolkit interface.)
+
+
+
+
+-------------------------
+3  Poplog Startup Under X
+-------------------------
+
+The first of the generic X facilities provided in Poplog is a  mechanism
+for specifying that  X is  present (and hence  that an  X interface  can
+sensibly be activated),  and for passing  parameters to that  interface,
+for example from the command line. This mechanism centres on the  system
+variable popunderx, and is described fully in REF * SYSTEM. The variable
+popunderx is  initially false,  but  if set  to  a non-false  value,  it
+indicates that  Poplog is  running  under X,  and various  system  hooks
+(described below) use this  to compile X-specific initialisation  files,
+run X-specific startup routines, and so forth. Furthermore, the value of
+popunderx  (when  non-false)  may  be  used  to  provide  initialisation
+parameters for X interface startup.
+
+popunderx can be set in one of two ways:
+
+    (1) From the  command line: Invoking Poplog  with the  %x flag  (for
+        details see REF * SYSTEM). In this case its value can be set  to
+        a list  of  string  parameters,  using  the  "(  ...  )"  syntax
+        described in REF * SYSTEM. For example the Unix shell command:
+
+          % pop11 %x \( -display mysun -font 6x10 \)
+
+        will cause Poplog to start up in pop11 with popunderx set to
+
+          ['-display' 'mysun' '-font' '6x10']
+
+        If no parenthesised arguments are specified, popunderx is set to
+        [],  indicating  the  presence  of   X,  but  with  no   initial
+        parameters. Note that all the standard Poplog startup  commands,
+        ved, prolog, clisp etc.., respect the %x flag in this way.
+
+    (2) By a user or library program: popunderx is a perfectly  ordinary
+        variable which can be  set manually to  influence X startup.  Of
+        course, the value assigned  must make sense  to the X  interface
+        package in use.  For  example the  X Toolkit  interface  expects
+        a (possibly empty) list of  strings as would have been passed on
+        the command line as above. Also the assignment must occur before
+        any X-related system hooks are run  if it is to have its  proper
+        effect. (Note: the  user's init.p  file is  compiled before  any
+        such X-related  hooks  are  encountered, so  manual  setting  of
+        popunderx in init.p will catch them all correctly).
+
+It is worth noting that it  is not possible for Poplog to  automatically
+determine that X support is required:  X clients can be run on  machines
+with no  local X  server support  at all,  communicating with  a  remote
+server over a network, and conversely a user running X might want to run
+Poplog without any X features.
+
+Also X interfaces  themselves should generally  not depend on  popunderx
+being set: if it is set then  they may use its value for  initialisation
+information, but  they  should  work if  initialised  directly  even  if
+popunderx is false.
+
+
+
+3.1  Generic X Hooks
+--------------------
+While setting popunderx is an indication that X support is required,  it
+does not  itself cause  any X-related  activity. It  merely causes  some
+standard Poplog system hooks to  run X-specific variants (thus  syssetup
+will run  sysxsetup  etc.).  This  section  describes  those  X-specific
+variants and the contexts in which they are called.
+
+
+initx.p                                                           [file]
+        If popunderx is non-false, and the %noinit flag (for details see
+        REF * SYSTEM) is not specified, then  sysinitcomp will look  for
+        the file '$popsys/initx.p'  and compile  it if  found, and  then
+        '$poplib/initx.p' and compile it if found. If the latter file is
+        not found, it will look  for 'initx.p' in the current  directory
+        and  compile  it  if  found.  This  process  takes  place  after
+        compilation of the corresponding 'init.p' files.
+
+
+xpopexit                                            [procedure variable]
+        If popunderx is non-false, this procedure is called by  sysexit,
+        just after popexit.
+
+
+
+
+-----------------------------------------------------
+4  Generic X libraries: LIB POPXLIB and INCLUDE XDEFS
+-----------------------------------------------------
+
+A single library  in the main  Pop-11 library directory  is intended  to
+provide the  initial access  point  for all  Poplog X  facilities.  This
+library is called LIB * POPXLIB (ie '$usepop/pop/lib/lib/popxlib.p') and
+will need to be compiled by almost  any user of any of the X  facilities
+discussed here.
+
+LIB * POPXLIB extends  Poplog's  various search  paths  with  additional
+directories  containing  X-specific  files.  Thus  the  X   autoloadable
+directory  is  added  to  popautolist,   the  X  library  directory   to
+popuseslist, the X  help directory  to vedhelplist etc..  Once this  has
+been done, most of the  X facilities become directly accessible.  (Note:
+many of the REF files  referred to in this  file are X-specific, and  so
+will only be found after
+
+        uses popxlib;
+
+has been run. So even if you are just browsing the X documentation,  you
+will need to have loaded this library.)
+
+LIB * POPXLIB obtains all of  the potentially site-specific  information
+it  needs   from  the   include   file  INCLUDE * XDEFS.   The   default
+INCLUDE * XDEFS file defines a set of constants giving the location of X
+facilities within Poplog, and probably will not need alteration in  most
+cases. If needed, it can be  customised to the local site  requirements;
+the  recommended  way   to  achieve   this  it   to  make   a  copy   of
+$usepop/pop/lib/include/xdefs.ph called $poplocal/local/include/xdefs.ph
+(which will then override the system one), and then edit in  appropriate
+local changes.
+
+
+XPOP -> filename                                              [constant]
+        The directory contain all the  X-specific files within the  main
+        Poplog tree. Default '$usepop/pop/x'.
+
+
+XPOPSTB -> filename_or_false                                  [constant]
+        If non-false, this is the name of the 'stb' file to be used with
+        Poplog when running  under X. By  default the X  code is  linked
+        into the standard Poplog image, and the standard stb file can be
+        used. However some sites  may wish to  have two separate  Poplog
+        executables, one without X (and  hence smaller) and one with  X.
+        This can be achieved by renaming the executable linked WITH X to
+        a new name (say 'xpop11'), and defining this constant to be  the
+        FULL-PATHNAME of the .stb file (say 'xpop11.stb') created by the
+        link process. Running LIB * POPXLIB will then set $popexlinkbase
+        to  the   correct   stb   file   for   external   loading   (see
+        REF * EXTERNAL).
+
+
+XPOPBIN -> filename                                           [constant]
+        The directory containing X-specific  binaries (the Xpw  archive,
+        etc.). Default <XPOP>/bin.
+
+
+XPOPAUTO -> filename                                          [constant]
+        The   directory   containing   X-specific   Pop-11  autoloadable
+        libraries. Default <XPOP>/pop/auto.
+
+
+XPOPLIB -> filename                                           [constant]
+        The  directory  containing  X-specific  Pop-11  non-autoloadable
+        libraries. Default <XPOP>/pop/lib.
+
+
+XPOPXLIB -> filename                                          [constant]
+        The  directory   containing   the  'Xlib'   libraries.   Default
+        <XPOPLIB>/xlib.
+
+
+XPOPINCLUDE -> filename                                       [constant]
+        The directory containing  X-specific Pop-11  include files  (but
+        NOT INCLUDE *XDEFS !). Default <XPOP>/pop/include.
+
+
+XPOPHELP -> filename                                          [constant]
+        The directory containing  X-specific Pop-11 HELP files.  Default
+        <XPOP>/pop/help.
+
+
+XPOPTEACH -> filename                                         [constant]
+        The directory containing X-specific Pop-11 TEACH files.  Default
+        <XPOP>/pop/teach.
+
+
+XPOPDOC -> filename                                           [constant]
+        The directory  containing X-specific Pop-11 DOC  files.  Default
+        <XPOP>/pop/doc.
+
+
+XPOPREF -> filename                                           [constant]
+        The directory  containing X-specific Pop-11 REF  files.  Default
+        <XPOP>/pop/ref.
+
+
+XPOPSRC -> filename                                           [constant]
+        The directory containing X  Toolkit interface source files  (not
+        available on all systems). Default <XPOP>/pop/src.
+
+
+XPOPDEMO -> filename                                          [constant]
+        The  directory  containing  X-specific  Pop-11  demos.   Default
+        <XPOP>/pop/demo.
+
+
+
+
+------------------------------------
+5  Poplog Image X Link Specification
+------------------------------------
+
+The standard Poplog image  (e.g. as created by  the * NEWPOP link  step)
+will include support for X (unless  you override it with the NEWPOP  nox
+option, for example). Linking for  X requires access to your  system's X
+Toolkit and Xlib  archive libraries.
+
+Because  the  names  and  locations   of  these  libraries  are   highly
+system-dependent, the way  in which a  Poplog image is  linked for X  is
+controlled  by  Unix   environment  variable   settings  (logical   name
+translations in VMS), containing specifications of the form
+
+        x= xtype / xversion : library-arguments
+
+(the information in these specifications  is described more fully  under
+* sys_translate_exlibs below). For example, in Unix:
+
+        setenv POP_XOL_EXLIBS \
+            "x=openlook/3000: -L$OPENWINHOME/lib -lXol -lXt -lX11"
+
+and in VMS:
+
+        define POP_XM_EXLIBS -
+            "x=motif/1001: sys$share:decw$xmlibshr/shareable"
+
+As the examples illustrate, the variable names have the form
+
+        POP_XPREFIX_EXLIBS
+
+where XPREFIX is a short prefix corresponding to the X link type. NEWPOP
+may be  given an  argument  -xprefix (i.e.  the  same in  lowercase)  to
+specify that the  X link  type should  be taken  from the  corresponding
+variable.
+
+The default  used by  NEWPOP (and  other  parts of  the system)  is  the
+variable  POP_XLINK_EXLIBS   (i.e.  -xlink):   this  may   specify   the
+information explicitly,  but  more  usually  `dereferences'  to  another
+variable, by having a translation starting with "==", e.g.
+
+        setenv POP_XLINK_EXLIBS "==POP_XOL_EXLIBS"      (Unix)
+        define POP_XLINK_EXLIBS "==POP_XM_EXLIBS"       (VMS)
+
+The Poplog login shell script files
+
+        $popcom/popenv                      (Unix)
+        popcom:popenv.com                   (VMS)
+
+(which are sourced automatically by $popcom/poplog etc) provide default
+host-specific definitions for the following variables:
+
+        POP_XM_EXLIBS                       (Motif)
+        POP_XOL_EXLIBS                      (OpenLook)
+        POP_XT_EXLIBS                       (MIT)
+        POP_XLINK_EXLIBS                    (== default)
+
+Note that while POP_XM_EXLIBS and POP_XOL_EXLIBS may be set to something
+on a particular system, this does not imply that Motif or OpenLook,  etc
+is actually available on that system. POP_XLINK_EXLIBS is always set for
+the appropriate host system default.  If required, you can override  any
+of these settings in your own local files, i.e.
+
+        $poplocal/local/com/popenv          (Unix)
+        poplocal:[local.com]popenv.com      (VMS)
+
+The information from the X link  specification is made available in  the
+run-time system by the following identifiers:
+
+
+XLINK_TYPE -> string                                          [constant]
+popxlink_motif    -> true                                     [constant]
+popxlink_openlook -> true                                     [constant]
+popxlink_mit      -> true                                     [constant]
+        These constants are defined if and only if the Poplog image  was
+        linked with the X part of the system.
+
+        XLINK_TYPE contains a string describing which X system the image
+        was linked against (i.e. relating to the value of  XLINK_EXLIBS,
+        see below). At the same time, the constant
+
+            popxlink_string
+
+        is also defined, with value true.
+
+        Standard values for XLINK_TYPE include:
+
+            'motif'
+                XLINK_EXLIBS includes the Motif widget set library.
+
+            'openlook'
+                XLINK_EXLIBS includes the OpenLook widget set library.
+
+            'mit'
+                XLINK_EXLIBS contains only  the standard  MIT X  Toolkit
+                libraries.
+
+
+XLINK_VERSION -> int                                          [constant]
+        This constant is  defined only  if the Poplog  image was  linked
+        with the X  part of  the system  (and then  only if  the X  link
+        specification supplied  it). It  represents the  version of  the
+        libraries specified in XLINK_EXLIBDIRS/XLINK_EXLIBFILES.
+
+        It usually has the form
+
+            (major-release-number * 1000) + minor-release-number
+
+        However, being  X  implementation-specific, this  is  meaningful
+        only in relation  to XLINK_TYPE;  you should  therefore NOT  use
+        XLINK_VERSION  directly,  but  instead  use  the   corresponding
+        widgetset identifier, e.g. XOL_VERSION, XM_VERSION, etc.
+
+
+XLINK_EXLIBDIRS  -> string_list                               [variable]
+XLINK_EXLIBFILES -> string_list                               [variable]
+XLINK_EXLIBS     -> string_list                               [variable]
+        These variables are only defined  in a Poplog image linked  with
+        X, and contain  lists of  strings describing the  X Toolkit  and
+        Xlib library archives against which the image was linked.  Their
+        contents are system-dependent.
+
+        XLINK_EXLIBDIRS  contains  any  preceding  Unix  '-L'  directory
+        specifications, e.g.
+
+            [ '-L/usr/openwin' ]
+
+        This is always [] in VMS.
+
+        XLINK_EXLIBFILES contains the  actually library file  arguments,
+        e.g.
+
+            [ '-lXol' '-lXt' '-lX11' ]
+
+        in Unix, or
+
+            [ 'sys$share:decw$xmlibshr/share' ]
+
+        in VMS.
+
+        XLINK_EXLIBS is an autoloadable variable which is a concatention
+        of the other two via their identifiers, i.e.
+
+            [% ident XLINK_EXLIBDIRS, ident XLINK_EXLIBFILES %]
+
+        Thus  when  used  as  an   external  library  list  to   exload,
+        XptLoadProcedures, etc,  the  identifiers  are  dereferenced  to
+        produce the composite list,  and will automatically include  any
+        additions  you   might   have   made   to   XLINK_EXLIBDIRS   or
+        XLINK_EXLIBFILES after system startup.
+
+
+XLINK_EXT_EXLIBS -> string_list                               [variable]
+        This is an autoloadable list of additional external libraries to
+        be used  (in  exload, XptLoadProcedures,  etc)  when  externally
+        loading MIT  toolkit  extensions.  Its default  value  for  Unix
+        systems is
+
+            [ '-lXmu' '-lXext' ]
+
+        and
+
+            [ 'decw$xmulibshr/share' 'decw$xextlibshr/share' ]
+
+        in VMS.
+
+
+sys_translate_exlibs(varname) -> (xtype, xversion, exlibs)   [procedure]
+        This procedure takes a Unix environment variable or VMS  logical
+        name varname  (a  string),  and  returns  its  translation  from
+        systranslate as  a list  of external  library file  strings.  In
+        addition, if the translation is  a Poplog X link  specification,
+        the type and version from that are returned as well.
+
+        First, if the  translation string  trans begins  with '==',  the
+        remainder  of  trans  is  assumed  to  be  another   environment
+        variable/logical  name,  and  the  results  are  the   recursive
+        translation of that variable with sys_translate_exlibs.
+
+        Otherwise, if  trans does  not begin  with 'x=',  the xtype  and
+        xversion results are both false, and the exlibs result is
+
+            sysparse_string(trans, false)
+
+        i.e. the list of  strings got by  splitting trans at  whitespace
+        boundaries.
+
+        X Link Specification
+        --------------------
+        However, if trans begins with 'x=', it is taken to be a Poplog X
+        link specification of the form
+
+            x= xtype / xversion : library-arguments
+
+        (where the  '/ xversion'  and ':  library-arguments' parts,  and
+        spaces between the parts, are optional).
+
+        xtype
+            This  field  is  a  single  keyword  used  to  identify  the
+            particular X  implementation  against which  the  image  was
+            linked, and is returned as the xtype result (a string).
+
+            (When used by  the Poplog linker,  this information is  made
+            available in the running  image as the  string value of  the
+            constant   XLINK_TYPE.    In    addition,    the    constant
+            popxlink_xtype is also defined, with value true.)
+
+        xversion
+            This field gives the version number of the X implementation,
+            usually defined as:
+
+              (major-release-number * 1000) + minor-release-number
+
+            This information can be omitted; if present, it is  returned
+            as the xversion result (an integer), otherwise false.
+
+            (When used by the Poplog linker, this information if present
+            is made available in the running  image as the value of  the
+            constant XLINK_VERSION.)
+
+        library-arguments
+            This field is some arbitrary sequence of arguments, returned
+            in the exlibs result as
+
+              sysparse_string(library-arguments, false)
+
+            i.e. the list of strings  got by splitting it at  whitespace
+            boundaries.
+
+            (When used by the Poplog linker, this information is  passed
+            to  the   operating-system   linker,  and   identifies   the
+            particular X libraries to use. The information is also  made
+            available in the running image as the value of the variables
+            XLINK_EXLIBDIRS and XLINK_EXLIBFILES -- see above.)
+
+        Examples
+        --------
+        See the introduction to this section above for a description  of
+        the naming  conventions for  X link  environment variables,  and
+        other example settings.
+
+        The most basic X configuration would be:
+
+              x= mit : -lXt -lX11                         (Unix)
+              x= mit : sys$share:decw$xtshr/shareable     (VMS)
+
+        The xtype  and xversion  fields can  have any  values;  however,
+        there   are   three   xtypes   for   which   the   corresponding
+        popxlink_xtype  identifier  is  tested   for  in  the   Poplog X
+        libraries:
+
+            motif
+                implies use of the Motif Widget Set and Toolkit
+
+            openlook
+                implies use of Sun's OLIT
+
+            mit
+                implies use of a standard MIT distribution
+
+        The :library-arguments part is optional: In Unix, omitting  this
+        is only meaningful if  all the relevant X  libraries are in  the
+        standard directories  (/lib, /usr/lib,  and /usr/local/lib),  or
+        the LD_LIBRARY_PATH environment  variable is set  appropriately.
+        It is  usually more  reliable to  supply specific  -L  directory
+        qualifiers, e.g. to use Version 2.5 of OLIT without  necessarily
+        running in the OpenWindows environment:
+
+              x= openlook/2005: -L/usr/openwin/lib -lXol -lXt -lX11
+
+        In VMS, you should  always supply :library-arguments giving  the
+        relevant DECwindows shareable image(s).
+
+
+
+---------------------------
+6  Poplog And The X Toolkit
+---------------------------
+
+It is expected  that most  Poplog applications  will make  use of  the X
+Toolkit to implement X  based user interfaces.  For this reason,  Poplog
+provides  an  extensive  application  programmer's  interface  to  the X
+Toolkit. The entry point into reference documentation for this interface
+is REF * XTOOLKIT. Tutorial introductions to some of the facilities  can
+be found in TEACH * XTOOLKIT, TEACH * Xpw, TEACH * RC_GRAPHIC (which use
+the Poplog widget  set, available  on all  systems), TEACH * MOTIF  (for
+those with access to  the Motif widget  set), and TEACH * OPENLOOK  (for
+those with  access  to  the  OLIT  widget  set,  available  under  Sun's
+OpenWindows system).
+
+No explicit  support  for widget  class  programming is  available  yet,
+although all of the low-level primitives required are present in  Poplog
+V14.
+
+
+
+------------------------
+7  Widget Set Interfaces
+------------------------
+
+Predefined C  widget classes  can be  externally loaded  like any  other
+external data. However, Poplog provides  direct support for the  Poplog,
+Motif, OLIT  and Athena  widget sets  -- see  Widget Set  Interfaces  in
+REF * XT_LIBS for more details, as well as
+
+     # HELP * Xpw
+     # HELP * OpenLook,
+     # REF * OpenLook
+     # HELP * Motif,
+     # REF * Motif
+     # REF * Athena.
+
+
+
+7.1  The Poplog Widget Set: Xpw
+-------------------------------
+The Poplog widget  set is a  small collection of  simple widget  classes
+provided with  Poplog  (although  written in  C).  It  includes  general
+purposes graphics and  text handling  widgets, aimed  to support  simple
+graphics and bitmap operations, and multi-window Ved.
+
+The Poplog widget set is available on all X-supported platforms, and  is
+self-contained (aside from the standard toolkit facilities),  allowing a
+range of  applications  to be  constructed  (see TEACH * RC_GRAPHIC  for
+examples of use).
+
+The Xpw documentation  presupposes knowledge  of the  general X  toolkit
+interface, and the  entry point is  HELP * Xpw. A tutorial  introduction
+can be found in TEACH * Xpw.
+
+
+
+------------------
+8  Poplog And Xlib
+------------------
+
+LIB * XLIB  (see  HELP * XLIB)  provides  access  to  a  collection   of
+libraries which externally load the  Xlib interface layer to X  Windows.
+This  provides  a  full   interface  to  Xlib,   defined  in  terms   of
+LIB * NEWEXTERNAL  (see  HELP * NEWEXTERNAL).  This  interface  is   not
+integrated into Poplog to the same  extent as the Toolkit interface  ---
+for example  the data  structure  management is  purely as  provided  by
+LIB * NEWEXTERNAL and event handling must be catered for explicitly.
+
+Nevertheless there is  a degree of  interchangeability between the  two.
+The external-class data structures of either will be acceptable for  the
+other, IF type  checks are bypassed.  Thus it is  quite feasible to  use
+this Xlib  interface  with  care to  augment  Toolkit  functionality  if
+desired.
+
+It is anticipated that the Xlib  and Xt interfaces will be more  closely
+integrated in future releases of Poplog.
+
+
+
+
+------------
+9  Ved And X
+------------
+
+9.1  XVed
+---------
+From Version 14.1, Poplog includes a multi window X based version of the
+Ved editor called XVed. See TEACH * XVED for details.
+
+
+
+9.2  Terminal Ved
+-----------------
+Use of  terminal Ved  under X  operates largely  independently of  other
+notions of  running  Poplog as  an  X client.  That  is, if  X  terminal
+emulators are available (as they are in most X implementations),  Poplog
+can be run within X just as it would be on a terminal, and this is quite
+independent of whether  such a Poplog  instance is itself  an X  client.
+Nevertheless, Ved needs to  be customised to  operate in this  scenario,
+and such customisation  is X-dependent  in the sense  that the  terminal
+emulator in use will generally be part of the X system.
+
+A Ved customisation for  the most common of  such X terminal  emulators,
+'xterm' is  currently  available.  (Customisations  for  other  terminal
+emulators will be provided  in the near  future.) This customisation  is
+contained in LIB * VEDXTERM and documented in HELP * VEDXTERM.
+
+An additional library for use with LIB * VEDXTERM which allows the mouse
+buttons to act  like function  keys is  provided by  LIB * VEDXGOTOMOUSE
+(See SHOWLIB * VEDXGOTOMOUSE).
+
+Notes:
+
+(1) To take full advantage of these terminal emulators, in particular of
+    the function keys available on the range of possible keyboards, some
+    site-specific customisation of the X system is desirable. These  are
+    discussed in HELP * VEDXTERM.
+
+(2) xterm is  unfortunately not  available under  all X  systems. It  is
+    present in the MIT distribution, and exists in the 'demo'  directory
+    of the OpenWindows 2.0 (SunOS 4.1.1) system. Users of other terminal
+    emulators may find suitable 'generic' Ved customisations work (VT100
+    emulations   are   common,   for   example   -   see   HELP * VT100,
+    HELP * VEDVT100).
+
+
+
+-----------------
+10  Miscellaneous
+-----------------
+
+10.1  Poplog And CLX
+--------------------
+CLX  (see  HELP * CLX   from  within  Common   Lisp)  is   essentially a
+stand-alone Common-Lisp interface to X Windows, with probably no overlap
+with the  other X  facilities  described here.  It establishes  its  own
+connection to the server, has its own data structures and procedures and
+is completely  Lisp  oriented. It  is  available to  Poplog  users  as a
+package in the 'contrib' area (see HELP * CONTRIB)
+
+
+
+10.2  Prolog And X
+------------------
+Poplog V14 does not provide any explicit support for a Prolog  interface
+to X  Windows.  However a  prototype  of  a package  offering  a  Prolog
+interface to the Poplog Widget Set can be found in the contrib area, see
+'$popcontrib/x/prolog/xpw/README' for more information.
+
+
+
+10.3  Legal Liability
+---------------------
+The Poplog X interfaces are just  that - interfaces to code produced  by
+third parties.  Some  of this  code  is public  domain,  some of  it  is
+proprietary. Almost all  of it  is covered by  copyrights, warranty  and
+liability limitations  and  sometimes restrictions  on  use. It  is  the
+user's responsibility  to ensure  that  their use  of such  software  in
+conjunction with Poplog does not violate any of these restrictions.  The
+University of  Sussex,  Integral  Solutions Ltd.,  and  their  appointed
+agents offer no  warranty and accept  no liability for  the use of  such
+third party  code.  The provision  of  interface support  within  Poplog
+should not  be taken  as an  indication that  the relevant  third  party
+software is present, supported or legally available for use.
+
+Much of the  documentation on  the Poplog/X  interface is  based on  the
+following documentation:
+
+                     Xlib - C Language X Interface,
+                       MIT X Consortium Standard,
+                         X Version 11, Release 4
+
+        Copyright (C) 1985, 1986, 1987, 1988, 1989 Massachusetts
+        Institute of Technology,  Cambridge, Massachusetts,  and
+        Digital Equipment Corporation, Maynard, Massachusetts.
+
+               X Toolkit Intrinsics - C Language Interface
+                             X Window System
+                         X Version 11, Release 4
+
+        Copyright (C)  1985,  1986,  1987,  1988,  Massachusetts
+        Institute of Technology,  Cambridge, Massachusetts,  and
+        Digital Equipment Corporation, Maynard, Massachusetts.
+
+We have used this material under the terms of its copyright which grants
+free use under the following conditions:
+
+        "Permission to  use, copy,  modify and  distribute  this
+        documentation [ie. those volumes  listed above] for  any
+        purpose and without fee is hereby granted, provided that
+        the above  copyright notice  appears in  all copies  and
+        that both  the  copyright  notice  and  this  permission
+        notice appear in supporting documentation, and that  the
+        name of M.I.T. or Digital not be used in advertising  or
+        publicity pertaining  to  distribution of  the  software
+        without specific, written, prior permission. M.I.T.  and
+        Digital makes no  representations about the  suitability
+        of the software described herin  for any purpose. It  is
+        provided "as is" without express of implied warranty."
+
+
+
+------------
+11  See Also
+------------
+
+DOC * XBIBLIOGRAPHY
+    A comprehensive list of X publications
+HELP * X
+    General pointers for the Poplog/X interface
+
+
+
+
+--- C.all/ref/x
+--- Copyright University of Sussex 1993. All rights reserved.

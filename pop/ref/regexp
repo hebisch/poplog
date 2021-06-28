@@ -1,0 +1,569 @@
+REF REGEXP                                     Jonathan Meyer Sept 1992
+
+       COPYRIGHT University of Sussex 1993. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<                              >>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<      REGULAR EXPRESSIONS     >>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<                              >>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+This file describes the Poplog  regular expression matcher. The  regular
+expression matcher is used in Ved and other Poplog facilities to perform
+pattern-based (or `wildcard') searching in strings.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+
+  2   Poplog Regular Expressions
+      2.1   The Escape Character
+      2.2   Word Boundaries
+      2.3   Ved Search Patterns
+      2.4   Literal mode
+      2.5   Long regular expressions
+
+  3   Constructing Regular Expressions
+      3.1   Single Character Matching
+      3.2   Multi Character Matching
+      3.3   Concatenation
+      3.4   Sub-expressions
+      3.5   Operators
+      3.6   Ved Compatibility patterns
+      3.7   Long Regular Expressions
+      3.8   The Case Mode
+
+  4   Compiling Regular Expressions
+
+  5   Bracketed Sub-expressions
+
+  6   Miscellaneous
+
+
+
+---------------
+1  Introduction
+---------------
+
+Regular expressions  are  a  powerful and  flexible  way  of  performing
+pattern matching  in strings,  popularised by  UNIX facilities  such  as
+grep, awk, vi, ed, sed, etc.
+
+The Poplog regular expression matcher lets you to search Poplog  strings
+and words using regular  expressions. You have  the option of  searching
+from left-to-right  or  from right-to-left,  and  of case  sensitive  or
+insensitive searching.
+
+See REF * VEDSEARCH for  details of  how to use  regular expressions  in
+Ved.  TEACH * REGEXP  gives  an  introduction  to  constructing  regular
+expressions.
+
+
+
+
+-----------------------------
+2  Poplog Regular Expressions
+-----------------------------
+
+The main  differences  between  Poplog  regular  expressions  and  those
+provided by the `C' library described in UNIX * REGEXP are:
+
+
+
+2.1  The Escape Character
+-------------------------
+
+Because the backslash character `\' already has a meaning to the  Poplog
+itemiser in strings, the Poplog regular expression compiler uses the `@'
+(at) character as its escape code  instead of the `\' character used  by
+the `C' regular expression matcher. This means that, in Poplog,  instead
+of writing:
+
+    \(hello\)
+
+you write:
+
+    @(hello@)
+
+
+
+2.2  Word Boundaries
+--------------------
+The @< and @> operators can  be matched using * vedchartype rather  than
+the more simplified approach used in the `C' regular expression matcher.
+Using * vedchartype means that  word boundaries are language  sensitive,
+and obey the rules of the Pop-11 itemiser.
+
+
+
+2.3  Ved Search Patterns
+------------------------
+As well as  the regular  expression patterns  described in  UNIX * grep,
+regexp_compile recognises the additional search patterns @a, @z, and @?.
+These are provided for compatibility with exisiting search facilities in
+Ved.
+
+
+
+2.4  Literal mode
+-----------------
+Unlike UNIX regular expressions, in Poplog the characters $ ^ . * [  and
+] stand for themselves, and  are not special wildcard characters  UNLESS
+they are preceded by an escape (eg. @. or @*). Thus, in Poplog,  instead
+of writing
+
+    .*[abc]
+
+you write:
+
+    @.@*@[abc@]
+
+
+2.5  Long regular expressions
+-----------------------------
+The regular expression matcher can handle regular expressions which span
+more than one line of text. See Long Regular Expressions below.
+
+
+
+
+-----------------------------------
+3  Constructing Regular Expressions
+-----------------------------------
+
+This  section  describes  the   rules  used  for  constructing   regular
+expressions.
+
+
+
+3.1  Single Character Matching
+------------------------------
+The following one-character regular expressions match a single character:
+
+   c    An ordinary character is a one-character regular expression that
+        matches that character.
+
+   @.   An escaped `.'  (period) is a  one-character regular  expression
+        that matches any character except NEWLINE.
+
+   @[string@]
+        A non-empty  string of  characters  enclosed in  escaped  square
+        brackets is a one-character regular expression that matches  any
+        one character in that string.
+
+        If, however,  the first  character of  the string  is a  `^'  (a
+        circumflex  or  caret),  the  one-character  regular  expression
+        matches  any  character   except  NEWLINE   and  the   remaining
+        characters in the string. The `^' has this special meaning  only
+        if it occurs first in the string.
+
+        The `-' (minus) may be used  to indicate a range of  consecutive
+        ASCII  characters;   for  example,   [0-9]  is   equivalent   to
+        [0123456789]. The `-'  loses this special  meaning if it  occurs
+        first (after an initial `^', if any) or last in the string.
+
+
+
+3.2  Multi Character Matching
+-----------------------------
+The asterisk is used for multiple character matching:
+
+   @*   Any one-character regular expression followed by escaped `*' (an
+        asterisk) is  a regular  expression that  matches zero  or  more
+        occurrences of the one-character regular expression.
+
+        If there is any choice, the longest leftmost string that permits
+        a match is chosen.
+
+
+
+3.3  Concatenation
+------------------
+Single and multi character regular expressions can be concatenated  with
+other regular expressions to form  compound expressions which match  the
+concatenation of the strings  matched by each  component of the  regular
+expression. Thus you can build complex regular expressions by  combining
+one or more single and multi character regular expressions.
+
+
+
+3.4  Sub-expressions
+--------------------
+Regular expressions can  contain up to  nine sub-expressions,  specified
+using the @( @) brackets:
+
+   @( and @)
+        A regular expression enclosed between the character sequences @(
+        and  @)  matches  whatever  the  unadorned  regular   expression
+        matches. See @n below.
+
+You  can refer back to a sub-expression using the @n expression:
+
+   @N   The expression @N  (where N  is a  digit 1-9)  matches the  same
+        string of characters  as was matched  by an expression  enclosed
+        between @( and @) earlier in the same regular expression.
+
+        The sub-expression  specified is  that  beginning with  the  nth
+        occurrence of @( counting from the left.
+
+        For example, the expression ^@(.*@)@1$ matches a line consisting
+        of two repeated appearances of the same string.
+
+
+
+3.5  Operators
+--------------
+The following special operators can be used in regular expressions:
+
+   @<   The  sequence  @<  in   a  regular  expression  constrains   the
+        one-character regular expression  immediately following it  only
+        to match something at the beginning of a "word"; that is, either
+        at the beginning of a line,  or just before a letter, digit,  or
+        underscore (_) and after a character  not one of these (but  see
+        the description of the FLAGS argument to regexp_compile).
+
+   @>   The  sequence  @>  in   a  regular  expression  constrains   the
+        one-character regular expression  immediately following it  only
+        to match something at  the end of a  "word"; that is, either  at
+        the end of a line, or just before a character which is neither a
+        letter, digit, nor  underscore (_) (but  see the description  of
+        the FLAGS argument to regexp_compile).
+
+   @{m@}
+   @{m,@}
+   @{m,n@}
+        A regular  expression  followed  by @{m@},  @{m,@},  or  @{m,n@}
+        matches a range  of occurrences of  the regular expression.  The
+        values of m and n must  be non-negative integers less than  256.
+
+            @{m@}   matches exactly m  occurrences;
+            @{m,@}  matches at  least m occurrences;
+            @{m,n@} matches any number of occurrences between m and  n
+                    inclusive.
+
+        Whenever a choice exists, the regular expression matches as many
+        occurrences as possible.
+
+   @^   An escaped circumflex or caret (^) at the beginning of an entire
+        regular expression constrains that  regular expression to  match
+        an initial segment of a line.
+
+   @$   An escaped currency symbol ($) at  the end of an entire  regular
+        expression constrains that regular  expression to match a  final
+        segment of a line.
+
+Note that the construction
+
+    @^entire regular expression@$
+
+constrains the entire regular expression to match the entire line.
+
+
+
+3.6  Ved Compatibility patterns
+-------------------------------
+The following patterns can be  specified in regular expressions for  Ved
+compatibility:
+
+   @a   The same as @^ at the start an expression.
+
+   @z   The same as @$ at the end of an expression.
+
+   @?   The same as @. in an expression, ie. it matches any character.
+
+   @@   This matches the single character "@".
+
+   @C   Where C is one of `/', `\', `"', or ``' matches C.
+
+
+
+3.7  Long Regular Expressions
+-----------------------------
+Regular expressions are, by convention, used to perform pattern matching
+against single lines in  a text file -  a single regular expression  can
+match at most all of the characters of one line in a file.
+
+It is useful to be able to  search for patterns which span line  breaks.
+For example, you might wish to  search for text which started with  'if'
+on one line and 'endif' on the next line.
+
+The Poplog regular expression matcher provides support for multiple line
+(`long')  regular  expressions.  These   work  by  deviding  a   regular
+expression for  matching  several  lines into  several  smaller  regular
+expressions each matching a  single line. Line  breaks are indicated  in
+the regular expression by writing `@$' (or `@z', ie. constrain to end of
+line) followed immediately by `@^' (or  `@z', ie. constrain to start  of
+line). For example:
+
+    dog@$@^cat
+
+Matches text which contains 'dog', followed by a line break, followed by
+'cat'. The long-string expression matcher does not allow sub-expressions
+to span over line breaks. Thus the following expression is illegal:
+
+    '@(some text @z@a and some more text@)'
+
+Instead you must write:
+
+    '@(some text @)@z@a@( and some more text@)'
+
+
+
+3.8  The Case Mode
+------------------
+You can turn  on and off  case sensitivity  in the middle  of a  regular
+expression using @i and @c.
+
+    @i  makes the matcher ignore the case of the characters that follow.
+
+    @c  turns on case sensitivity, making the matcher examine case.
+
+
+
+
+--------------------------------
+4  Compiling Regular Expressions
+--------------------------------
+
+regexp_compile(regexp_string) -> (error_info, regexp_p)      [procedure]
+regexp_compile(regexp_string, flags, delim_char)
+                              -> (error_info, regexp_p)
+        Takes a regular expression regexp_string (a string or word)  and
+        compiles ito  into  an  efficient  internal  representation  for
+        performing regular expression string comparisons.
+
+        The optional flags argument  is an integer  whose bits have  the
+        following meanings:
+
+            Bit     Meaning
+            ---     -------
+             1      If set,  the resulting  regexp_p  will not  be  case
+                    sensitive.  If   clear,   then  the   matcher   will
+                    distinguish between upper and lower case  characters
+                    See REF * isuppercode, * islowercode.
+
+             2      If set, the regular expression will only match  non-
+                    embedded items, otherwise it will match embedded  or
+                    non-embedded items. This implicitly inserts a @< and
+                    @> at the start  and end of  the expression, and  is
+                    used for " and ` searches in Ved.
+
+             3      If set, the pattern $ (or @z) followed by ^ (or  @a)
+                    will be  treated  as  a line  break,  and  a  `long'
+                    regular expression matcher  will be  built. See  the
+                    section on 'Long Expressions' below.
+
+             4      If set, word  boundaries are  identified in  strings
+                    passed  to  the  regexp_p  using  the  * VEDCHARTYPE
+                    mechanism, otherwise  they are  identified with  the
+                    simpler algorithm used by the `C' regular expression
+                    matcher (where words are  formed from letter  codes,
+                    number codes, or the underscore (_) character).
+                    See        REF * isalphacode,        * isnumbercode,
+                    REF * pop_character_set.
+
+             5      If set, occurrences of a tab character (`\t`,  ASCII
+                    9) in strings passed to the regexp_p are expected to
+                    be followed by  a number of  padding tab  characters
+                    determined by vedindentstep.  This flag is  provided
+                    to allow Ved buffer strings containing hard tabs  to
+                    be      searched.      See      REF * veddecodetabs,
+                    REF * vedencodetabs, HELP * vednotabs.
+
+        If the flags argument is omitted, all bits default to 0.
+
+        The optional delim_char  is an ASCII  character code that  marks
+        the end  of the  regular  expression. regexp_compile  will  stop
+        parsing regexp_string once  it reaches  a delim_char  character.
+        For example, in an editor like Ved this character would  usually
+        be `/`. If delim_char is false, or if the delim_char argument is
+        omitted, the whole of the regexp_string is used.
+
+        If  regexp_string  can  be  successfully  parsed  and  compiled,
+        error_info will be false and regexp_p will be a procedure of the
+        form:
+
+            regexp_p(n, string, len, back) -> (start_index, num_chars)
+
+        The integer n specifies  where to start  searching in string  (a
+        string or word), and len specifies how many characters should be
+        examined. If len  is false,  the rest of  the string  from n  is
+        used.
+
+        If back  is false,  searching  is done  from  left to  right  in
+        string. If it is true, searching is done from right to left (ie.
+        backwards) starting at the  position n + len  -1 (or the end  of
+        the string if  len is false).  If it  is an integer,  it is  the
+        subscript in the string where backward searching starts.
+
+        On completion,  start_index  and  num_chars  indicate  where  in
+        string the regular expression matches.  If there is no match  in
+        string, both start_index and num_chars will be false.  Otherwise
+        the matching portion of the string can be obtained using:
+
+            substring(start_index, num_chars, string)
+
+        For example,
+
+            vars err, searchp;
+
+            ;;; the regular expression is 'd@.@*s' - which matches a 'd'
+            ;;; followed by any number of characters followed by 's'
+
+            regexp_compile('d@.@*s') -> (err, searchp);
+
+            searchp =>
+            ** <procedure d@.@*s>
+
+            searchp(1, 'this string wont match', false, false) =>
+            ** false false ;;; no match can be found
+
+            searchp(1, 'this string does match', false, false) =>
+            ** 13 4
+
+            ;;; there was a match - use * substring to identify it:
+            substring(13, 4, 'this string does match') =>
+            ** does
+
+        Note that  the  * pdprops of  regexp_p  is set  to  the  regular
+        expression string that it matches.
+
+        If regexp_string cannot be successfully parsed and compiled into
+        a regular expression, error_info will be a string containing  an
+        error message, and regexp_p will be a procedure which mishaps if
+        called (regexp_p  will always  be a  procedure so  that you  can
+        reliably   assign   it   identifiers   whose   * identtype    is
+        "procedure"). For example:
+
+            regexp_compile('@[a-z') -> (err, searchp);
+            err =>
+            ** '[] imbalance'
+
+            regexp_compile('@[a-z@]') -> (err, searchp);
+            err =>
+            ** <false>
+
+        A common usage of regexp_compile is therefore:
+
+            if (regexp_compile(string) -> searchp ->> err) then
+                mishap(string, 1, err);
+            endif;
+
+        Long Expressions
+        ----------------
+        You set bit 5 of the flags argument to regexp_compile to  enable
+        compilation of long regular expressions. The resulting  regexp_p
+        procedure is of the form:
+
+            regexp_p(n, string_1, string_2, ..., string_m, len, back)
+                    -> (start_index, num_chars)
+
+        Where  the   integer  m   is  determined   by  adding   one   to
+        regexp_break_count, n  is an  index in  string_1 where  matching
+        starts, and len is  the number of  characters of string_m  which
+        are included in  the search. If  m is one  (ie. the search  only
+        spans one line), then len characters starting from n in string_1
+        are used. len may be false, in which case as many characters  as
+        possible from  string_m are  used. All  characters from  strings
+        string_2 to string_m-1 are used. back is as before.
+
+        If a  match is  found, start_index  is the  index into  string_1
+        where  the  match  starts,  and  num_chars  is  the  number   of
+        characters in string_m that are included in the match. Otherwise
+        start_index and num_chars are both false.
+
+        If m is 1, the matching portion of text is retrieved using:
+
+            substring(start_index, string_1, num_chars)
+
+        Otherwise, it is:
+
+            allbutfirst(start_index - 1, string_1)
+            <> string_2 <> ... <> substring(1, num_chars, string_m)
+
+
+
+
+----------------------------
+5  Bracketed Sub-expressions
+----------------------------
+
+Regular expressions can have  up to 9 sub-expessions  enclosed in @(  @)
+brackets. You can find out how many sub-expessions a regular  expression
+has, and also where those sub-expessions matched in the last search.
+
+regexp_subexp_count(regexp_p) -> n                           [procedure]
+        Returns the number  of bracketed @(  @) sub-expessions found  in
+        the regular  expression  that  was  compiled  into  regexp_p  by
+        regexp_compile.  n  will  be  0   if  there  are  no   bracketed
+        expressions. The current implementation allows up to 9 of  these
+        bracketed expressions.
+
+
+regexp_subexp(n, regexp_p) -> (start_index, len, string)     [procedure]
+        After regexp_p has  been successfully applied  to a string  (ie.
+        the string can  be matched against  the regular expression),  an
+        internal table is set to the  locations in the string where  any
+        bracketed  @(  @)  sub-expessions  in  the  regular   expression
+        matched.  You   can  access   elements  of   this  table   using
+        regexp_subexp. It  returns the  start index  and length  of  the
+        substring enclosed by the  n'th @( @)  pattern. It also  returns
+        the string which the sub-expression was matched against.
+
+        For example:
+
+            ;;; compile a regular expression
+            vars procedure searchp;
+
+            regexp_compile('h@(....@) world') -> (,searchp);
+
+            searchp =>
+            ** <procedure h@(....@) world>
+
+            ;;; apply searchp to the string 'hello world':
+
+            searchp(1, 'hello world', false, false) =>
+            ** 1 11 ;;; ie. the whole string matches
+
+            ;;; find out where the first bracketed expression matched:
+            regexp_subexp(1, searchp) =>
+            ** 2 4 hello world
+
+            substring(regexp_subexp(1, searchp)) =>
+            ** ello
+
+
+
+
+----------------
+6  Miscellaneous
+----------------
+
+isregexp(item) -> bool                                       [procedure]
+        true if item is a regular expression matching procedure compiled
+        by regexp_compile.
+
+
+regexp_delimeter(regexp_p) -> n                              [procedure]
+        Returns the index of the location of the delimeter character  in
+        the string  regexp_string  passed to  regexp_compile  to  create
+        regexp_p, or false  in no  delimeter character  appeared in  the
+        string.
+
+
+regexp_break_count(regexp_p) -> n                            [procedure]
+        Returns the number  of line  breaks that appear  in the  regular
+        expression encoded by regexp_p.  For any expression which  spans
+        only a single line, this will  be 0. For an expression  spanning
+        two lines, this will be 1, etc.
+
+
+regexp_anchored(regexp_p) -> bool                            [procedure]
+        true if the regexp_p expression includes an @a, @z, @^ or @$  to
+        anchor the expression to the start or end of a line.
+
+
+
+
+--- C.all/ref/regexp
+--- Copyright University of Sussex 1993. All rights reserved.

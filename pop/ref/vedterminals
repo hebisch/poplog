@@ -1,0 +1,1086 @@
+REF VEDTERMINALS                               Rob Duncan, December 1989
+                                            Updated John Gibson Jan 1997
+
+       COPYRIGHT University of Sussex 1997. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<      VED TERMINAL TYPES     >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+This file describes how Ved determines which terminal it is running  on,
+how it configures itself  to make use of  that terminal, and  summarises
+which terminal types are known.
+    More information about using and writing terminal libraries is given
+in HELP * TERMINAL. Procedures which provide a higher-level interface to
+the terminal screen are described in REF * VEDPROCS. Pointers to general
+Ved documentation are in REF * VED. Logical names for Ved key  sequences
+are in HELP * LOGICAL_KEYS.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Terminal Recognition and Initialisation
+
+  2   Terminal Descriptions
+
+  3   Terminal-Dependent Standard Screen Procedures
+
+  4   Mappings from Keyboard to Ved Functions
+
+  5   Known Terminal Types
+
+  6   LIB MKVEDIMAGE
+
+
+
+
+------------------------------------------
+1  Terminal Recognition and Initialisation
+------------------------------------------
+
+vedinitterm()                                       [procedure variable]
+        Called by * vedsetup to determine the terminal type on which Ved
+        is running and  to initialise Ved  to use it  (Ved will not  run
+        until this procedure has terminated successfully). The procedure
+        is called by  vedsetup immediately after  any 'vedinit.p'  files
+        have been compiled.
+
+        The  XVed  version  of  vedinitterm  just  calls  * vedxvedinit,
+        followed  by  veduseterm('xved').  See  REF * XVED  for  further
+        details.
+
+        For other versions  of Ved,  if a terminal  library has  already
+        been loaded, vedinitterm will merely check that all the features
+        which Ved needs have actually been defined. In the case where no
+        terminal library is loaded explicitly, vedinitterm will  attempt
+        to  determine  the  terminal  type  automatically,  trying   the
+        following strategies in order:
+
+            (1) the variable * vedterminalselect is consulted first,  to
+                invoke any user-defined terminal recognition procedure;
+
+            (2) if this fails,  and Poplog is  running under UNIX,  then
+                the value of the environment variable $TERM is taken  as
+                the name of terminal  and the procedure * veduseterm  is
+                called  with  this  name  as  argument  to  perform  the
+                necessary initialisation;
+
+            (3) if this  also fails,  the user  is prompted  to  enter a
+                terminal name interactively and veduseterm is called  to
+                initialise from the given name.
+
+        At each stage, the variable vedterminalname is used as a flag to
+        indicate whether or  not a terminal  type has been  successfully
+        selected, so you should never assign to this variable unless you
+        know what you're doing.
+
+        There is a minimum degree of functionality which a terminal must
+        provide in order  for Ved  to work at  all (see  the section  on
+        ``Terminal Descriptions'' below). If the terminal type  selected
+        doesn't conform to  this, then vedinitterm  will repeatedly  try
+        step (3) above until a usable type is found; the opportunity  to
+        abort Ved is offered as an alternative at this stage.
+
+        Users may redefine vedinitterm for themselves (in a  "vedinit.p"
+        file for example) to impose some alternative terminal  selection
+        method. The  standard  method  offers  considerable  flexibility
+        however, and a  complete redefinition of  vedinitterm should  be
+        considered as very much  a last resort. If  you do redefine  it,
+        you must still  initialise for a  particular terminal type  with
+        veduseterm.
+
+
+vedterminalselect -> list_or_false                            [variable]
+list_or_false -> vedterminalselect
+        Used by  vedinitterm  for automatic  terminal  recognition:  the
+        strategy is  to  an  elicit  an  answer-back  message  from  the
+        terminal and use that to identify the terminal type.
+
+        The value of vedterminalselect is normally a list. Each entry in
+        the list has one of three forms, interpreted as follows:
+
+            a string
+                assumed to  be  an  escape  sequence  for  eliciting  an
+                answer-back message  from the  terminal. The  string  is
+                assigned to  the  variable vvedscreensendidseq  and  the
+                answer-back obtained by calling vedtermidseq;
+
+            a procedure
+                assumed to  be a  method  for obtaining  an  answer-back
+                message. The procedure is called, and the result  (which
+                must be a  string or  <false>) is taken  as the  current
+                answer-back;
+
+            a list of two elements
+                having the form:
+
+                    [<string> <terminal-type>]
+
+                The <string> is compared against the current answer-back
+                message using
+
+                    isstartstring(<string>, <answer-back>)
+
+                If this succeeds, then the corresponding <terminal-type>
+                is assumed. If the answer-back hasn't yet been set,  the
+                procedure vedtermidseq is called first to obtain it.
+
+        The <terminal-type> may itself be either of two things:
+
+            a string
+                assumed to be a terminal name. The procedure  veduseterm
+                is called with the name as argument;
+
+            a procedure or procedure variable name
+                assumed  to   be  an   initialisation  procedure   for a
+                particular  terminal  type.  The  procedure  is   simply
+                called; if  it  expects  an  argument,  the  answer-back
+                message is provided.
+
+        On Unix systems vedterminalselect  is normally empty, since  the
+        value of  the  TERM environment  variable  is taken  as  a  more
+        reliable indicator of the terminal type. On VMS systems it has a
+        value something like:
+
+            [
+                '\^[Z'
+                    ['\^[[?63'  vedvt220]
+                    ['\^[[?62'  vedvt220]
+                    ['\^[[?'    vedvt100]
+                    ['/K'       vedvt52select]
+            ]
+
+        This causes  vedinitterm to  prompt for  an answer-back  message
+        using the sequence  <ESC> Z, and  then use the  reply to  choose
+        between vt220, vt100  and vt52-type terminals.  If the  terminal
+        doesn't respond to <ESC>  Z or sends  an unrecognised reply,  no
+        terminal type is selected.
+
+        If the value of vedterminalselect is anything other than a list,
+        it   is   simply   ignored.   Most   terminal   libraries    set
+        vedterminalselect to <false> to suppress the automatic  terminal
+        selection.
+
+
+vedset                                                          [syntax]
+        This syntax word can be used to tailor Ved terminals to  specify
+        screen handling  and mappings  from  keyboard sequences  to  Ved
+        procedures. There are three formats, the first of which provides
+        a more readable alternative to using * vedsetkey.
+
+            vedset keys      <commands>    endvedset
+            vedset screen    <commands>    endvedset
+            vedset chars     <commands>    endvedset
+
+        For full details see HELP * VEDSET, * TERMINAL
+
+
+vedtermidseq() -> string                                     [procedure]
+        Reads an answer-back message from the terminal. The terminal  is
+        prompted with the control sequence vvedscreensendidseq  (default
+        value:  '\^[Z')  and   the  reply  read   using  the   procedure
+        vedinescapeseq.  Returns  <false>  if   no  sensible  reply   is
+        forthcoming.
+
+
+vedinescapeseq() -> string                                   [procedure]
+        Reads an escape sequence from  the terminal. Returns <false>  if
+        the  input  is  unrecognisable  or  doesn't  complete   within 3
+        seconds.
+
+
+veduseterm(term) -> bool                                     [procedure]
+        Initialises Ved to work on the terminal type term. term may be a
+        word or a string, e.g,  "vt100", 'sun-cmd' etc. The result  is a
+        flag indicating whether  the initialisation  was successful:  it
+        will be <false> if the terminal  type is unknown, or is in  some
+        way unsuitable  for  Ved. Ved  will  not function  correctly  on
+        terminals for which this procedure returns <false>.
+
+        Initialisation is performed in two stages: screen initialisation
+        followed  by  keyboard  initialisation.  Screen   initialisation
+        configures Ved's screen-control variables for driving the  named
+        terminal screen; this  must complete successfully  if Ved is  to
+        function correctly. Keyboard initialisation extends Ved's keymap
+        tables  to  recognise  any  function  keys  which  the  terminal
+        keyboard may provide: this step is optional.
+
+        Screen initialisation is normally performed by calling a library
+        procedure whose name  is constructed from  the argument term  as
+        follows:
+
+            consword('ved' >< term >< 'screen')
+
+        Thus for a value of term of "vt100", the corresponding procedure
+        name would be  "vedvt100screen". Any hyphens  in term are  first
+        translated to underscores, so that the name 'sun-cmd' would  map
+        onto the procedure "vedsun_cmdscreen".  The procedure is  called
+        with no arguments. If  no such procedure can  be found, but  the
+        operating system  supports TERMCAP  (UNIX only),  then an  entry
+        will be sought for term in  the TERMCAP database and the  screen
+        initialised from that instead. In either case there are a number
+        of screen-control variables  which must be  assigned before  Ved
+        can proceed; if any  of these are  not properly set,  veduseterm
+        will return <false>.
+
+        The default initialisation of  the keyboard proceeds  similarly,
+        calling a procedure whose name is constructed from term as
+
+            consword('ved' >< term >< 'keys')
+
+        This step can be suppressed  or modified by appropriate  setting
+        of the variable vedfunctionkeys described below.
+
+
+vedfunctionkeys -> bool_or_word_or_p                          [variable]
+bool_or_word_or_p -> vedfunctionkeys
+        Controls the keyboard initialisation performed by veduseterm. It
+        can take one of four values:
+
+            true (the default)
+                gives the default behaviour described above: the name of
+                the keyboard is taken to be the same as the name of the
+                terminal screen;
+
+            false
+                suppresses all the keyboard initialisation: in this
+                case, only the standard set of key bindings described in
+                HELP * VEDKEYS will be recognised, together with any
+                explicitly installed by the user;
+
+            a word
+                taken to be the name of the keyboard: veduseterm will
+                use this name as the root of the keyboard configuration
+                procedure regardless of the name of the terminal;
+
+            a procedure
+                to be applied to the terminal name before the keyboard
+                initialisation procedure is called; it may return any
+                value appropriate to vedfunctionkeys, typically a
+                (different) keyboard name.
+
+
+
+
+------------------------
+2  Terminal Descriptions
+------------------------
+
+The terminal and its screen-handling  capabilities are described by  the
+values of  the following  global variables.  Variables with  the  prefix
+"vvedscreen" define  the  control  sequences used  to  activate  various
+terminal functions:  a control  sequence may  be a  single  character, a
+string or  a procedure,  and will  be  sent to  the terminal  using  the
+procedure  vedscreencontrol.  A  null  string  value  implies  that  the
+particular function is not supported by the terminal.
+
+Note that keyboard facilities (e.g.  interpretation of function keys  or
+key sequences, are set separately from screen manipulation.
+
+Initialising Ved to work with a particular terminal type means assigning
+to as many of these variables as  possible. In order for Ved to work  at
+all, sensible values must be assigned to at least the following:
+
+    # vvedscreencharup
+    # vvedscreencharright
+    # vvedscreencleartail
+
+as well  as those  procedures  given under  Terminal-Dependent  Standard
+Screen Procedures below.
+
+For full details of  how to build a  terminal description from  scratch,
+see HELP * TERMINAL.
+
+
+vedterminalname -> word_or_false                              [variable]
+word_or_false -> vedterminalname
+        The name of the terminal on which Ved is running (a word).  Will
+        be <false> until Ved has been properly set up.
+
+
+vedscreenlength -> int                                        [variable]
+int -> vedscreenlength
+        The number of usable lines on the terminal screen (an  integer).
+        In windowed Ved (XVed), set to the number of lines in the window
+        whenever the current file is set.
+
+
+vedscreenwidth -> int                                         [variable]
+int -> vedscreenwidth
+        The  number  of  usable  columns  on  the  terminal  screen  (an
+        integer). In windowed Ved (XVed),  set to the number of  columns
+        in the window whenever the current file is set.
+
+
+vedscreenwrap -> bool                                         [variable]
+bool -> vedscreenwrap
+        Indicates whether  the terminal  has automatic  margins:  <true>
+        means that whenever the cursor  is moved beyond the last  column
+        on a line, it will automatically wrap round to the first  column
+        of the following  line, possibly causing  the screen to  scroll;
+        <false> means that the cursor sticks at the end of a line.
+
+
+veddumbvdu -> bool                                            [variable]
+bool -> veddumbvdu
+        A  rough  indicator  of  the  intelligence  of  the  terminal: a
+        non-false value means that the terminal doesn't support any kind
+        of insertion or deletion of lines and characters. This  variable
+        is set by Ved on startup, but not subsequently used.
+
+
+vednochardelete -> bool                                       [variable]
+bool -> vednochardelete
+vednocharinsert -> bool                                       [variable]
+bool -> vednocharinsert
+vednolinedelete -> bool                                       [variable]
+bool -> vednolinedelete
+vednolineinsert -> bool                                       [variable]
+bool -> vednolineinsert
+        These variables  indicate  the  level of  support  the  terminal
+        provides for insertion and  deletion of characters and  complete
+        lines. A value of <false>  means that the terminal DOES  support
+        the feature; any  other value  means that it  doesn't. Ved  will
+        normally set  these  variables  on startup  depending  on  which
+        screen control sequences have been defined: thus vednochardelete
+        will be <false> if vvedscreendeletechar is not the null  string.
+        Ved compensates for terminals without insertion and deletion  by
+        redrawing appropriate parts of the screen.
+
+
+vednokeypad -> bool                                           [variable]
+bool -> vednokeypad
+        Indicates whether  the terminal  has a  separately  programmable
+        keypad: the value  <false> means that  the terminal does  have a
+        keypad, any other value means that it doesn't.
+
+
+vedinserting -> bool                                          [variable]
+bool -> vedinserting
+        Indicates the current  output mode  of the  terminal: the  value
+        <false> means that the terminal is in normal (overstrike)  mode;
+        <true> means that the terminal is in insert mode.
+
+
+vednomoveinsert -> bool                                       [variable]
+bool -> vednomoveinsert
+        Indicates whether it is safe to move the cursor while in  insert
+        mode.
+
+
+vvedscreeninit -> char_or_string_or_p                         [variable]
+char_or_string_or_p -> vvedscreeninit
+        Control sequence to initialise the terminal for editing.
+
+
+vvedscreenreset -> char_or_string_or_p                        [variable]
+char_or_string_or_p -> vvedscreenreset
+        Control sequence  to reset  the  terminal to  normal  (non-edit)
+        mode.
+
+
+vvedscreensetpad -> char_or_string_or_p                       [variable]
+char_or_string_or_p -> vvedscreensetpad
+        Control sequence to enable the function keypad.
+
+
+vvedscreenresetpad -> char_or_string_or_p                     [variable]
+char_or_string_or_p -> vvedscreenresetpad
+        Control sequence to disable the function keypad.
+
+
+vvedscreeninsertmode -> char_or_string_or_p                   [variable]
+char_or_string_or_p -> vvedscreeninsertmode
+        Control sequence to set the terminal into insert mode.
+
+
+vvedscreenovermode -> char_or_string_or_p                     [variable]
+char_or_string_or_p -> vvedscreenovermode
+        Control sequence to  reset the terminal  to normal  (overstrike)
+        mode.
+
+
+vvedscreengraphic -> char_or_string_or_p                      [variable]
+char_or_string_or_p -> vvedscreengraphic
+vvedscreenalpha -> char_or_string_or_p                        [variable]
+char_or_string_or_p -> vvedscreenalpha
+        These  control   sequences  are   sent   out  by   the   default
+        vedscreencharmode to set the terminal  into or out of  alternate
+        (graphic) character set mode (see vedscreencharmode below).
+
+        vvedscreengraphic  sets   graphic   character  set   mode,   and
+        vvedscreenalpha sets normal character set mode.
+
+
+vvedscreencharnormal -> char_or_string_or_p                   [variable]
+char_or_string_or_p -> vvedscreencharnormal
+vvedscreencharhighlight -> char_or_string_or_p                [variable]
+char_or_string_or_p -> vvedscreencharhighlight
+vvedscreencharbold -> char_or_string_or_p                     [variable]
+char_or_string_or_p -> vvedscreencharbold
+vvedscreencharunderline -> char_or_string_or_p                [variable]
+char_or_string_or_p -> vvedscreencharunderline
+vvedscreencharaltfont -> char_or_string_or_p                  [variable]
+char_or_string_or_p -> vvedscreencharaltfont
+vvedscreencharblink -> char_or_string_or_p                    [variable]
+char_or_string_or_p -> vvedscreencharblink
+        These  control   sequences  are   sent   out  by   the   default
+        vedscreencharmode to change the display attributes of characters
+        on the  screen (see  vedscreencharmode below).  If the  form  of
+        these sequences is not suitable  for a particular terminal,  you
+        will   need    to   redefine    (nonactive)    vedscreencharmode
+        appropriately.
+
+        The default vedscreencharmode procedure assumes that (as on  the
+        vt100), attributes accumulate when their corresponding sequences
+        are sent out, and that the only way to turn one attribute off is
+        to  turn   them   all  off.   This   is  achieved   by   sending
+        vvedscreencharnormal.
+
+        vvedscreencharhighlight should make characters highlighted (e.g.
+        in inverse video).
+
+        vvedscreencharbold should  make  characters display  in  a  bold
+        version of the current font.
+
+        vvedscreencharunderline   should   cause   characters   to    be
+        underlined.
+
+        vvedscreencharaltfont  should  make  characters  display  in  an
+        alternative font of the same  size (preferably italic). If  this
+        variable  is  nullstring,  the  default  vedscreencharmode  will
+        indicate alt font characters by using underlining instead,  i.e.
+        vvedscreencharunderline.
+
+        vvedscreencharblink should cause characters to blink (i.e. flash
+        on and off), or some suitable substitute.
+
+
+vvedscreencharup -> char_or_string_or_p                       [variable]
+char_or_string_or_p -> vvedscreencharup
+vvedscreenchardown -> char_or_string_or_p                     [variable]
+char_or_string_or_p -> vvedscreenchardown
+vvedscreencharleft -> char_or_string_or_p                     [variable]
+char_or_string_or_p -> vvedscreencharleft
+vvedscreencharright -> char_or_string_or_p                    [variable]
+char_or_string_or_p -> vvedscreencharright
+        Control sequences to move  the cursor one  place up, down,  left
+        and right. Not used at the boundaries of the screen.
+
+
+vvedscreenscreenleft -> char_or_string_or_p                   [variable]
+char_or_string_or_p -> vvedscreenscreenleft
+        Control sequence to move  the cursor to  the leftmost column  of
+        the current line.
+
+
+vvedscreenpoint -> char_or_string_or_p                        [variable]
+char_or_string_or_p -> vvedscreenpoint
+        Control sequence to move the cursor to a given point on  screen:
+        should be followed by the line  and column to move to,  suitably
+        encoded. Used by vedvt52screenxy only.
+
+
+vvedscreenscrollup -> char_or_string_or_p                     [variable]
+char_or_string_or_p -> vvedscreenscrollup
+        Control sequence to scroll the screen forwards. Used only on the
+        last line of the screen or scrolling region.
+
+
+vvedscreenscrolldown -> char_or_string_or_p                   [variable]
+char_or_string_or_p -> vvedscreenscrolldown
+        Control sequence to  scroll the screen  backwards. Used only  on
+        the top line of the screen or scrolling region.
+
+
+vvedscreencursorupscroll -> char_or_string_or_p               [variable]
+char_or_string_or_p -> vvedscreensursorupscroll
+        Control sequence to move the cursor one place up, and to  scroll
+        the screen if on the top line (no longer used by Ved).
+
+
+vvedscreenclear -> char_or_string_or_p                        [variable]
+char_or_string_or_p -> vvedscreenclear
+        Control sequence to clear the entire screen.
+
+
+vvedscreencleartail -> char_or_string_or_p                    [variable]
+char_or_string_or_p -> vvedscreencleartail
+        Control sequence to clear from the cursor position to the end of
+        the current line.
+
+
+vvedscreeninsertchar -> char_or_string_or_p                   [variable]
+char_or_string_or_p -> vvedscreeninsertchar
+        Control sequence to insert the next character; characters  under
+        and to the right of the  cursor on the current line are  shifted
+        to the right.
+
+
+vvedscreendeletechar -> char_or_string_or_p                   [variable]
+char_or_string_or_p -> vvedscreendeletechar
+        Control sequence  to  delete  the character  under  the  cursor;
+        characters to the right of the  cursor on the current line  move
+        one place left.
+
+
+vvedscreeninsertline -> char_or_string_or_p                   [variable]
+char_or_string_or_p -> vvedscreeninsertline
+        Control sequence  to open  a new  blank line  on screen  at  the
+        current cursor position; the  current and subsequent lines  move
+        down.
+
+
+vvedscreendeleteline -> char_or_string_or_p                   [variable]
+char_or_string_or_p -> vvedscreendeleteline
+        Control  sequence  to  delete   the  current  line  on   screen;
+        subsequent lines move up.
+
+
+vvedscreenbell -> char_or_string_or_p                         [variable]
+char_or_string_or_p -> vvedscreenbell
+        Control sequence  to ring  the  terminal bell  or to  give  some
+        visible error indication.
+
+
+vvedscreensendidseq -> char_or_string_or_p                    [variable]
+char_or_string_or_p -> vvedscreensendidseq
+        Control sequence to elicit the terminal answer-back message.
+
+
+vedansiscreenxy(col, line)                                   [procedure]
+        One possible value for  vedscreenxy. Positions the cursor  using
+        an ansi-compatible  escape  sequence. The  characters  it  sends
+        could be generated by the call:
+
+           printf('\^[[%p;%pH', [% line, col %]);
+
+
+vedvt52screenxy(col, line)                                   [procedure]
+        One possible value for vedscreenxy. Positions the cursor using a
+        vt52-compatible escape sequence. The  characters it sends  could
+        be generated by the call:
+
+            printf('%p%c%c', [% vvedscreenpoint, line+31, col+31 %])
+
+
+vedvt52screengraphtrans(char)  -> (outchar, graphic)         [procedure]
+vedvt100screengraphtrans(char) -> (outchar, graphic)         [procedure]
+        Procedures  that  can  be  assigned  to  vedscreengraphtrans  to
+        perform appropriate  translations  for Ved  graphics  characters
+        when output to the screen. vedvt52screengraphtrans does this for
+        vt52-type   terminals,    and    vedvt100screengraphtrans    for
+        vt100-type.
+
+        For example, vedvt100screengraphtrans is defined as
+
+            define vedvt100screengraphtrans(char);
+                lvars char, c;
+                ;;;                123456789ABCDEF0123456789ABCD
+                lconstant trans = 'qqqxmjvxlkwxtunf`~___________';
+                subscrs(char-16:80, trans) -> c;
+                ;;; 2nd result true means graphics mode
+                if c == `_` then char, false else c, true endif
+            enddefine;
+
+        See vedscreengraphtrans below for further information.
+
+
+vedsetscrollregion(top, bottom)                     [procedure variable]
+        Sets the terminal scrolling region between line numbers top  and
+        bottom inclusive. top  and bottom are  both integers. The  first
+        usable line of the screen is numbered 1.
+
+
+vedansisetscrollregion(top, bottom)                          [procedure]
+        One possible  value of  vedsetscrollregion. Sets  the  scrolling
+        region using an ansi-compatible escape sequence. The  characters
+        it sends could be generated by the call:
+
+            printf('\^[[%p;%pr', [% top, bottom %]);
+
+
+vedscreencontrol(seq)                                        [procedure]
+        Sends the control  sequence seq  to the terminal.  seq may  be a
+        single character,  a  string  or  a  procedure.  Characters  and
+        strings are  used  where  a  fixed  sequence  of  characters  is
+        sufficient  to   activate  the   desired  terminal   function; a
+        procedure is  appropriate in  cases  where the  actual  sequence
+        needed may  vary: it  may, for  example, depend  on the  current
+        position of  the cursor  on screen.  A possible  definition  for
+        vedscreencontrol would be:
+
+            define vedscreencontrol(seq);
+                lvars seq;
+                if isprocedure(seq) then
+                    seq();
+                else
+                    vedoutascii(seq);
+                endif;
+            enddefine;
+
+
+
+
+------------------------------------------------
+3  Terminal-Dependent Standard Screen Procedures
+------------------------------------------------
+
+The following  procedures  present  standard  interfaces  that  all  Ved
+procedures can use,  and must  therefore always be  defined. Except  for
+vedscreenxy, the  others have  default values  which will  work for  any
+terminal.
+
+
+vedscreenxy(col, line)                              [procedure variable]
+        Moves the cursor to the given  position on screen. line and  col
+        are both integers. The north-west  corner of the usable area  of
+        the screen has (col, line) coordinates of (1, 1).
+
+        The default  value  of this  procedure  mishaps, so  for  a  new
+        terminal you MUST give it a definition.
+
+
+vedscreencharmode -> mode                   [(variable) active variable]
+mode -> vedscreencharmode
+        This active  variable returns  or  updates a  set of  mode  bits
+        controlling  how  characters  sent  to  the  screen/window   are
+        displayed. (It is usually called by vedscreenoutput, to set  the
+        mode for the character being output.)
+
+        The mode argument is an integer,  the bits in which are  defined
+        in INCLUDE * VEDSCREENDEFS.PH. Currently, these are
+
+            VEDCMODE_GRAPHIC
+
+        - When set, characters will be interpreted in graphics char set.
+        (Note that  this  bit is  NOT  a character  attribute  like  the
+        others.)
+
+            VEDCMODE_COLOURNUM
+            VEDCMODE_UNDERLINE
+            VEDCMODE_BOLD
+            VEDCMODE_ALTFONT
+            VEDCMODE_BLINK
+
+        -  When   set,  characters   will  be   displayed   respectively
+        underlined, in  a  bold  font,  in  an  alternative  font  (e.g.
+        italic), or blinking  on and off.  VEDCMODE_COLOURNUM is a  mask
+        for a 3-bit colour field starting at bit  VEDCMODE_COLOUR_SHIFT,
+        i.e. the colour number is
+
+            (mode && VEDCMODE_COLOURNUM) >> VEDCMODE_COLOUR_SHIFT
+
+        Since most  terminals will  support  only one  highlight  colour
+        (e.g. inverse  video), the  default vedscreencharmode  uses  the
+        least significant bit of  the colour field  (VEDCMODE_HIGHLIGHT)
+        to determine whether that should  be set, i.e. odd colours  will
+        set it and even colours clear it. (Note that XVed supports all 8
+        possible colours.)
+
+        These bits  start  at bit  16,  and  are used  directly  as  the
+        attribute bits attached to characters  in Ved buffer lines  (and
+        stored in  'dstrings'  -  see  REF * STRINGS).  (They  are  also
+        representable  as  backslash   sequences  in  Pop-11   character
+        constants see  Backslash in  Strings  & Character  Constants  in
+        REF * ITEMISE.)
+
+        The default vedscreencharmode (used at least for vt100 and xterm
+        Ved), sends out the sequences
+
+            vvedscreengraphic
+            vvedscreenalpha
+            vvedscreencharnormal
+            vvedscreencharhighlight
+            vvedscreencharbold
+            vvedscreencharunderline
+            vvedscreencharaltfont
+            vvedscreencharblink
+
+        in response to  the above bits  being set and  cleared (see  the
+        description of these  variables above).  However, its  behaviour
+        may not  be  appropriate  for  all terminals,  so  it  may  need
+        redefining for  a particular  terminal. (For  example, the  XVed
+        vedscreencharmode does  not need  the  above sequences  at  all,
+        since it can control the modes by direct procedure calls to  the
+        XpwScrollText widget.)
+
+        The default vedscreencharmode is defined as follows:
+
+            lvars current_charmode = 0;
+
+            define vars active vedscreencharmode;
+                current_charmode
+            enddefine;
+            ;;;
+            define updaterof active vedscreencharmode mode;
+                lvars mode, diff, old = current_charmode;
+
+                returnif((mode ||/& old ->> diff) == 0);
+                mode -> current_charmode;
+
+                ;;; deal with graphic first
+                if diff &&/=_0 VEDCMODE_GRAPHIC then
+                    vedscreencontrol(if mode &&/=_0 VEDCMODE_GRAPHIC then
+                                        vvedscreengraphic
+                                     else
+                                        vvedscreenalpha
+                                     endif);
+                    returnif((diff &&~~ VEDCMODE_GRAPHIC ->> diff) == 0)
+                endif;
+                mode &&~~ VEDCMODE_GRAPHIC -> mode;
+
+                ;;; Assumes that the other modes accumulate when sent
+                ;;; out, ie the only way to turn one off is to turn
+                ;;; them all off (this is the vt100 behaviour).
+
+                if diff &&~~ mode /== 0 then
+                    ;;; clearing some modes -- must clear them all first
+                    vedscreencontrol(vvedscreencharnormal);
+                    returnif(mode == 0)
+                else
+                    ;;; only setting new ones
+                    diff -> mode
+                endif;
+
+                if mode &&/=_0 VEDCMODE_BOLD then
+                    vedscreencontrol(vvedscreencharbold)
+                endif;
+                if mode &&/=_0 VEDCMODE_ALTFONT then
+                    if vvedscreencharaltfont == nullstring then
+                        mode || VEDCMODE_UNDERLINE -> mode
+                    else
+                        vedscreencontrol(vvedscreencharaltfont)
+                    endif
+                endif;
+                if mode &&/=_0 VEDCMODE_UNDERLINE then
+                    vedscreencontrol(vvedscreencharunderline)
+                endif;
+                if mode &&/=_0 VEDCMODE_HIGHLIGHT then
+                    vedscreencontrol(vvedscreencharhighlight)
+                endif;
+                if mode &&/=_0 VEDCMODE_BLINK then
+                    vedscreencontrol(vvedscreencharblink)
+                endif;
+            enddefine;
+
+
+vedscreengraphtrans(char) -> (outchar, graphic)     [procedure variable]
+        This procedure  is  called  by  vedscreenoutput  to  perform  an
+        appropriate translation for Ved standard graphics characters.
+
+        It takes  a character  char  in the  range  16:81 -  16:9D,  and
+        returns two  results: the  character  outchar to  output,  and a
+        boolean graphic saying whether graphics mode should be turned on
+        for outchar  (i.e. whether  VEDCMODE_GRAPHIC  should be  set  in
+        vedscreencharmode).
+
+        See Ved  Standard Graphics  Characters in  REF * VEDPROCS  for a
+        description of the graphics characters, and Backslash in Strings
+        & Character Constants  in REF * ITEMISE for  a complete list  of
+        their characters codes.
+
+        The default value  of vedscreengraphtrans is  a procedure  which
+        translates  all   graphics  characters   to  ordinary   printing
+        characters (as described in REF * VEDPROCS); this default  value
+        can also be assigned by calling vednographics.
+
+        There are two  standard procedures  for converting  to vt52  and
+        vt100 graphics codes respectively: vedvt100screengraphtrans  and
+        vedvt52screengraphtrans (see  above). The  default procedure  is
+        defined
+
+            define vars vedscreengraphtrans(char);
+                lvars char, c;
+                ;;;                123456789ABCDEF0123456789ABCD
+                lconstant trans = '---|---|---|||+o#.___________';
+                subscrs(char-16:80, trans) -> c;
+                ;;; 2nd result false means not graphics mode
+                if c == `_` then char else c endif, false
+            enddefine;
+
+        If a  new  translation  procedure  needs  to  be  written  for a
+        particular terminal, note that currently,  not all of the  range
+        16:81  -  16:9D  is  actually  used  by  the  standard  graphics
+        characters; the existing procedures simply do no translation for
+        the unused codes.
+
+
+vedscreencursoron -> char_or_false          [(variable) active variable]
+char_or_false -> vedscreencursoron
+        Where possible, this  active variable provides  for turning  the
+        text cursor on and off, and for displaying different cursors.
+
+        char_or_false may  be  a character-with-attributes  (similar  to
+        vedscreenoutput), or false. If a character, the updater sets the
+        cursor to correspond to that character; if false, the cursor  is
+        turned off. The base procedure returns the current setting.
+
+        The ASCII characters Ved assumes may be available for  different
+        cursors are as follows:
+
+            Char    Description
+            ----    -----------
+            `O`     Rectangular block
+            `_`     Underscore
+            `I`     I-beam
+            `^`     Carat
+            `\s`    Invisible
+
+        The attributes part of the character is as for vedscreencharmode
+        above, except  that  Ved  assumes  only  the  colour  and  blink
+        attributes may actually have any effect.
+
+        The default vedscreencursoron just remembers the value  assigned
+        to it  and  returns  that  when  accessed,  but  otherwise  does
+        nothing.
+
+
+
+
+------------------------------------------
+4  Mappings from Keyboard to Ved Functions
+------------------------------------------
+
+The initial mapping from key presses to editor functions is built in  to
+Ved, but  corresponds  to  that set  by  the  procedure  veddefaultkeys:
+running this procedure at any time  will reset all key bindings back  to
+their  initial  state.  The   default  key  map   is  as  described   in
+HELP * VEDKEYS. This  mapping was  introduced  in Poplog  Version  14.5;
+anyone wishing to restore the mapping used prior to that version can  do
+so by placing at the start of their 'vedinit.p' file the two lines:
+
+        vedoldkeys();
+        vedoldkeys -> veddefaultkeys;
+
+The first line  restores the old  key map immediately;  the second  line
+ensures that  any  program  which  needs to  re-set  the  keyboard  will
+continue to use the old map.
+
+
+veddefaultkeys()                                    [procedure variable]
+        Restores the key map to some initial state.  User-assignable, it
+        defaults to vednewkeys.
+
+
+vednewkeys()                                                 [procedure]
+        Sets the key map as described in HELP * VEDKEYS.
+
+
+vedoldkeys()                                                 [procedure]
+        Sets the key map as described in HELP * VEDOLDKEYS.
+
+
+vedkeymapname -> strword_or_false                             [variable]
+        A string describing the current mapping of keyboard keys to  Ved
+        operations. Used by ved_hkeys  to find and  display a HELP  file
+        that  describes  the  current  mapping.  Its  initial  value  is
+        <false>, indicating that only the default key mappings have been
+        set up.  The  procedure veduseterm  assigns  vedterminalname  to
+        vedkeymapname  (unless  vedfunctionkeys  is  false).  Individual
+        libraries that implement Ved key  mappings may assign their  own
+        values to vedkeymapname (e.g. LIB * VEDNCDXTERMKEYS)
+
+
+
+
+-----------------------
+5  Known Terminal Types
+-----------------------
+
+The following procedures  configure Ved for  use on particular  terminal
+types. Most of  them, with  the exception of  the Visual  200 and  vt100
+procedures, are defined in autoloadable libraries. Where a terminal type
+has "screen" and/or  "keys" procedures defined  for it, then  it can  be
+initialised automatically with a call to veduseterm: this will  autoload
+any library  files  as  necessary.  For  the  remaining  terminals,  the
+initialisation procedure  must be  called  explicitly. For  guidance  on
+selecting a terminal type see HELP * TERMINAL.
+
+
+vedansi()                                                    [procedure]
+vedansikeys()                                                [procedure]
+vedansiscreen()                                              [procedure]
+        Basic ANSI-compatible terminal.  Defines minimal  screen-control
+        facilities and no function keys. See HELP * ANSIKEYS.
+
+
+vedatari()                                                   [procedure]
+        Atari ST  running UniTerm  vt100 terminal  emulator.  Requires a
+        special UniTerm initialisation file to program the function keys
+        correctly. See HELP * VEDATARI.
+
+
+vedbbc()                                                     [procedure]
+vedbbckeys()                                                 [procedure]
+vedbbcscreen()                                               [procedure]
+        BBC micro running vt52 terminal emulator.
+
+
+vedbbcvt100()                                                [procedure]
+vedbbcvt100keys()                                            [procedure]
+vedbbcvt100screen()                                          [procedure]
+        BBC micro running vt100 terminal emulator. HELP * BBCVT100.
+
+
+vedcifer()                                                   [procedure]
+vedciferkeys()                                               [procedure]
+vedciferscreen()                                             [procedure]
+        Cifer 2634 terminal. HELP * VEDCIFER.
+
+
+vedcmdtool()                                                 [procedure]
+        Sunview "cmdtool" window. HELP * VEDCMDTOOL.
+
+
+veddxterm()                                                  [procedure]
+veddxtermkeys()                                              [procedure]
+veddxtermscreen()                                            [procedure]
+        DECwindows terminal emulator.  Similar to an  XTERM, but  with a
+        vt220-like keyboard. See HELP * VEDDXTERM.
+
+
+vedhpscreen()                                                [procedure]
+        Generic Hewlett Packard terminal. See LIB * VEDHPSCREEN
+
+
+vedsun()                                                     [procedure]
+vedsunkeys()                                                 [procedure]
+vedsunkeys_SUNVIEW()                                         [procedure]
+vedsunkeys_NOSUNVIEW()                                       [procedure]
+vedsunscreen()                                               [procedure]
+vednosunviewkeys                                              [variable]
+        Sun console or  Sunview "shelltool" window  (if you know  it's a
+        window, vedwinsun can be quicker to start up). vedsunkeys  calls
+        vedsunkeys_SUNVIEW by default  (which assumes  that the  SunView
+        accelerator keys are  unavailable to Ved),  but if the  variable
+        vednosunviewkeys is  declared  and  not <false>,  it  will  call
+        vedsunkeys_NOSUNVIEW instead. See HELP * VEDSUN.
+
+
+vedsun_cmd()                                                 [procedure]
+vedsun_cmdkeys()                                             [procedure]
+vedsun_cmdscreen()                                           [procedure]
+        Sunview "cmdtool" window: same as vedcmdtool.
+
+
+vedtvi()                                                     [procedure]
+vedtvikeys()                                                 [procedure]
+vedtviscreen()                                               [procedure]
+        Televideo TVI 920C in vt52 emulation mode. See HELP * TVI.
+
+
+vedtvi925()                                                  [procedure]
+vedtvi925keys()                                              [procedure]
+vedtvi925screen()                                            [procedure]
+        Televideo 925. For key bindings see LIB * VEDTVI925KEYS.
+
+
+vedvi200()                                                   [procedure]
+vedvi200keys()                                               [procedure]
+vedvi200screen()                                             [procedure]
+        Visual 200. See HELP * V200.
+
+
+vedvi500()                                                   [procedure]
+vedvi500keys()                                               [procedure]
+vedvi500screen()                                             [procedure]
+        Visual 500. See HELP * V500.
+
+
+vedvi55()                                                    [procedure]
+vedvi55keys()                                                [procedure]
+vedvi55screen()                                              [procedure]
+        Visual 55 in Visual  200 emulation mode.  Basically the same  as
+        the Visual 200, but with lots more function keys.  LIB * AUTOV55
+        determines from the answerback whether the terminal is a  Visual
+        200 or a 55 and configures Ved accordingly. See HELP * V55.
+
+
+vedvi550()                                                   [procedure]
+vedvi550keys()                                               [procedure]
+vedvi550screen()                                             [procedure]
+        Visual 550. See HELP * V550.
+
+
+vedvt100(id)                                                 [procedure]
+vedvt100keys()                                               [procedure]
+vedvt100screen()                                             [procedure]
+        vt100 series terminal. Makes minimal assumptions, so works  with
+        many lookalikes  and  emulators, although  the  function  keypad
+        escape sequences aren't  always the same.  The argument id  is a
+        dummy, present  for historical  reasons, and  usually passed  as
+        <false>. See HELP * VT100KEYS, HELP * VT100.
+
+
+vedvt100screenextra()                                        [procedure]
+        Can be used to inform Ved that a vt100-type terminal  (including
+        vt220, xterm,  etc.)  is  able to  cope  with  inline  character
+        insertion and deletion.  These operations are  then speeded  up.
+        See LIB * VEDVT100SCREENEXTRA.
+
+
+vedvt200()                                                   [procedure]
+vedvt200keys()                                               [procedure]
+vedvt200screen()                                             [procedure]
+vedvt220()                                                   [procedure]
+vedvt220keys()                                               [procedure]
+vedvt220screen()                                             [procedure]
+        vt200 series  terminal.  Similar to  a  vt100 but  with  smarter
+        screen handling and extra function keys. See HELP * VT220KEYS.
+
+
+vedvt300()                                                   [procedure]
+vedvt300keys()                                               [procedure]
+vedvt300screen()                                             [procedure]
+vedvt320()                                                   [procedure]
+vedvt320keys()                                               [procedure]
+vedvt320screen()                                             [procedure]
+        vt300 series terminal. Ved treats this the same as a vt200  (see
+        above).
+
+
+vedvt52()                                                    [procedure]
+vedvt52keys()                                                [procedure]
+vedvt52screen()                                              [procedure]
+        vt52 terminal or emulator. See HELP * VT52.
+
+
+vedwinsun()                                                  [procedure]
+        Similar to vedsun, but assumes a Sunview "shelltool" window  and
+        so can start up a little quicker. See HELP * VEDWINSUN.
+
+
+vedxterm()                                                   [procedure]
+vedxtermkeys()                                               [procedure]
+vedxtermscreen()                                             [procedure]
+        X  windows  "xterm"  vt102  terminal  emulator.  Uses  the  same
+        screen-control sequences as  the vt100, but  offers a choice  of
+        function key maps for different workstations and terminals.  For
+        more detailed information, see HELP * VEDXTERM.
+
+
+vedtermcapscreen(term)                                       [procedure]
+        (UNIX only)  Reads  the TERMCAP  database  entry for  the  named
+        terminal. term should be a word or string.
+
+
+
+
+-----------------
+6  LIB MKVEDIMAGE
+-----------------
+
+LIB * MKVEDIMAGE is a  utility for  building saved  images that  include
+terminal configuration libraries of the  type described above. Ved  will
+start up more  quickly inside such  a saved image,  since the  necessary
+library files  will  already  have  been  compiled.  LIB  MKVEDIMAGE  is
+described fully in HELP * MKVEDIMAGE.
+
+
+
+
+--- C.all/ref/vedterminals
+--- Copyright University of Sussex 1997. All rights reserved.

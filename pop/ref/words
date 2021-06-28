@@ -1,0 +1,321 @@
+REF WORDS                                           John Gibson Nov 1992
+
+        COPYRIGHT University of Sussex 1992. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<           WORDS             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+This REF file contains those procedures and predicates necessary for the
+construction, generation and manipulation of words along with those  for
+using the dictionary.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+
+  2   Predicates on Words
+
+  3   Constructing Words
+
+  4   Accessing Word Characters
+
+  5   Generating New Words (gensym)
+
+  6   Dictionary Procedures
+
+  7   Miscellaneous
+
+
+
+
+---------------
+1  Introduction
+---------------
+
+A word in  Poplog is  a record  structure that  represents a  particular
+string of  characters (the  characters of  the word)  as a  'meaningful'
+entity. Poplog maintains  a dictionary of  word records and,  whenever a
+word record is to be constructed  for a particular string of  characters
+with consword, the dictionary is searched to see if it already  contains
+a word for  that string.  If so,  that is  returned --  otherwise a  new
+record is  constructed  and  entered  in the  dictionary.  (This  is  in
+contrast, say,  to the  construction of  a new  string with  consstring,
+where a completely new string is produced every time. On the other hand,
+copy applied to a word returns a copy which is not in the dictionary.)
+
+Although they can be employed for  other purposes, the principal use  of
+words  is  for  the  representation  of  identifiers  (i.e.   variables,
+constants, etc) in a program. See REF * IDENT.
+
+Note that some string manipulation procedures can also be used on  words
+(see REF * STRINGS). See also  REF * DATA for general record  procedures
+applicable to words.
+
+
+
+
+----------------------
+2  Predicates on Words
+----------------------
+
+See also  Predicates on  Strings in  REF * STRINGS, most  of which  also
+apply to words.
+
+
+isword(item) -> bool                                         [procedure]
+        Returns true if item is a word, false if not.
+
+
+check_word(item)                                             [procedure]
+        Mishaps if item is not a word.
+
+
+
+
+---------------------
+3  Constructing Words
+---------------------
+
+consword(char1, char2, ..., charN, N) -> word                [procedure]
+consword(string) -> word
+        Returns a word word constructed from the top N characters on the
+        user stack (where  the top character  on the stack  is the  last
+        character of the  word), or  from the characters  in the  string
+        string. For example:
+
+            consword(`c`, `a`, `t`, 3) =>
+            ** cat
+
+            consword('mouse') =>
+            ** mouse
+
+        The word is taken  from the dictionary if  it is in there,  or a
+        new word constructed and entered  in the dictionary if not.  See
+        HELP * WORDS for an introduction to the rules for word formation
+        in Pop-11.
+
+
+subword(N, len, word) -> sub_word                            [procedure]
+        Returns  the  word  sub_word   whose  characters  are  the   len
+        characters of the  word word starting  from its N-th  character.
+        word may also be a string (but the result is still a word -- see
+        substring in REF * STRINGS if you want a string result).
+
+
+
+
+----------------------------
+4  Accessing Word Characters
+----------------------------
+
+destword(word) -> (char1, char2, ..., charN, N)              [procedure]
+        Destructs the word  word, i.e.  puts all its  characters on  the
+        stack, together  with its  length N  (in other  words, does  the
+        opposite of consword(N)). E.g.
+
+                destword("abcd") =>
+                ** 97 98 99 100 4
+
+
+subscrw(N, word) -> char                                     [procedure]
+        Returns the N-th character char of the word word (this procedure
+        does NOT have an updater).  Since subscrw is the class_apply  of
+        words (see REF * KEYS), it can also be called as
+
+                word(N) -> char
+
+
+word_string(word) -> string                                  [procedure]
+        Returns (a copy of) the string of characters of the word word.
+
+
+
+
+--------------------------------
+5  Generating New Words (gensym)
+--------------------------------
+
+gensym(root_word) -> word                                    [procedure]
+n -> gensym(root_word)
+        This procedure takes a 'root'  word root_word and returns a  new
+        word word with an integer  suffix appended. Each call of  gensym
+        on the same  word will increment  the integer suffix  by 1.  For
+        example,
+
+            repeat 4 times gensym("cat") endrepeat =>
+            ** cat1 cat2 cat3 cat4
+
+        The next integer suffix applicable  to each root word is  stored
+        in the property  gensym_property. You can  thus reset the  value
+        for a particular word by assigning directly to this property, or
+        (more safely, since it checks its argument to be an integer), by
+        using the updater of gensym:
+
+            8 -> gensym("cat");
+            repeat 3 times gensym("cat") endrepeat =>
+            ** cat8 cat9 cat10
+
+        Using clearproperty on gensym_property will reset the suffix  to
+        1 for all root words, e.g.
+
+            clearproperty(gensym_property);
+            gensym("cat") =>
+            ** cat1
+
+        Using appproperty on gensym_property, you can apply a  procedure
+        to each word that  gensym knows about with  the next suffix  for
+        that word. For example:
+
+            define report(word, suffix);
+                lvars suffix;
+                [the gensym suffix for ^word is ^suffix] =>
+            enddefine;
+
+            appproperty(gensym_property, report);
+            ** [the gensym suffix for dog is 2]
+            ** [the gensym suffix for cat is 2]
+
+
+gensym_property(root_word) -> N                     [procedure variable]
+N -> gensym_property(root_word)
+        The property in  this variable is  used by gensym  to store  the
+        next integer suffix for a given root word. The default value  of
+        the property is 1, so that
+
+            clearproperty(gensym_property)
+
+        will reset the suffix for all root words to 1.
+
+
+appgensymproperty(p)                                         [procedure]
+cleargensymproperty()                                        [procedure]
+        Same as
+
+                appproperty(gensym_property, p)
+
+        and
+
+                clearproperty(gensym_property)
+
+        respectively.
+
+
+(Note: Prior to Version 14.5, gensym was implemented as a closure of  an
+anonymous procedure whose frozval was the integer-suffix property.  This
+is  no  longer  the   case:  the  property  is   now  in  the   variable
+gensym_property, and gensym  itself is an  ordinary constant  procedure.
+If required, use
+
+        uses popobsoletelib, old_gensym;
+
+to restore the old implementation.)
+
+
+
+
+------------------------
+6  Dictionary Procedures
+------------------------
+
+Note that the garbage collector removes words from the dictionary  which
+are not  referenced elsewhere,  providing they  do not  have  associated
+permanent identifiers.
+
+
+fast_appdic(p)                                               [procedure]
+        Applies  the  procedure  p  to   each  word  currently  in   the
+        dictionary. If the procedure p causes new words to be created in
+        the dictionary,  or old  words  to be  deleted  from it,  it  is
+        undefined as to whether p gets applied to those words or not (in
+        general it is safer to use  such a procedure with appdic  rather
+        than fast_appdic).
+
+
+appdic(p)                                                    [procedure]
+        Applies the  procedure  p to  each  word in  the  dictionary  by
+        copying all  dictionary  words  into a  vector  first  and  then
+        applying p to each element of  that (thus ensuring that the  set
+        of words to which p is applied is unaffected by p causing  words
+        to be created or deleted). Defined as
+
+                appdata({% fast_appdic(identfn) %}, p)
+
+
+mapdic(p) -> list                                            [procedure]
+        Applies the procedure p  to each word  in the dictionary  (using
+        appdic), and returns a list of any results produced. Defined as
+
+                [% appdic(p) %]
+
+
+dic_distrib()                                                [procedure]
+        Supplies information  on the  structure of  the dictionary.  The
+        dictionary has  1024  slots --  if a  slot  is  empty  a  period
+        character, and otherwise an  integer representing the number  of
+        words resident in the slot, is printed.
+
+
+countwords() -> N                                            [procedure]
+        Returns the number of words in the dictionary.
+
+
+wordswith(strword) -> list                                   [procedure]
+        Given a word or a string as argument, this procedure returns  an
+        alphabetically sorted list of  words from the system  dictionary
+        which contain the argument as a substring or subword.
+
+
+match_wordswith(strword, p) -> list                          [procedure]
+match_wordswith(string_pattern) -> list
+        In the  first  form,  given  a  string  or  word  strword  and a
+        procedure p, returns an alphabetically sorted list of all  words
+        in the system dictionary such that
+
+                p(strword, dicword)
+
+        returns true. In the second form, the list  contains  all  words
+        that match the pattern string_pattern. See  HELP * WORDSWITH for
+        more details.
+
+
+syscancelword(word)                                          [procedure]
+        Cancels the word word, i.e. removes it from the dictionary.
+
+
+word_dict_status(word) -> result                             [procedure]
+        Given a word word, returns true if word is in the  dictionary, a
+        pair  if  word  was  produced  by  word_identifier,  and   false
+        otherwise.
+
+        In the case of a word identifier (see REF * SECTIONS), the  pair
+        returned contains a word and a section, i.e.
+
+                conspair(name, sect)
+
+        where name is the  name of the identifier  in section sect  (the
+        components of this pair should NOT be altered).
+
+
+
+
+----------------
+7  Miscellaneous
+----------------
+
+undef -> word                                                 [constant]
+        This constant contains  the word "undef".  It should contain  an
+        undef record (see REF * IDENT), but for historical reasons  does
+        not. Rather than use this, it is always clearer to use the  word
+        "undef" directly.
+
+
+word_key -> key                                               [constant]
+        This constant holds the key structure for words. See REF * KEYS.
+
+
+
+--- C.all/ref/words
+--- Copyright University of Sussex 1992. All rights reserved.

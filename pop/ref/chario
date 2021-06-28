@@ -1,0 +1,467 @@
+REF CHARIO                                          John Gibson Jul 1993
+
+       COPYRIGHT University of Sussex 1993. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<      CHARACTER STREAM       >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<      INPUT AND OUTPUT       >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+Character stream input and output is the simplest form of I/O in Poplog.
+This REF  file details  the procedures,  etc, associated  with  standard
+character repeaters and consumers, and the creation of new repeaters and
+consumers.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+
+  2   Standard Character Repeaters
+
+  3   Standard Character Consumers
+
+  4   Raw Mode Repeaters/Consumers
+
+  5   Creating New Repeaters/Consumers
+
+
+
+---------------
+1  Introduction
+---------------
+
+Character streams are the simplest form of input/output in Poplog.  They
+are used by many parts of the system, including the Pop-11 compiler  and
+printing  utilities.  For  more  complex  I/O  facilities  using  device
+records, see REF * SYSIO.
+
+    Character stream  I/O  is  performed using  character  repeater  and
+consumer procedures. A character repeater is a procedure which each time
+it is  called  returns  the  next  character  from  an  input  stream; a
+character consumer takes  a character as  argument and writes  it to  an
+output stream.  Character streams  are terminated  by the  special  item
+<termin> (the value of the  constant termin); a character repeater  will
+return <termin> when an input  stream is exhausted, and giving  <termin>
+to a character consumer will close its output stream.
+
+    See also REF * ITEMISE, which describes the procedure incharitem for
+turning  character  repeaters  into  item  repeaters.   REF * POPCOMPILE
+explains how a text item stream  is created from a character stream  for
+the Pop11 compilation process.
+
+
+
+
+-------------------------------
+2  Standard Character Repeaters
+-------------------------------
+
+charin() -> char                                             [procedure]
+        This is  a character  repeater for  the current  standard  input
+        channel,   i.e.   it   reads   characters   from   the    device
+        pop_charin_device (normally in interactive mode this is a system
+        device that inputs from the user's terminal/window etc, but when
+        in Ved  interactive mode,  it is  a pseudo  `user' device  which
+        reads input from the current Ved input buffer).
+
+        The prompt string  output by charin  is determined by  popprompt
+        (see REF * popprompt).
+
+        If the character read in  is `\^G` (CTRL-G) then charin  invokes
+        setpop (This mechanism  may be withdrawn,  as it is  a relic  of
+        earlier versions of Pop-2).
+
+        If  the  last  character  read   in  was  a  newline   character
+        (poplastchar == `\n`), and the  next character read in is  char,
+        charin  checks   to   see   whether  char   is   in   the   list
+        pop_charin_escapes, in which  case it will  spawn a DCL  process
+        (in VMS) or  Shell process (in  Unix) and hand  the rest of  the
+        line as a command to be run by that process, using sysobey.  The
+        character char is given to sysobey as its second argument.  When
+        sysobey returns, charin assigns the newline character to char.
+
+        Before finally  returning, charin  assigns char  to  poplastchar
+        then checks whether poplogfile is a procedure, in which case  it
+        is applied to char. This provides a simple logging mechanism.
+
+        REF * ITEMISE explains  how an  "item-repeater" can  be  created
+        from a  character  repeater like  charin,  and  REF * POPCOMPILE
+        explains how program  text read  in from the  standard input  is
+        compiled. HELP * IM explains how charin is made to read from the
+        Ved buffer.
+
+        The character returned by charin is normally an ASCII  character
+        code, but  if the  "end  of file"  character  was typed  at  the
+        terminal, or if the  device has been  "emptied" then it  returns
+        the special  object  <termin>,  as explained  in  the  Overview,
+        above.
+
+        (Note that before  reading a  character from  pop_charin_device,
+        charin first calls the  trap procedure pop_chario_trap with  the
+        device and true as arguments, i.e.
+
+            pop_chario_trap(pop_charin_device, true)
+
+        See pop_chario_trap below.)
+
+
+pop_charin_escapes -> list                                    [variable]
+list -> pop_charin_escapes
+        This list is examined by  charin as explained above,  whenever a
+        character is read in immediately  after a newline character.  If
+        the new character is a member of pop_charin_escapes then  charin
+        uses sysobey to spawn a sub-process given the rest of the  input
+        line as a command.
+
+        In VMS the list pop_charin_escapes defaults to [`$`] and on Unix
+        to [ `%`  `$` `!`],  i.e. the characters  that can  be given  as
+        second  argument  to  sysobey.  The  procedure  vedsetpop   sets
+        pop_charin_escapes locally to [], so that the mechanism will not
+        be  triggered  accidentially  in  Ved  immediate  in  mode  (See
+        HELP * IM) or in processes that compile from the Ved buffer (See
+        HELP * LMR). (Ved allows an  alternative mechanism for  spawning
+        sub-processes from  the  command  line,  as  described  in  HELP
+        VEDCOMMS)
+
+
+poplastchar -> char                                           [variable]
+char -> poplastchar
+        Always contains the last character read by charin.
+
+
+poplinenum -> int                                   [protected variable]
+        This  integer  variable  is   incremented  whenever  a   newline
+        character is read by charin  or a character repeater created  by
+        discin.  poplinenum  is  local  to  pop11_compile  where  it  is
+        initialised to  1:  hence  it  records  the  number  of  newline
+        characters  read  in  since  the   beginning  of  the  call   of
+        pop11_compile (and  is  used  by  * sys_pr_message  in  printing
+        mishap and warning messages).
+
+
+poplogfile -> char_cons_or_false                              [variable]
+false_or_char_cons -> poplogfile
+        This variable  may contain  a  character consumer  procedure  or
+        false. In the  former case  every character read  by charin,  or
+        output  by  charout  is  also  given  to  poplogfile  (including
+        prompts). This can be used to record terminal interactions  (for
+        an example of which, see LIB * RECORD). (Default value false)
+
+
+termin -> <termin>                                            [constant]
+termin_key -> key                                             [constant]
+        The value of  termin is  the unique  item <termin>,  used as  an
+        end-of-file marker for character/item  stream I/O (and also  for
+        dynamic list streams, see REF * LISTS). termin_key is a constant
+        holding the  key  structure of  the  unique item  <termin>  (see
+        REF * KEYS).
+
+
+pop_chario_trap(dev, is_input)            [protected procedure variable]
+        The procedure in this variable is called by charin, charout  and
+        charerr before  doing  anything;  it  is  redefined  in  various
+        contexts, e.g. in Ved, and is intended for system use only.
+
+        (If a  new trap  procedure trap_p  is to  be added,  it must  be
+        concatenated onto the existing value, i.e.
+
+            trap_p <> pop_chario_trap -> pop_chario_trap;
+
+        where trap_p is defined as
+
+            trap_p(dev, is_input) -> (dev, is_input);
+
+        that is,  passes  on the  arguments  given  to it  to  the  next
+        procedure in the chain.)
+
+
+
+
+-------------------------------
+3  Standard Character Consumers
+-------------------------------
+
+charout(char)                                                [procedure]
+charerr(char)                                                [procedure]
+        These are character  consumers for the  current standard  output
+        and error  output  channels respectively,  i.e.  characters  are
+        output via the devices pop_charout_device and pop_charerr_device
+        respectively (normally  in  interactive mode  these  are  system
+        devices that output to the user's terminal/window etc, but  when
+        in Ved interactive  mode, they are  pseudo `user' devices  which
+        output to the current Ved output buffer).
+
+        (Note that before writing a character to pop_charX_device, these
+        procedures first call  the trap  procedure pop_chario_trap  with
+        the device and false as arguments, i.e.
+
+            pop_chario_trap(pop_charX_device, false)
+
+        See pop_chario_trap above.)
+
+
+pop_charout_col -> int                                        [variable]
+int -> pop_charout_col
+pop_charerr_col -> int                                        [variable]
+int -> pop_charerr_col
+        These variables  contain  integers representing  the  number  of
+        columns filled  by charout  and  charerr respectively  in  their
+        current lines,  where  tab  characters  count  as  vedindentstep
+        columns if in Ved or 8 otherwise, control characters (i.e. ASCII
+        value < 32) count as none, and all other characters count as  1.
+        These values are reset to 0 on outputting a newline character.
+
+
+poplinewidth -> int                                           [variable]
+int -> poplinewidth
+poplinemax -> int                                             [variable]
+int -> poplinemax
+        When poplinewidth is  an integer, these  two variables  together
+        control the breaking of long lines by charout and charerr.
+
+        If on  outputting  a  character  with  charX,  pop_charX_col  is
+        greater than or  equal to poplinewidth,  and either the  current
+        character for output is a space  or tab, OR the column count  is
+        already greater than or equal  to poplinemax, then an  automatic
+        linebreak is inserted before printing the character.
+
+        (In other  words,  lines  are  broken  at  the  next  whitespace
+        character after  poplinewidth  columns, or  failing  that  after
+        poplinemax columns. Note that if a line is broken at a space  or
+        tab, that character is NOT output.)
+
+        A  linebreak   consists   of   a   newline   followed   by   any
+        continuation-line prefix characters specified by * poplineprefix
+        (qv).
+
+        If poplinewidth is not an integer, linebreaks are not  inserted.
+        poplinewidth defaults to 70, and poplinemax to 78.
+
+
+poplineprefix -> pair_or_false                                [variable]
+pair_or_false -> poplineprefix
+        This variable enables  automatic prefixing of  lines output  via
+        charout and charerr. It may be  false, or a pair whose front  or
+        back are each either a string or false.
+
+        If poplineprefix is a pair whose front is a string, that  string
+        is output at the beginning of every line (that is, when charX is
+        called with pop_charX_col = 0).
+
+        If poplineprefix is a pair whose  back is a string, that  string
+        is output instead at the  beginning of every continuation  line,
+        i.e. after  an automatic  newline inserted  by the  poplinewidth
+        mechanism.
+
+        If poplineprefix is  not a pair,  or the back  is not a  string,
+        automatic newlines  are  followed  by  any  'every-line'  prefix
+        specified, plus a single tab character.
+
+
+cucharout(char)                                     [procedure variable]
+cucharerr(char)                                     [procedure variable]
+        These  procedure   variables  contain   the  current   character
+        consumers for  standard output  and error  output. All  printing
+        utilities in Poplog  use cucharout  to produce  output, and  all
+        error printing is  done via  cucharerr. The  standard values  of
+        these variables are charout and charerr respectively.
+
+
+cuchartrace -> char_cons                                      [variable]
+char_cons -> cuchartrace
+        If this variable  is false  then cucharout is  used for  tracing
+        output. Otherwise the character consumer cuchartrace contains is
+        used instead. Assigning  a character consumer  to this  variable
+        enables trace printing to be separated from normal printout.
+
+
+pop_buffer_charout -> bool                                    [variable]
+bool -> pop_buffer_charout
+        This boolean  variable  controls whether  normal-mode  character
+        output to terminals is buffered within each line; if false, each
+        character is output  immediately (it  therefore affects  charout
+        and charerr when these reference terminals). See REF * SYSIO.
+
+
+
+
+-------------------------------
+4  Raw Mode Repeaters/Consumers
+-------------------------------
+
+rawcharin() -> char                                          [procedure]
+        This repeater  reads  characters  from  the  device  poprawdevin
+        (giving 'raw mode' input from the terminal). See REF * SYSIO.
+
+
+rawcharout(char_or_string)                                   [procedure]
+        This consumer  writes  characters  to  the  device  poprawdevout
+        (giving buffered 'raw mode' output to the terminal). It can take
+        either a single character or a byte vector. See REF * SYSIO.
+
+
+rawsubstringout(string, index, num);                         [procedure]
+        Just like rawcharout,  but outputs num  characters, starting  at
+        index, from string. See REF * SYSIO.
+
+
+rawoutflush()                                                [procedure]
+        Flushes poprawdevout, i.e. writes out any outstanding characters
+        in the buffer. Same as sysflush(poprawdevout).
+
+
+charin_timeout(hsecs) -> char                                [procedure]
+        Returns  the  first  character  read  from  the  terminal   with
+        rawcharin during  the time-span  hsecs, or  false if  none  were
+        available. hsecs  is measured  in hundredths  of a  second  (but
+        rounded  to  the  nearest  whole  second).  (This  procedure  is
+        implemented in terms  of pop_timeout_secs  and pop_timeout,  see
+        REF * SYSIO).
+
+
+
+
+-----------------------------------
+5  Creating New Repeaters/Consumers
+-----------------------------------
+
+bits_out(filename, n, signed) -> int_consumer                [procedure]
+bits_in(filename, n, signed) -> int_repeater                 [procedure]
+        The bits_in/bits_out mechanism facilitates compact storage  of a
+        series of integers.  For example,  the data for  a binary  array
+        could be stored using 1/8 the space used by simply printing  the
+        numbers to disk.
+
+        For both procedures, the  argument filename may  be a file  name
+        string, or a device.
+
+        The n argument  specifies the  bitsize of the  integers; if  the
+        boolean argument  signed  is  true,  the  integers  are  signed,
+        otherwise unsigned.
+
+        bits_out returns  an 'integer  consumer' procedure  int_consumer
+        for the specified file.  Successive calls of int_consumer  write
+        n-bit integers to the file, i.e.
+
+                int_consumer(int_or_termin);
+
+        bits_in returns  an  'integer repeater'  procedure  int_repeater
+        linked  to  the  specified  file  (normally,  one  created  with
+        bits_out). Successive calls of int_repeater read n-bit  integers
+        from the file, i.e.
+
+                int_repeater() -> int_or_termin
+
+
+discin(filename) -> char_rep                                 [procedure]
+        Returns a character  repeater for the  filename filename,  which
+        may be a string  or word -- if  a word then pop_default_type  is
+        appended to the name (see below).
+
+        Note that, despite the name  of this procedure, filename is  not
+        restricted to  being  a  disk  file;  it  may  be  any  suitable
+        operating system device. (The device is opened using
+
+            sysopen(filename, 0, false, `N`) -> dev;
+
+        i.e. a  disk  file  is  assumed  to be  a  text  file.  See  the
+        description of the third argument to sysopen in  REF * SYSIO.) A
+        mishap will result if the specified file cannot be opened.
+
+        filename may also be  a device record  open for reading,  e.g. a
+        device created by sysopen or syspipe (in Unix) or sysmailbox (in
+        VMS). In  that  case a  character  repeater for  the  device  is
+        returned. This technique  can be used  for 'binary' disk  files,
+        e.g.
+
+            sysopen(filename, 0, true, `N`) -> dev;
+            discin(dev) -> char_rep;
+
+
+discout(filename) -> char_cons                               [procedure]
+        Returns a character consumer for the filename filename (which is
+        as for discin). If filename is a  disk file, then a new file  is
+        created, otherwise the  file is  simply opened.  (The device  is
+        created using
+
+            syscreate(filename, 1, false) -> dev;
+
+        i.e. a  disk  file  is  assumed  to be  a  text  file.  See  the
+        description of the third argument to syscreate in  REF * SYSIO.)
+        A mishap will result if the specified file cannot be created  or
+        opened.
+
+        filename may also be a device record open for writing, in  which
+        case a character consumer for  that device is returned. As  with
+        discin, this technique can be used for 'binary' disk files, e.g.
+
+            syscreate(filename, 1, true) -> dev;
+            discout(dev) -> char_cons;
+
+
+discappend(filename) -> char_cons                            [procedure]
+        Opens  an  existing  file,  and  returns  a  character  consumer
+        char_cons that will  append characters  to the  file (i.e.  will
+        actually update  an  existing disk  file).  filename is  as  for
+        discin.
+
+
+discin_device(char_rep) -> dev                               [procedure]
+discin_device(char_rep, mishap) -> dev_or_false
+        Given a  character  repeater  procedure  char_rep,  returns  the
+        device record  dev  associated  with it.  If  char_rep  was  not
+        created by discin, a mishap  occurs unless the optional  boolean
+        argument mishap is supplied and is false (in which case false is
+        returned).
+
+
+discout_device(char_cons) -> dev                             [procedure]
+        Returns the  device record  dev  associated with  the  character
+        consumer procedure char_cons. An error is signalled if char_cons
+        was not created by discout.
+
+
+pop_default_type -> string                                    [variable]
+string -> pop_default_type
+        The string in this variable (default value '.p') is used as  the
+        default file type/extension by  discin, discout and  discappend,
+        and  is  concatenated  onto  a  word  argument  given  to  these
+        procedures (but not onto a string argument).
+
+
+sysisprogfile(filename) -> bool                              [procedure]
+        Where filename is  a string,  returns true if  filename has  the
+        file type/extension given by pop_default_type, false otherwise.
+
+
+stringin(string) -> char_rep                                 [procedure]
+        Returns a  character  repeater  for the  string  string,  i.e. a
+        procedure which  each  time  it  is  called  produces  the  next
+        character from  the  string, and  <termin>  when the  string  is
+        exhausted.
+
+
+isclosed(item, mishap) -> bool                               [procedure]
+isclosed(item) -> bool
+        For item a device, this procedure returns true if the device  is
+        closed, false if it is still open.
+
+        For item a character repeater produced by discin or stringin, it
+        returns true if  the repeater  is exhausted  (i.e. would  return
+        <termin> if  called),  or  false  if  it  still  has  characters
+        available.
+
+        For a character consumer produced by discout, it returns  true
+        if <termin> has been given to the consumer.
+
+        The mishap argument  is a  boolean controlling  what happens  if
+        item is not one  of the above: if  false, the procedure  returns
+        "undef", otherwise a mishap occurs. The mishap argument defaults
+        to true if omitted.
+
+
+
+--- C.all/ref/chario
+--- Copyright University of Sussex 1993. All rights reserved.

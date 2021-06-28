@@ -1,0 +1,798 @@
+REF DOCUMENTATION                                John Williams, Feb 1992
+
+       COPYRIGHT University of Sussex 1992. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<    POPLOG  DOCUMENTATION    >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+This file  briefly  describes  the  procedures  and  variables  used  to
+implement the Poplog online documentation system. For details of how  to
+use Poplog's documentation, see HELP * HELP and HELP * DOCUMENTATION.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Locating Documentation
+
+  2   Documentation Cross-references
+
+  3   DOC Files
+
+  4   HELP Files
+
+  5   INCLUDE Files
+
+  6   LIB Files
+
+  7   MAN Files (Unix only)
+
+  8   REF Files
+
+  9   SRC Files
+
+ 10   TEACH Files
+
+ 11   The HELPFOR and SHOWLIB Commands
+
+ 12   <ENTER> SOURCEFILE
+
+ 13   Indexing Documentation Files
+
+ 14   <ENTER> ??
+
+ 15   Indexing A Poplog Directory Tree
+
+ 16   Obsolete Facilities
+
+
+
+-------------------------
+1  Locating Documentation
+-------------------------
+
+The  following  set  of   procedures  are  used   to  locate  and   edit
+documentation files. They are also documented in HELP * VEDSYSFILE.
+
+
+vedgetlibfilename(search_list, word, lib_name)      [procedure variable]
+                  -> filename_or_false
+
+        Uses syssearchpath to search for  a file named lib_name. If  the
+        search is successful then lib_name  is assigned to the value  of
+        the variable  word,  and  the  full  pathname  of  the  file  is
+        returned.
+
+        If word is "vedlibname" (i.e.  a library file is being  searched
+        for), and lib_name does not  include a file extension, then  the
+        value of pop_default_type is appended to lib_name before passing
+        it to syssearchpath.
+
+        The search  proceeds  as follows.  First,  a  subsystem-specific
+        search list is tried. If lib_name cannot be located there,  then
+        the search_list given as argument is tried.
+
+        The subsystem-specific search list is determined by executing:
+
+            subsystem_searchlist(word, veddocsubsystem);
+
+        except in the case where word is "vedlibname" and lib_name has a
+        non-empty file extension. In  this case, the  subsystem-specific
+        search list is:
+
+            subsystem_searchlist(word, sys_fname_extn(lib_name));
+
+        vedgetlibfilename returns a vector instead  of a file name  when
+        multiple index  entries for  lib_name occur  in the  "doc_index"
+        subdirectory of  one  of the  directories  in the  search  lists
+        (assuming that there is no  file called lib_name). Each  element
+        of the  vector is  itself  a vector,  of  the type  produced  by
+        sys_parse_doc_index_entry (see below).
+
+
+vedsysfile(word, search_list, p)                             [procedure]
+        Attempts to  locate and  edit the  documentation file  named  in
+        vedargument. search_list is a list of directories through  which
+        vedsysfile will search (using vedgetlibfilename). If the file is
+        found, then its name is assigned to be the value of the variable
+        named word. If vedargument is empty,  then the value of word  is
+        used. The procedure p is run when the file is opened, to set  up
+        any special defaults (if p is false, vedhelpdefaults is used).
+
+        vedargument  may  also   contain  a  second   argument  to   set
+        * vvedgotoplace. This must  be separated from  the file name  by
+        space(s),  and   must  be   of   the  form   /search_string   or
+        @line_number;  vvedgotoplace  to  is  then  set  to  the  string
+        search_string or the integer line_number.
+
+        If no suitable file is found, then the procedure vedsysfileerror
+        is called, which by default signals an error.
+
+        In the  case  where vedargument  names  an identifier  which  is
+        documented  in  more  than  one  REF  file  (in  the  same   REF
+        directory), a  temporary Ved  buffer is  created which  contains
+        pointers to those REF files, in cross-reference format. The user
+        can then select the entry they prefer.
+
+
+vedsysfilelog(word, string, filename_or_false)      [procedure variable]
+        Each time  vedsysfile  is  used  to locate  a  piece  of  system
+        documentation, it checks  whether vedsysfilelog  is a  procedure
+        with pdnargs equal to 3. If so, vedsysfilelog is applied to  the
+        following arguments:
+
+            Argument   Meaning
+            --------   -------
+            word:      The name of the procedure that invoked
+                       vedsysfile (e.g. the word "ved_help")
+
+            string:    The name of the requested document.
+
+            filename:  The full pathname of the document
+                       (<false> if the document wasn't found).
+
+        The default value of vedsysfilelog is identfn, which has pdnargs
+        0, and is therefore ignored by vedsysfile.
+
+
+vedsysfileerror(doc_type, name)                     [procedure variable]
+        Called by  vedsysfile  when an  attempt  to locate  a  piece  of
+        documentation  fails.   doc_type   is  a   string   specifying a
+        documentation category, e.g. 'HELP', 'REF', 'TEACH' etc. name is
+        also a string, the name of the file that could not be found.  By
+        default,  vedsysfileerror  prints   a  message   of  the   form:
+        <doc_type> <name>  not found  - Try  <doc_type> <DEFAULT>.  This
+        procedure may be redefined by users.
+
+
+doctypelist -> list                                           [variable]
+list -> doctypelist
+        A list containing the  name of each  document type (HELP,  TEACH
+        etc) and the variable associated  with each one, which  contains
+        the default  file, if  no  filename is  given as  argument  to a
+        documentation request.
+
+
+vedhelpdefaults()                                            [procedure]
+        Sets up values of Ved variables  for HELP and TEACH files  after
+        calling vedveddefaults.
+
+
+
+
+---------------------------------
+2  Documentation Cross-references
+---------------------------------
+
+The following  procedures are  used to  implement the  cross-referencing
+mechanism described in HELP * HELP.
+
+
+consvedcrossref(doctype, name, gotoplace)                    [procedure]
+        Constructs  a  dstring  representing   a  standard  Ved   cross-
+        reference. (This  could  be  inserted into  a  Ved  buffer  with
+        vedinsertstring). doctype should be a word or string  specifying
+        the document type (e.g.  HELP or REF). name  is the name of  the
+        document. gotoplace  may be  a  string or  integer  specifying a
+        search string or line number within  the document, or it may  be
+        false (the usual case).
+
+        For example:
+
+            vedinsertstring(consvedcrossref("help", "news", 200))
+
+        would insert:
+
+            HELP * NEWS/200
+
+        Note that  the  doctype  and name  are  converted  to  uppercase
+        italics, and  that the  spaces around  the `*'  are special  Ved
+        no-break spaces (character `\Ss`). The entire cross reference is
+        `active' in colour 2A.
+
+
+vednexthelp()                                                [procedure]
+        Searches for the next occurrence  of an asterisk in the  current
+        file.
+
+
+vedprevioushelp()                                            [procedure]
+        Searches for the nearest previous  occurrence of an asterisk  in
+        the current file.
+
+
+vedgetsysfilepdr()                                           [procedure]
+        A property table associating  documentation types (e.g.  "HELP",
+        "REF", etc) to access procedures (e.g. ved_help, ved_ref,  etc).
+        Used  as  part  of  the  documentation  browsing  facility.  See
+        HELP * VEDGETSYSFILEPDR.
+
+
+vedgetsysfile()                                              [procedure]
+        Get appropriate documentation  file for  next text  item in  the
+        file, usually mapped to <ESC> h (see HELP * VEDGETSYSFILE).
+
+        This procedure just calls * ved_do_text_action with  appropriate
+        arguments, and will therefore also execute embedded text actions
+        (see SHOWLIB * vedgetsysfile).
+
+
+
+
+------------
+3  DOC Files
+------------
+
+The DOC files are intended as hard-copy manuals. See DOC * DOCFILES.
+
+
+veddocdirectory -> dir                                        [variable]
+dir -> veddocdirectory
+        The main DOC file directory.
+
+
+veddoclist -> search_list                                     [variable]
+search_list -> veddoclist
+        List of directories where DOC files may be found.
+
+
+veddocname -> string                                          [variable]
+string -> veddocname
+        The name of the most recently accessed DOC file.
+
+
+ved_doc filename [ /search_string | @line_number ]           [procedure]
+        Uses vedsysfile to search through the directories in  veddoclist
+        for a DOC file named filename, and then reads it into Ved.
+
+        If supplied, the buffer is positioned initially at search_string
+        or line_number.
+
+
+ved_qdoc filename [ /search_string | @line_number ]          [procedure]
+        Quits current  file,  and  then calls  ved_doc  with  the  given
+        argument(s).
+
+
+doc                                                             [syntax]
+        Syntax word for accessing DOC files from Pop-11.
+
+
+
+
+-------------
+4  HELP Files
+-------------
+
+The HELP files document  a large number of  Pop-11 procedures, and  some
+library packages. Also see HELP * HELPFILES.
+
+
+vedhelpdirectory -> dir                                       [variable]
+dir -> vedhelpdirectory
+        The main HELP file directory.
+
+
+vedhelplist -> search_list                                    [variable]
+search_list -> vedhelplist
+        List of directories where HELP files may be found.
+
+
+vedhelpname -> string                                         [variable]
+string -> vedhelpname
+        The name of the most recently accessed HELP file.
+
+
+ved_help filename [ /search_string | @line_number ]          [procedure]
+        Uses vedsysfile to search through the directories in vedhelplist
+        for a HELP file named filename, and then reads it into Ved.
+
+        If supplied, the buffer is positioned initially at search_string
+        or line_number.
+
+
+ved_qhelp filename [ /search_string | @line_number ]         [procedure]
+        Quits current  file,  and then  calls  ved_help with  the  given
+        argument(s).
+
+
+help                                                            [syntax]
+        Syntax word for accessing HELP files from Pop-11.
+
+
+
+
+----------------
+5  INCLUDE Files
+----------------
+
+These  are  library  files   containing  identifier  declarations.   See
+HELP * INCLUDE and REF * PROGLIST.
+
+
+ved_showinclude filename [ /search_string | @line_number ]   [procedure]
+        Uses  vedsysfile   to   search  through   the   directories   in
+        popincludelist for  an INCLUDE  file  named filename,  and  then
+        reads  it   into   Ved.
+
+        If supplied, the buffer is positioned initially at search_string
+        or line_number.
+
+        See HELP * INCLUDE,  HELP * SHOWLIB, #_INCLUDE,  popincludelist,
+        REF * LIBRARY.
+
+
+showinclude                                                     [syntax]
+        Syntax word for accessing INCLUDE files from Pop-11.
+
+
+
+
+------------
+6  LIB Files
+------------
+
+These are program library files. See REF * LIBRARY and HELP * LIBFILES.
+
+
+vedlibname                                                    [variable]
+        The name of the last file accessed via ved_showlib.
+
+
+ved_showlib filename [ /search_string | @line_number ]       [procedure]
+        Uses vedsysfile  to  search  through the  directories  named  in
+        popuseslist for a library file named filename, and then reads it
+        into Ved.
+
+        If supplied, the buffer is positioned initially at search_string
+        or line_number.
+
+
+ved_qshowlib filename [ /search_string | @line_number ]      [procedure]
+        Quits current file,  and then calls  ved_showlib with the  given
+        argument(s).
+
+
+showlib                                                         [syntax]
+        Syntax word for accessing library files from Pop-11.
+
+
+
+
+------------------------
+7  MAN Files (Unix only)
+------------------------
+
+The following procedures provide a  mechanism for accessing Unix  manual
+files from Ved. See HELP * MAN.
+
+
+vedmandefaults()                                    [procedure variable]
+        This procedure is executed when a  Unix 'man' file is read  into
+        Ved via the command ved_man.
+
+
+ved_man topic                                                [procedure]
+        Invokes the Unix  'man' command with  the argument topic  given.
+        The manual  file  is read  into  a Ved  buffer  and  underlining
+        removed, using ved_noul. See HELP * MAN.
+
+
+ved_qman topic                                               [procedure]
+        Quits current  file,  and  then  calls  ved_man  with  topic  as
+        argument.
+
+
+man                                                             [syntax]
+        Syntax word for accessing Unix manual files from Pop-11.
+
+
+
+
+------------
+8  REF Files
+------------
+
+The REF files provide definitive documentation of the Poplog system. See
+REF * REFFILES.
+
+
+vedrefdirectory -> dir                                        [variable]
+dir -> vedrefdirectory
+        The main REF file directory.
+
+
+vedreflist -> search_list                                     [variable]
+search_list -> vedreflist
+        List of directories where REF files may be found.
+
+
+vedrefname -> string                                          [variable]
+string -> vedrefname
+        The name of the most recently accessed REF file.
+
+
+ved_ref filename [ /search_string | @line_number ]           [procedure]
+        Uses vedsysfile to search through the directories in  vedreflist
+        for a REF file named filename, and then reads it into Ved.
+
+        If supplied, the buffer is positioned initially at search_string
+        or line_number.
+
+
+ved_qref filename [ /search_string | @line_number ]          [procedure]
+        Quits current  file,  and  then calls  ved_ref  with  the  given
+        argument(s).
+
+
+ref                                                             [syntax]
+        Syntax word for accessing REF files from Pop-11.
+
+
+
+
+------------
+9  SRC Files
+------------
+
+These are the main  source files for the  Pop-11, LISP, Prolog, and  PML
+subsystems. See HELP * SRCFILES.
+
+
+vedsrclist                                                    [variable]
+        List of directories where SRC files may be found.
+
+
+vedsrcname                                                    [variable]
+        The name of the most recently edited SRC file.
+
+
+ved_src filename [ /search_string | @line_number ]           [procedure]
+        Uses vedsysfile  to  search  through the  directories  named  in
+        vedsrclist for a  file named  filename, and then  reads it  into
+        Ved.
+
+        If supplied, the buffer is positioned initially at search_string
+        or line_number.
+
+
+ved_qsrc filename [ /search_string | @line_number ]          [procedure]
+        Quits current  file,  and  then calls  ved_src  with  the  given
+        argument(s).
+
+
+src                                                             [syntax]
+        Syntax word for accessing SRC files from Ved.
+
+
+
+
+---------------
+10  TEACH Files
+---------------
+
+The TEACH files contain tutorial style explanations of how to use Poplog
+as  a  program   development  environment  for   AI  applications.   See
+TEACH * TEACHFILES.
+
+
+vedteachdirectory -> dir                                      [variable]
+dir -> vedteachdirectory
+        The main TEACH file directory.
+
+
+vedteachlist -> search_list                                   [variable]
+search_list -> vedteachlist
+        List of directories where TEACH files may be found.
+
+
+vedteachname -> string                                        [variable]
+string -> vedteachname
+        The name of the most recently accessed TEACH file.
+
+
+ved_teach filename [ /search_string | @line_number ]         [procedure]
+        Uses  vedsysfile   to   search  through   the   directories   in
+        vedteachlist for a TEACH file  named filename, and then read  it
+        into Ved.
+
+        If supplied, the buffer is positioned initially at search_string
+        or line_number.
+
+
+ved_qteach filename                                          [procedure]
+        Quits current  file, and  then calls  ved_teach with  the  given
+        argument(s).
+
+
+teach                                                           [syntax]
+        Syntax word for accessing TEACH files from Pop-11.
+
+
+
+
+------------------------------------
+11  The HELPFOR and SHOWLIB Commands
+------------------------------------
+
+The <ENTER> helpfor and <ENTER> showlib  commands allow you to find  all
+the documentation and library files whose names match a given word.
+
+
+ved_helpfor word                                             [procedure]
+        Lists all HELP, TEACH, REF and  DOC files which feature word  in
+        their name. See HELP * HELPFOR.
+
+
+helpfor                                                         [syntax]
+        Syntax word for using the <ENTER> helpfor command from Pop-11.
+
+
+ved_showlibs word                                            [procedure]
+        Lists all LIB files that match word. See HELP * SHOWLIBS.
+
+
+
+
+----------------------
+12  <ENTER> SOURCEFILE
+----------------------
+
+The following procedures provide indexed access to procedure definitions
+in  the   main  Poplog   source  directories.   See   HELP * SOURCEFILE,
+HELP * POPINDEX, and HELP * POPWHERE.
+
+
+popindex(strword) -> list                                    [procedure]
+        Given a  word  or  string, popindex  returns  an  alphabetically
+        sorted list of strings indicating  the source files for all  the
+        procedures defined in the system source and library  directories
+        which contain  the  given item  as  an initial  substring.  Each
+        string in the list returned contains the procedure name followed
+        by a single space and the source file for that procedure, unless
+        the procedure  is  an  UPDATER when  "updaterof"  is  sandwiched
+        between the name and the file. See HELP * POPINDEX for examples.
+
+
+popwhere(strword)                                            [procedure]
+        Given a word or string, popwhere  prints all the entries in  the
+        index of system and library  procedures which contain the  given
+        item as an  initial substring, indicating  the source files  for
+        all the  procedures defined  in the  system source  and  library
+        directories
+
+
+ved_sourcefile word                                          [procedure]
+        Uses popwhere to locate and edit the source code for  procedures
+        whose names match  word. Only procedures  defined by the  syntax
+        word define can be located. See HELP * SOURCEFILE.
+
+
+vedsrcfiledefaults()                                [procedure variable]
+        Run by ved_sourcefile when  it sets the  source file on  screen.
+        Calls vedhelpdefaults, assigns  <false> to  vednotabs, and  sets
+        vedfileprops to "lib" if the source code is located in a  Poplog
+        library file, and "src" otherwise. User-assignable.
+
+
+
+
+--------------------------------
+13  Indexing Documentation Files
+--------------------------------
+
+The procedures described below implement a mechanism for indexing a  set
+of documentation  files  so  they  can  be  accessed  by  commands  like
+<ENTER> ? and <ENTER> ??. See HELP * MKREFINDEX.
+
+
+mkrefindex(dir)                                              [procedure]
+        Indexes the directory dir. An error is signalled if dir does not
+        have a sub-directory named "doc_index".
+
+
+The following procedures are called  by mkrefindex to determine  where a
+description starts and ends. Each may be redefined by the user.
+
+
+description_hdr_start(line) -> bool                 [procedure variable]
+        Should  return  true  if  the  line  of  text  line  commences a
+        description.
+
+
+description_hdr_end(line) -> bool                   [procedure variable]
+        Should return  true  if line  terminates  the header  part  of a
+        description. (Also, by  definition, true if  line commences  the
+        text part of a description).
+
+
+description_hdr_name(line) -> string                [procedure variable]
+        Given the first line  of a description,  should return the  name
+        under which the description is to be indexed.
+
+
+The following procedures are used to access the index:
+
+
+sys_parse_doc_index_entry(string) -> vec                     [procedure]
+        Converts a string (normally  a line from  an index file)  into a
+        five-element vector, containing the five components of an  index
+        entry. string should consist of five space-separated text items.
+
+
+sys_search_doc_index(name, dir, flags) -> n                  [procedure]
+        Searches the index associated with dir for entries listed  under
+        name. Returns the  number of matching  entries (n), followed  by
+        the entries themselves. Each entry is a five element vector,  of
+        the type produced by sys_parse_doc_index_entry.
+
+        The  argument  flags  should   a  positive  integer,  which   is
+        interpreted as a series of bit flags controlling various aspects
+        of the search. Currently only the bottom two bits are inspected.
+        Bit 0 indicates that `*` characters at the beginning and end  of
+        name are  to  be interpreted  as  wild cards.  Bit  1  specifies
+        whether sys_search_doc_index should return as soon as it finds a
+        matching entry, or return all matching entries.
+
+        For compatibility with  previous versions of  Poplog, flags  may
+        also be a boolean, with true being equivalent to 2:11, and false
+        being equivalent to 2:00.
+
+
+
+
+--------------
+14  <ENTER> ??
+--------------
+
+The commands  <ENTER> ?  and  <ENTER> ??  use  the  indexes  created  by
+mkrefindex to  locate  and  display documentation.  These  commands  are
+documented fully in HELP * QUERY.
+
+
+ved_? word                                          [procedure variable]
+ved_?? word                                         [procedure variable]
+        These commands  search  Poplog's  online  documentation  for  an
+        explanation of word.  The results of  this search are  displayed
+        either on the  status line (ved_?)  or in a  temporary Ved  file
+        (ved_??). See HELP * QUERY for a full description.
+
+
+ved_??_list -> search_list                                    [variable]
+search_list -> ved_??_list
+        The list  of  directories  searched by  ved_?  and  ved_??.  May
+        include words  and  identifiers, which  denote  "nested"  search
+        lists. The default value is vedreflist. See HELP * QUERY.
+
+
+ved_??_status_display -> bool                                 [variable]
+bool -> ved_??_status_display
+        If true  (the  default value),  ved_?  will attempt  to  display
+        information on the status line of the current file (if there  is
+        enough room). Otherwise, ved_? uses  a temporary Ved file,  like
+        ved_??. See HELP * QUERY.
+
+
+ved_??_max_lines -> n                                         [variable]
+n -> ved_??_max_lines
+        The maximum number  of lines  of descriptive  text displayed  by
+        ved_??. The default value is 12. See HELP * QUERY.
+
+
+ved_??_tmpfile -> filename                                    [variable]
+filename -> ved_??_tmpfile
+        The name of the temporary Ved file used by ved_? and ved_??  for
+        display.  The  value  of  this  variable  is  initially   false,
+        indicating that no such display has taken place.
+
+
+ved_??_defaults()                                   [procedure variable]
+        Run when ved_??_tmp_file is first created. By default, it simply
+        calls vedhelpdefaults.
+
+
+ved_??_search_doc_index                                      [procedure]
+ved_do_??                                                    [procedure]
+ved_try_do_??                                                [procedure]
+        System procedures used to implement ved_? and ved_??.
+
+
+
+
+------------------------------------
+15  Indexing A Poplog Directory Tree
+------------------------------------
+
+The library  LIB * MAKE_INDEXES  provides facilities  for  automatically
+indexing all the documentation directories in a Poplog directory tree of
+a "standard"  shape. This  involves creating  indexes for  use with  the
+<ENTER> ? and <ENTER> ?? commands (using LIB * MKREFINDEX), and separate
+cross-referenced index files (like HELP * INDEX and TEACH * INDEX.)  For
+full information see HELP * MAKE_INDEXES.
+
+The following, provided by LIB * MAKE_INDEXES, creates the documentation
+indexes.
+
+
+make_indexes(path, skip_paths, prefix, suffix, doc_types)    [procedure]
+make_indexes(path, skip_paths, prefix, suffix, doc_types, strip)
+        ROOT is the root directory of  the tree which is to be  indexed.
+        skip_paths is a  list of  directories which  should be  ignored.
+        prefix is the word or string which should be added to the  start
+        of all index files created. suffix  is the word or string  which
+        should be added to the end of all index files created. doc_types
+        is a list  of the  documentation types whose  indexes should  be
+        created.
+
+        If the optional  boolean arg  strip is  true, all  documentation
+        files for  which indexes  are  built are  also stripped  of  Ved
+        character attributes and graphics characters.
+
+        For  full  details   of  the  use   of  make_indexes  see   HELP
+        MAKE_INDEXES.
+
+
+mi_indexing_commands -> list                                  [variable]
+list -> mi_indexing_commands
+        Procedures  or   Unix/DCL  scripts   for  updating   "doc_index"
+        directories.
+
+
+mi_verbose -> bool                                            [variable]
+bool -> mi_verbose
+        Unless false, warning  and trace information  is displayed  when
+        make_indexes is running.
+
+
+The following variables control the form  of the index files created  by
+the make_indexes procedure.
+
+
+mi_num_columns -> integer                                     [variable]
+integer -> mi_num_columns
+        The number of columns available in an index file.
+
+
+mi_pr_index_header(doc_type, index_name,            [procedure variable]
+    index_path, other_indexes)
+mi_pr_index_footer(doc_type, index_name,            [procedure variable]
+    index_path, other_indexes)
+        The procedures used to create the top and bottom of index  files
+        like HELP * INDEX. See HELP * MAKE_INDEXES for full information.
+
+
+
+
+-----------------------
+16  Obsolete Facilities
+-----------------------
+
+The following commands are obsolete and may be removed from Poplog soon.
+
+
+ved_h word                                                   [procedure]
+        Tells you about  help files on  word, and lets  you choose  one.
+        Copes with  minor  spelling  errors and  truncated  topics.  See
+        ved_vh (below).
+
+
+ved_vh word                                                  [procedure]
+        Equivalent to
+
+            <ENTER> ?? ved_word
+
+        I.e. prefixes word with "ved_" and then runs ved_??.
+
+
+ved_ploghelp filename                                        [procedure]
+ved_plogshowlib filename                                     [procedure]
+ved_plogteach filename                                       [procedure]
+        Obsolete commands for accessing Prolog documentation and library
+        files. The file HELP * SUBSYSTEMS explains how to do this.
+
+
+
+--- C.all/ref/documentation
+--- Copyright University of Sussex 1995. All rights reserved.

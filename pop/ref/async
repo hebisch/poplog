@@ -1,0 +1,747 @@
+REF ASYNC                                           Roger Evans Dec 1987
+                                            Revised John Gibson Sep 1996
+
+     COPYRIGHT University of Sussex 1996. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<     ASYNCHRONOUS TRAPS      >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<        AND SIGNALS          >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+This REF  file describes  asynchronous trap  procedures and  signals  in
+Poplog.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+
+  2   Asynchronous Trap Procedures
+      2.1   ast_p Argument Values
+      2.2   ASTP Execution
+
+  3   Signals
+      3.1   INCLUDE * SIGDEFS
+
+  4   Processing Asynchronous Traps & Signals
+
+  5   The Signal Table
+      5.1   Handlers & Flags
+      5.2   The Initial Signal Table
+            ... Table (1) - Logical Signal Name to Initial Handlers
+            ... Table (2) - Logical Signal Name to Signal Number
+      5.3   Built-in Signal Handlers
+            ... SIG_HUP & SIG_TERM
+            ... SIG_INT
+            ... SIG_TSTP and SIG_TTIN
+
+  6   Other Signal Operations
+
+  7   Detection of Asynchronous Events
+
+
+
+---------------
+1  Introduction
+---------------
+
+Various facilities in  Poplog make use  of asynchronous trap  procedures
+(ASTPs), that is, procedures which are executed outside the normal  flow
+of control. For example, a timer  set going with sys_timer will  execute
+its ast_p  argument  when  the timer  expires;  this  execution  happens
+asynchronously, i.e.  inside whatever  other  procedures the  system  is
+currently executing.
+
+In addition  to trap  procedures associated  with individual  facilities
+(sys_timer, sys_fork  and  sys_async_io),  there is  a  second  type  of
+asynchronous event: signals. A signal is a global condition (like typing
+Ctrl-C to interrupt the system), which has a specific handler  procedure
+to be run asynchronously when the signal occurs.
+
+Under certain  conditions, asynchronous  trap procedures  and/or  signal
+handlers may  be blocked:  this  means that  instead of  being  executed
+immediately, a procedure is queued (on pop_ast_queue) until such time as
+the blocking condition is released.
+
+ASTPs and signals can  also be raised  synchronously with the  procedure
+sys_raise_ast.  Synchronous  raising  is  basically  equivalent  to   an
+ordinary call  of the  handler procedure,  except that  it respects  any
+blocking condition  currently in  force,  and so  provides a  model  for
+handling events within  a program  which is the  same as  that used  for
+asynchronous events.
+
+
+
+
+-------------------------------
+2  Asynchronous Trap Procedures
+-------------------------------
+
+An asynchronous event (such as a timer expiring) causes the  asychronous
+trap procedure (ASTP) associated with the  event to be raised. (See  the
+section Detection  of  Asynchronous Events  below  for more  details  on
+asynchronous event detection.)
+
+Alternatively, ASTPs  may be  raised  synchronously with  the  procedure
+sys_raise_ast.
+
+In all cases, individual ASTPs can have flags associated with them which
+specify that the  trap should  be blocked under  certain conditions;  in
+addition, global blocking of all traps is possible by assigning false to
+the  active  variable  pop_asts_enabled.
+
+If blocked, the trap procedure  is queued (on pop_ast_queue) until  such
+time as the blocking condition is released.
+
+Whenever any trap is raised, ASTPs that were previously queued but  have
+now become enabled are  executed first. Thus as  far as possible,  ASTPs
+are executed  in  the order  in  which  they were  raised.  (After  each
+execution of  a  trap  procedure,  queue  processing  resumes  from  the
+beginning of the queue,  on the assumption that  the handler might  have
+processed the queue in  some way, so the  "current" queue context is  no
+longer valid.)
+
+
+2.1  ast_p Argument Values
+--------------------------
+In addition to sys_raise_ast for raising a trap procedure synchronously,
+the procedures
+
+        * sys_timer
+        * sys_fork
+        * sys_async_io
+
+all take  an  argument ast_p,  which  is an  ASTP  to be  run  when  the
+appropriate event  occurs  (timer  firing, child  process  dying,  input
+becoming available on device).
+
+In all cases, this argument may  be either the trap procedure  directly,
+or a pair of the form
+
+        conspair(p, flags)
+
+where p is the actual procedure, and the (integer) flags value specifies
+blocking (and other) conditions for its execution.
+
+Symbolic  names  for  the  flags  bits  are  defined  in  INCLUDE * AST.
+Currently, these are:
+
+    ASTP_BLOCK_RECURSIVE
+                    If set, recursive invocations of the trap  procedure
+                    are blocked; it will  be executed only when  outside
+                    any calls of itself.
+
+    ASTP_BLOCK_IN_EXTERNAL
+                    If set, the  trap procedure will  not be run  inside
+                    callback from  external code;  it will  be  executed
+                    only when  the system  is in,  or has  returned  to,
+                    `top-level'.
+
+                    (N.B. If  a trap  procedure with  this flag  set  is
+                    queued inside the  Poplog X toolkit  wait state,  or
+                    inside  a  toolkit   callback,  etc,  an   automatic
+                    XptSetXtWakeup is performed.)
+
+    ASTP_BLOCK_NEVER
+                    If set, the  trap procedure will  never be  blocked,
+                    even when pop_asts_enabled is  false. (This flag  is
+                    HIGHLY DANGEROUS -- avoid using it, or (if you must)
+                    do so only with procedures that perform the simplest
+                    of operations  (like  assigning  to  a  variable). A
+                    procedure using  it must  not create  garbage,  call
+                    external procedures,  or  do any  other  complicated
+                    work.)
+
+    ASTP_ERROR_DELETE
+                    If set, any invocations of this trap which have been
+                    raised, but are currently  blocked and queued,  will
+                    be deleted from the queue  if an error occurs  (i.e.
+                    on  a  call  of  mishap  or  setpop).  In  addition,
+                    supplying this flag for  sys_timer causes the  timer
+                    to be cancelled altogether on an error.
+
+    ASTP_TEMP_PAIR
+                    If set, the ast_p argument pair is temporary and can
+                    be reclaimed when the trap procedure is executed.
+
+    ASTP_TEMP_CLOSURE
+                    If set, the trap procedure p is a temporary  closure
+                    and can be garbaged (with * sys_grbg_closure)  after
+                    execution.   Also   in    this   case,   the    flag
+                    ASTP_BLOCK_RECURSIVE  is  taken  to  refer  to   the
+                    * pdpart of  the  closure, i.e.  different  closures
+                    with the  same pdpart  will not  be run  inside  one
+                    another.
+
+Note that for  an actual procedure  ast_p argument (i.e.  with no  flags
+specified), the flags value defaults to just ASTP_BLOCK_RECURSIVE.
+
+
+2.2  ASTP Execution
+-------------------
+Asynchronous  trap  procedures  and  signal  handlers  are  executed  at
+arbitrary points inside the running system. Hence they must not
+
+    (1) Leave the user stack in  a changed condition after  execution. A
+        mishap will  result  if  the  stack  length  has  changed  after
+        executing an ASTP.
+
+    (2) Assume that standard global  variables will have any  particular
+        values, if these are likely to be dynamically localised and  set
+        to different values by procedures in the main program.
+
+Of particular relevance  to (2)  is the variable  * cucharout. To  allow
+ASTPs to print output  safely, this is locally  set to * charout  during
+ASTP execution. (Other  variables that affect  printing must be  locally
+set by the ASTP itself.)
+
+
+
+
+----------
+3  Signals
+----------
+
+A signal  is  a global  asynchronous  event  such as  typing  Ctrl-C  to
+interrupt the system. Signals are represented by small positive integers
+(typically some signal numbers are  reserved by the operating system  to
+have special  meanings,  but  the  user may  also  add  new  signals  if
+desired).
+
+Signals are handled similarily to  asychronous traps, except that  there
+is only  one global  handler  procedure for  each signal  (specified  by
+sys_signal_handler for the signal number), and blocking actions are more
+limited (specified by sys_signal_flag for the signal number).
+
+As with  asynchronous  trap  procedures,  signals  can  also  be  raised
+synchronously, by  giving a  signal number  to sys_raise_ast.  Assigning
+false to pop_asts_enabled blocks signals as well as ASTPs.
+
+Note that  to  enable Poplog  to  implement more  modular  and  powerful
+facilities  itself  (such  as  sys_timer),  certain  Unix  signals   are
+commandeered by the system,  and the user handlers  for these are  never
+invoked (see the  section on  the initial  signal table  below for  more
+details).
+
+
+3.1  INCLUDE * SIGDEFS
+----------------------
+INCLUDE * SIGDEFS is a  library defining  iconstant macros  for all  the
+operating system signals available  on the system  you are running.  The
+constant names consist  of SIG_  followed by the  signal name  (SIG_INT,
+SIG_ALRM, etc). If  the signal is  not defined on  your system,  SIGDEFS
+will not define a macro for it. Thus to achieve a degree of portability,
+you can do, for example:
+
+    #_IF DEF SIG_USR1
+        myhandler -> sys_signal_handler(SIG_USR1);
+    #_ENDIF;
+
+See HELP * DEF, * SYSDEFS.
+
+
+
+
+------------------------------------------
+4  Processing Asynchronous Traps & Signals
+------------------------------------------
+
+pop_asts_enabled -> bool                               [active variable]
+bool -> pop_asts_enabled
+        This active variable  provides global control  over blocking  of
+        asynchronous traps and signals. If false, all ASTPs and  signals
+        are blocked, that  is, when  raised they  are added  to the  AST
+        queue but  not acted  upon. Setting  this variable  true  allows
+        ASTPs and signals in the queue  to be processed, and causes  any
+        currently in the queue that  are not individually blocked to  be
+        dealt with.
+
+
+sys_raise_ast(ast_p_or_signum_or_false)                      [procedure]
+        This procedure raises an asynchronous trap procedure ast_p or an
+        an instance of the signal signum (an integer) and processes  the
+        AST queue (if necessary -- see description above) in an  attempt
+        to handle it. If  the argument is false,  it just processes  the
+        queue without raising a new trap.
+
+        Note that for a signal, if the handler expects an argument (that
+        is, its pdnargs is 1), the  signal number is passed as  argument
+        to it.
+
+
+pop_ast_queue -> list                                  [active variable]
+list -> pop_ast_queue
+        This  variable  returns   a  copy  of   the  current  queue   of
+        asynchronous    trap    procedures    and    signals    awaiting
+        execution/handling (a list of astp_p values and signal numbers).
+
+        When updated, it makes a copy of the list given (which must  not
+        be a dynamic list), and assigns it to be the current queue. (The
+        reason for the copying in these operations is to ensure that the
+        actual queue is private  to the system,  so it can  successfully
+        inhibit the creation of garbage during normal operation.)
+
+        Note  that  assigning  []  to  pop_ast_queue  also  clears   any
+        internally-queued asynchronous  events that  have not  yet  been
+        raised.
+
+
+
+
+-------------------
+5  The Signal Table
+-------------------
+
+The key data  structures of the  signal mechanism is  the signal  table,
+which contains the information needed to handle each signal. The  signal
+table actually consists of two  structures: a vector of signal  handlers
+(one for each signal), and  a corresponding vector of flags  controlling
+whether the signal is enabled for handling or not.
+
+
+5.1  Handlers & Flags
+---------------------
+
+sys_max_signal -> int                                  [active variable]
+int -> sys_max_signal
+        This variable returns the  largest signal currently defined  (an
+        integer). Initially, this value is set to the number of  signals
+        defined by the  operating system  (which varies  from system  to
+        system), and  it is  not permitted  to set  it lower  than  this
+        value. It  can,  however,  be increased,  thereby  creating  new
+        signals, but such signals can only be raised synchronously.
+
+
+sys_signal_flag(signum) -> flag                              [procedure]
+flag -> sys_signal_flag(signum)
+sys_signal_flag(sig_vec) -> flag
+flag -> sys_signal_flag(sig_vec)
+        Returns/updates the status value(s) associated with the
+        specified signal signum, or with those given by the vector of
+        signals sig_vec.
+
+        For a single signum, legitimate values for flag are:
+
+        false
+            Handling is  blocked --  the  signal will  be added  to  the
+            signal queue but not acted upon. (Setting the flag to a true
+            value again will  automatically cause queued  signals to  be
+            handled.)
+
+        {signum1, ... signumN}  (i.e. a vector of signals)
+            Handling is enabled, with handling of all the signals  given
+            in the vector  blocked while  the handler  is running,  i.e.
+            sys_signal_flag is set false for  each signal in the  vector
+            before running  the  handler, and  restored  afterwards  (at
+            which point, any queued signals resulting from the  blocking
+            will be actioned).
+
+        true  (the default for most signals)
+            This is  equivalent to  {signum}, i.e.  a vector  containing
+            just signum itself  -- thus  while the  handler is  running,
+            only signum itself is blocked. This value is the default, on
+            the basis that most handlers will not want to be re-entrant,
+            i.e. invoked again while already running (typically  because
+            of problems with global data structures, etc). A handler can
+            be made re-entrant by using {}, i.e. an empty vector.
+
+        When a set of signals sig_vec is given, the flag value  returned
+        depends on whether all signals  in sig_vec have the same  value.
+        If so, then that value is returned, but otherwise the result  is
+        a list of values, one for  each signal in sig_vec. Similarly  on
+        updating, either a single flag value for all signals in  sig_vec
+        can be given, or a list of different values for each signal.
+
+        Note that  since the  signal  raising mechanism  changes  signal
+        flags locally  while running  a handler,  any changes  to  those
+        flags made by the handler procedure will be lost.
+
+
+sys_signal_handler(signum) -> handler                        [procedure]
+handler -> sys_signal_handler(signum)
+        This  procedure  returns/updates  the  signal  handler  for  the
+        specified  signal   (a  positive   integer  not   greater   than
+        sys_max_signal). Legitimate values for handler are:
+
+        A procedure
+            which is  called  to handle  the  signal. If  the  procedure
+            expects an  argument (that  is,  its pdnargs  is 1),  it  is
+            passed the signal number.
+
+        A procedure identifier
+            whose idval is used  as the handler.  The syntax word  ident
+            (see REF * IDENT)  can  be  used to  access  the  identifier
+            associated with a variable, with the effect that the handler
+            will be the current  value of that  variable. Note that  the
+            variable must  be declared  as  a procedure  variable.  Once
+            again, if the handler expects an argument, it is passed  the
+            signal number.
+
+        true or false
+            for operating-system-defined signals in Unix systems,  these
+            values cause  the  signal  handling to  be  set  to  SIG_DFL
+            (default behaviour) and SIG_IGN (ignore signal) respectively
+            (see UNIX * signal  etc).  The Poplog  signal  mechanism  is
+            bypassed completely for asynchronous raises, which result in
+            default/ignore  behaviour   outside  Poplog   control.   For
+            synchronous raises of these signals, and all raises of other
+            signals (ALL signals in  non-Unix systems), a boolean  value
+            is equivalent to  assigning identfn as  the handler, ie  the
+            signal is effectively ignored.
+
+
+
+5.2  The Initial Signal Table
+-----------------------------
+When Poplog first starts up, the signal table is initialised with values
+for the  signals which  can be  raised asynchronously  by the  operating
+system. (Users can extend the table to include new synchronous  signals,
+of course.) Exactly which signals these are varies from operating system
+to operating system.  The enable  flag for all  signals is  set to  true
+initially. Table  (1) below  defines the  initial handlers  for  logical
+signal names (not  all signals  are available in  all systems  however),
+table (2) defines the mapping of signal names to signal numbers for  the
+different operating systems:
+
+
+...  Table (1) - Logical Signal Name to Initial Handlers
+--------------------------------------------------------
+
+   Signal      Initial Handler
+   ------      ---------------
+   HUP         Exit, writing files, etc.
+   INT         ident keyboard_interrupt
+   QUIT        mishap - see note 1
+   ILL         mishap - see note 3
+   TRAP        mishap
+   IOT         mishap
+   EMT         mishap - see note 3
+   FPE         mishap - see note 2
+   KILL        mishap - see note 6
+   BUS         mishap - see note 3
+   SEGV        mishap - see note 3
+   SYS         mishap
+   PIPE        false - see note 9
+   ALRM        See note 4
+   TERM        Exit, writing files, etc.
+   USR1        mishap
+   USR2        mishap
+   CHLD        true (i.e., ignored) - see note 7, 9
+   PWR         mishap
+   WINCH       false - see note 9
+   URG         mishap
+   IO          See note 5
+   POLL        mishap
+   STOP        mishap - see note 6
+   TSTP        Reset terminal state, move cursor to bottom of screen,
+                   stop
+   CONT        false - see note 9
+   TTIN        Move cursor to bottom of screen, stop
+   TTOU        true (i.e., stop) - see note 8, 9
+   VTALRM      See note 4
+   PROF        mishap
+   XCPU        mishap
+   XFSZ        false - see note 9
+   LOST        mishap
+
+NOTES: Although handlers are provided  for all the system signals,  some
+signals are trapped by low level system routines. For these signals, the
+handler in  the table  is not  always invoked  if the  signal is  raised
+asynchronously. Instead, the following actions are taken:
+
+    1)  When an asynchronous QUIT is  received, Poplog waits one  second
+        and then executes setpop. If during  this wait a second QUIT  is
+        received,  Poplog  exits  immediately  (without  tidying).  This
+        mechanism allows Poplog  to be interrupted  cleanly at ANY  TIME
+        during its execution - regardless of the settings of the various
+        control flags.
+
+    2)  When an  asynchronous  FPE  signal is  received,  Poplog  checks
+        system dependent error codes to determine exactly what has  gone
+        wrong. FPE  signals  can result  in  any one  of  (a)  immediate
+        handling, if  Poplog  can  recover  from  the  error,  (b)  user
+        handling (default - mishap), if  Poplog cannot recover from  the
+        error, (c) "SYSTEM  ERROR" mishap if  the error is  recoverable,
+        but the data  required for recovery  is not present  (eg if  the
+        error occurs in externally loaded code).
+
+    3)  When an asynchronous EMT, ILL,  BUS or SEGV signal is  received,
+        Poplog interprets it as a system error condition which cannot be
+        handled by user routines.  Instead, Poplog always mishaps,  with
+        "SYSTEM ERROR" for ILL and EMT, "ATTEMPT TO ALTER  NON_WRITEABLE
+        SYSTEM STRUCTURE" for  BUS, and "STACK  EMPTY" for SEGV.  (Note:
+        this also explains why these mishaps sometimes occur during  the
+        execution of incorrect externally loaded routines.).
+
+    4)  Poplog reserves the asynchronous ALRM and VTALRM signals for the
+        management  of  interval  timers  installed  by  sys_timer  (see
+        REF * TIMES).
+
+    5)  Poplog reserves the asynchronous IO signal for the management of
+        asynchronous input on devices (see REF * SYSIO).
+
+    6)  The KILL and  STOP signals  cannot be handled ---  Poplog  exits
+        (KILL) or suspends  (STOP) without any  further action if  these
+        signals are received asynchronously.
+
+    7)  Poplog reserves the asynchronous CHLD signal for the  management
+        of child  processes  created  by  sys_fork  and  sys_vfork  (see
+        REF * SYSUTIL).
+
+    8)  The default  action for  TTOU is  to stop  immediately. In  this
+        case, unlike TTIN and TSTP, Poplog does no tidying or  restoring
+        of the screen before or after the stop.
+
+    9)  Signals whose handler value is  boolean are ignored when  raised
+        synchronously.
+
+
+
+...  Table (2) - Logical Signal Name to Signal Number
+-----------------------------------------------------
+
+                                                   SunOS/
+   Signal        SVR4        IRIX       HP-UX      Ultrix         VMS
+   ------        ----        ----       -----      ------         ---
+   HUP             1           1           1           1
+   INT             2           2           2           2           1
+   QUIT            3           3           3           3
+   ILL             4           4           4           4
+   TRAP            5           5           5           5
+   IOT             6           6           6           6
+   EMT             7           7           7           7
+   FPE             8           8           8           8
+   KILL            9           9           9           9
+   BUS            10          10          10          10
+   SEGV           11          11          11          11
+   SYS            12          12          12          12
+   PIPE           13          13          13          13
+   ALRM           14          14          14          14           2
+   TERM           15          15          15          15
+   USR1           16          16          16          30
+   USR2           17          17          17          31
+   CHLD           18          18          18          20           3
+   PWR            19          19          19
+   WINCH          20          25          23          28
+   URG            21          24          29          16
+   IO             22          23          22          23           4
+   POLL           22          22
+   STOP           23          20          24          17
+   TSTP           24          21          25          18
+   CONT           25          28          26          19
+   TTIN           26          29          27          21
+   TTOU           27          30          28          22
+   VTALRM         28          26          20          26
+   PROF           29          27          21          27
+   XCPU           30          31                      24
+   XFSZ           31          32                      25
+   LOST                                   30          29
+
+
+
+5.3  Built-in Signal Handlers
+-----------------------------
+As well as the signals discussed above which are handled at a low  level
+by Poplog,  some  of the  other  signals have  built-in  handlers  which
+perform useful functions, briefly described in table (1). The  functions
+are discussed in more detail in this section. Note, however, that  these
+handlers can be overridden and so are not guaranteed. Note also that not
+all the  signals  discussed  here  are  available  on  all  systems,  in
+particular, only INT and  ALRM are available on  VMS systems (see  table
+2).
+
+
+...  SIG_HUP & SIG_TERM
+-----------------------
+When HUP or TERM is received,  Poplog exits "cleanly". That is it  calls
+sysexit, which  calls  popexit, writes  Ved  files etc.  However  before
+exiting, it sets pop_exit_ok false, and this inhibits generation of  any
+terminal IO (see entry on pop_exit_ok in REF * SYSTEM). It also disables
+any further signals. Note:  the earlier behaviour  of HUP (exit  without
+any  tidying)  can  be  recovered  by  assigning  the  system  procedure
+fast_sysexit as handler.
+
+
+...  SIG_INT
+------------
+When  INT   is  received,   Poplog   invokes  the   variable   procedure
+keyboard_interrupt, which  by  default  calls  the  procedure  interrupt
+(whose default value in  turn is setpop).  INT is sent  (asynchronously)
+when the  user  types  the  interrupt sequence  (often  Ctrl-C)  on  the
+keyboard:
+
+keyboard_interrupt()                                [procedure variable]
+        The procedure  in  this  variable is  called  asynchronously  in
+        response to a  SIG_INT signal  -- which is  usually produced  by
+        Ctrl-C typed on the keyboard.
+
+        The default value is a procedure which just calls interrupt().
+
+
+interrupt()                                         [procedure variable]
+        The procedure in this variable  is called by the standard  value
+        of keyboard_interrupt.
+
+        interrupt is also called by mishap after it has printed a mishap
+        message and before  it calls setpop  (thus redefining  interrupt
+        can be  used to  alter the  action taken  after mishaps  --  see
+        REF * MISHAPS).
+
+        The default value of this variable is setpop.
+
+
+...  SIG_TSTP and SIG_TTIN
+--------------------------
+When TSTP  or TTIN  is received,  Poplog suspends  after performing  the
+following tidying  up  operations: First  it  invokes a  user  procedure
+popsuspend discussed below.  Then it  saves the current  Ved state,  and
+moves the cursor to the bottom of the screen Then if the signal is  TSTP
+it restores the terminal to the state  it was in when Poplog started  up
+(or last  resumed  after a  suspension).  Then it  suspends  itself,  by
+setting the the  signal handler to  the Unix default  and resending  the
+signal.
+
+When Poplog is restarted, it undoes the tidying done by the suspend:  it
+saves the current  state of  the terminal (to  be restored  on the  next
+suspend, or exit) and resets it to what Poplog expects.
+
+It then  restarts Ved,  if  it was  active  when Poplog  suspended.  For
+non-windowed Ved, the  variable vedstop_refresh_both is  used to  decide
+how to do this: if false (the  default), only the last window edited  is
+redisplayed, if true both windows (if appropriate) are redisplayed.
+
+Finally it runs popsuspend again (defined below).
+
+popsuspend(s)                                       [procedure variable]
+        The procedure  popsuspend  provides  a  way  of  attaching  user
+        actions to suspending and continuing without having to  redefine
+        the handlers themselves. It  takes one argument identifying  the
+        context of use as follows:
+
+        positive integer s:
+            about to suspend in response to signal s
+
+        negative integer s:
+            continuing after suspension due to signal s
+
+        The default value of popsuspend is erase.
+
+
+There are a number of known problems with these stop handlers.  Firstly,
+the STOP signal  cannot be handled  and so cannot  be brought into  this
+scheme. It is recommended therefore that TSTP is used to suspend  Poplog
+rather than STOP. Indeed TSTP is the signal sent when the user types the
+suspend sequence (usually ctrl Z, ctrl  Y or ctrl \) from the  terminal.
+It is also the signal raised  (synchronously) by the stop macro and  the
+Ved <ENTER>  stop  command  (see HELP * STOP).
+
+Finally note that Poplog gets sent a CONT signal when it restarts  after
+a suspension, which is ignored by default.
+
+
+
+
+--------------------------
+6  Other Signal Operations
+--------------------------
+
+sys_send_signal(pid, signum) -> bool     (unix only)         [procedure]
+        Sends the  signal number  signum to  the process  whose  Process
+        IDentification number  is the  integer  pid, returning  true  if
+        successful. false is returned if the specified process does  not
+        exist, or you do not have  the privilege to send that signal  to
+        it.
+
+        If pid refers to a  Poplog process, this causes an  asynchronous
+        raise of signal signum in that process.
+
+
+syskill(pid) -> bool                                         [procedure]
+        In Unix, this is the same as sys_send_signal(pid, 9), i.e.  send
+        a "kill" signal to the process specified by pid.
+
+        In VMS,  it  attempts to  kill  the VMS  process  whose  Process
+        IDentification number  is the  integer  pid, returning  true  if
+        successful.
+
+
+sys_reset_signal()    (unix only)                            [procedure]
+        Restores Poplog's  low-level  signal  handling  routines  to  be
+        consistent    with    the    signal    table.    Signals    with
+        procedure/identifier handlers are set to the Poplog standard low
+        level handler,  those with  boolean-valued handlers  are set  to
+        SIG_DFL/SIG_IGN for  true/false respectively.  This should  only
+        need to be used to tidy up after an external routine has altered
+        the signal-handling.
+
+
+
+
+-----------------------------------
+7  Detection of Asynchronous Events
+-----------------------------------
+
+Asynchronous traps  and signals  can  occur at  any time  during  Poplog
+processing. However,  Poplog cannot  immediately  interrupt what  it  is
+currently doing to handle the event, because there is no guarantee  that
+the system is in  an appropriate state for  running a user procedure  at
+the moment the event occurs (for example, Poplog may be in the middle of
+a  garbage  collection).   Thus  Poplog's  immediate   response  to   an
+asynchronous event is to record which event has occurred (on an internal
+low-level queue), set  a flag indicating  that asynchronous handling  is
+required, and then  return to whatever  processing it was  doing at  the
+time the event arrived.
+
+    In order for such events to  actually be handled, Poplog must  check
+(during normal processing) whether the flag  has been set. It does  this
+frequently, but  only  at times  when  it is  safe  to run  the  handler
+procedure. If it finds  the flag has been  set, it retrieves the  event,
+finds the appropriate ASTP or  signal number, then does a  (synchronous)
+raise of that (as if with sys_raise_ast). From that point on, it behaves
+exactly as if the user program had raised the ASTP or signal.
+
+    So that this approach can work satisfactorily, Poplog must check for
+asynchronous events frequently. Checks are automatically carried out  at
+the beginning  of each  user procedure,  and whenever  control  branches
+backwards, in  particular, inside  every loop  construct. (But  see  the
+compile_mode:vm flags -pentch  and -bjmpch  in HELP * compile_mode.)  In
+addition, certain system procedures also check for asynchronous  events.
+All of this  ensures that  in normal  operation, ASTPs  and signals  are
+handled promptly.
+
+    Nevertheless, there can be situations  where checking does not  take
+place for several seconds (the main one being garbage collections). This
+can cause Poplog's low-level queue to accumulate a number of events, all
+of which will  be handled  at the next  check; however,  the queue  only
+allows space for 64 events, and  if more than this arrive without  being
+handled, only the last 64 will be processed.
+
+The following  active variable  allows users  to block  the checking  of
+asynchronous events. The only possible use for this is in an application
+which must not under circumstances perform a garbage collection; in  all
+other contexts, assign false to  pop_asts_enabled (so that at least  the
+contents of  the  low-level  queue  are  constantly  being  drained  and
+transferred to the higher-level pop_ast_queue):
+
+pop_enable_interrupts -> bool                          [active variable]
+bool -> pop_enable_interrupts
+        This variable  provides global  control  over the  disabling  of
+        asynchronous events. While false, asynchronous events are  added
+        to an  internal  low-level  queue, and  not  raised  until  this
+        variable becomes true  again (but synchronous  raising is  still
+        possible).
+
+        The only exceptions to this are certain signals that are trapped
+        by the low level routines:  in particular in Unix systems,  QUIT
+        will    allow    Poplog    to    be    interrupted    even    if
+        pop_enable_interrupts is false.
+
+        (Note that internally queued asynchronous signals can be cleared
+        by assigning [] to pop_ast_queue.)
+
+
+
+
+--- C.all/ref/async
+--- Copyright University of Sussex 1996. All rights reserved.

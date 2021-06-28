@@ -1,0 +1,633 @@
+REF LIBRARY                          John Gibson, John Williams May 1991
+                                            Revised John Gibson Aug 1995
+
+        COPYRIGHT University of Sussex 1995. All Rights Reserved
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<  POPLOG LIBRARY MECHANISMS  >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+Libraries are  programs which  provide much  of Poplog's  functionality.
+This REF  file provides  information on  the Poplog  library  structure.
+where they are stored (including  variable names), the rationale  behind
+their  storage,  how  they  are  found  (using  searchlists),  and   the
+procedures for manipulating these searchlists. Details are also given on
+the compilation procedures used for library files.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+
+  2   Types of Library
+
+  3   Library Directories
+      3.1   Note for VMS users
+      3.2   Standard Library Directories
+
+  4   Library Names and Library Search Lists
+      4.1   Search List Format
+      4.2   Standard Pop-11 Search Lists
+      4.3   Manipulating Search Lists
+
+  5   Locating Library Files: syssearchpath
+
+  6   Autoloading Pop-11 Library Files
+
+  7   Loading Library Files with uses
+
+  8   Loading Library Files Explicitly
+
+  9   Standard Library Directory Names
+
+
+
+
+---------------
+1  Introduction
+---------------
+
+The term  library  denotes  a  program  component,  or  set  of  program
+components, that  can be  handled  as a  single  named entity.  Much  of
+Poplog's functionality is provided in library form. These libraries  may
+be loaded into the core Poplog run-time system as desired.
+
+Poplog's libraries are stored in disk files, one library per file. It is
+not possible for one file to contain several libraries.
+
+The name  of a  library is  the name  of the  file (as  a string)  which
+contains the library program.
+
+
+
+
+-------------------
+2  Types of Library
+-------------------
+
+There are various types of library:
+
+    (a) compile libraries
+
+    (b) include libraries
+
+Compile libraries generally contain a single procedure definition,  or a
+set of related procedure definitions. They are loaded into the  run-time
+image by simply compiling the library file.
+
+Include  libraries,   on  the   other   hand,  consist   of   identifier
+declarations. When  referenced,  include  libraries  are  not  compiled:
+instead, their  contents  are merged  into  the current  compiler  input
+stream, as if the  declarations were explicitly  present in the  current
+file. The  term  "include" is  derived  from C.  Include  libraries  are
+documented fully in HELP * INCLUDE and REF * PROGLIST.
+
+Some  libraries  are  autoloadable.  These  normally  define  a   single
+identifier. Poplog  will automatically  load  such libraries  when  that
+identifier is first referenced. The method by which this is accomplished
+is discussed below (and also in HELP * AUTOLOAD).
+
+Non-autoloadable libraries may define  several related identifiers,  and
+are only loaded on explicit request.
+
+
+
+
+----------------------
+3  Library Directories
+----------------------
+
+Poplog's library files are divided amongst various library  directories.
+Each directory groups libraries of a similar status. Roughly speaking, a
+library file is assigned to a particular library directory according to
+
+    (a) subsystem   (i.e. Pop-11, Prolog, Lisp or ML)
+
+    (b) type        (i.e. autoloadable, non-autoloadable, include)
+
+    (c) function    (e.g. X Windows Interface libraries, Ved libraries)
+
+
+
+3.1  Note for VMS users
+-----------------------
+In this file, directory names are specified in Unix format, which may be
+translated to VMS format as follows:
+
+    UNIX                                VMS
+    $usepop/pop/lib/auto/nl.p     >>    usepop:[pop.lib.auto]nl.p
+
+The section Filename Processing in  REF * SYSUTIL discusses Unix to  VMS
+filename translation in more detail.
+
+
+
+3.2  Standard Library Directories
+---------------------------------
+Poplog includes the following Pop-11 library directories:
+
+    # pop/lib/auto
+    # pop/lib/data
+    # pop/lib/database
+    # pop/lib/demo
+    # pop/lib/flavours
+    # pop/lib/include
+    # pop/lib/lib
+    # pop/lib/proto
+    # pop/lib/sun
+    # pop/lib/turtle
+    # pop/lib/ved
+    # pop/lib/ved/term
+    # pop/x/pop/lib
+
+and these Lisp library directories:
+
+    # pop/lisp/modules
+
+and these Prolog library directories:
+
+    # pop/plog/auto
+    # pop/plog/lib
+
+and these ML library directories:
+
+    # pop/pml/lib
+
+
+The status and purpose of these libraries is discussed in  DOC * SYSSPEC
+and HELP * LIBFILES.
+
+
+
+
+-----------------------------------------
+4  Library Names and Library Search Lists
+-----------------------------------------
+
+Library names do not contain any directory information. Poplog therefore
+needs a mechanism for  mapping library names  to actual file  pathnames.
+This mapping is effected using search lists. A search list specifies the
+set of directories in  which to look for  a particular library.  Given a
+library name,  and  a search  list,  the procedure  syssearchpath,  will
+return the full library file pathname.
+
+The file HELP * SEARCH_LISTS  provides a more  tutorial introduction  to
+this topic.
+
+Poplog documentation  is  also  accessed via  search  lists.  These  are
+discussed in HELP * VEDSYSFILE and REF * VEDPROCS.
+
+
+
+4.1  Search List Format
+-----------------------
+Each element of  a search list  must be  one of the  following types  of
+object:
+
+    (a) string
+
+    (b) list
+
+    (c) word or identifier
+
+    (d) procedure
+
+Strings denote explicit directory names (e.g. '$popautolib').
+
+Lists are considered to be annotated directory names. They consist  of a
+directory name (the first item in the list), plus additional information
+for use by the Poplog editor, Ved.
+
+Words and identifiers are treated as pointers to a "nested" search list.
+They may also be indirect references to strings or procedures.
+
+Procedures compute  library  file  pathnames,  given  library  names  as
+argument.
+
+The manner in  which syssearchpath  uses these various  types of  search
+list component is discussed below.
+
+
+
+4.2  Standard Pop-11 Search Lists
+---------------------------------
+Pop-11 provides the following search lists as standard:
+
+
+popautolist -> search_list                                    [variable]
+search_list -> popautolist
+        The set of directories  where Pop-11 autoloadable library  files
+        may be found. Its default value is the list:
+
+            [   '$poplocalauto/'
+                '$popautolib/'
+                '$popvedlib/'
+                '$popvedlib/term/'
+                '$usepop/pop/lib/database/'
+            ]
+
+        Users may extend  or modify this  list; it is  also extended  by
+        various  system   libraries   (such   as   LIB * POPXLIB).   See
+        HELP * POPAUTOLIST.
+
+
+popuseslist -> search_list                                    [variable]
+search_list -> popuseslist
+        The set of Pop-11 library directories to be searched by the uses
+        syntax construct. Its default value is the list:
+
+            [   ^(ident popautolist)
+                '$poplocal/local/lib/'
+                '$popliblib/'
+                '$popdatalib/'
+            ]
+
+        Users may extend  or modify this  list; it is  also extended  by
+        various  system   libraries   (such   as   LIB * POPXLIB).   See
+        HELP * POPUSESLIST.
+
+        (Note that the  use of  'ident popautolist' in  the above  means
+        that the value  of popautolist is  not frozen into  popuseslist,
+        and changes to the former will be picked up in the latter.)
+
+
+popsyslist -> search_list                                     [variable]
+search_list -> popsyslist
+        This list is mainly used by the Popc compiler, and contains  the
+        set of all  source and  library directories to  be searched  for
+        identifier declarations. Its default value is the list:
+
+            [   '$usepop/pop/src/'
+                '$usepop/pop/ved/src/'
+                ^(ident popuseslist)
+            ]
+
+        Users may extend  or modify this  list; it is  also extended  by
+        various  system  libraries  (such  as  LIB * POPXLIB,  which  in
+        addition to adding the X library directories to popuseslist also
+        adds the  X  source  directory  $usepop/pop/x/src/  directly  to
+        popsyslist).
+
+        (Note that the  use of  'ident popuseslist' in  the above  means
+        that the value of popuseslist is not frozen into popsyslist, and
+        changes to the former will be picked up in the latter.)
+
+
+
+4.3  Manipulating Search Lists
+------------------------------
+
+flatten_searchlist(search_list) -> list                      [procedure]
+flatten_searchlist(search_list, want_props) -> list
+        Flattens a search list into a list of directory names (strings),
+        i.e.  dereferences  any  words   or  identifiers  contained   in
+        search_list. If the  optional argument  want_props is  supplied,
+        and not false, then  annotated directory names  (2 or 3  element
+        lists) are  returned unchanged.  Otherwise, annotated  directory
+        names are reduced to simple directory names.
+
+        Note   that   flatten_searchlist   cannot   sensibly   interpret
+        procedures in a search list, so these are quietly ignored.
+
+
+extend_searchlist(item, search_list) -> search_list          [procedure]
+extend_searchlist(item, search_list, at_end) -> search_list
+        Adds item  to the  library search  list search_list,  unless  it
+        already contains  item.  item  may  be  any  valid  search  list
+        component  (i.e.  a  string,  annotated  directory  name,  word,
+        identifier, or procedure). When testing whether item is a member
+        of  search_list,  extend_searchlist  dereferences  pointers   to
+        nested search lists as necessary. If  item needs to be added  to
+        search_list, it is added to the end of the list if the  optional
+        argument at_end is supplied and true;  it is added to the  front
+        of the list otherwise. search_list  is returned unchanged if  it
+        already contains item.
+
+
+
+
+----------------------------------------
+5  Locating Library Files: syssearchpath
+----------------------------------------
+
+syssearchpath(search_list, lib_name) -> filename             [procedure]
+syssearchpath(search_list, lib_name, bool) -> filename
+
+        Searches the directories in search_list for the library named by
+        lib_name, returning the full pathname of the file if successful,
+        and false  otherwise.  syssearchpath examines  the  elements  of
+        search_list in left-to-right order,  according to the  algorithm
+        described below (and also in HELP * SEARCH_LISTS):
+
+            # If the  element E is  a string, it  is considered to  be a
+            directory name. If a file called:
+
+                sysfileok(E) dir_>< lib_name
+
+            exists, then the search is terminated, and that filename  is
+            returned. Otherwise, if a directory named:
+
+                sysfileok(E) dir_>< 'doc_index'
+
+            exists, that directory is considered  to be an index to  the
+            directory E. The  procedure sys_search_doc_index  (described
+            in HELP * MKREFINDEX) is  used to  search the  index for  an
+            entry for lib_name, as follows:
+
+                sys_search_doc_index(
+                    lib_name, E, if bool then 2:01 else 2:11 endif)
+
+            (bool is an optional argument, which defaults to false).
+            If one or more index entries for lib_name are found, then:
+
+                  # If  bool is  false, or  there is  only one  matching
+                  entry, the filename  associated with  lib_name by  the
+                  index is returned.
+
+                  # If bool is true, and there is more than one matching
+                  entry, a  vector containing  the matching  entries  is
+                  returned.
+
+          # If the element E is a procedure, it is applied to  lib_name.
+            The result,  if  non-false, is  considered  to be  the  full
+            pathname of lib_name, and returned.
+
+          # If the element E is a  word or identifier, it is  considered
+            to be a pointer to a "nested" search list, which is examined
+            recursively.
+
+          # If the  element E  is a  list,  it is  considered to  be  an
+            annotated directory  name. The  head of  the list  may  be a
+            string, procedure, or word/identifier,  and is processed  as
+            described in steps 1, 2, and 3 respectively. If this results
+            in a pathname being determined, a copy of the list with  the
+            full pathname as its first element is returned.
+
+        syssearchpath is used by  vedsysfile (via vedgetlibfilename)  to
+        locate system documentation and library source code.
+
+
+
+
+-----------------------------------
+6  Autoloading Pop-11 Library Files
+-----------------------------------
+
+The procedures and variables used to implemement Pop-11 autoloading  are
+described below. For a more tutorial discussion, see HELP * AUTOLOAD.
+
+
+syslibcompile(lib_name, dir_list) -> dir                     [procedure]
+syslibcompile(lib_name) -> dir
+        This procedure is  used by  sys_autoload to  locate and  compile
+        Pop-11 library files.  It searches the  directories in  dir_list
+        for the library named by lib_name.  If such a library is  found,
+        it is compiled (with pop11_compile), and the relevant  directory
+        is returned. Otherwise, syslibcompile returns false.
+
+        The argument  lib_name may  be  a string  or  a word.  The  file
+        extension '.p' is added to lib_name if necessary.
+
+        If the  argument  dir_list  is  omitted,  popautolist  is  used.
+        dir_list may contain the full range of search list components as
+        described above.
+
+
+prautoloadwarn(lib_name)                            [procedure variable]
+        Called by syslibcompile when it has determined the full pathname
+        of the library named lib_name, immediately before compiling  it.
+        (Note that this only happens when lib_name is found in an actual
+        directory, not when 'found' by  a procedure in popautolist.  Its
+        default value  is erase,  which means  that autoloading  etc  is
+        normally done silently; the  procedure sysprautoloadwarn may  be
+        assigned to this variable when notification is required.
+
+
+sysprautoloadwarn(lib_name)                                  [procedure]
+        This  procedure   may  be   assigned  to   prautoloadwarn   when
+        notification of autoloading is required. It prints the line
+
+                ;;; AUTOLOADING lib_name
+
+        on the standard output (i.e. through cucharout).
+
+
+sys_autoload(word) -> dir                                    [procedure]
+        This procedure is  called by parts  of the system  that need  to
+        check that an autoloadable definition of a permanent  identifier
+        called WORD  is  loaded  (e.g.  see  the  description  of  macro
+        expansion in REF * PROGLIST, and sysdeclare in REF * VMCODE).
+
+        It first checks to see if word is already defined as a permanent
+        identifier, and returns true if so. Here 'defined' means that
+
+                isdefined(word)
+
+        is true, i.e. that word has  an attached identifier that is  not
+        just a 'weak' declaration (see REF * IDENT).
+
+        If word is not defined, but pop_autoload is false, then false is
+        returned. Otherwise,  if  pop_autoload  is  true,  it  tries  to
+        autoload word:  If  word has  an  autoloading procedure  in  the
+        property sys_autoload_action, then that is called, i.e. if
+
+                sys_autoload_action(word) -> P
+
+        is a procedure, then
+
+                P(word) -> dir
+
+        Otherwise, the autoloading procedure defaults to
+
+                syslibcompile(word) -> dir
+
+        to try and autoload a file 'word.p' from one of the  directories
+        in popautolist. In either case,  the result of the procedure  is
+        returned.
+
+        It  should   normally   be   the  case   that   an   autoloading
+        procedure/autoloaded  file  will  define  word  as  a  permanent
+        identifier; note that  during the call  of syslibcompile or  the
+        autoloading procedure, word is marked specially, so that a  call
+        of sys_autoload on the same word during compilation of the  file
+        will return  false  rather  than  cause  a  recursive  call.  In
+        addition, an abnormal exit from sys_autoload during  compilation
+        will remove any  declaration that word  may have acquired  (thus
+        ensuring  that  word  remains  undefined  after  a   compilation
+        mishap).
+
+
+sys_autoload_action(word) -> p_or_false                      [procedure]
+p_or_false -> sys_autoload_action(word)
+        Property used by sys_autoload. If word is to be autoloaded, and
+
+                sys_autoload_action(word) -> p
+
+        is  a  procedure,   then  that   will  be   called  instead   of
+        syslibcompile.
+
+        (Note that whenever a given word becomes (strongly) declared  as
+        a  permanent  identifier,  any  sys_autoload_action  for  it  is
+        removed.)
+
+
+pop_autoload -> bool                                          [variable]
+bool -> pop_autoload
+        This  variable  (default  value  true)  can  be  used  to   stop
+        sys_autoload from autoloading undefined identifiers; when false,
+        sys_autoload just returns false for such an identifier.
+
+        Setting pop_autoload false is  particularly useful for  programs
+        that wish  to  use  itemread  or nextitem  to  read  words  from
+        proglist with macro expansion, but  do not want undefined  words
+        to be autoloaded.
+
+
+
+
+----------------------------------
+7  Loading Library Files with uses
+----------------------------------
+
+See HELP * USES for a description of the Pop-11 uses syntax construct.
+
+uses_lib_idents(lib_name, lib_list, id_names, flags)         [procedure]
+        System procedure called by the * uses syntax construct.
+
+
+useslib(lib_name)                                   [procedure variable]
+        This procedure was previously called by the uses syntax word. It
+        is now the same as
+
+                uses_lib_idents(lib_name, false, [], 0)
+
+
+
+
+-----------------------------------
+8  Loading Library Files Explicitly
+-----------------------------------
+
+The following  procedures  and syntax  words  are provided  for  loading
+library files explicitly.
+
+
+subsystem_libcompile(lib_name, dir_list) -> bool             [procedure]
+        Loads  the  library  lib_name,  using  its  file  extension   to
+        determine to which subsystem the library belongs and hence which
+        search-lists and which compiler to use.
+
+        If a subsystem-specific version of the library cannot be  found,
+        the given dir_list is searched. The result indicates whether  or
+        not the library was found and compiled.
+
+
+loadlib(lib_name)                                   [procedure variable]
+loadlib(lib_name, lib_list)
+        Loads the library lib_name, by doing
+
+            subsystem_libcompile(lib_name, lib_list)
+
+        where lib_list defaults  to popuseslist  if not  supplied as  an
+        optional second argument.
+
+        An error is signalled if the library file cannot be found,  i.e.
+        if subsystem_libcompile returns false.
+
+        (Note that subsystem_compile_warn is locally set to erase during
+        this procedure.)
+
+
+syslibwarning(lib_name)                                      [procedure]
+        Uses sysprmessage to print a message of the form
+
+            ;;; LOADING LIB lib_name
+
+        syslibwarning is  the default  value of  the procedure  variable
+        libwarning, a call to which is planted by the syntax word lib.
+
+
+libwarning(lib_name)                                [procedure variable]
+        A call to this procedure is  planted by the syntax word lib,  in
+        order to inform the user that  the library lib_name is about  to
+        be compiled. The  default value of  libwarning is the  procedure
+        syslibwarning.
+
+
+
+
+-----------------------------------
+9  Standard Library Directory Names
+-----------------------------------
+
+The following variables  refer to standard  Poplog library  directories,
+via the environment variables (Unix)  or logical names (VMS) defined  in
+the file $popcom/popenv (Unix) or POPCOM:POPENV.COM (VMS).
+
+
+popdisk -> dir                                                [variable]
+dir -> popdisk
+        The root of the Poplog directory tree. Default value  '$usepop/'
+        (Unix) or 'usepop:' (VMS). This variable is only used at system-
+        build time; altering its value has no effect whatsoever.
+
+
+poplibdir -> dir                                              [variable]
+dir -> poplibdir
+        The main Pop-11  autoloadable library  directory. Default  value
+        '$popautolib/' (Unix) or 'popautolib:'  (VMS). This variable  is
+        only used at system-build time; altering its value has no effect
+        whatsoever.
+
+
+vedlibdir -> dir                                              [variable]
+dir -> vedlibdir
+        The main  Ved  autoloadable  library  directory.  Default  value
+        '$popvedlib/' (Unix)  or 'popvedlib:'  (VMS). This  variable  is
+        only used at system-build time; altering its value has no effect
+        whatsoever.
+
+
+popliblibdir -> dir                                           [variable]
+dir -> popliblibdir
+        The main  Pop-11  non autoloadable  library  directory.  Default
+        value '$popliblib/' (Unix) or  'popliblib:' (VMS). The value  of
+        this variable is  inserted into  popuseslist when  that list  is
+        first created, after  which, altering  its value  has no  effect
+        whatsoever.
+
+
+popdatalib -> dir                                             [variable]
+dir -> popdatalib
+        A Pop-11 library directory,  containing miscellaneous data  used
+        by other library programs.  Default value '$popdatalib/'  (Unix)
+        or 'popdatalib:' (VMS). The value  of this variable is  inserted
+        into popuseslist when that list  is first created, after  which,
+        altering its value has no effect whatsoever.
+
+
+popsunlib -> dir                                              [variable]
+dir -> popsunlib
+        The library  directory  where SUN-specific  Pop-11  software  is
+        kept. Default  value  is '$popsunlib/'  (Unix)  or  'popsunlib:'
+        (VMS). This variable  is only defined  if running on  a SUN,  in
+        which case its value is  included in popautolist (and  therefore
+        popuseslist). To define popsunlib on a machine other than a SUN,
+        load LIB * POPSUNLIB. (Default value '$popsunlib/' ).
+
+
+popturtlelib -> dir                                           [variable]
+dir -> popturtlelib
+        This variable is only defined if the library  LIB * POPTURTLELIB
+        has been  loaded. It  holds the  library directory  used by  the
+        Pop-11  "turtle"  graphics   package.  Its   default  value   is
+        '$usepop/pop/lib/turtle/'  (Unix)   or   USEPOP:[POP.LIB.TURTLE]
+        (VMS). Loading LIB * POPTURTLELIB adds  popturtlelib to the  end
+        of popautolist.
+
+
+
+
+--- C.all/ref/library
+--- Copyright University of Sussex 1995. All rights reserved.

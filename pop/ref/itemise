@@ -1,0 +1,767 @@
+REF ITEMISE                                         John Gibson Nov 1995
+
+       COPYRIGHT University of Sussex 1995. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<       ITEMISATION AND       >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<        LEXICAL SYNTAX       >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+This file deals with  the Pop-11 itemiser, which  splits up a stream  of
+characters  stream  of  items  according  to  12  pre-defined  character
+classes. Each item is one of the following types: word, string,  integer
+(or biginteger), ratio, floating-point (decimal or ddecimal), or complex
+number: rules  are given  for  the recognition  of  each of  these.  The
+representation of Ved graphic  characters and control  codes in text  is
+explained, as is the use of Ved character attributes.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Character Classes
+
+  2   Syntax of Items Produced by the Itemiser
+      2.1   Word
+      2.2   String
+      2.3   Integer
+      2.4   Floating-Point
+      2.5   Ratio
+      2.6   Complex Number
+
+  3   Operation of Character Classes
+      3.1   Alphabeticiser (Class 12)
+      3.2   End-of-line Comments (Class 9)
+      3.3   Bracketed Comments (Classes 10 and 11)
+
+  4   Backslash in Strings & Character Constants
+      4.1   Control Characters
+      4.2   Ved Graphics Characters
+      4.3   Ved Special Space Characters
+      4.4   Explicit Integer Character Code
+      4.5   Backslash in Words
+      4.6   Ved Character Attributes
+      4.7   Ved Characters with Associated Data
+
+  5   Associated Procedures
+
+  6   Exceptions Raised
+
+
+
+
+--------------------
+1  Character Classes
+--------------------
+
+The itemiser procedure returned by incharitem (see below) takes a stream
+of input characters produced by a character repeater procedure and turns
+it into a stream of items for  compilation, or any other use. To  effect
+this process, each  ASCII character value  from 0 -  255 has  associated
+with it an integer defining the class of that character, the class  of a
+character governing how it is treated.
+
+The 12  pre-defined classes  are described  below. Note  that the  class
+names (and examples of them) are determined by the normal assignment  of
+classes to  characters, although  by using  item_chartype the  user  can
+assign any  character to  any desired  class, either  globally or  for a
+particular item repeater (thus for example,  the letter "A" can made  to
+behave as if it were a separator in class 5).
+
+    Class   Description
+    -----   -----------
+        1   Alphabetic - the letters a-z, A-Z ;
+
+        2   Numeric - the numerals 0-9;
+
+        3   Signs -- characters like "+",   "-",  "#", "$",  "&"  etc; A
+            character in classes  10 and  11 (bracketed comment  1 &  2)
+            will default to this class  if not occurring in the  context
+            of such a comment.
+
+        4   Underscore, i.e. "_" ;
+
+        5   Separators- the  characters ".", ",", ";", """, "%"  and the
+            brackets "[",  "]", "{",  "}". Control  characters are  also
+            included in this class (except for those in class 6), as are
+            all characters 128-255;
+
+        6   Spaces - the space, tab and newline characters;
+
+        7   String quote - the apostrophe character;
+
+        8   Character quote - the character "`";
+
+        9   End-of-line comment character - the character ";"   (but see
+            below);
+
+        10  Bracketed comment or sign, 1st character - the character
+            "/" ;
+
+        11  Bracketed comment or sign, 2nd character - the character
+            "*" ;
+
+        12  Alphabeticiser - this is special class that forces  the next
+            character in the  input stream  to be  of class  alphabetic,
+            i.e. class 1 - see below. "\" (backslash) may be given  this
+            type by default in later versions of Poplog.
+
+New  classes  other  than  these  can  be  defined  with  the  procedure
+item_newtype (see below under Associated Procedures).
+
+
+
+-------------------------------------------
+2  Syntax of Items Produced by the Itemiser
+-------------------------------------------
+
+The itemiser splits up  a stream of characters  into a stream of  items,
+each item being one of the following types:
+
+    #   word
+    #   string
+    #   integer (or biginteger)
+    #   ratio
+    #   floating-point (decimal or ddecimal)
+    #   complex number
+
+This is done according to the following rules:
+
+
+
+2.1  Word
+---------
+A word is represented by either
+
+    #   a sequence  of alphabetic or numeric  characters beginning
+        with an alphabetic one, e.g. "abc123", "X45" ;
+
+    #   a sequence of sign characters, e.g. "+", "&$+" ;
+
+    #   a sequence of  words produced  by either  of the  preceding,
+        joined by underscores, e.g. "fast_+";
+
+    #   a single separator character, e.g. "[" ;
+
+    #   a  sequence  of  characters  in a  new  class  created  by
+        item_newtype.
+
+
+
+2.2  String
+-----------
+A string  is represented  by  any sequence  of characters  starting  and
+ending with string quotes, e.g.  'abcdefgh12&3'. If   the characters  of
+the string extend over more than one line, the newline character at  the
+end  of  the  line  must  be  preceded  by  a  "\"  (backslash),  unless
+pop_longstrings is  true,  i.e.  if pop_longstrings  is  false  then  an
+unescaped newline causes a mishap.
+
+There is also additional syntax inside strings for representing  special
+characters, e.g. a  newline can be  inserted as '\n'.  See Backslash  in
+Strings & Character Constants below.
+
+
+
+2.3  Integer
+------------
+An integer is represented by either
+
+    #   A sequence of  digits, optionally preceded  by a minus  sign
+        e.g. 12345, -789;
+
+    #   A number preceded  by an  integer and a  colon (:),  meaning
+        that the number is to be  taken to the base of the  integer,
+        e.g. `2:1101` represents 13 as a binary number. The  integer
+        base must be  in the  range 2-36;  if greater  than 10,  the
+        letters A-Z (uppercase only)  can be used  in the number  to
+        represent  digit  values  from  10  to  35,  e.g.  `16:1FFA`
+        represents 8186 as a hexadecimal number.
+
+        If a minus sign is present, this may either follow the radix
+        or precede it,  e.g. both  of the following:  8:-77 and  and
+        -8:77 are valid.
+
+    #   A character  constant,  giving  the integer  code  for  that
+        character. This is any character preceded and followed  by a
+        character  quote.  E.g.  `a`  gives  the  ASCII  value   for
+        lowercase  "a"  (97).  See   also  Backslash  in   Strings &
+        Character Constants below.
+
+Except in  the character  constant case,  an integer  may optionally  be
+followed by  the  letter 'e'  and  a  (signed or  unsigned)  integer  to
+indicate an exponent specification, i.e. NeI will produce
+
+        N * (b  ** I)
+
+where b is the radix of N. This may actually result in the production of
+a ratio rather than an integer, e.g.
+
+        2:110e5 = 2:110 * (2 ** 5) = 192
+        23e-2   = 23 * (10 ** -2)  = 23_/100
+
+If the integer  read in is  too large  to be represented  as a  "simple"
+object (see REF * DATA) then a biginteger is created. E.g.
+
+        isinteger(123456789) =>
+        ** <true>
+        isinteger(123456789123456789) =>
+        ** <false>
+        isbiginteger(123456789123456789) =>
+        ** <true>
+
+
+
+2.4  Floating-Point
+-------------------
+A floating-point literal is a sequence of numeric characters  containing
+a period, e.g.  `12.347`; as with  integers, this can  also be  prefixed
+with a base,  i.e. an integer  followed by a  colon. (The whole  number,
+including fractional places, is taken to this base.)
+
+As with integers, an exponent specification may follow, but in this case
+any of the letters 'e', 's' or 'd' may be used. That is
+
+            NeI   NsI   NdI
+
+all produce
+
+            N *  (b ** I)
+
+where b is the base  of N. The difference between  them is that 'e'  and
+'d'  specify  a  double-float  (ddecimal),  whereas  's'  results   in a
+simple-float (decimal). Thus
+
+        23.0e-2  = 23.0 * (10 ** -2)  = 0.23     (ddecimal)
+        2:11.1d5 = 2:11.1 * (2 ** 5)  = 112.0    (ddecimal)
+        56.2s+3  = 56.2 * (10 ** 3)   = 56200.0  (decimal)
+
+If the  exponent  specification  is  omitted,  the  result  is  always a
+double-float (ddecimal), regardless of the value of popdprecision.
+
+
+
+2.5  Ratio
+----------
+A ratio  is  two integers  (numerator  and denominator)  joined  by  the
+character sequence `_/`,  e.g. 2_/3, -467_/123678.  If the numerator  is
+preceded by a radix,  then this radix applies  also to the  denominator;
+the denominator itself must not have a radix or preceding minus sign.
+
+Note that owing to the rule of 'rational canonicalisation' the resulting
+object will actually  be a  ratio with the  greatest common  denominator
+divided out of numerator  and denominator, or an  integer if this  would
+make the denominator equal to 1.
+
+
+
+2.6  Complex Number
+-------------------
+A complex number is any two of the above kinds of number (the real  part
+and the imaginary part) joined by the character sequence `_+:` or `_-:`,
+e.g. 2_+:3, 1.2_+:8.9, 5_/4_-:3_/2.
+
+The imaginary  part must  not  have either  a radix  specification  or a
+preceding minus sign; as with ratios, the redix of the first number  (if
+any) carries over to the second, and  the sign of the imaginary part  is
+determined by the joining sequence, `_+:` or `_-:`. If an explicit radix
+is specified, then  this must PRECEDE  any minus sign  on the real  part
+(that is, 16:-A_+:B is valid, but not -16:A_+:B).
+
+The two numbers  may be of  different types, although  when either  is a
+floating-point the actual  result will  have both parts  coerced to  the
+same type  of float;  in addition,  when both  parts are  rational,  the
+result will be a rational rather than a complex if the imaginary part is
+integer 0.
+
+
+
+---------------------------------
+3  Operation of Character Classes
+---------------------------------
+
+The itemiser reads characters and produces items from them according  to
+the rules given above;  all characters in the  space class are  ignored,
+and only serve to delineate item boundaries (but see popnewline below).
+
+The effect of other classes not  mentioned in the preceding rules,  i.e.
+the comment classes and the alphabeticiser, are as follows:
+
+
+
+3.1  Alphabeticiser (Class 12)
+------------------------------
+An occurrence of  a character of  this class causes  the next  character
+read to be  interpreted as  having class alphabetic,  regardless of  its
+actual class.  Assuming that  \  has this  class,  this means  that  for
+example
+
+        A\+B\-C   \&_\[\{\(   \12345
+
+are all valid 5-character words. In addition, the following character is
+also interpreted  as  for  the  character following  \  in  strings  and
+character constants  (see Backslash  in  Strings &  Character  Constants
+below), thus enabling non-printable characters to have class alphabetic,
+e.g.
+
+        \nA\^A\^Z\r
+
+is a word consisting  of the characters newline,  A, Ctrl-A, Ctrl-Z  and
+carriage return (ASCII 10, 65, 1, 26, 13).
+
+
+
+3.2  End-of-line Comments (Class 9)
+-----------------------------------
+A character in  this class causes  the rest of  the current line  upto a
+newline to be treated as a comment and ignored. Normally, this character
+is semicolon  ";" and,  IN THIS  CASE ONLY,  3 adjacent  semicolons  are
+actually required for  a comment. If  a semicolon occurs  by itself,  or
+only adjacent to one other, then it is treated as a separator (class 5).
+(This is due to the Pop-11 compiler needing ";" for punctuation, and the
+fact that ";;;" has always been the Pop-11 comment escape.)
+
+
+
+3.3  Bracketed Comments (Classes 10 and 11)
+-------------------------------------------
+These two classes provide  for comments which  begin with a  2-character
+sequence like `/*` and  end with the reversed  sequence `*/`, and  which
+otherwise occupy any number of characters or lines in between. The start
+of such  a comment  is  therefore recognised  as  a class  10  character
+immediately followed by a class 11 character, after which characters are
+read and discarded until the sequence  class 11 followed by class 10  is
+encountered. During the  reading of  the comment  another occurrence  of
+class 10, class 11 is  taken as a nested  comment and so will  correctly
+account for such nesting. For example (assuming / and * have classes  10
+and 11 respectively):
+
+        1 -> x; /* this is a comment */ 2 -> y;
+    /*  1 -> x; /* this is a comment */ 2 -> y; */
+
+where in the second example the whole line has been commented out.
+
+Any occurrence of class 10 or  11 characters other than one  immediately
+followed by the other will default to class 3, i.e. to the sign class.
+
+
+
+---------------------------------------------
+4  Backslash in Strings & Character Constants
+---------------------------------------------
+
+Various special and non-printable  characters (e.g. control  characters)
+can be  represented inside  strings and  character constants  using  the
+character "\" (backslash) combined with other characters, as follows:
+
+
+
+4.1  Control Characters
+-----------------------
+The following sequences are available for the most commonly used control
+characters:
+
+        Seq     Dec    Hex   Name
+        ---     ---    ---   ----
+        \b        8     8    backspace
+        \t        9     9    tab
+        \n       10     A    newline
+        \r       13     D    carriage return
+        \e       27    1B    escape
+        \s       32    20    space
+
+Additionally, any of the control characters  ASCII 0 - 31 and ASCII  127
+can be got  by following  the "\"  with "^"  (up-arrow) and  one of  the
+characters
+
+            @  A-Z  [  \  ]  ^  _  ? a-z
+
+These sequences are:
+
+        Seq     Dec    Hex   Name
+        ---     ---    ---   ----
+        \^@       0     0    NUL
+        \^A       1     1    Ctrl-A      (also \^a)
+        \^B       2     2    Ctrl-B      (also \^b)
+        ...     ...    ...   ...
+        \^Z      26    1A    Ctrl-Z      (also \^z)
+        \^[      27    1B    ESC
+        ...     ...    ...   ...
+        \^_      31    1F
+        \^?     127    7F    DEL
+
+
+
+4.2  Ved Graphics Characters
+----------------------------
+The Ved editor  defines a standard  set of codes  to represent  graphics
+characters; these  consist  of 15  line-drawing  characters plus  a  few
+others. They are represented by sequences with "G" after the "\", viz:
+
+        Seq     Dec    Hex   Name
+        ---     ---    ---   ----
+
+        \Gle    129    81    left end of horizontal line
+        \Gre    130    82    right end of horizontal line
+        \Gbe    132    84    bottom end of vertical line
+        \Gte    136    88    top end of vertical line
+
+        \Gtl    137    89    top left corner junction
+        \Gtr    138    8A    top right corner junction
+        \Gbl    133    85    bottom left corner junction
+        \Gbr    134    86    bottom right corner junction
+
+        \Glt    141    8D    left T-junction
+        \Grt    142    8E    right T-junction
+        \Gtt    139    8B    top T-junction
+        \Gbt    135    87    bottom T-junction
+
+        \G-     131    83    full horizontal line
+        \G|     140    8C    full vertical line
+        \G+     143    8F    crossed full horizontal/vertical lines
+
+        \Go     144    90    degree sign
+        \G#     145    91    diamond
+        \G.     146    92    centred dot
+
+Note  that  the  15  line-drawing   characters  are  all  built  up   by
+superimposing combinations of the  half-line 'end' characters Gle,  Gre,
+Gte and Gbe  (e.g. G-  is Gre combined  with Gle).  Moreover, the  'end'
+characters are encoded  with single  1s in  bits 0, 1,  2 and  3 of  the
+character codes,  which means  that the  other characters  are  produced
+simply by or'ing together the appropriate combination. For example,
+
+        `\G-`  =  `\Gre` || `\Gle`
+        `\Gtl` =  `\Gte` || `\Gle`
+        `\Gtt` =  `\G-`  || `\Gte`
+
+etc. However, also  note that  terminals, etc which  support display  of
+these  line-drawing  graphics  do   not  support  the  half-line   'end'
+characters; these are  therefore always displayed  as the  corresponding
+full-line characters G- or G|.
+
+(The reason for representing the  'end' characters as separate codes  is
+to make it easy for facilities like * veddrawline to produce the correct
+combined character  when 'overdrawing'  one character  on another.  E.g.
+although Gle will display as G-, if overdrawn with Gte it will turn into
+Gtl, whereas G- overdrawn with Gte will become Gtt.)
+
+
+
+4.3  Ved Special Space Characters
+---------------------------------
+In addition to the graphics characters, Ved also defines several special
+kinds of space and a special newline; these (together with the ISO Latin
+'no-break' space character) are represented by sequences beginning  "\S"
+and "\N", viz:
+
+        Seq     Dec    Hex   Name
+        ---     ---    ---   ----
+        \Sh     155    9A    Ved hair space
+        \Nt     155    9B    Trailing newline
+        \Sf     156    9C    Format-control space
+        \Ss     157    9D    Ved no-break space
+        \St     158    9E    Trailing space
+        \Sp     159    9F    Prompt-marker space
+        \Sn     160    A0    ISO Latin no-break space
+
+(See Special Spaces Etc in REF * VEDPROCS for more information.)
+
+
+
+4.4  Explicit Integer Character Code
+------------------------------------
+"\" may also be followed by "(" to signal an explicit integer value  for
+a character, the integer being terminated by ")". E.g.
+
+            '\(255)abc'
+
+is a string containing the characters 255, `a`, `b` and `c`. The integer
+obeys the normal itemiser syntax, so can be radixed, etc. It must be  >=
+0 and <= 255.
+
+
+
+4.5  Backslash in Words
+-----------------------
+As described  under  Operation  of  Character  Classes  above,  all  the
+foregoing "\" sequences are also valid as part of a word when  following
+any alphabeticiser (class 12) character. E.g, if "\" has this class then
+
+        \e\Gtl\(255)
+
+is word containing the character codes 27, 137 and 255.
+
+However,  backslash  sequences  representing  Ved  character  attributes
+(described below) are  valid only in  strings and characters  constants,
+NOT in words.
+
+
+
+4.6  Ved Character Attributes
+-----------------------------
+From Version  14.11  of  Poplog,  integer  character  values  have  been
+extended to  24  bits, and  a  new  datatype, the  'dstring',  has  been
+introduced  to  allow  characters-with-attributes   to  be  stored   and
+retrieved. (See REF * STRINGS.)
+
+Although the basic system does not  give any interpretation to the  (top
+8) attribute bits in characters, the Ved editor does: these are  defined
+in INCLUDE * VEDSCREENDEFS.  In  strings and  character  constants,  the
+sequence
+
+        \[attributes]
+
+may be used to  attach Ved attribute bits  to the succeeding  character,
+where attributes is a sequence of the following (in any order):
+
+           b       sets VEDCMODE_BOLD         (i.e. Bold)
+           u       sets VEDCMODE_UNDERLINE    (i.e. Underline)
+         a or i    sets VEDCMODE_ALTFONT      (i.e. Alt Font/Italic)
+           f       sets VEDCMODE_BLINK        (i.e. Flashing)
+           A       sets VEDCMODE_ACTIVE       (selects colours 0A - 7A)
+         0 to 7    sets colour number 0 to  7
+
+For example,
+
+            `\[bi5]X`
+
+is a character constant for a bold italic `X` in colour 5.
+
+Note that the following character itself may be a backslash sequence. In
+a character constant, the following character may be omitted  altogether
+to give just the attributes bits (i.e. as if with a NUL character).
+
+In a string,  curly brackets may  be used instead  of square ones.  This
+means apply the attributes to all characters following, e.g.
+
+            'abc\{bi5}defg'
+
+would attach the same set of attributes to 'defg'. However, \[...] takes
+precedence for the next character, so that in
+
+            'abc\{bi5}de\[u]fg'
+
+the "f" would have  only the 'underline' attribute.  On the other  hand,
+the additional characters "+" and "-"  may appear in the attributes  (in
+either brackets) to indicate that following options are to be added  to,
+or subtracted from, those currently in force. For example,
+
+           'abc\{bi5}de\[+u]fg'
+
+would add 'underline' to the others rather than replacing them (for  the
+"f", that  is). Note  that when  any colour  number is  specified,  this
+always replaces any existing colour; thus in
+
+            'abc\{bi5}de\[-5+7]fg'
+
+the -5 is unnecessary, since
+
+            'abc\{bi5}de\[+7]fg'
+
+gives the same result.
+
+Finally (of  course), a  string literal  that contains  characters  with
+non-zero attribute  bits will  result  in the  production of  a  dstring
+rather than an ordinary one.
+
+
+4.7  Ved Characters with Associated Data
+----------------------------------------
+From Version 15+ of Poplog, the  concept of 'character' in Ved has  been
+further extended  to include  not just  'character-with-attributes'  but
+'character-with-attributes-plus-associated-data'. By itself, a character
+with associated data is represented by a pair of the form
+
+        conspair(integer-char, data-item)
+
+where integer-char is the ordinary  integer character, and data-item  is
+any associated item. Such characters  are stored in "vedstrings",  which
+are actually  just strings  or dstrings,  but with  any associated  data
+items  held  by  entries   in  the  property  vedstring_data_prop   (see
+Vedstrings in REF * STRINGS).
+
+The \[attributes] escape sequence in quoted strings has been extended to
+allow the construction  of vedstrings,  but with  associated data  items
+being limited to quoted strings only. To embed a string on a  character,
+simply include a quoted string in attributes, e.g.
+
+            'abc\{bi5}de\['EMBEDDED STRING']fg'
+
+will attach the string 'EMBEDDED STRING' to the character "f" (note this
+is permissible only inside \[...], not inside \{...} ).
+
+If (as in the above example), attributes contains only a quoted  string,
+other character attributes  currently in  force are  unaffected for  the
+character. (Hence "f" also gets bold, italic, colour 5. Compare
+
+            'abc\{bi5}de\[]fg'
+
+which would set 0 attributes on the "f". You can use
+
+            'abc\{bi5}de\[0'EMBEDDED STRING']fg'
+
+to force 0 attributes with an embedded string.)
+
+Embedded strings are  also applicable  (if less  useful) with  character
+constants:
+
+            `\[bi5'EMBEDDED STRING']X`
+
+results in the pair
+
+            conspair(`\[bi5]X`, 'EMBEDDED STRING')
+
+
+
+
+------------------------
+5  Associated Procedures
+------------------------
+
+incharitem(char_rep) -> item_rep                             [procedure]
+        Returns an item repeater  item_rep constructed on the  character
+        repeater char_rep, i.e. item_rep is a procedure which each  time
+        it is called returns the next item produced from the  characters
+        supplied by char_rep, or termin when there are no more to  come.
+        item_rep is initially set up to use the global character  table;
+        by use of item_chartype (see below) item_rep can be made to  use
+        its own local table.
+
+        (Note that  from Poplog  14.11,  integer characters  values  are
+        allowed to be  24-bit, where  the top 8  bits represent  display
+        attributes, and  the  bottom  16 are  the  character  code  (see
+        REF * STRINGS). However, as for strings, characters produced  by
+        char_rep are restricted  to 8-bit  character codes  -- that  is,
+        they may have non-zero attribute  bits (which are ignored),  but
+        the bottom 16 bits must be in the range 0 - 16:FF.)
+
+
+popnewline -> bool                                            [variable]
+bool -> popnewline
+        If true, this boolean variable causes item repeaters produced by
+        incharitem to change the class  of the newline character  (ASCII
+        10) to  be 5,  (i.e.  a separator),  so  that instead  of  being
+        ignored as a  space-type character, a  newline will produce  the
+        word whose single character is a newline. (Default value false)
+
+
+pop_longstrings -> bool                                       [variable]
+bool -> pop_longstrings
+        A boolean  variable controlling  reading  of quoted  strings  by
+        incharitem item repeaters. If this is false then quoted  strings
+        cannot contain  a  newline  unless preceded  by  "\".  Otherwise
+        strings can extend over several  lines without the backslash  at
+        the end of each line. (Default value false)
+
+
+isincharitem(item_rep) -> item_rep_or_false                  [procedure]
+isincharitem(item_rep, true) -> char_rep_or_false
+        Used to test whether item_rep is a procedure created by applying
+        * incharitem to  a character  repeater, or  whether the  current
+        value of * proglist is based  on an item repeater created  using
+        incharitem.
+
+        If item_rep  was created  using incharitem  then the  result  is
+        item_rep itself. If item_rep is * readitem or * itemread and the
+        current proglist is a dynamic list, then its generator procedure
+        is examined, and  if derived  from incharitem  the generator  is
+        returned. Otherwise false is returned.
+
+        If the  optional  boolean  second argument  is  true,  then  the
+        underlying character repeater  is returned instead  of the  item
+        repeater.
+
+
+item_chartype(char)           -> N                           [procedure]
+item_chartype(char, item_rep) -> N
+N -> item_chartype(char)
+N -> item_chartype(char, item_rep)
+        The base procedure returns the integer class number N associated
+        with the character char, either  for the global character  table
+        (the first form) or for  the item repeater item_rep (the  second
+        form).
+
+        The updater assigns the  class number N  to the character  char,
+        either for the global  character table (the  first form) or  for
+        the item repeater  item_rep only  (the second  form). Note  that
+        once an assignment has been done for a particular item  repeater
+        item_rep, it  will  no longer  use  the global  table,  so  that
+        subsequent changes to this will not be reflected in item_rep. On
+        the other hand, changes to the global table WILL be reflected in
+        all item repeaters which have not been locally changed.
+
+        For both  base and  updater, the  item repeater  item_rep  (when
+        supplied) may be either a  procedure produced by incharitem,  or
+        one of the procedures itemread or readitem. In the latter  case,
+        the item repeater at the end of proglist is used.
+
+        Note that any attributes (i.e. top 8 bits) on char are ignored.
+
+
+item_newtype() -> N                                          [procedure]
+        Returns an  integer N  ( >  12  ) representing  a new  class  of
+        characters that form words only with members of that class.  The
+        value returned  can  be given  to  item_chartype to  assign  any
+        desired characters into the new class.
+
+
+nextchar(item_rep) -> char                                   [procedure]
+char_or_string -> nextchar(item_rep)
+        Returns (and removes) the next character in the input stream for
+        the item  repeater item_rep  -- this  may or  may not  call  the
+        character repeater  on which  item_rep  is based,  depending  on
+        whether there are any characters buffered inside item_rep.
+
+        The updater adds character(s) back onto the front of the current
+        input stream for the  item repeater item_rep. If  char_or_string
+        is an integer character, then  this is added; otherwise it  must
+        be string, in which  case all the characters  of the string  are
+        added.
+
+        item_rep may take the same values as for item_chartype.
+
+
+
+
+--------------------
+6  Exceptions Raised
+--------------------
+
+This section describes exceptions generated by procedures in this file.
+
+
+incharitem-num:syntax                                     [exception ID]
+        (Error) An incharitem item repeater  detected a syntax error  in
+        an input number.
+
+
+incharitem-bsseq:syntax                                   [exception ID]
+        (Error)  An  incharitem  item   repeater  detected  an   invalid
+        backslash escape sequence in a string or character constant.
+
+
+incharitem-attr:syntax                                    [exception ID]
+        (Error) An  incharitem  item   repeater  detected  an   invalid
+        attribute specification in a string or character constant.
+
+
+incharitem-utcomm:syntax                                  [exception ID]
+        (Error) An incharitem item repeater  failed to find the  closing
+        */ bracket in a /* comment sequence.
+
+
+incharitem-uts:syntax                                     [exception ID]
+        (Error) An incharitem item repeater  failed to find the  closing
+        quote for a string or character constant.
+
+
+incharitem-nextchar:type-incharitem_rep                   [exception ID]
+        (Error) isincharitem  was not  true  for the  item_rep  argument
+        given to nextchar or item_chartype.
+
+
+
+
+--- C.all/ref/itemise
+--- Copyright University of Sussex 1995. All rights reserved.

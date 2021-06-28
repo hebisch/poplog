@@ -1,0 +1,827 @@
+REF SUBSYSTEM                      John Williams, Robert Duncan Jul 1991
+                                           Revised John Gibson, Feb 1993
+
+        COPYRIGHT University of Sussex 1993. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<          SUBSYSTEMS         >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+A description of the facilities used for installing and controlling  the
+language subsystems  of Poplog.  If  new subsystems  make use  of  these
+facilities, then  operations such  as switching  from one  subsystem  to
+another can be achieved in a general way. For an overview of this topic,
+see HELP * SUBSYSTEMS.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Subsystem Records
+
+  2   Standard Subsystems
+
+  3   Subsystem Initialisation
+
+  4   Current Subsystem and Current Compiler Subsystem
+
+  5   Invoking Subsystem Compilers
+
+  6   Subsystem Image Startup
+
+  7   Ved and Subsystems
+
+  8   Subsystem-Sensitive Procedures
+
+
+
+
+--------------------
+1  Subsystem Records
+--------------------
+
+Subsystem  records  are  data  structures  held  in  the  list  variable
+sys_subsystem_table. However,  you do  not  normally access  this  list,
+since user access  to a subsystem  is always in  terms of the  subsystem
+name (there can only be one subsystem for a given name).
+
+A subsystem contains the  following fields:
+
+    Field Name        Type          Description
+    ----------        ----          -----------
+    SS_NAME           word          The subsystem name: e.g. "pop11"
+
+    SS_PROCEDURES     substructure  A      sub-structure      containing
+                                    procedures -- see below.
+
+    SS_FILE_EXTN      string        The  default  file  extension:  e.g.
+                                    '.p'.
+
+    SS_PROMPT         string        The  default   prompt   string   for
+                                    interactive input: e.g. ': '.
+
+    SS_SEARCH_LISTS   list          Table of search-lists  for Ved:  see
+                                    section Ved and Subsystems below.
+
+    SS_TITLE          string        A descriptive  title, typically  the
+                                    full language name.
+
+The  SS_PROCEDURES  field  contains  a  sub-structure  holding  all  the
+procedures associated with the subsystem compiler, as follows:
+
+    Field Name        Type          Description
+    ----------        ----          -----------
+    SS_COMPILER       procedure     The subsystem compilation procedure:
+                                    e.g. pop11_compile. Used to  compile
+                                    files   and   as   an    interactive
+                                    top-level;  may   be  applied   to a
+                                    filename, a  device or  a  character
+                                    repeater.
+
+    SS_RESET          procedure     Reset    procedure,    called     by
+                                    pop_setpop_compiler      immediately
+                                    before re-invoking  the compiler  at
+                                    top-level.
+
+    SS_SETUP          procedure     Initialisation procedure, called  on
+                                    system startup (from syssetup) or by
+                                    sys_init_subsystem.
+
+    SS_BANNER         procedure     Procedure for  printing the  banner,
+                                    called  on  system  startup  or   by
+                                    sys_subsystems_init.
+
+    SS_INITCOMP       procedure     Compiler  initilisation   procedure:
+                                    e.g. sysinitcomp.  Called on  system
+                                    startup or  by  sys_subsystems_init.
+                                    Typically compiles  user and  system
+                                    "init" files.
+
+    SS_POPARG1        procedure     Procedure  for  processing   command
+                                    line arguments  on  system  startup.
+                                    Usually  calls   sys_process_poparg1
+                                    with arguments  appropriate  to  the
+                                    subsystem.
+
+    SS_VEDSETUP       procedure     Ved initialisation procedure, called
+                                    from vedsetup.
+
+    SS_XSETUP         procedure     X Windows initialisation  procedure,
+                                    called   on   system   startup   (if
+                                    popunderx  is   non-false)   or   by
+                                    sys_subsystems_init.
+
+Currently, the outer subsystem record is  simply a list with the  fields
+ordered as above,  and the SS_PROCEDURES  field is a  vector (also  with
+elements in  the  order  given).  However, to  avoid  reliance  on  such
+implementation details, the procedure subscr_subsystem is provided: this
+allows any field to be accessed in an implementation-independent way.
+
+The  first  argument   to  subscr_subsystem  is   an  integer   'virtual
+subscript', whose encoding specifies either one of the outer fields,  or
+one of the  inner SS_PROCEDURES fields.  All the field  names above  are
+defined  as   suitable   integer   constants   by   the   include   file
+INCLUDE * SUBSYSTEM.
+
+Note that the SS_PROCEDURES field may contain either a vector  directly,
+or an identifier/identifier name whose idval/valof is the vector. If the
+field contains an identifier name (ie, a word), the identifier need  not
+actually be  defined: this  enables  the outer  subsystem record  to  be
+present without  any of  the compiler  procedures being  loaded, and  is
+useful for those facilities (such as subsystem_searchlist) which  access
+only the SS_FILE_EXTN and SS_SEARCH_LISTS fields, etc.
+
+
+sys_subsystem_table -> list                                   [variable]
+list -> sys_subsystem_table
+        List of active subsystem records.
+
+
+is_subsystem_loaded(ss_name) -> bool                         [procedure]
+is_subsystem_loaded(ss_name, include_no_compiler) -> bool
+        Tests whether (the word) ss_name is a known subsystem name, i.e.
+        whether sys_subsystem_table contains a subsystem record of  that
+        name.
+
+        If the optional  boolean include_no_compiler  argument is  true,
+        then true is returned  for a subsystem which  is present in  the
+        table, but whose SS_PROCEDURES field is an undefined  identifier
+        (that is, one  whose procedures are  not loaded). Otherwise,  if
+        include_no_compiler  is  false   (the  default  when   omitted),
+        subsystems whose procedures are not loaded will produce a  false
+        return.
+
+
+subscr_subsystem(field, ss_name) -> item                     [procedure]
+item -> subscr_subsystem(field, ss_name)
+subscr_subsystem(field, ss_name, err_p) -> item
+item -> subscr_subsystem(field, ss_name, err_p)
+        Access or update a field of  a subsystem.
+
+        field is the integer 'virtual subscript' for the field, and must
+        be one of the constants defined by INCLUDE * SUBSYSTEM.
+
+        ss_name must be the name of an entry in sys_subsystem_table, and,
+        if field refers  to one  of the  SS_PROCEDURES sub-fields,  then
+        SS_PROCEDURES must not be an undefined identifier name (i.e.
+
+            is_subsystem_loaded(ss_name, false)
+
+        must be true).
+
+        If ss_name  is  not  present in  sys_subsystem_table,  or  field
+        specifies a procedure field and  the procedures are not  loaded,
+        then by  default  the  mishaps  'SUBSYSTEM  NONEXISTENT  OR  NOT
+        LOADED' or 'SUBSYSTEM  COMPILER NOT LOADED'  occur. However,  if
+        the optional procedure  err_p is supplied,  then this is  called
+        instead with the relevant  mishap message (prefixed by  ss_name)
+        as argument, viz
+
+                err_p(ss_name >< message)
+
+        err_p  is  then  expected  to   cause  an  abnormal  exit   from
+        subscr_subsystem.
+
+        For example,
+
+          subscr_subsystem(SS_COMPILER, "foo", vederror) -> compiler;
+
+        could be used to  the get the  compiler procedure for  subsystem
+        "foo", but with  a Ved  error message if  subsystem or  compiler
+        were not loaded.
+
+
+app_subsystems(p)                                            [procedure]
+        Applies the procedure p to the SS_NAME field of every  subsystem
+        in sys_subsystem_table. i.e. runs
+
+                p(ss_name)
+
+        for every subsystem.
+
+
+subsystem_add_new(ss_name, procedures, extn, prompt,         [procedure]
+                                search_lists, title)
+        Constructs a new (outer)  record for a  subsystem named by  (the
+        word) ss_name, and  adds it at  the end of  sys_subsystem_table.
+        (If pop_debugging is false, the subsystem ss_name must not exist
+        already; otherwise, any existing entry is removed first.)
+
+        extn, prompt and  title are  strings for the  initial values  of
+        SS_FILE_EXTN, SS_PROMPT and SS_TITLE respectively;  search_lists
+        is list for the initial value of SS_SEARCH_LISTS.
+
+        For  SS_PROCEDURES,  procedures  may  be  either  a  vector   of
+        procedures directly, or just a compiler procedure (in which case
+        a 1-element  vector is  constructed around  it). procedures  may
+        also be a word (whose valof will contain the procedure vector).
+
+        (Note that the outer structure is declared writeable.)
+
+
+
+
+----------------------
+2  Standard Subsystems
+----------------------
+
+The following subsystems are provided as a standard part of Poplog.
+
+
+pop11                                                   [subsystem name]
+        The base Pop-11 subsystem, always present in the normal  system.
+
+
+prolog                                                  [subsystem name]
+top                                                     [subsystem name]
+        The Prolog subsystems.  These are  defined in  the library  file
+        LIB * PROLOG_SUBSYSTEM.  Their  SS_PROCEDURES  fields   indirect
+        through the  identifier  names  prolog_subsystem_procedures  and
+        top_subsystem_procedures  respectively:  these  identifiers  are
+        defined when  LIB * PROLOG is  loaded (as  in the  Prolog  saved
+        image). See HELP * PROLOG.
+
+
+lisp                                                    [subsystem name]
+        The Common  Lisp  subsystem.  Its  definition  can  be  found in
+        LIB * LISP_SUBSYSTEM. Its SS_PROCEDURES field indirects  through
+        the identifier name  lisp_subsystem_procedures: this  identifier
+        is defined when  LIB * CLISP  is loaded (as  in the CLisp  saved
+        image). See HELP * CLISP.
+
+
+ml                                                      [subsystem name]
+        Standard  ML subsystem,  defined   by   LIB * ML_SUBSYSTEM.  Its
+        SS_PROCEDURES  field  indirects  through  the  identifier   name
+        ml_subsystem_procedures:  this   identifier  is   defined   when
+        LIB * PML is loaded (as in the PML saved image). See HELP * PML.
+
+
+csh                                                     [subsystem name]
+sh                                                      [subsystem name]
+dcl                                                     [subsystem name]
+csh_subsystem -> "csh"                                        [constant]
+sh_subsystem  -> "sh"                                         [constant]
+dcl_subsystem -> "dcl"                                        [constant]
+        Subsystems for the Ved 'immediate mode' operating system command
+        interpreters (csh  and  sh in  Unix,  dcl in  VMS).
+
+        They are defined by the autoloadable identifiers  csh_subsystem,
+        sh_subsystem (Unix) and dcl_subsystem  (VMS), all of which  have
+        the subsystem name as  their value. (This  makes it possible  to
+        have a entry in * vedfiletypes such as
+
+            [ '.csh' {subsystem csh_subsystem} ]
+
+        which will both  autoload the subsystem  and supply the  correct
+        value for subsystem.)
+
+        (These  subsystem  libraries  load  their  compiler   procedures
+        automatically and do not  indirect through identifier names  for
+        their SS_PROCEDURES fields.)
+
+
+
+
+---------------------------
+3  Subsystem Initialisation
+---------------------------
+
+sys_init_subsystem(ss_name)                                  [procedure]
+        Initialises the named subsystem ss_name by calling its SS_SETUP,
+        SS_INITCOMP, SS_XSETUP and SS_VEDSETUP procedures.
+
+        The SS_INITCOMP procedure is called only if pop_noinit is false.
+        The SS_XSETUP procedure is called only if popunderx is true, and
+        sysxsetup is called before running it.
+
+
+sys_subsystems_init(pfield)                                  [procedure]
+        Where  pfield   specifies  a   subsystem  procedure   field   in
+        SS_PROCEDURES, applies  the  procedure  in that  field  for  all
+        subsystems in sys_subsystem_table (that is, all which have their
+        SS_PROCEDURES loaded).
+
+        If pfield is  SS_BANNER, and  popheader has a  true value,  then
+        popheader  is  printed  (and  set  false)  before  running   the
+        SS_BANNER procedures.
+
+        If pfield is SS_XSETUP, then sysxsetup is called before  running
+        the procedures.
+
+
+
+
+---------------------------------------------------
+4  Current Subsystem and Current Compiler Subsystem
+---------------------------------------------------
+
+There are two notions of 'currency' with respect to subsystems:  current
+subsystem  and  current   compiler  subsystem.   They  are   represented
+respectively by the variables subsystem and pop_compiler_subsystem.
+
+On the one hand,  subsystem is simply  the name of  the subsystem to  be
+used for  any  operation which  is  subsystem-dependent (such  as  which
+documentation searchlists to use, or subsystem_valof, for example). Each
+file  in  Ved  has  its  own  value  for  subsystem  (usually  set  from
+vedfiletypes), and determines the compiler used when loading all or part
+of the file,  etc. subsystem can  be (locally) set  by any procedure  if
+this is required.
+
+pop_compiler_subsystem, on  the  other  hand,  defines  which  (if  any)
+language subsystem compiler is currently executing. This is a  protected
+variable, and  is set  only by  those system  procedures which  invoke a
+compiler in 'subsystem' mode, viz
+
+        pop_setpop_compiler
+        subsystem_compile
+        ved_lmr
+
+These procedures locally set  both subsystem and  pop_compiler_subsystem
+to  the  name  of  the  subsystem   being  run;  by  virtue  of   having
+pop_compiler_subsystem as a  dynamic local,  they define  points in  the
+calling sequence  at which  commands to  switch between  languages  will
+operate. E.g. if Prolog were invoked on a file with
+
+        subsystem_compile(file, "prolog");
+
+then the Prolog command
+
+        :- pop11.
+
+occurring in file would chain out  of the call of prolog_compile  inside
+subsystem_compile, and  replace it  with a  call to  pop11_compile.  The
+procedure   which    implements   this    switch   (the    updater    of
+sys_compiler_subsystem), knows at  what point in  the calling chain  the
+switch     should     operate     because     subsystem_compile      has
+pop_compiler_subsystem as a dynamic local.
+
+An important point in this respect is that subsystem compiler procedures
+do not  in themselves  set either  subsystem or  pop_compiler_subsystem.
+Thus an ordinary call to one, e.g.
+
+        prolog_compile(file);
+
+is not equivalent  to
+
+        subsystem_compile(file, "prolog");
+
+since it will not be recognised as a 'subsystem' invocation.
+
+Note that  the variable  pop_compiler_subsystem is  normally  referenced
+with sys_compiler_subsystem (see below).
+
+
+subsystem -> ss_name                                          [variable]
+ss_name -> subsystem
+        The  name   of  the   subsystem  currently   to  be   used   for
+        subsystem-dependent operations.
+
+        Each file in Ved  sets its own  value for subsystem  (usually, a
+        value got from vedfiletypes),  and this determines the  compiler
+        used by ved_lmr, ved_x, etc.
+
+        pop_setpop_compiler uses this variable to decide which subsystem
+        compiler  to  run  at  top-level  outside  of  Ved,  or  in  Ved
+        'immediate mode'.
+
+
+sys_compiler_subsystem(which) -> ss_name_or_false            [procedure]
+ss_name -> sys_compiler_subsystem(which)
+        In access mode, this procedure  returns the name of the  current
+        or 'top-level' compiler-subsystem invocation,  or false if  none
+        is running. In  update mode,  it switches  to a  new current  or
+        top-level compiler subsystem.
+
+        (As  described  above  in  the  introduction  to  this  section,
+        compiler-subsystem invocations  are  calls of  procedures  which
+        locally set the protected variable pop_compiler_subsystem,  i.e.
+        pop_setpop_compiler, subsystem_compile and ved_lmr.)
+
+        The which argument  is an integer  character with the  following
+        meanings:
+
+           which    Meaning
+           -----    -------
+            `c`     The   current   compiler-subsystem   invocation,
+                    relative to Ved.
+
+            `t`     The  top-level  compiler-subsystem   invocation,
+                    relative to Ved.
+
+            `C`     The   current   compiler-subsystem   invocation,
+                    external to Ved.
+
+            `T`     The  top-level  compiler-subsystem   invocation,
+                    external to Ved.
+
+        In the above, 'relative to Ved' means 'within Ved' if the system
+        is currently  inside  Ved  (i.e. vedinvedprocess  is  true),  or
+        'external to  Ved' otherwise.  Thus the  lowercase values  treat
+        vedprocess as  the outer  limit of  the system  when inside  it.
+        (Outside Ved, upper and lowercase are the same.)
+
+        For `t` and `T`, a  'top-level' invocation means one to  which a
+        setpop would reset,  i.e. one being  run by  pop_setpop_compiler
+        (either inside or outside Ved).
+
+        Base Procedure
+        The  base   procedure  returns   the  subsystem   name   ss_name
+        corresponding to the  which argument, or  false if none  exists.
+        (For  argument   `c`,  the   result  is   just  the   value   of
+        pop_compiler_subsystem.)
+
+        Note, for example,  the following circumstances  in which  false
+        will result: for `c` or `t` if inside Ved, but not in a compiler
+        (e.g. when executing  a Ved command);  for `t` when  compiling a
+        file or marked range in Ved, and not in immediate mode; for  `C`
+        or `T`  in the  XVed standalone  image, where  no compiler  runs
+        outside of Ved.
+
+        Updater
+        The updater  switches  the compiler-subsystem  corresponding  to
+        which  to  be  the  new  subsystem  specified  by  ss_name.  The
+        corresponding one must already exist (i.e. it is an error if the
+        base procedure would  return false for  which); if the  existing
+        one is already ss_name, the updater does nothing.
+
+        Only values `c`  and `t`  are allowed  for which  (that is,  the
+        compiler external to Ved cannot  be switched from inside Ved  --
+        use ved_pop for this).
+
+        The  updater  performs  the  switch  by  chaining  out  of   the
+        currently-executing compiler, back into  the environment of  its
+        first procedure call; the value of cucharin in that  environment
+        is then  taken  as  the  input  argument  for  the  new  ss_name
+        compiler. (This ensures that local redefinitions of cucharin  at
+        other points inside the old compiler are ignored.)
+
+        Both  subsystem  and  pop_compiler_subsystem  are  then  set  to
+        ss_name, and finally, before chaining the new compiler from  the
+        old, if  the  subsystem being  replaced  is actually  the  outer
+        top-level compiler (i.e. that  being run by  pop_setpop_compiler
+        outside of  Ved), and  cucharin is  charin, then  the  procedure
+        subsystem_changed_warn is called with ss_name as argument. (This
+        happens regardless of whether which is `c` or `t`.)
+
+
+subsystem_changed_warn(ss_name)                     [procedure variable]
+        User  hook  called  by  the  updater  of  sys_compiler_subsystem
+        whenever there is a change  to the top-level compiler  subsystem
+        (i.e. that being run by pop_setpop_compiler, outside of Ved). It
+        is called only if cucharin for the compiler is charin. ss_name is
+        the new subsystem name. (Default value erase.)
+
+
+pop_compiler_subsystem -> ss_name_or_false          [protected variable]
+        The  system  variable   used  to  implement   compiler-subsystem
+        invocations, as described above.
+
+
+
+
+
+-------------------------------
+5  Invoking Subsystem Compilers
+-------------------------------
+
+See also subsystem_libcompile in REF * LIBRARY.
+
+
+subsystem_compile(source, ss_name_or_false)                  [procedure]
+        Invokes  a  subsystem  compiler  to  compile  the  input  source
+        argument, where the  second argument may  be either an  explicit
+        subsystem name, or false.
+
+        If a  subsystem name  is supplied,  then the  compiler for  that
+        subsystem is  used; in  this case,  source may  be any  argument
+        suitable for that compiler.
+
+        Otherwise, the subsystem is deduced from the filename  extension
+        got from source. To effect this, source must be either
+
+          # a filename string, or a word;
+
+          # a device whose device_full_name is a filename;
+
+          # a character  repeater  (or other)  procedure  whose  pdprops
+            (dereferenced by recursive_front) are a filename.
+
+        If the  filename derived  from any  of the  above has  an  empty
+        extension, then pop_default_type is used instead.
+
+        To deduce the subsystem name, vedfiletypes is first searched  to
+        see if it contains a setting for subsystem corresponding to  the
+        extension; if not,  then all  subsystems in  sys_subsystem_table
+        are searched for one whose SS_EXTENSION field matches it.
+
+        Before calling  the compiler,  subsystem_compile_warn is  called
+        with the input  filename as  argument. (This is  also done  when
+        ss_name is supplied directly,  providing source yields a  string
+        or word as a filename, in  the way described above. It will  not
+        be called if source  is e.g. a list,  or a procedure with  false
+        pdprops.)
+
+        The compiler  for  the  subsystem is  then  invoked,  with  both
+        subsystem  and   pop_compiler_subsystem  locally   set  to   the
+        subsystem name.
+
+
+subsystem_compile_warn(filename)                    [procedure variable]
+        Called by subsystem_compile before  compiling a source  argument
+        from which  a string  or word  filename is  derivable.  (Default
+        value erase.)
+
+
+loadcompiler(filename)                              [procedure variable]
+        This procedure  is called  by  the Pop-11  syntax word  load  to
+        compile filename. Its default value is defined as:
+
+            define vars loadcompiler(filename);
+                lvars filename;
+                dlocal subsystem_compile_warn = erase;
+                subsystem_compile(filename, false);
+            enddefine;
+
+        That is, call subsystem_compile on filename with a false ss_name
+        argument, allowing  the  appropriate subsystem  compiler  to  be
+        selected on the basis of filename's extension.
+
+
+loadwarning(filename)                               [procedure variable]
+sysloadwarning(filename)                                     [procedure]
+        loadwarning is called by the load syntax word to print a warning
+        message  when  filename  is  compiled.  The  default  value   of
+        loadwarning is sysloadwarning, which uses sysprmessage to  print
+        the message
+
+            ;;; LOADING filename
+
+
+load                                                            [syntax]
+        A Pop-11  syntax  construct  for loading  files  containing  any
+        subsystem language. Its format is:
+
+                load filename
+
+        where filename is read with rdstringto up to ";", end of line or
+        termin.
+
+        It plants Poplog VM code to print a warning message (by applying
+        loadwarning to filename),  and then plants  code to compile  the
+        file (by applying  loadcompiler to  filename).
+
+
+
+
+--------------------------
+6  Subsystem Image Startup
+--------------------------
+
+LIB * MKIMAGE provides  a  standard  method for  building  saved  images
+containing one or more subsystems -- see HELP * MKIMAGE.
+
+By default (that is, if not given other entry points), both the standard
+Poplog executable image and  images built with  LIB MKIMAGE perform  the
+following code on startup:
+
+        sysexit -> interrupt;
+        syssetup();
+        interrupt();        ;;; sysexit unless syssetup redefines it
+
+(In both cases, this happens after processing any command line arguments
+beginning with %, which  result in assignments  to pop_noinit, etc.  See
+General System Startup in REF * SYSTEM.)
+
+The procedure syssetup implements the standard Poplog language-subsystem
+startup protocol, and is described  below. Its principal control  aspect
+is that
+
+  # When poparglist contains a (non-Ved startup) argument, interrupt  is
+    left unchanged; the argument is compiled, and the call of  interrupt
+    will therefore cause system exit.
+
+  # Otherwise, interrupt is reset to setpop (and pop_first_setpop is set
+    true). Thus after the  call of syssetup  returns, setpop is  called:
+    this performs  all  necessary  resetting  actions,  and  then  calls
+    pop_setpop_compiler.
+
+pop_setpop_compiler is the handle by  which control is regained  after a
+setpop. It is actually a (protected)  variable, and can be redefined  to
+provide other forms of top-level control (which is done, for example, by
+the XVed  standalone  saved  image). However,  its  default  value  is a
+procedure which (re)starts  the interactive compiler  for the  subsystem
+specified by the variable subsystem. See REF * pop_setpop_compiler.
+
+
+syssetup()                                                   [procedure]
+        This procedure implements the standard Poplog language-subsystem
+        startup, as follows:
+
+        It first assigns true to pop_first_setpop, and then calls
+
+            sys_subsystems_init(SS_SETUP);
+
+        to run the SS_SETUP procedures for all (fully-loaded) subsystems
+        present in sys_subsystem_table.
+
+        Further action then depends on  poparglist. If this contains  an
+        argument which is not one of the Ved commands:
+
+            doc help im ref teach ved src showlib showinclude man
+
+        then  the  SS_POPARG1  procedure  for  the  subsystem  given  by
+        subsystem is  called  to  process  the  argument,  and  syssetup
+        returns.
+
+        (A special exception to the above is the argument 'mkimage'.  In
+        order to  make the  LIB * MKIMAGE  facilities available  to  all
+        language subsystems, this argument  invokes the Pop-11  compiler
+        on LIB MKIMAGE instead.)
+
+        Otherwise, if poparglist is empty or starts with a Ved  command,
+        this is a subsystem compiler  or Ved startup, and the  following
+        initialisations are performed:
+
+          # setpop is assigned to interrupt.
+
+          # If  pop_nobanner  is  false,  and  pop_charin_device  is  an
+            on-line terminal, then
+
+                sys_subsystems_init(SS_BANNER);
+
+            is called to print appropriate banners.
+
+          # If pop_noinit is false, then
+
+                sys_subsystems_init(SS_INITCOMP);
+
+            is called  to compile  'init'  files for  each  fully-loaded
+            subsystem.
+
+          # If popunderx is true, then
+
+                sys_subsystems_init(SS_XSETUP);
+
+            is called to perform any required X setups.
+
+        Finally, if the first  element COMMAND of  poparglist is one  of
+        the Ved commands listed above, then
+
+             popvedcommand(consword('ved_' <> COMMAND))
+
+        is called to  invoke Ved  with the given  command (with proglist
+        locally   set   to    the   remaining    argument   list,    see
+        REF * popvedcommand).
+
+
+
+
+---------------------
+7  Ved and Subsystems
+---------------------
+
+A  feature  of  the  subsystem   library  is  the  ability  to   specify
+documentation or  program libraries  specific  to each  subsystem.  When
+searching for files in response to  a HELP command or similar, Ved  will
+search first in the search-list specific to the subsystem determined  by
+the variable veddocsubsystem (see below) before looking in the  standard
+directories.
+
+Subsystem-specific search-lists should be entered in the SS_SEARCH_LISTS
+field of  the subsystem  record.  This is  an association  list  mapping
+documentation names to search-lists, in the form:
+
+    [ docname1 list1 docname2 list2 ...]
+
+The documentation names are those used by vedgetlibfilename, such as
+
+    vedhelpname       (for HELP requests)
+    vedteachname      (for TEACH requests)
+    vedrefname        (for REF requests)
+    vedsrcname        (for SRC requests)
+    vedlibname        (for SHOWLIB requests)
+    ved_??_name       (for ? and ?? requests)
+
+The corresponding search-lists are as described in  HELP * SEARCH_LISTS.
+For example, a typical value for the SS_SEARCH_LISTS field might be
+
+    [
+     vedhelpname    [['$subsystemroot/help/'  help]]
+     vedteachname   [['$subsystemroot/teach/' teach]]
+    ]
+
+
+veddocsubsystem -> item                                       [variable]
+item  ->  veddocsubsystem
+        Determines how Ved decides the  subsystem to use when  searching
+        for  documentation  or   library  files.   Possible  values   of
+        veddocsubsystem and their effects are:
+
+            "EXTERNAL"
+                Uses the value  of subsystem external  to Ved (i.e.  its
+                value outside of vedprocess).
+
+            "CURRENT"
+                Just uses the current value  of subsystem, (i.e. as  set
+                for the current Ved buffer).
+
+            Any other word
+                Taken as the name of the subsystem to use.
+
+            A string
+                Taken as a  file extension:  uses vedsearchfiletypes  to
+                determine a value of subsystem from vedfiletypes.
+
+        The default value is "EXTERNAL",  meaning that the search  paths
+        for documentation and libraries are  determined by the value  of
+        subsystem outside of Ved  (normally, the language compiler  from
+        which Ved is being called).
+
+
+subsystem_searchlist(docname, ss_name)        -> list        [procedure]
+subsystem_searchlist(docname, ss_name, false) -> list
+subsystem_searchlist(docname, ss_name, true)  -> (list, ss_extn)
+        Returns a  search-list from  the  SS_SEARCH_LISTS field  of  the
+        nominated  subsystem.  docname  identifies  the  search-list  to
+        return (see above  for example values).  ss_name is  typically a
+        subsystem name -- "pop11", "prolog", etc -- but may be any value
+        appropriate to veddocsubsystem.
+
+        If no search-list matching docname is found, the empty list ([])
+        is returned.
+
+        The procedure  may  also  be given  an  optional  boolean  third
+        argument: if  this is  true, a  second result  is returned.  The
+        second  result  ss_extn  is  the  subsystem  SS_FILE_EXTN   if a
+        search-list was found, or false otherwise.
+
+
+ved_subsystem [ss_name]                                      [procedure]
+        Ved command: changes the the value of subsystem for the  current
+        file to be ss_name. Without an argument, it reports the  current
+        value of subsystem.
+
+
+veddo_in_subsystem(ss_name)                                  [procedure]
+        If vedargument  is a  non-empty  string, executes  it as  a  Ved
+        command, but with subsystem locally set to ss_name.
+
+        If vedargument is nullstring, behaves the same as
+
+                <ENTER> pop ss_name
+
+        i.e, Ved  is exited  and control  transferred to  the  top-level
+        compiler for the subsystem ss_name (see REF * ved_pop).
+
+
+ved_lisp   [command]                                         [procedure]
+ved_pml    [command]                                         [procedure]
+ved_pop11  [command]                                         [procedure]
+ved_prolog [command]                                         [procedure]
+        These Ved  <ENTER> commands  use veddo_in_subsystem  to  execute
+        command as if the current subsystem were "lisp", "pml", "pop11",
+        or "prolog" respectively.
+
+
+
+
+---------------------------------
+8  Subsystem-Sensitive Procedures
+---------------------------------
+
+The procedures described below  provide a consistent, modular  mechanism
+for  making   procedures  "sensitive"   to  the   current   subsystem. A
+subsystem-sensitive procedure is one whose behaviour varies according to
+current value of subsystem.
+
+
+subsystem_valof(word, ss_name) -> p                          [procedure]
+p -> subsystem_valof(word, ss_name)
+        Returns/updates the procedure  p which would  be invoked if  the
+        value of word were applied while the subsystem name ss_name  was
+        the current subsystem. An error is signalled if ss_name is not a
+        known  subsystem  name.  false  is  returned  if  word  is   not
+        subsystem-sensitive.
+
+        An example:
+
+            my_jcp -> subsystem_valof("ved_jcp", "mysubsystem");
+
+        This ensures that the procedure my_jcp is invoked if ved_jcp  is
+        called while "mysubsystem" is the  current subsystem. It has  no
+        effect on the behaviour of ved_jcp relative to other subsystems.
+
+
+is_subsystem_sensitive(word) -> bool                         [procedure]
+bool -> is_subsystem_sensitive(word)
+        Tests whether  the  value  of  word  is  a  subsystem  sensitive
+        procedure.   The    updater   may    be   used    to    return a
+        subsystem-sensitive identifier to its original value, e.g.
+
+            false -> is_subsystem_sensitive("ved_jcp");
+
+
+
+--- C.all/ref/subsystem
+--- Copyright University of Sussex 1993. All rights reserved.

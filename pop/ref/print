@@ -1,0 +1,583 @@
+REF PRINT                                          John Gibson Feb 1995
+
+        COPYRIGHT University of Sussex 1995. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<    PRINTING PROCEDURES      >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+This REF  file deals  with the  various Poplog  printing procedures.  It
+groups these into those dealing with: standard printing, printing  items
+off the  stack, formatted  printing,  and printing  into strings  or  as
+character codes. It also details several useful printing constants.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+
+  2   Standard Printing Procedures
+
+  3   Printing Items off the Stack
+
+  4   Formatted Printing
+
+  5   Printing Into Strings/Character Codes
+
+  6   Useful Printing Constants
+
+
+
+
+---------------
+1  Introduction
+---------------
+
+The basic printing procedure  in Poplog is  sys_syspr, which prints  any
+item in its  standard format. While  this can be  called directly if  so
+desired, the system additionally provides the procedures pr and syspr as
+a two-stage mechanism for printing objects in a way that allows  dynamic
+redefinition of the actual printing procedures used.
+
+    The mechanism  is based  on the  convention that  programs  normally
+print objects using the variable procedure pr, which in the first  place
+can be redefined in any desired  way. However, the default value of  the
+variable pr is the  procedure syspr, which prints  an object by  calling
+its * class_print procedure with the object as argument (for details see
+REF * KEYS); thus secondly, the printing of individual data types can be
+altered by redefining their class_print procedures. Because the  default
+class_print of any type is sys_syspr (printing in standard format),  the
+normal sequence of events is therefore:
+
+      pr(item)
+          -------> syspr(item)
+                     --------> class_print(datakey(item))(item)
+                                    -------> sys_syspr(item)
+
+To enable the redefinition of  printing procedures for given data  types
+to take effect  at any  level, sys_syspr always  calls pr  to print  the
+sub-components of  any  data structure  (i.e.  list, vector  and  record
+elements, etc).  (Thus saying  that sys_syspr  "prints any  item in  its
+standard  format"  is  not  strictly  correct,  since  the  printing  of
+sub-components  will  depend  on  pr.  A  completely  standard  printing
+procedure would be
+
+        define pr_standard(item)
+            dlocal pr = sys_syspr;
+            sys_syspr(item)
+        enddefine;
+
+i.e. one that locally redefines pr to be sys_syspr.)
+
+    Objects are actually printed by sys_syspr by passing each  character
+in  its  printed  representation  to  the  standard  character  consumer
+* cucharout. See REF * CHARIO for a description of character stream  I/O
+(including formatting of line output, etc).
+
+ See also * sys_pr_message, which prints mishap and warning messages.
+
+
+
+
+-------------------------------
+2  Standard Printing Procedures
+-------------------------------
+
+sys_syspr(item)                                              [procedure]
+        This is the basic  printing procedure in  the system: it  prints
+        any item item in  its standard format, calling  pr to print  the
+        sub-components of data structures (e.g. list, vector, and record
+        elements, etc).  Printing  characters  produced  are  passed  to
+        cucharout.
+
+        Certain  aspects  of  the   way  sys_syspr  prints  things   are
+        controlled by the pop_pr_ variables below.
+
+
+pop_pr_level -> int                                           [variable]
+int -> pop_pr_level
+        The integer in this active variable (default 1000) specifies the
+        depth to  which sub-components  of structures  are printed.  Its
+        value is dynamically  local to syspr,  which decrements it  by 1
+        locally before calling the appropriate printing procedure for an
+        object (this is also true for sys_syspr, EXCEPT when called from
+        syspr). As  recursive printing  calls for  structure  components
+        proceed, the  value is  decremented until  it reaches  0  (after
+        which it  is  not decremented  further).  When 0,  the  standard
+        printing   routines   in   sys_syspr   will   then   print   any
+        data-structure (i.e.  one  with  components to  which  pr  would
+        normally be applied recursively) just in "minimal" format, e.g.
+
+            <list>  <pair>  <vector>
+
+        etc (numbers, words and strings are printed as normal).
+
+        Note that, while it decrements the variable, syspr always  calls
+        the class_print procedure regardless of whether pop_pr_level  is
+        0 or  not;  thus it  is  the responsibility  of  a  user-defined
+        class_print procedure  to test  for this  condition itself,  and
+        take appropriate action.
+
+
+pop_pr_quotes -> bool                                         [variable]
+bool -> pop_pr_quotes
+        This boolean  variable determines  how  strings are  printed  by
+        sys_syspr. If true, sys_syspr will print them enclosed in string
+        quotes '...'  (this  is useful  in  some circumstances  --  e.g.
+        mishap messages  -- to  enable words  to be  distinguished  from
+        strings).
+
+        If  false  (the  default),  strings  are  printed  without   any
+        decoration (and thus appear the same as words). For example,
+
+            [hello 'hello'] =>
+            ** [hello hello]
+
+            true -> pop_pr_quotes;
+
+            [hello 'hello'] =>
+            ** [hello 'hello']
+
+
+pop_pr_radix -> int                                           [variable]
+int -> pop_pr_radix
+        This variable contains an integer controlling the base to  which
+        all kinds of  numbers are  printed by  sys_syspr (including  the
+        printing of fractional places in floating-point numbers).
+
+        Thus a value of 2 will cause them to be printed in binary, 16 in
+        hexadecimal, etc. Allowable values are 2 to 36, the letters  A-Z
+        being used as numerals for digit values of 10 to 35. The default
+        value is 10 (i.e. print in decimal). E.g.
+
+            pop_pr_radix =>
+            ** 10
+
+            2 -> pop_pr_radix;
+            29 =>
+            ** 11101
+
+        (See also  * radix_apply  below, which  can be  used to  apply a
+        printing procedure in an  environment in which pop_pr_radix  has
+        been altered temporarily.)
+
+
+pop_pr_ratios -> bool                                         [variable]
+bool -> pop_pr_ratios
+        This  boolean  variable  controls  the  printing  of  ratios  by
+        sys_syspr. If true (the default),  ratios are printed as  ratios
+        in the itemisable form  N_/D, where N  is the integer  numerator
+        and D the integer denominator. Otherwise, ratios are printed  as
+        floating-point numbers. E.g.
+
+            true -> pop_pr_ratios;
+            6_/10 =>
+            ** 3_/5
+
+            false -> pop_pr_ratios;
+            6_/10 =>
+            ** 0.6
+
+        (In non-mathematical  applications, where  precise knowledge  of
+        how  a  particular  numeric  quantity  is  represented  is   not
+        relevant, the  latter  may  be preferable  since  decimal  point
+        notation is often easier to comprehend.)
+
+
+pop_pr_places -> int                                          [variable]
+int -> pop_pr_places
+        The bottom 16 bits of the integer in this variable specifies the
+        maximum number  of  fractional places  to  which  floating-point
+        numbers are printed by sys_syspr; numbers printed are rounded to
+        this many places  (a value  of 0 causes  them to  be printed  as
+        integers).
+
+        Note that  this is  normally the  maximum number  of  fractional
+        places  output,  in  the  sense  that  trailing  zeros  in   the
+        fractional  part  are   truncated.  However,  if   pop_pr_places
+        contains a non-zero value above  the bottom 16 bits, this  value
+        is taken to be  a padding character to  be output in each  place
+        containing a trailing zero. E.g.
+
+                (`\s` << 16)  ||  6 -> pop_pr_places;
+
+        will ensure that  6 places  are always  produced, with  trailing
+        zeros replaced by spaces. (Default value 6.)
+
+
+pop_pr_exponent -> bool_or_int                                [variable]
+bool_or_int -> pop_pr_exponent
+        This variable  (default value  false) controls  in which  format
+        sys_syspr prints floating-point numbers.  If false, numbers  are
+        printed in  normal  format; if  true,  printing is  in  exponent
+        format, i.e in the form
+
+                    I.FFFFFFeSE
+
+        where  1  <=  I   <  pop_pr_radix,  there   are  a  maximum   of
+        pop_pr_places fractional places F  after the dot,  and S is  the
+        sign of the exponent E (E is always printed in base 10).
+
+        For example,
+
+            true -> pop_pr_exponent;
+            345.789 =>
+            ** 3.45789e+2
+
+        Note that the exponent value  specifies a power of the  printing
+        radix, e.g.
+
+            2 -> pop_pr_radix;
+            6.5 =>
+            ** 1.101e+2
+
+        The value of pop_pr_exponent can also be an integer, the  bottom
+        16 bits of which specify the  field width for the exponent  E. E
+        is then padded on the left to this width, the padding  character
+        being taken  from  the bits  above  the  bottom 16  if  this  is
+        non-zero, or defaulting to the character `0` otherwise.
+
+
+syspr(item)                                                  [procedure]
+        This procedure does
+
+                class_print(datakey(item))(item)
+
+        i.e. apply the * class_print of the  data type of item to  item.
+        The default class_print  of every  data type  is sys_syspr,  but
+        this can be redefined as desired -- see REF * KEYS.
+
+
+pr(item)                                            [procedure variable]
+        This variable procedure is conventionally used by all procedures
+        in the system which print something; its default value is syspr.
+
+
+npr(item)                                                    [procedure]
+        Prints item followed by a newline, i.e.
+
+            pr(item), cucharout(`\n`);
+
+
+spr(item)                                                    [procedure]
+        Prints item followed by a space, i.e.
+
+                pr(item), cucharout(`\s`);
+
+
+ppr(item)                                                    [procedure]
+        For item a list, prints item "flattened" (i.e. with the list and
+        all its sublists without  list brackets); for  item not a  list,
+        does spr(item). Defined as
+
+                if ispair(item) then
+                    applist(item, ppr)
+                else
+                    spr(item)
+                endif;
+
+        (Compare  with   pretty,   which  attempts   to   print   Pop-11
+        data-structures in a readable format by inserting line-breaks in
+        appropriate places.)
+
+
+sp(n)                                                        [procedure]
+tabs(n)                                                      [procedure]
+nl(n)                                                        [procedure]
+        These procedures respectively output  n spaces (ASCII 32),  tabs
+        (ASCII 9) and newlines (ASCII 10) to cucharout.
+
+
+quote_pr(item)                                               [procedure]
+        Prints item using pr, surrounded by the appropriate Pop-11 quote
+        characters if item is a word  or string, i.e. single quotes  (')
+        for strings, double quotes (") for words.
+
+
+printlength(item) -> n                                       [procedure]
+        Returns the number of characters  that pr(item) would output  to
+        cucharout.
+
+
+outcharitem(char_cons) -> item_cons                          [procedure]
+        Given a character consumer procedure char_cons (such as charout,
+        or one  returned by  discout), returns  an item  print  consumer
+        procedure item_cons, i.e. a procedure  which when given an  item
+        item will do pr(item) with cucharout locally set to char_cons.
+
+
+
+
+-------------------------------
+3  Printing Items off the Stack
+-------------------------------
+
+sysprarrow(all)                                              [procedure]
+        This is the procedure  called by the Pop-11  print arrow =>.  It
+        prints the  string in  pop_=>_flag (normally  '**\s'), and  then
+        either
+
+          # Prints (and removes from the stack) one item only, if all is
+            false;
+
+          # Prints and clears from  the stack all  items upto the  stack
+            length as it was on entry to pop11_compile, if all is true.
+
+        Each  item  is  printed  with  spr,  printing  finishing  with a
+        newline, i.e. cucharout(`\n`).
+
+
+pretty(item)                                                 [procedure]
+        This procedure attempts to print items in a more readable format
+        than sysprarrow (and is the procedure used by the Pop-11  pretty
+        print arrow ==>).  Basically, it  prints an  item starting  with
+        pop_=>_flag  and  ending with  a newline, but  will start a  new
+        line with  appropriate indentation,  etc for  each structure  or
+        sub-structure that will not fit into a single line.
+
+
+pop_=>_flag -> string                                         [variable]
+string -> pop_=>_flag
+        This variable contains  the string to  be printed by  sysprarrow
+        and pretty before  printing things  off the  stack. The  default
+        value is
+
+            '**\s'
+
+
+
+
+---------------------
+4  Formatted Printing
+---------------------
+
+printf(itemN, ..., item2, item1, string)                     [procedure]
+printf(string, item_list)
+        This procedure  provides  formatted  printing,  where  printable
+        characters in the  string string  may be  intermixed with  field
+        specifiers that cause the  next item argument  to be printed  at
+        that position.
+
+        A field specifier is the  character % immediately followed  by a
+        selector  character,  which  may  (currently)  be  one  of   the
+        following:
+
+            p   any Poplog item, printed with pr
+            P   any Poplog item, printed with sys_syspr
+            s   a string printed recursively with printf
+            S   a string (or word) printed literally
+            c   an integer interpreted as an ASCII character code
+            M   last operating system error message (see below)
+            %   output a % character
+
+        (The characters b, d, i and x are also meaningful, but  reserved
+        for system use.)
+
+        The characters  of  string  are  scanned  from  left  to  right,
+        printable characters being output with cucharout, and (with  the
+        exception of %% or %M), each field specifier encountered causing
+        the next item argument to be printed as per the specifier;  thus
+        the I-th field specifier in the string selects the I-th argument
+        item.
+
+        In the first form  of the call the  arguments are taken off  the
+        stack one  by one  (and  must therefore  be stacked  in  REVERSE
+        order), whereas in the second form the arguments are supplied in
+        a list item_list. E.g.
+
+            printf('The sum of %p and %p is %p.\n', [65 66 131]);
+            printf(131, 66, 65, 'The sum of %p and %p is %p.\n');
+
+        both produce the line
+
+            The sum of 65 and 66 is 131.
+
+        Note that the first form is incompatible with contexts in  which
+        cucharout is redefined to leave characters on the stack (because
+        then the characters get mixed up with the printf arguments), and
+        so the second form is the "preferred" one.
+
+        %M specifier
+        Whenever Poplog system procedures call operating system routines
+        which result  in an  error,  they leave  the  error code  in  an
+        internal variable  (like  the  variable  errno  in  C).  The  %M
+        specifier prints an  error message string  corresponding to  the
+        current value of this variable. (And can therefore be used after
+        errors in things like sysopen, syscreate, sysread, syswrite etc,
+        to  provide   information   about   the   problem.   Note   that
+        sprintf('%M') will return the error message as a string.)
+
+
+nprintf(itemN, ..., item2, item1, string)                    [procedure]
+nprintf(string, item_list)
+        As printf, but followed by a newline, i.e.
+
+            printf(string, item_list), cucharout(`\n`);
+
+
+sys_message_printf(string, item_list) -> rem_item_list       [procedure]
+        This procedure is  used by  sys_pr_message to  print mishap  and
+        warning message strings.
+
+        If string begins with a % character, then string (excluding  the
+        first %) is printed with  printf, using item_list as the  second
+        argument.  In  addition,  the  trailing  sublist  of   item_list
+        containing any  items not  picked up  by %  field specifiers  in
+        string is returned.
+
+        If string does not begin with  a %, string is printed  literally
+        and item_list is returned unchanged.
+
+
+pr_field(item, width, lpad_char, rpad_char, pr_p)            [procedure]
+pr_field(item, width, lpad_char, rpad_char)
+        Prints item in a field of width width, using the procedure  pr_p
+        to print the item if this is supplied, or pr otherwise. The item
+        can be left-justified, right-justified, or centred in the field,
+        depending on the the values of lpad_char and rpad_char, both  of
+        which may be an integer ASCII character or false.
+
+        If lpad_char is a character and rpad_char is false, the item  is
+        right-justified, by being  left-padded to the  field width  with
+        lpad_char (or left-truncated if too long).
+
+        Alternatively,  if  lpad_char  is   false  and  rpad_char   is a
+        character, the item is left-justified, by being right-padded  to
+        the field  width  with  rpad_char. (or  right-truncated  if  too
+        long).
+
+        Finally, if  both are  characters, the  item is  centred in  the
+        field, by being left-padded with lpad_char and right-padded with
+        rpad_char as appropriate (or right-truncated if too long).
+
+        (If both are false,  then rpad_char defaults  to `\s`, i.e.  the
+        item is left-justified, padded on the right with spaces.)
+
+
+prnum(num, int_places, frac_places)                          [procedure]
+        This procedure takes any non-complex number num and prints it in
+        floating-point format.
+
+        int_places is  an integer  specifying  the number  of  character
+        positions that the integer part should occupy (including a minus
+        sign if num is negative);  this will be left-padded with  spaces
+        to the given width.
+
+        frac_places specifies  the number  of positions  the  fractional
+        part should  occupy, including  the fractional  point;  trailing
+        zeros are printed to this width if necessary (if frac_places  is
+        1, only  the fractional  point  is printed,  if  0 then  num  is
+        printed as an integer).
+
+        (This   procedure   uses   pr_field   and   pop_pr_places,   see
+        SHOWLIB * PRNUM.)
+
+
+format_print(string, item_struct)                            [procedure]
+        This procedure gives the formatted printing capabilities of  the
+        Common  LISP  function  FORMAT.  See  HELP * FORMAT_PRINT  for a
+        description.
+
+
+radix_apply(item1, item2, ..., itemN, p, radix)              [procedure]
+        Used for printing  with a non-standard  value for  pop_pr_radix.
+        The integer radix is assigned  locally to pop_pr_radix and  then
+        the  procedure  p  is  invoked,  taking  whatever  arguments  it
+        requires off the stack. p could be any print procedure (e.g. pr,
+        prnum, printf, etc). radix_apply could be defined thus:
+
+            define radix_apply(p, pop_pr_radix);
+                lvars procedure p;
+                dlocal pop_pr_radix;
+                p()
+            enddefine;
+
+        For example:
+
+            radix_apply(15,pr,2);
+            1111
+
+            radix_apply(15,pr,10);
+            15
+
+            radix_apply(15,pr,16);
+            F
+
+            radix_apply(17,pr,16);
+            11
+
+            radix_apply(17,pr,32);
+            H
+
+
+
+
+----------------------------------------
+5  Printing Into Strings/Character Codes
+----------------------------------------
+
+sprintf(itemN, ..., item2, item1, string) -> pr_string       [procedure]
+sprintf(string, item_list)                -> pr_string
+        Same as * printf above, but the characters that the latter would
+        print are instead returned as a string.
+
+
+item1 >< item2 -> pr_string                                 [operator 5]
+        Produces, for any two items item1  and item2, a string which  is
+        the concatenation of  the printed representations  of item1  and
+        item2. E.g.
+
+                'abcd' >< 'efgh'     is   'abcdefgh'
+                "word" >< 'string'   is   'wordstring'
+                {1 2 3} >< [a b c]   is   '{1 2 3}[a b c]'
+                false >< true        is   '<false><true>'
+
+        The two items are "printed" by using pr and redefining cucharout
+        to get the printing characters.
+
+        Note that >< always constructs a new string, even if one of  the
+        arguments is empty (compare with REF * <>).
+
+
+item1 sys_>< item2 -> pr_string                             [operator 5]
+        Same as ><,  but uses  sys_syspr to "print"  the items,  locally
+        setting all the pop_pr_ variables (see above) to their  standard
+        values.
+
+
+dest_characters(item) -> (char1, char2, ..., charN)          [procedure]
+        Prints item with sys_syspr, but leaving all the character  codes
+        on the user stack (by  redefining cucharout to be identfn).  All
+        the pop_pr_ variables are locally  set to their standard  values
+        during the call  of sys_syspr. This  procedure could be  defined
+        as:
+
+            define dest_characters(item);
+                lvars item;
+                dlocal  cucharout       = identfn,
+                        pop_pr_exponent = false,
+                        pop_pr_places   = 6,
+                        pop_pr_quotes   = false,
+                        pop_pr_radix    = 10;
+                sys_syspr(item);
+            enddefine;
+
+
+
+
+----------------------------
+6  Useful Printing Constants
+----------------------------
+
+space -> word                                                 [constant]
+tab -> word                                                   [constant]
+newline -> word                                               [constant]
+        These three constants contain words whose single characters  are
+        respectively a space (ASCII 32), a tab (ASCII 9), and a  newline
+        (ASCII 10).
+
+
+
+--- C.all/ref/print
+--- Copyright University of Sussex 1995. All rights reserved.

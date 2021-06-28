@@ -1,0 +1,225 @@
+REF TIMES                                           John Gibson Apr 1994
+
+        COPYRIGHT University of Sussex 1994. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<       DATE TIME AND         >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<      TIMER PROCEDURES       >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+This REF file describes  all the procedures in  Poplog for dealing  with
+times and dates, CPU times, and timing.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Date and Time Procedures
+
+  2   CPU Time
+
+  3   Timer Procedures
+
+
+
+---------------------------
+1  Date and Time Procedures
+---------------------------
+
+sys_real_time() -> time                                      [procedure]
+        Returns the  time as  an integral  number of  seconds since  the
+        standard Unix base date, i.e. 00:00 GMT on 1 Jan 1970 (N.B. this
+        value is a biginteger, not a simple integer).
+
+
+sys_convert_date(time, local) -> string                      [procedure]
+        Given a time in seconds since 00:00 GMT 1 Jan 1970 (as  returned
+        by sys_real_time, or a file date returned by sys_file_stat etc),
+        returns a date string in  the standard operating system  format,
+        i.e.
+
+            'nnn mmm dd hh:mm:ss timezone yyyy'
+
+        in Unix systems (where nnn is the day name), and
+
+            'dd-mmm-yyyy hh:mm:ss'
+
+        in VMS systems.
+
+        In VMS systems, the local  argument is ignored; in Unix  systems
+        it specifies whether time is interpreted as local time (true) or
+        GMT (false), and  therefore affects  the value  of the  timezone
+        substring (which depends upon the timezone C library  function -
+        see ctime(3) in the Unix Programmers Manual.)
+
+
+sysdaytime() -> string                                       [procedure]
+        Returns the current date  and time as a  string in the  standard
+        operating system form. E.g, in Unix:
+
+            sysdaytime() =>
+            ** Mon Mar  6 12:43:15 GMT 1995
+
+        This procedure is the same as
+
+            sys_convert_date(sys_real_time(), true)
+
+
+
+
+-----------
+2  CPU Time
+-----------
+
+systime() -> hsecs                                           [procedure]
+        Returns the elapsed CPU time for this run of the Poplog  system,
+        an integer number of hundredths of a second.
+
+        The returned value  refers to  the amount of  time spent  within
+        Poplog. It does not refer to "real" time and is not effected  by
+        any other processes running on your machine
+
+
+timediff() -> float_secs                                     [procedure]
+        Returns the elapsed CPU time since the last call of timediff, as
+        a floating-point number of seconds SECS (the first call produces
+        a meaningless  result).  This  procedure uses  systime,  so  the
+        resolution of the result will be hundredths of a second.
+
+        The returned value  refers to  the amount of  time spent  within
+        Poplog. It does not refer to "real" time and is not effected  by
+        any other processes running on your machine
+
+
+
+
+-------------------
+3  Timer Procedures
+-------------------
+
+The variables pop_timeout  and pop_timeout_secs are  also available  for
+timing-out terminal read operations -- see REF * SYSIO for details.
+
+For a general  discussion of asynchronous  trap procedures and  signals,
+see REF * ASYNC.
+
+
+sys_timer(ast_p, flags) -> usecs_or_false                    [procedure]
+sys_timer(ast_p)        -> usecs_or_false
+usecs_or_false -> sys_timer(ast_p, flags)
+usecs_or_false -> sys_timer(ast_p)
+        This  procedure  and  its  updater  provide  multiple  real   or
+        `virtual'  interval  timers,  each  attached  to  a   particular
+        asynchronous trap procedure ast_p that  gets run when the  timer
+        expires.
+
+        (See  Asynchronous  Trap  Procedures  in  REF * ASYNC  for  full
+        details of the ast_p  argument, which may also  be a pair  whose
+        front  is  the  procedure.   Note  that  different  timers   are
+        discriminated by == applied to the ast_p structure given;  hence
+        if a pair is supplied, the timer is attached to the pair, not to
+        the procedure.  If you  supply the  ASTP_ERROR_DELETE flag  with
+        ast_p, the timer is cancelled by a mishap or setpop.)
+
+        The updater sets a timer going for usecs microseconds which will
+        execute ast_p  when  it  expires  (asynchronously,  i.e.  inside
+        whatever procedures  the  system is  currently  executing).  Any
+        current timer running for ast_p  is first cancelled. Unless  the
+        TIMER_REPEAT bit is set in  the flags argument (see below),  the
+        timer setting is  one-shot, i.e.  is not reset  when it  expires
+        (ast_p can set another timer for itself if required).
+
+        usecs may  be  a  biginteger, the  largest  time  allowed  being
+        pop_max_int seconds plus 999999  microseconds (i.e. the  seconds
+        part of usecs must be within the range of a simple integer). The
+        smallest time allowed is 0, but assigning a non-zero time  value
+        smaller than the resolution of the system clock sets a timer for
+        that resolution (e.g. 1/100th second on VAXen and Sun-4 systems,
+        1/50th sec on MC68000  systems, etc). A  zero time value  causes
+        the timer to expire immediately.
+
+        Assigning false instead of usecs  cancels any current timer  for
+        ast_p.
+
+        The base  procedure returns  the  number of  microseconds  usecs
+        remaining on  the timer  for  ast_p, or  false  if no  timer  is
+        running for it.
+
+        The optional flags  argument is  an integer  whose bits  control
+        various aspects of the timer; symbolic names for these bits  are
+        defined in INCLUDE * AST. Currently, they are:
+
+            TIMER_VIRTUAL
+                    (Updater only, ignored  by base  procedure) If  set,
+                    then  the  timer  runs  in  process  "virtual"  time
+                    instead of real  time, i.e. it  runs only while  the
+                    Poplog process  is executing  code, and  not  during
+                    wait states or when swapped  out (or in Unix,  while
+                    operating system calls are being executed).
+
+             TIMER_CANCEL
+                    (Base only, ignored by updater) If set, then getting
+                    the time remaining  on a  timer will  simultaneously
+                    cancel it.
+
+             TIMER_REPEAT
+                    (Updater only, ignored  by base  procedure) If  set,
+                    then  instead  of  being  one-shot  the  timer  will
+                    continue to  repeat every  usecs microseconds  until
+                    cancelled. (I.e, if the current  time is T then  the
+                    timer is set  to fire at  times T+usecs,  T+2*usecs,
+                    T+3*usecs, ... etc.)
+
+                    (N.B. Using this flag  is generally not  appropriate
+                    for a  virtual  timer,  since this  will  cause  the
+                    execution time of the handler itself to be  included
+                    in the interval usecs, i.e.  the next timer will  be
+                    running  during  the  execution  of  ast_p  for  the
+                    previous one. A virtual timer should therefore reset
+                    itself at the end; this (in effect) stops the  timer
+                    while the handler is running.)
+
+        If the flags argument is omitted, all bits default to 0.
+
+        For example,  to  set a  5-second  (real) timer  which  prints a
+        message and resets itself:
+
+            define timer_trap();
+                "hello" =>
+                5e6 -> sys_timer(timer_trap)    ;;; 1e6 = 1 sec in usec
+            enddefine;
+
+            5e6 -> sys_timer(timer_trap);       ;;; start it off
+            ** hello
+            ** hello
+
+        Note that currently, space is allowed for upto 32 timers running
+        together at any one time.
+
+
+syssleep(hsecs)                                              [procedure]
+        Waits (with  syshibernate) until  hsecs hundredths  of a  second
+        have elapsed (for which it uses a real timer set by sys_timer).
+
+
+syshibernate()                                               [procedure]
+        Suspends the  current  Poplog  process  awaiting  some  form  of
+        interrupt caused by an asynchronous trap or signal firing  (e.g.
+        a timer trap set by sys_timer, a SIG_INT caused by Ctrl-C  typed
+        on the terminal, or (when X is running) an X event, etc).
+
+        After the interrupting event  has been processed (and  providing
+        it does not cause  an abnormal exit),  the call of  syshibernate
+        returns.
+
+        The usual way for a program  to wait for a particular  condition
+        of interest, processing asynchronous events in the meantime,  is
+        therefore
+
+            until condition do syshibernate() enduntil;
+
+
+
+
+--- C.all/ref/times
+--- Copyright University of Sussex 1994. All rights reserved.

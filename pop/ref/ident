@@ -1,0 +1,830 @@
+REF IDENT                                           John Gibson May 1995
+
+     COPYRIGHT University of Sussex 1995. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<         IDENTIFIERS         >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+This REF file deals comprehensively  with all aspects of identifiers  in
+Poplog; from their types to  their structure. Explanation is also  given
+of their  dual-like  nature  with  words and  their  relation  to  undef
+records.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+      1.1   Kinds of Identifiers
+      1.2   Active Identifiers
+      1.3   Weak Declarations for Permanent Identifiers
+
+  2   Predicates On Identifiers
+
+  3   Constructing Identifiers
+
+  4   Accessing Information About Identifiers
+
+  5   Manipulating Values of Identifiers
+
+  6   Manipulating Attachment of Permanent Identifiers to Words
+
+  7   Undef Records
+
+  8   Miscellaneous
+
+  9   Pop-11 Syntax For Use With Identifiers
+
+
+
+---------------
+1  Introduction
+---------------
+
+Identifier records are structures  that represent program variables  and
+constants. In general, they contain the following information:
+
+    #   A field for holding the value  of the identifier (its idval,  or
+        valof when accessed via a word).
+
+    #   Type information that restricts what  objects can be assigned to
+        the identifier (its identtype).
+
+    #   A flag saying whether  the identifier is  an active variable  or
+        not, and if so, a field containing its multiplicity (see  Active
+        Identifiers below).
+
+    #   The  syntactic  properties  of  the  identifier  for  the Pop-11
+        compiler, which tell the latter  how to interpret an  occurrence
+        of the identifier name in a program (its identprops).
+
+    #   An indication  of whether the identifier is lexical or permanent
+        (see below).
+
+Although identifier  records  can be  manipulated  in their  own  right,
+program variables and constants are  always specified to compilers  (and
+to the Poplog Virtual Machine) by name, i.e. by word records which  have
+identifiers associated with them (see REF * WORDS).
+
+
+1.1  Kinds of Identifiers
+-------------------------
+Identifiers used in a program (and declared to the Poplog VM) are of two
+kinds: permanent (declared with vars or constant), and lexical (declared
+with lvars or lconstant).  The latter are different  from the former  in
+that their scope is not indefinite,  that is, a lexical identifier  only
+exists while the file  or procedure that defines  it is being  compiled.
+Permanent identifiers,  on the  other hand,  have indefinite  scope  and
+exist until they are cancelled.
+
+    For this  reason,  the  attachment  from  words  to  identifiers  is
+maintained differently for the two  kinds. For lexical identifiers,  the
+Poplog VM  holds an  association list  of words  to identifier  records,
+entries being  deleted from  this list  when the  scopes of  identifiers
+terminate. For  permanent identifiers,  the association  is achieved  by
+making an  actual  field  in  the word  record  point  directly  to  the
+identifier. (However,  a given  word can  be associated  with  different
+permanent   identifiers    in    different   program    sections,    see
+REF * SECTIONS.)
+
+    Because of the duality  between words and  identifiers, some of  the
+procedures described below can  take either an identifier  or a word  as
+argument (this is indicated  by the argument name  wident as opposed  to
+ident  for  an  identifier-only  argument).  However,  because   lexical
+declarations exist only at  compile-time, these procedures when  given a
+word argument will extract only  a PERMANENT identifier attached to  the
+word. (The only way of accessing a lexical identifier associated  with a
+word is via sys_current_ident, described in REF * VMCODE.)
+
+
+1.2  Active Identifiers
+-----------------------
+Active identifiers  generalise  the  notion  of  a  identifier  with  an
+associated value  by allowing  the actual  value slot  in an  identifier
+record to contain not the associated value itself, but a procedure  that
+will return that value when called. Thus, when an identifier is declared
+active, attempting to access its value will cause the procedure found in
+the value  slot to  be  executed, and  its result  returned.  Similarly,
+attempting to  assign to  the  variable will  run  the updater  of  that
+procedure with the new value passed as its argument.
+
+    Moreover, the mechanism is generalised still further by allowing the
+"nonactive"  procedure   and  its   updater  to   have  not   just   one
+result/argument, but any fixed number of them: this number is called the
+multiplicity of the active identifier. An access to an active identifier
+of multiplicity M  therefore produces  M results, and  a similar  number
+must be given when assigning to it.
+
+    Various means  are provided  for  referencing the  actual  procedure
+without  executing  it  (e.g.  nonactive_idval).  Note  that  an  active
+identifier is  usually  a variable,  in  the sense  that  the  procedure
+result(s) are  not  constant  (although the  nonactive  procedure  value
+itself may be either constant or variable); however, it is also possible
+to have an active constant, where the nonactive procedure does not  have
+an updater (and the base procedure always returns the same value(s)).
+
+
+1.3  Weak Declarations for Permanent Identifiers
+------------------------------------------------
+Permanent identifiers support a  weak mode of  declaration in which  the
+identifier is not  considered to  have been fully  'defined' (in  Pop-11
+this is represented by  the syntax weak constant  ... or weak vars  ...,
+etc).
+
+    The purpose  of  this  mode  is  to  enable  the  attachment  of  an
+identifier record  to  a  word  record  so  that  its  section  context,
+identprops and identtype, etc, are established,  but in a way that  does
+not prevent operations  which access  the value of  the identifier  from
+treating it as  if it were  still undefined (and  thus does not  prevent
+autoloading of the value, for example).
+
+    In particular (in  conjunction with  a Poplog VM  facility for  weak
+references to identifiers  which does  not insist on  their being  fully
+defined), it  allows programs  to  declare and  conditionally  reference
+identifiers which may or may not be present at run-time. (This  includes
+optionally-present protected  system  identifiers  for  which  a  normal
+declaration would mishap, since weak declarations for identifiers  which
+are already defined are simply ignored.)
+
+    Another facility (available through the Poplog VM and via the Pop-11
+syntax construct weakref) also allows the declared/defined status of one
+identifier to be made dependent on a set of others, in the sense that if
+any member of the dependency set becomes fully defined, then this forces
+the dependent  identifier to  be defined  also (i.e.  as if  a  'strong'
+reference to it had occurred).
+
+
+
+
+----------------------------
+2  Predicates On Identifiers
+----------------------------
+
+isident(item) -> kind                                        [procedure]
+        Returns a true result if item is an identifier record, or  false
+        if not. The true  result is a word  which indicates the kind  of
+        identifier, as follows:
+
+                 Word          Identifier Type
+                 ----          ---------------
+                "perm"         permanent identifier
+                "lex"          'real' lexical identifier
+                "lextoken"     'token' lexical identifier
+
+        (The difference between "lex" and "lextoken" is that a "lex"  is
+        a real  identifier record  whose idval  is its  actual  run-time
+        value, whereas a "lextoken" is a record being used by the Poplog
+        VM to represent  a procedure-local lexical  variable, and  which
+        will not necessarily play  any part in  the final compiled  code
+        for the procedure.)
+
+
+isdeclared(wident) -> ident                                  [procedure]
+        Given an identifier (of any  kind), this procedure just  returns
+        its argument.  For wident  a word  with a  permanent  identifier
+        currently  attached  the  (true)  result  is  that   identifier,
+        otherwise false for an undeclared word. (The truth value of  the
+        result is thus identical to identprops(wident) /== "undef".)
+
+        This  procedure  differs  from  isdefined  in  that  it  returns
+        identifiers which have only  weak declarations (see above).  (In
+        fact, this is the only way  to access such an identifier  from a
+        word, since identof will treat one as undefined.)
+
+
+isdefined(wident) -> ident                                   [procedure]
+        Same  as  isdeclared,  except  that  false  is  returned   for a
+        permanent identifier  having  only  a  weak  declaration.  (Thus
+        identprops(wident)  /==   "undef"   does  NOT   guarantee   that
+        isdefined(wident) is true.)
+
+
+isassignable(wident) -> bool                                 [procedure]
+isconstant(wident)   -> bool                                 [procedure]
+isprotected(wident)  -> bool                                 [procedure]
+        These  predicates  test   extra  status   information  for   the
+        identifier (or  permanent identifier  extracted from  the  word)
+        wident:
+
+        # isassignable returns true if wident can have its value updated
+          (with idval etc, or a program assignment statement), false  if
+          not.
+
+        # isconstant returns a  true result if  wident is declared  as a
+          constant, false if not. In the first case, the result is  true
+          if a value  has been assigned  to the constant,  and the  word
+          "undef"  otherwise  (note  that  isassignable  is  true  for a
+          constant not yet assigned to).
+
+        # isprotected returns  true if  wident  has been  declared  as a
+          protected identifier, false if not.
+
+        Note that by  default, these procedures  all return  information
+        for the  active value  of  an active  identifier (if  an  active
+        identifier has  no  updater,  then  isconstant  and  isprotected
+        return true, and isassignable returns false).
+
+        The status of the nonactive value can be got by wrapping  wident
+        in a 'nonactive pair', i.e.
+
+                conspair(wident, "nonactive")
+
+
+isglobal(wident) -> bool                                     [procedure]
+        Returns true  if  wident  is  declared  as  a  global  permanent
+        identifier (that is, an  identifier which will be  automatically
+        imported  into  daughter  sections   below  its  level),   false
+        otherwise.
+
+
+isactive(wident) -> mult_or_false                            [procedure]
+        Given an identifier (or permanent identifier extracted from  the
+        word) wident,  this  procedure  returns  a  true  value  if  the
+        identifier is declared active, or false if not. The true  result
+        returned is the active multiplicity  of the identifier, i.e.  an
+        integer in the range 0-255.
+
+
+isdlocal(wident, p) -> bool                                  [procedure]
+        Given a  word  or identifier  wident  and a  procedure  p,  this
+        procedure returns true if wident is  a dynamic local of p  (i.e.
+        declared dlocal in p), or false otherwise.
+
+        If wident  is an  active variable,  then by  default the  result
+        reflects whether  its  active value  is  local; if  wident  is a
+        variable active  variable,  and you  wish  to test  whether  its
+        nonactive value is  local, wrap  wident in  a 'nonactive  pair',
+        i.e.
+
+                conspair(wident, "nonactive")
+
+
+
+
+---------------------------
+3  Constructing Identifiers
+---------------------------
+
+ident_declare(word, idprops, const_mode)                     [procedure]
+        Declares  the  word  word   as  a  permanent   constant/variable
+        identifier with identprops idprops in the current section.
+
+        The const_mode argument is an integer in which bit 0  determines
+        whether the  identifier  is  constant  or  variable,  and  bit 1
+        whether this a weak  declaration or not  (for an explanation  of
+        which, see Weak Declarations  for Permanent Identifiers  above).
+        I.e.
+
+            Bit      Meaning
+            ---      -------
+             0       0 = variable, 1 = constant
+             1       0 = ordinary declaration, 1 = weak declaration
+
+        Alternatively, const_mode  may  be  a boolean,  true  and  false
+        representing constant/variable in ordinary  mode (i.e. 2:01  and
+        2:00 respectively).
+
+        Permissible values for the idprops argument are
+
+            Value         Meaning
+            -----         -------
+            0             Untyped identifier.
+
+            "procedure"   Procedure-type identifier.
+
+            N             Pop-11 operation of precedence  N, where N  is
+                          an integer  or  floating-point  in  the  range
+                          -12.7 to 12.7 .
+
+            "macro"       Pop-11 macro.
+
+            "syntax"      Pop-11 syntax word.
+
+            "syntax N"    Pop-11 syntax operator of precedence N,  range
+                          as above.
+
+        (Note that "syntax N" is not a normal itemisable word in Pop-11,
+        and requires  additional  string  quotes  to  itemise  it,  e.g.
+        "'syntax 3'" .)
+
+        To declare an active variable, idprops may also be a pair  whose
+        front is any of the above  identprops values, and whose back  is
+        the  active  multiplicity.  For  an  ordinary  untyped  variable
+        (identprops value 0), the multiplicity may be an integer in  the
+        range 0  - 255;  for any  other identprops,  it must  be 1.  The
+        const_mode argument  in this  case refers  to the  constancy  or
+        otherwise of  the nonactive  procedure value  of the  identifier
+        (its active value(s) are always variable).
+
+        If word was previously  undeclared, the attached identifier  has
+        its idval  initialised to  a  newly-created undef  record  whose
+        undefword is word;  by default for  an existing identifier,  the
+        idval is left undisturbed but the identprops etc are changed  to
+        reflect the  new declaration  (except  for a  weak  declaration,
+        which is ignored).
+
+        Note that when a constant is declared, the Poplog VM effectively
+        treats it as a variable until  a value is assigned to it  (after
+        which, attempting to assign to it again produces a mishap); this
+        means that 'forward' declarations and uses of constants in  code
+        will actually  treat  the  identifier as  a  variable.  Also  by
+        default,  the  same  applies   when  an  existing  constant   is
+        redeclared (ensuring that recompiled  code does not continue  to
+        use the  old value  of a  constant for  which a  new value  will
+        recompiled later).
+
+        However,   when   pop_debugging   is   false,   and   the   flag
+        VM_PERM_FIXED_DECLARE  is  set   in  * pop_vm_flags,  then   any
+        redeclaration for  an existing  identifier must  agree with  its
+        current declaration (in  respect of  both constant/variable  and
+        identprops), otherwise a mishap results. Moreover, in this  mode
+        redeclarations of constants  do not reset  them to  'unassigned'
+        (variable) status  (thus  permitting  a  file  in  a  multi-file
+        program to  have header  declarations for  constants defined  in
+        prior-loaded files,  without losing  the  benefit of  using  the
+        constant values).
+
+        Note also  that  when  pop_debugging has  the  value  true  (its
+        default),  the  Poplog  VM  treats  all  user-defined  permanent
+        constants as variables. See * pop_debugging.
+
+
+consident(idprops, const_mode, kind) -> ident                [procedure]
+        This procedure  gives  a  way to  construct  identifier  records
+        directly, without the associated declaration of a word.
+
+        The idprops argument specifies the identprops and/or  activeness
+        of the identifier: permissible  values are as for  ident_declare
+        above.
+
+        The const_mode  argument is  also as  for ident_declare.
+
+        kind specifies the  kind of  identifier as  returned by  isident
+        (see above); permissible values are the words "perm", "lex"  and
+        "lextoken".
+
+
+
+
+------------------------------------------
+4  Accessing Information About Identifiers
+------------------------------------------
+
+See also the is- predicates above for other properties of identifiers.
+
+
+identprops(wident) -> idprops                                [procedure]
+        Returns the identprops (macro/Pop-11  syntax properties) of  the
+        identifier (or  permanent identifier  extracted from  the  word)
+        wident. This can take the following values:
+
+            Value         Meaning
+            -----         -------
+            "undef"       wident is a word  not declared as a  permanent
+                          identifier  (i.e.  for  which  isdeclared   is
+                          false).
+
+            N             Pop-11 operation of precedence  N, where N  is
+                          an integer  or  floating-point  in  the  range
+                          -12.7 to 12.7 .
+
+            "macro"       Pop-11 macro.
+
+            "syntax"      Pop-11 syntax word.
+
+            "syntax N"    Pop-11 syntax operator of precedence N,  range
+                          as above.
+
+            0             An "ordinary" permanent  identifier, i.e.  one
+                          that has no special syntactic properties.
+
+        (Note that "syntax N" is not a normal itemisable word in Pop-11,
+        and requires  additional  string  quotes  to  itemise  it,  e.g.
+        "'syntax 3'" .)
+
+
+identtype(wident) -> type                                    [procedure]
+        Returns the data type of the identifier (or permanent identifier
+        extracted from the word) wident. Possible values are
+
+            Value         Meaning
+            -----         -------
+            "undef"       wident is a word  not declared as a  permanent
+                          identifier  (i.e.  for  which  isdeclared   is
+                          false).
+
+            0             Untyped, i.e. may hold anything.
+
+            "procedure"   May hold procedures only.
+
+
+full_identprops(wident) -> idprops_list                      [procedure]
+        Returns  a  list  of  all  the  declaration  keywords  for   the
+        identifier (or  permanent identifier  extracted from  the  word)
+        wident, or  "undef"  if  wident  is a  word  not  declared  as a
+        permanent identifier. The list has the form
+
+            [prot  glob  const/var  type  idprops]
+
+        where
+
+            Value       Meaning
+            -----       -------
+            prot        "protected" for  a protected  identifier,  empty
+                        otherwise;
+
+            glob        "global"  for  a  global  permanent  identifier,
+                        empty otherwise;
+
+            const/var   "constant"   for   a   constant   (preceded   by
+                        "assignable" if  the  identifier  can  still  be
+                        assigned to), or "vars" for a variable;
+
+            type        "procedure"  for  a  procedure-type  identifier,
+                        empty otherwise;
+
+            idprops     the identifier's identprops  (except that 0  for
+                        an ordinary untyped  identifier is omitted,  and
+                        "syntax N" for a syntax operator is returned  as
+                        "syntax" followed by the number N).
+
+
+is_syntax_word(item) -> idprops_or_false                     [procedure]
+        If item is a  word whose identprops are  "syntax" or "syntax  N"
+        then returns  those  identprops.  For any  other  item,  returns
+        false.
+
+
+
+
+-------------------------------------
+5  Manipulating Values of Identifiers
+-------------------------------------
+
+See REF * PROCEDURE for more information  on dynamic local variables  of
+procedures.
+
+
+identof(word) -> ident                                       [procedure]
+ident -> identof(word)
+        Returns or updates the  permanent identifier currently  attached
+        to word.
+
+        In access  mode, if  word has  no permanent  identifier  already
+        attached  (or   the  attached   identifier  has   only  a   weak
+        declaration,  see  above),  sysdeclare  is  called  on  word  to
+        autoload it or to provide a default definition (see REF * VMCODE
+        for a description of sysdeclare).
+
+        In  update  mode,  ident  must  be  permanent  identifier  (i.e.
+        assigning a  lexical  identifier  is  not  allowed).  Note  that
+        assigning an identifier to a dictionary word or a word  produced
+        by  word_identifier   is  equivalent   to  declaring   it   with
+        ident_declare, i.e. it  is registered by  the section  mechanism
+        (see REF * SECTIONS).
+
+
+idval(ident) -> item                                         [procedure]
+item -> idval(ident)
+        Returns or updates the  value cell of  the identifier ident  (in
+        update mode, item must be valid for the identtype of ident).
+
+        When ident  is  an active  variable,  idval runs  the  nonactive
+        procedure value of  ident, or  its updater in  update mode.  The
+        number of items produced as  results by the procedure, or  taken
+        as arguments by its updater, will then be the multiplicity M  of
+        the variable.
+
+
+nonactive_idval(ident) -> item                               [procedure]
+item -> nonactive_idval(ident)
+        Returns or  updates  the value  cell  of the  identifier  ident,
+        regardless of whether the identifier is active or not.
+
+
+valof(wident) -> item                                       [procedure]
+item -> valof(wident)
+        Where wident  is an  identifier, or  a word  with an  associated
+        permanent identifier,  returns  or  updates  the  idval  of  the
+        identifier. That is, valof is the same as idval if wident is  an
+        identifier, and otherwise the same as
+
+                identof <> idval
+
+        i.e. identof  is  first  applied  to  translate  a  word  to  an
+        identifier.
+
+
+nonactive_valof(wident) -> item                              [procedure]
+item -> nonactive_valof(wident)
+        Same as * valof, but using * nonactive_idval.
+
+
+caller_valof(wident, caller) -> item                         [procedure]
+item -> caller_valof(wident, caller)
+        Where wident  is an  identifier, or  a word  with an  associated
+        permanent identifier, returns or updates the valof of wident  as
+        it would be in the environment of the currently-active procedure
+        specified by caller.
+
+        The argument caller may be either
+
+         # An actual procedure  or a caller number as  input to * caller
+           (see REF * PROCEDURE).
+
+         # false,  meaning  that  the  value  outside  of  all   dynamic
+           localisations  (i.e.   outside   all  procedure   calls)   is
+           accessed/updated.
+
+        (From Version 14.53, this procedure works correctly with  active
+        variables, i.e. returns or updates their active value(s).)
+
+
+nonactive_caller_valof(wident, caller) -> item               [procedure]
+item -> nonactive_caller_valof(wident, caller)
+        Same  as  * caller_valof,  but   active  variables  have   their
+        nonactive value returned or updated.
+
+
+set_global_valof(item, wident)                               [procedure]
+        Using caller_valof, assigns item  to be the  value of wident  in
+        the context of  every currently active  procedure for which  the
+        identifier (or  permanent identifier  extracted from  the  word)
+        wident is a dynamic local.
+
+
+recursive_valof(word) -> item                                [procedure]
+        Recursively applies  valof to  word while  item is  a word,  and
+        returns the result -- that is, recursive_valof calls valof  with
+        word  as  argument:  if  the   result  item  is  a  word,   then
+        recursive_valof is called with item as argument; if it is  not a
+        word, item itself is returned.
+
+
+
+
+------------------------------------------------------------
+6  Manipulating Attachment of Permanent Identifiers to Words
+------------------------------------------------------------
+
+syssynonym(word1, word2)                                     [procedure]
+        An autoloadable library procedure, defined simply as
+
+                identof(word2) -> identof(word1)
+
+
+sysprotect(word)                                             [procedure]
+        Protects the permanent identifier  associated with word --  that
+        is, stops word being redeclared  (i.e. given a new  identifier),
+        and disallows any assignment to the identifier.
+
+
+sysunprotect(word)                                           [procedure]
+        Unprotects the permanent identifier associated with word  (after
+        a sysprotect) -- allows the word  to be redeclared (given a  new
+        identifier), and makes possible assignment to the identifier.
+
+
+syscancel(word)                                              [procedure]
+        Cancels any permanent identifier currently attached to the  word
+        word. This is registered by  the section mechanism if word  is a
+        dictionary word  or  a  word produced  by  word_identifier  (for
+        details see REF * SECTIONS).
+
+
+
+
+----------------
+7  Undef Records
+----------------
+
+Undef records  are  special records  containing  just one  field,  their
+undefword, and  are used  by  the system  to  initialise the  values  of
+newly-created  global  identifers  (although  they  be  used  for  other
+purposes). The  undefword  may be  a  word  or false;  a  new  permanent
+identifier is  initialised to  a  newly-constructed undef  record  whose
+undefword is  the name  of the  identifier, whereas  new global  lexical
+identifiers are initialised  to the fixed  undef record pop_undef  (with
+undefword false, which prints as <undef>  as opposed to <undef foo>  for
+one containing the word "foo").
+
+However, since procedure-type identifiers  must always have a  procedure
+value, they are initialised to  undef-closures, which are closures  of a
+system error procedure, partially applied to the actual undef record for
+the identifier (where  the error procedure  will produce an  appropriate
+mishap if an  attempt is  made to  apply it).  Global lexical  procedure
+identifiers use the standard undef-closure pop_undef_p.
+
+Yet  another  type  of  undef-closure  is  used  to  initialise   active
+variables: these are  such that  if the  variable is  accessed, it  will
+return an actual undef  record M times, where  M is the multiplicity  of
+the variable. Assigning to the variable  will simply erase M items  from
+the stack.
+
+All types  of  undef  record/closures  are  recognised  by  isundef  and
+undefword. See also HELP * UNDEF.
+
+
+isundef(item) -> bool                                        [procedure]
+        Returns true  if item  is an  undef record  or an undef-closure,
+        false if not.
+
+
+consundef(word) -> undef                                     [procedure]
+        Creates a new undef record  with undefword word, which may  be a
+        word or false. For example:
+
+            consundef("cat")=>
+            ** <undef cat>
+
+
+undefword(undef) -> word                                     [procedure]
+        Returns a word or  false for the  undef record or  undef-closure
+        undef.
+
+
+pop_undef -> undef                                            [constant]
+pop_undef_p -> undef                                         [procedure]
+        The  standard  'untyped'   undef  record  and   'procedure-type'
+        undef-closure (used  apart from  other things  for  initialising
+        global lexical identifiers).
+
+        (N.B.  The   constant   undef  should   really   be   pop_undef.
+        Unfortunately, historically undef has always contained the  word
+        "undef".)
+
+
+
+
+----------------
+8  Miscellaneous
+----------------
+
+_ -> undef                                                    [variable]
+item -> _
+        The 'anonymous'  (active)  variable  _  returns  pop_undef  when
+        accessed, and discards any value assigned to it. For example,
+
+                1, 2, 3 -> (x, _, y);
+
+        will assign 3 to y, 1 to x, and discard the 2.
+
+        This variable may also appear in Pop-11 identifier declarations,
+        and as a formal argument or result in define headers, e.g.
+
+                lvars (x, _, y) = dl([a b c]);
+
+                define foo(arg1, _, arg3);
+                    ...
+                enddefine;
+
+        (Uses of this  variable are  recognised and  fully optimised  by
+        Poplog VM  instructions such  as sysPUSH,  sysPOP, sysLOCAL  and
+        sysPASSIGN, etc.)
+
+
+ident_key -> key                                              [constant]
+undef_key -> key                                              [constant]
+        Hold  the   keys  for   identifiers  and   undef  records   (see
+        REF * KEYS).
+
+
+
+
+-----------------------------------------
+9  Pop-11 Syntax For Use With Identifiers
+-----------------------------------------
+
+ident                                                           [syntax]
+        This syntax word compiles  code to push  an identifier onto  the
+        stack (the identifier itself, not its value). Usage is
+
+                ident name
+
+        where name is  a word declared  as any kind  of identifier;  the
+        effect is to push onto  the stack the (run-time) identifier  for
+        the current declaration of name.
+
+        (ident operates by calling  sysIDENT for the  given word --  see
+        REF * VMCODE for more details.)
+
+        Note that any ident expression for a permanent identifier may be
+        surrounded by word quotes to  get the corresponding quoted  word
+        identifier, e.g.
+
+            "ident $-mysect$-xxxx" -> word_id;
+
+        See REF * word_identifier for more details.
+
+
+weak                                                            [syntax]
+        Used  before  a  vars  or   constant  statement  to  make   weak
+        declarations for permanent  identifiers (see `Weak  Declarations
+        for Permanent Identifiers' above). E.g.
+
+                weak vars foo, baz;
+                weak constant xxx;
+
+
+weakref                                                         [syntax]
+        Flags a 'weak' access to  a permanent identifier, i.e. one  that
+        will not  cause the  identifier  to become  'defined' if  it  is
+        currently only weakly declared. In Pop-11
+
+                weakref name
+
+        can occur  anywhere where  name by  itself would  constitute  an
+        identifier reference (i.e. excluding declarations). For example,
+
+                weakref foo -> a;
+                weakref foo(1,2,3);
+                ident weakref foo -> id;
+                nonop weakref foo -> p;
+                dlocal weakref foo;
+
+        etc. (In Poplog VM terms, weakref passes the identifier name  to
+        the appropriate VM instruction inside a 'weakref pair', e.g.
+
+                sysPUSH(conspair(name, "weakref"))
+
+        See REF * VMCODE.)
+
+        weakref has also has  a more complicated  form which allows  the
+        declared/defined status of one  identifier to be made  dependent
+        on a set of others. The syntax
+
+                weakref [ dname1, dname2, ..., dnameN ] name
+
+        is identical in terms of code produced to
+
+                weakref name
+
+        but  additionally  declares  name  as  being  dependent  on  the
+        identifiers dname1  ... dnameN.  This  means that  whenever  any
+        member of the  dependency set becomes  fully defined  (including
+        the case where one  or more already are),  then this forces  the
+        dependent identifier name to be  defined also (as if a  'strong'
+        reference to it had occurred). E.g.
+
+                weakref[foo, baz] grum()
+
+        makes grum dependent on  the status of  foo and baz.  Dependency
+        identifiers for  a given  identifier accumulate  across uses  of
+        weakref, so that a later
+
+                weakref[xxx] grum()
+
+        will make grum dependent on all of foo, baz and xxx.
+
+
+testdef                                                         [syntax]
+        Allows the declared/defined status of a permanent identifier  to
+        be tested. The form
+
+                testdef name
+
+        is equivalent to the truth value of the expression
+
+                isdefined(ident weakref name)
+
+        Since  a  weakly  declared   identifier  has  an  undef   value,
+        attempting to execute it as in
+
+                weakref foo(1,2,3);
+
+        may cause a mishap; weak references should therefore normally be
+        protected with testdef used in a conditional, e.g.
+
+                if testdef foo then
+                    weakref foo(1,2,3)
+                endif;
+
+        guarantees that foo will be  executed only if fully defined.  On
+        the other hand, uses such as
+
+                if value == weakref foo then ...
+
+        are safe without a testdef (assuming that value can never be the
+        undef value of foo). In particular,
+
+                dlocal weakref foo;
+
+        is always safe.
+
+
+cancel                                                          [syntax]
+        Cancels permanent identifiers. Usage is
+
+            cancel name1, name2, ..., nameN ;
+
+        where each  name  is an  identifier  name (which  can  include a
+        section pathname). It applies syscancel  to each name (but  note
+        that it will not cancel protected identifiers -- if you want  to
+        do this,  either use  sysunprotect  on the  word first,  or  use
+        syscancel directly).
+
+
+
+--- C.all/ref/ident
+--- Copyright University of Sussex 1995. All rights reserved.

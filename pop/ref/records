@@ -1,0 +1,273 @@
+REF RECORDS                                         John Gibson Jan 1996
+
+       COPYRIGHT University of Sussex 1996. All Rights Reserved.
+
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+>>>>>>>>>>>>>>>>>>>>>>>                       >>>>>>>>>>>>>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>>>>>>>>>>     MISCELLANEOUS     >>>>>>>>>>>>>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>>>>>>>>>>   RECORD PROCEDURES   >>>>>>>>>>>>>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>>>>>>>>>>                       >>>>>>>>>>>>>>>>>>>>>>>>>>
+>><<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Overview
+
+  2   References
+
+  3   Booleans
+
+  4   Matchvars
+      4.1   Implementing Other Matching Operations
+
+
+
+-----------
+1  Overview
+-----------
+
+This file describes standard  record types not  documented in other  REF
+files, namely references, booleans and matchvars.
+
+
+
+-------------
+2  References
+-------------
+
+A reference (dataword "ref") is a record containing a single field,  its
+cont (contents), which may be any Poplog item.
+
+isref(item) -> bool                                          [procedure]
+        Returns true if item is a reference, false if not.
+
+
+consref(item) -> ref                                         [procedure]
+        Constructs and returns a reference with a cont of item.
+
+
+cont(ref) -> item                                            [procedure]
+item -> cont(ref)
+        Returns or updates the contents of the reference ref.
+
+
+ref_key -> key                                                [constant]
+        This constant  holds  the  key  structure  for  references  (for
+        details see REF * KEYS).
+
+
+
+
+-----------
+3  Booleans
+-----------
+
+There are just two of these  objects, true and false. Their dataword  is
+"boolean". Note that  as regards the  representation of truth-values  in
+condition-testing generally, only false is significant in that any value
+other than false is considered to be true.
+
+true -> bool                                                  [constant]
+        The value of this constant is the boolean <true>.
+
+
+false -> bool                                                 [constant]
+        The value  of this  constant is  the boolean  <false>. false  is
+        returned by  all  procedures  with * BOOLEAN  results  when  the
+        condition does not hold.
+
+
+isboolean(item) -> bool                                      [procedure]
+        Returns  true  if  item  is  one  of  the  two  booleans,  false
+        otherwise.
+
+
+not(item) -> bool                                            [procedure]
+        Negates the truth-value of item (which may be anything). If item
+        is false then not returns true.  If item is anything else  false
+        is returned. Also see and and or.
+
+
+boolean_key -> key                                            [constant]
+        This constant holds the key structure for booleans (for  details
+        see REF * KEYS).
+
+
+
+
+------------
+4  Matchvars
+------------
+
+Matchvars (dataword "matchvar") are  records that may  be used alone  or
+embedded in other structures to match against arbitrary values during an
+= (or equals) operation (see Pattern Matching With = in HELP * EQUAL).
+
+This behaviour is effected by the * class_= procedure of matchvars,  and
+only happens when the matchvar is  part of the second (i.e.  right-hand)
+argument to =.
+
+There are two  distinct types  of matchvar (indicated  by bit  0 in  the
+flags field): single item,  and list segment.  The first matches  just a
+single item, whereas  the second  matches any  sequence of  (0 or  more)
+items in a list  (and must itself be  an element of a  list in order  to
+match).
+
+Matchvar records contain the following four fields:
+
+    name
+        Matchvar records are printed to look like the Pop-11 syntax  for
+        constructing them (see  HELP * EQUAL), i.e.  as =?(?)name  (etc)
+        when wident is  an identifier, as  =?(?)"name" when wident  is a
+        word, and as =*(*) when wident is false.
+
+        Thus name should be wident if wident is a word, the name of  the
+        identifier if wident  is an  identifier, or false  if wident  is
+        false.
+
+    wident
+        A word, an identifier, or false.
+
+        When a matchvar is matched against  a value value, the valof  or
+        idval of wident is set to value, and wident is added to the list
+        pop_matchvars_bound (the contents of this list are always  local
+        to the current call of =).
+
+        If however wident  is already in  pop_matchvars_bound (that  is,
+        has already been  matched in the  current call of  =), then  the
+        existing valof or idval of wident must equal value in order  for
+        the match to succeed.
+
+        wident  being  false  means  match  a  value  without  setting a
+        variable.
+
+    restriction
+        An item which restricts what the matchvar may match. false means
+        no restriction; an integer I means that length(value) must equal
+        I; a procedure P  means that P(value) must  return a true  (i.e.
+        non-false) result.
+
+        restriction may also be an identifier whose idval is an  integer
+        or procedure (this is dereferenced each time a match is tried).
+
+    flags
+        An integer  containing flag  bits. Currently,  only 2  bits  are
+        defined:
+
+            Bit     Meaning
+            ---     -------
+             0      If set this is a list segment matchvar,  otherwise a
+                    single item matchvar.
+
+             1      If  set,  a  restriction   procedure  P  is   also a
+                    'conversion' procedure. This means that if P accepts
+                    the match by  returning a non-false  item, then  the
+                    valof/idval of wident will be replaced with item  at
+                    the end of  the call  to = (providing  the call  was
+                    successful). Thus  on  return from  =,  wident  will
+                    contain item rather than value.
+
+
+(See also  the  procedure * matchvar_instantiate  in  REF * DATA,  which
+returns a partial  copy of a  structure with any  matchvars replaced  by
+their identifier values.)
+
+
+consmatchvar(name, wident, restriction, flags) -> matchvar   [procedure]
+        Returns a new  matchvar record matchvar.  The four fields  name,
+        wident, restriction and flags are as described above.
+
+
+destmatchvar(matchvar) -> (name, wident, restriction, flags) [procedure]
+        Returns all four fields of the matchvar matchvar.
+
+
+pop_matchvars_bound -> list                                   [variable]
+        This list is dynamically  localised and initially  set to []  by
+        the =, /=  and equals  operators (and the  procedure sys_=).  It
+        records matchvar variables that  have been bound  to a value  in
+        the current call of =, etc.
+
+        If empty (i.e. []), then no variables have been bound.
+
+        If non-empty,  its tl  is  the list  of  all widents  (words  or
+        identifiers) that have been assigned  a value. In addition,  its
+        hd is a (possibly empty) list
+
+                [% item1, wident1, ..., itemN, widentN %]
+
+        which records  any  results  from  matchvars  with  'conversion'
+        restriction procedures. That is, if the current call succeeds (=
+        returns true, or /= returns false), then each widentI will  have
+        its valof/idval replaced by itemI.
+
+
+matchvar_key -> key                                           [constant]
+        This constant holds the key structure for matchvars.
+
+
+
+4.1  Implementing Other Matching Operations
+-------------------------------------------
+A   matching   operation   that   requires   a   non-local   value   for
+pop_matchvars_bound can  be  effected  by calling  a  class_=  procedure
+directly instead of =. That is, instead of
+
+        item1 = item2
+
+use
+
+        class_=(datakey(item2))(item1, item2)
+
+Similarily, the procedure * sys_nonlocal_equals  can be used instead  of
+equals.
+
+The following two procedures may be  used in conjunction with the  above
+to implement self-contained matching operations other than the  standard
+= and equals. Such an  operation should start by dynamically  localising
+pop_matchvars_bound and initialising it to [], i.e.
+
+        dlocal pop_matchvars_bound = [];
+
+
+sys_restore_matchvars(save_conv, save_matchvars)             [procedure]
+        Restores pop_matchvars_bound to the state given by the arguments
+        save_conv and save_matchvars: these should previously have  been
+        saved as two separate lists with
+
+            fast_destpair(pop_matchvars_bound)
+                            -> (save_conv, save_matchvars);
+
+        (note that fast_destpair([]) is  guaranteed to produce [],  []).
+        sys_restore_matchvars simply calls sys_grbg_destpair to  reclaim
+        any pairs that have been added to pop_matchvars_bound since  the
+        save operation was done.
+
+
+sys_finish_matchvars(bool) -> bool                           [procedure]
+        Uses sys_grbg_destpair to reclaim all pairs that have been added
+        to pop_matchvars_bound,  after  performing  any  assignments  to
+        variables resulting from 'conversion' restriction procedures.
+
+        It should be called  at the end of  the matching operation,  but
+        only if pop_matchvars_bound is non-empty, i.e.
+
+            bool;
+            if pop_matchvars_bound /== [] then
+                sys_finish_matchvars()
+            endif;
+
+        The bool  argument is  true if  the match  succeeded, and  false
+        otherwise (this argument is  left unchanged on  the stack so  it
+        can be the result of the match operation). If bool is true,  and
+        the first element of pop_matchvars_bound is a non-empty list
+
+                [% item1, wident1, ..., itemN, widentN %]
+
+        then each itemI is assigned to the valof/idval of widentI.
+
+
+
+
+--- C.all/ref/records
+--- Copyright University of Sussex 1996. All rights reserved.

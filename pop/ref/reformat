@@ -1,0 +1,308 @@
+REF REFORMAT                                Diarmuid McIntyre April 1993
+                                           Revised D. McIntyre July 1993
+
+       COPYRIGHT University of Sussex 1993. All Rights Reserved.
+
+/* THIS IS A DRAFT VERSION ONLY */
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<     THE REFORMAT PACKAGE    >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+This file  briefly  describes  the  procedures  and  variables  used  to
+implement the  REFORMAT  program, which  can  be used  to  automatically
+create hard copy LATEXed manuals from the on line REF files. For details
+of how to use the REFORMAT package and altering it for your own use, see
+HELP * REFORMAT.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+
+  2   The Workings of the Program
+
+  3   How a REF file is broken down
+
+  4   How the Program Proceeds
+
+  5   Program Identifiers
+
+
+
+
+---------------
+1  Introduction
+---------------
+
+The REFORMAT program  allows the user  to create a  hardcopy manual  for
+Poplog using only the REF files as they exist now. For this purpose, the
+user can utilise the Poplog Manual master files which are located in the
+directory
+
+         $usepop/C.all/lib/lib/reformat
+
+Alternatively the user can create their own master file using a file  in
+from the above directory as a guide.
+
+A master file simply specifies what REF files are to be included and  in
+which order, along with some simple  commands dealing with the table  of
+contents and  the sub  division of  the manual.  The creation  of a  new
+master file from scratch is dealt with in HELP * REFORMAT.
+
+The flexibility of  the program allows  the contents of  a manual to  be
+dynamically updated whenever a REF file has been changed. By using  only
+the latest copy of REF files, the  manual is always assured of being  in
+date.
+
+This REF file deals mainly with  the syntax of the top level  procedures
+which are accessible to the user. Included are some procedures which are
+used at a low  level by the  REFORMAT Library but  which the user  might
+find handy,  when  attempting to  find  errors  in their  input  to  the
+REFORMAT program.
+
+
+
+------------------------------
+2  The Workings of the Program
+------------------------------
+This section gives a brief overview of the working of the program. It is
+given merely to aid understanding. The program itself is comprehensively
+documented and commented. Those  wishing to modify  the program in  some
+way are directed to LIB * REFORMAT.
+
+The REFORMAT program can be divided  up into 4 distinct parts which  are
+co-ordinated by the control procedures detailed in the main text below.
+
+   # The preparation stage
+
+     Where globals are declared and initialised, libraries which are
+     needed are loaded, and various important VED variables (i.e.
+     vedediting) given new values.
+
+     Each specified file, in its turn, is stripped of certain on-line
+     features no longer necessary and occasional substitutions made.
+
+   # The formatting stage
+
+     This essentially goes from the top downwards of each specified
+     file, placing the text in appropriate environments. The next
+     section details what types of environments there are. Environments
+     are generally one-dimensional. However due to the indented nature
+     of the REF files, allowance has been made for recursive embedding
+     of environments. When an embedded environment is entered into, the
+     global indentation variables are saved and then restored when the
+     embedding ends.
+
+   # The postformatting stage.
+
+     This deals with the small scale substitution of text and cross
+     references. The substitutions are a mixture of cosmetic
+     improvements, and changes necessary to the running of the LATEX
+     program.
+
+     When a cross reference occurs, either to an identifier or to a
+     file, the program insures that if the source is included in the
+     manual then the appropriate chapter or page number is mentioned.
+     Identifier references are then added to the index.
+
+     Dstrings  are also dealt with at this stage. A VED attribute will
+     cause a problem for the LATEX processor. Therefore all attributes
+     are stripped and the text placed in a corresponding LATEX
+     environment.
+
+   # The LATEXing stage
+
+     The files outputted by the above stages form a LATEX document. This
+     has to be processed several times in order to resolve cross
+     references and to  include the "table of contents" and the "index"
+     which will be generated. This is done by means of the makemanual
+     shell script. The shell script is executed within the main control
+     procedure makemanual. The processing is actually done within a
+     specially created xterm which disappears when processing is
+     complete.
+
+The control procedures combine the first  three of the above stages  and
+apply them to whatever REF files are specified either individually or in
+a master file.
+
+
+
+--------------------------------
+3  How a REF file is broken down
+--------------------------------
+The REFORMAT program works by recognising certain features in a REF file
+and surrounding  these features  with LATEX  commands so  that they  are
+represented properly. The recognition of the features is based upon  the
+standards laid  out in  REF * REFFORM. Deviations  from these  standards
+will cause the feature to either  be mistakenly identified or not to  be
+recognised at all. In either case, error will follow.
+
+The REFORMAT divides a REF file into the following components:
+
+     Component           Recogniseable form
+     ---------           ------------------
+     Program Code        Marked by a \Sp character at the beginning of
+                         each line of code. (including blank lines
+                         between  procedures).
+
+     Table               Laid out like this, with underlined
+                         headings above each column. Note also the right
+                         justification of the various columns.
+
+     Bullet List         Lists marked with a  'o' or '#' (\G#).
+
+     Enumerated List     A list with each entry marked by a letter or
+                         a number in the form '1)' '(A)' or 'B.'
+
+     Descriptive List    A list with the descriptive text either one
+                         line (at least two spaces right of the item)
+                         or a left justified paragraph starting the line
+                         immediately below the item (indented by 4
+                         columns).
+
+     Diagrams            These are simply marked as for program code.
+                         However VED graphics characters will be
+                         replaced appropriately.
+
+     Text Paragraphs     As per normal. Any one line paragraphs shorter
+                         than 72 characters should NOT have any double
+                         spaces in them.
+
+     Identifier heading  One or more lines dealing with the syntax form
+                         of an identifier. The type of identifier is
+                         named between square brackets on the far right
+                         of the first line.
+
+REF *REFFORM  provides  much  more comprehensive  details  of  how  text
+structures should be formatted.
+
+Also Recognised are Section (sub)Headings of both the old style and  new
+style. Once again, see REF *REFFORM and REF *REFFORM_OLD for details  of
+these.
+
+
+
+---------------------------
+4  How the Program Proceeds
+---------------------------
+The program proceeds  by stripping  each named REF  file of  unnecessary
+detail, such as the copyright notice, the contents listing (if there  is
+an overview present), and the header  arrows. The first heading is  then
+dealt with. The style  of the first heading  determines how the rest  of
+the file  will  be treated.  The  program  then attempts  to  match  the
+following text to one of the categories in the previous section. It then
+inserts the necessary formatting commands. This process continues  until
+the end of the section which is marked by (at least) 3 consecutive blank
+lines.
+
+The above process  then repeats  until the end  of the  file (marked  by
+<termin>).
+
+If an identifier entry heading  is found then the following  represented
+text is indented.  At the  end of an  identifer entry,  (2 blank  lines)
+indentation returns to normal. Whilst in an identifier entry, the search
+continues for all component parts  as before but section and  identifier
+entry headings are excluded from  the checklist. In general, text  which
+is indented in the on-line REF file is kept indented.
+
+Finally, a series of procedures are run which deals with the small scale
+substitution of text and cross references. All valid cross reference are
+added to the index.
+
+The output of  the above  will be  included as  a chapter  in a  manual,
+processed by LATEX (several times in  order to get the cross  references
+right, and create the index. The LATEX processing is done in a specially
+created xterm so the user can monitor its progress.
+
+
+
+----------------------
+5  Program Identifiers
+----------------------
+
+makemanual(string)                                           [procedure]
+        This is the main procedure. string is the name of a master file.
+        It creates a  list containing  each of  the REF  files which  is
+        named in the master file (by a 'refinclude' statement) and  then
+        proceeds to prepare a LATEX version  of each one. A copy of  the
+        master file is made  and a preamble and  ending tacked on.  This
+        copy is named:
+
+             string_rf.tex
+
+        It  is  this   that  provides  the   input  to  the   makemanual
+        shell-script. Make_manual  uses this  script to  runs the  LATEX
+        command several times and prepare the index, leaving the  output
+        file in:
+
+             string_rf.dvi
+
+
+ved_makemanual(string)                                       [procedure]
+        This is  simply  an ENTER  command  version  of  the  makemanual
+        procedure. It uses vedargument to get the string. If vedargument
+        is null then an error message is given.
+
+
+all_reffiles_included -> bool                                 [variable]
+bool -> all_reffiles_included
+        If bool is true then each  textual reference to a REF file  will
+        be followed by the phrase  "(included in another Volume)".  True
+        should only be assigned  to all_reffiles_included if a  complete
+        set of manuals is being generated. Its default value is false.
+
+
+non_existent_identifiers                                      [variable]
+        At the end of a run of the REFORMAT program on a REF file,  this
+        list holds  the names  of any  cross references  to  identifiers
+        which do not exist with within the Poplog system. It  ascertains
+        this by using a call to sys_search_doc_index with the identifier
+        name and the appropriate REF  directory as arguments. This  will
+        occur in the  cases of  a mis-spelling  or a  REF writer  having
+        named an identifier which has not yet been programmed, or is  in
+        library.
+
+
+
+whole_file_action()                                          [procedure]
+        This is the system  control procedure for formatting  individual
+        files but it  can be  accessed to good  effect by  the user.  It
+        allow the user  to process the  file they are  in without  going
+        through the rigmarole of the filepreview program.
+
+        Simply put, executing this procedure will cause LATEX formatting
+        commands  to  be  placed  in  the  current  file,  and  whatever
+        preprocessing or substitutions needs to  be done, are done.  The
+        end result  is not  a  LATEX stand-alone  document but  it  is a
+        useful command both to see the process at work,  and to find out
+        which bit of a file causes problems.
+
+        IMPORTANT NOTE: Since this command works on the current file, it
+        is best to  run it  on a  copy rather  than an  original as  the
+        original will be lost.
+
+
+ved_filepreview()                                            [procedure]
+        This ENTER command  allows to  user to preview  the current  REF
+        file which they are working on as a fully fledged chapter in the
+        manual. It does this by creating a copy of the file, running the
+        REFORMAT program on it, then placing this within a false  manual
+        shell. This  is  then  run  through  the  LATEX  and  xdvi  UNIX
+        programs. It leaves the user back in the original file which  is
+        unchanged. The user can then inspect the files created, to  make
+        any changes to the original as necessary.
+
+        The files  created by  the above  command can  (and should!)  be
+        removed using the:
+
+            ENTER latex clear
+
+        command. See HELP * VED_LATEX for more details of this.
+
+
+
+--- C.all/ref/reformat
+--- Copyright University of Sussex 1993. All rights reserved.

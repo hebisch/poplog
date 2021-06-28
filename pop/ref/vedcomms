@@ -1,0 +1,2546 @@
+REF VEDCOMMS                                              Dan Perri 1989
+                                            Updated John Gibson Dec 1996
+
+     COPYRIGHT University of Sussex 1996. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<        VED COMMAND          >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<        PROCEDURES           >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+This REF file describes those Ved commands which are available from  the
+status (command), line, normally referred to as Ved <ENTER> commands.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+
+  2   File Management Commands
+      2.1   Accessing Files
+      2.2   Leaving Files
+      2.3   Listing and Deleting Files and Directories
+      2.4   Miscellaneous
+
+  3   Moving Around a File
+
+  4   Search and Substitution Commands
+      4.1   Search and Substitute Commands
+
+  5   Formatting Commands
+      5.1   Justification Commands
+      5.2   Moving Lines of Text
+      5.3   Moving Blocks of Text
+      5.4   Moving the Cursor
+
+  6   Indexing Facilities
+
+  7   Controlling the Marked Range Markers
+
+  8   Text Editor Commands
+      8.1   Deletion and Retrieval Commands
+      8.2   Copying (Transcribing) and Moving Text
+      8.3   Changing Case
+      8.4   Changing Character Attributes
+      8.5   Current Character
+      8.6   Setting a Text Action
+      8.7   Miscellaneous
+
+  9   Printing Commands
+
+ 10   Program File Commands
+      10.1  Aids to Programming
+      10.2  Compilation Commands
+      10.3  Program Editing Commands
+      10.4  Moving Around and Searching Program Files
+      10.5  Miscellaneous
+
+ 11   Immediate Mode Commands
+
+ 12   Operating System Interaction Commands
+      12.1  UNIX Interaction Commands
+      12.2  Commands to Spawn Sub-Processes
+
+ 13   Altering Your Ved Environment
+      13.1  Finding Out About Your Environment
+      13.2  Setting Text Boundaries
+      13.3  Setting Variable Values
+      13.4  Miscellaneous
+
+ 14   Mail in Ved
+
+ 15   Time Commands
+
+ 16   Multiple Commands on One Line
+
+ 17   Miscellaneous Commands
+
+ 18   Information on Tailoring Ved
+      18.1  Command Line and Argument Processing
+      18.2  Analysing the Argument String
+
+
+
+---------------
+1  Introduction
+---------------
+
+Most Ved <ENTER> commands are implemented as Pop-11 procedures with  the
+word "ved_"  prefixed  to the  command  name,  and it  is  these  Pop-11
+procedure names which are documented here. Thus the command
+
+        <ENTER> ved
+
+is described below under
+
+        ved_ved
+
+and so on. There are a few <ENTER> commands which aren't implemented  in
+this way, because they  use different rules  for separating the  command
+name from  any  following  arguments. These  are  mainly  commands  with
+symbolic (rather  than alphabetic)  names, such  as the  various  search
+commands. For consistency, such commands are still documented here as if
+the corresponding  procedures  did  exist, but  are  identified  by  the
+special label
+
+        [ pseudo procedure ]
+
+For example, the search command
+
+        <ENTER> /
+
+is described by the entry for ved_/.
+
+For a full description  of the way Ved  processes the command line,  see
+HELP * VEDCOMMANDS.
+
+Many command procedures  are defined in  autoloadable libraries,  mostly
+from the directory $popvedlib,  and can be  inspected with SHOWLIB.  You
+can add your own commands by defining suitable "ved_" procedures, either
+in your "vedinit.p"  file or  in a private  autoloadable directory:  see
+HELP * AUTOLOAD. The file REF * VEDPROCS describes Ved procedures useful
+for building new commands.
+
+Some <ENTER> commands  are additionally  mapped onto  key bindings:  see
+HELP * VEDKEYS.
+
+See also:
+
+   HELP * VED           For an overview of Ved facilities
+   HELP * UNDO          For how to undo deletions
+   REF * DOCUMENTATION  (Online documentation)
+   REF * VEDPROCS       (Procedures used to implement Ved)
+   REF * VEDTERMINALS   (Screen control and key mappings)
+   REF * VEDVARS        (Global variables used by Ved)
+   REF * VEDSEARCH      (Search and substitution in Ved)
+
+
+
+
+---------------------------
+2  File Management Commands
+---------------------------
+
+These commands give  access to files  on disc, and  enable you to  write
+current files to disc.
+
+      2.1   Accessing Files
+      2.2   Leaving Files
+      2.3   Listing and Deleting Files and Directories
+      2.4   Miscellaneous
+
+
+
+2.1  Accessing Files
+--------------------
+ved_name [ -w ] [ name ]                                     [procedure]
+        With no argument, shows the  vedpathname of the current file  on
+        the status line.
+
+        If given name only, changes the  name of the current file to  be
+        name. This  causes  * vedveddefaults  to  be  run,  as  well  as
+        vedsetfiletypes(vedfiletypes), so that the global variables  are
+        reinitialised correctly for the new name.
+
+        The -w flag changes the  current file into a (pseudo-file)  work
+        buffer  with   vedfileprops   "workbuff"  (see   Real-File   and
+        Pseudo-File Buffers in REF * VEDPROCS).  The name of the  buffer
+        will be 'workbuff wname' where wname is name if supplied, or the
+        current vedpathname otherwise. See also * ved_work below.
+
+
+ved_pved filename [ filename ... ]                           [procedure]
+        Call ved_ved  in "protected"  mode, i.e.  with vedwriteable  set
+        false to prevent accidental erasure.
+
+
+ved_qved filename [ filename ... ]                           [procedure]
+        Quit  current  file  and  start   editing  new  one.  Also   see
+        ved_qand.
+
+
+ved_r [ N ] filename                                         [procedure]
+        Read the contents of filename into the current buffer, using the
+        same strategy for locating the file as ved_ved.
+
+        The optional argument  N specifies the  line number below  which
+        the file contents should be inserted, with 0 meaning the top  of
+        the buffer. The default value for N is the current line number.
+
+
+ved_rb                                                       [procedure]
+        Rotate Buffers in  Ved. Same as  <ESC> X if  there are only  two
+        files being looked at. Uses current window only.
+
+
+ved_rved machine filename                                    [procedure]
+        Reads the file filename from the remote machine into a temporary
+        Ved buffer. (UNIX only.) See also HELP * PIPEUTILS.
+
+
+ved_ved [ filename ... ]                                     [procedure]
+        Start or resume editing the file filename. If filename is not an
+        absolute pathname, it is sought first in the current  directory,
+        and then in each of the directories specified by  vedsearchlist.
+        See TEACH * VED, HELP * VED, REF * VED.
+
+        If more than one filename  is supplied, each subsequent file  is
+        edited immediately after bringing up the previous one.
+
+        If no filename is supplied, it defaults to the current value  of
+        * vedvedname.
+
+
+ved_work [ name ]                                            [procedure]
+        Start  or  resume  editing  a  (pseudo-file)  work  buffer  (see
+        Real-File  and  Pseudo-File  Buffers  in  REF * VEDPROCS).  Such
+        buffers have vedfileprops set to "workbuff".
+
+        The name  of the  buffer  will be  'workbuff name',  where  name
+        defaults to the current value of vedworkname if omitted.
+
+
+ved_ftp ftp-spec                                             [procedure]
+        (Unix Only)  Enables editing  of a  file on  a remote  host  via
+        Internet FTP (File Transfer Protocol).
+
+        The format of ftp-spec  is the same as  for an ftp URL  (Uniform
+        Resource Locator, as used  by the World  Wide Web), except  that
+        the leading ftp:// part is omitted. That is,
+
+            user:password@host:port/cwd1/cwd2/.../cwdN/name;type=type
+
+        :password may be omitted if no password is required for  access,
+        or the whole  user:password@ part may  be omitted for  anonymous
+        ftp. Following host,  :port may  be absent if  the standard  ftp
+        port should be used.
+
+        If present, each  cwd component  is the argument  for a  'change
+        working directory' command to the ftp server, starting from  the
+        default login directory of the user on the remote machine. (Thus
+        the format of  a cwd  component depends on  the remote  server's
+        operating system.)
+
+        The ;type=type part  may be  omitted; if specified,  type is  an
+        (upper or lowercase) letter, as follows:
+
+                type    meaning
+                ----    -------
+                 A      ASCII file
+                 I      Image (i.e. binary) file
+                 D      Give directory listing (just filenames)
+                 L      Give long directory listing
+
+        If ;type=type  is  omitted, the  default  is `A`  when  name  is
+        present, and `D` if name is omitted. (That is, a spec ending  in
+        `/` will list the current directory.)
+
+        Examples
+        It is important  to note  that the sequence  following the  host
+        spec is not a Unix pathname. Thus
+
+            <ENTER> ftp fred@machine/pop/foo.p
+
+        would access the file 'foo.p' in the sub-directory 'pop' of  the
+        login directory  of  user  'fred', not  in  the  top-level  Unix
+        directory '/pop'. To access /pop/foo.p requires
+
+            <ENTER> ftp fred@machine/%2Fpop/foo.p
+
+        where the  syntax  %XX  means 'the  character  with  ASCII  code
+        hexadecimal XX',  i.e.  %2F =  `/`.  (This syntax  can  be  used
+        anywhere in  ftp-spec  to  escape any  characters  with  special
+        meaning.)
+
+        If 'machine' were  a VMS  machine, the following  would both  be
+        equivalent to the first example above:
+
+            <ENTER> ftp fred@machine/[.pop]foo.p
+            <ENTER> ftp fred@machine/[.pop]/foo.p
+
+        whereas
+
+            <ENTER> ftp fred@machine/[pop]foo.p
+            <ENTER> ftp fred@machine/[pop]/foo.p
+
+        are equivalent to the second.
+
+
+
+2.2  Leaving Files
+------------------
+ved_bye                                                      [procedure]
+        Exit Poplog, after writing any files which have been changed.
+
+
+ved_q                                                        [procedure]
+        Quit current file. Compare ved_rrq and ved_qand.
+
+
+ved_qand command                                             [procedure]
+        Quits the  current  file and  then  executes the  specified  Ved
+        command command. For example, doing:
+
+            <ENTER> qand ref lists
+
+        Is the same as doing:
+
+            <ENTER> qref lists
+
+
+ved_qq                                                       [procedure]
+        Quit from  Ved and  Poplog, returning  to the  operating  system
+        shell, etc. Complains if any files have changed.
+
+
+ved_qpop                                                     [procedure]
+        Quit the  current  file and  exit  from  Ved to  Pop-11  or  the
+        language sub-system from which Ved was invoked.
+
+
+ved_rqq                                                      [procedure]
+        Really Quit  from  Ved  and  Quit  from  Pop-11  without  asking
+        questions.
+
+
+ved_rrq                                                      [procedure]
+        Really Really Quit current file without asking questions.
+
+
+ved_wq                                                       [procedure]
+        Write current file and quit.
+
+
+ved_xx                                                       [procedure]
+        Write all altered files, exit from Ved, exit from Pop-11.
+
+
+ved_w [ filename ]                                           [procedure]
+        If filename is specified, copy the current buffer to a disk file
+        called filename. Otherwise, write ALL changed files to disk.
+
+
+ved_w1                                                       [procedure]
+        Write only current file.
+
+
+ved_wapp filename                                            [procedure]
+        Write and APPend the current file to filename.
+
+
+ved_wappdr filename                                          [procedure]
+        Write and APPend  the marked range to filename  then Delete  the
+        marked Range. See also ved_mo.
+
+
+ved_wappr filename                                           [procedure]
+        Write and APPend the marked Range to filename. See also ved_to.
+
+
+ved_wqved filename                                           [procedure]
+        Write current file, quit it, then call Ved with new filename.
+
+
+ved_wr filename                                              [procedure]
+        Write marked range to filename.
+
+
+ved_wved filename                                            [procedure]
+        Write current file, then call Ved with the new filename.
+
+
+NOTE: There is also a set of quit commands such as "ved_qdoc word" which
+quits the  current file  (like ved_q)  and invokes  Ved to  examine  the
+online  documentation   file  named   word.   These  are   detailed   in
+REF * DOCUMENTATION.
+
+
+
+2.3  Listing and Deleting Files and Directories
+-----------------------------------------------
+ved_dired                                                    [procedure]
+        Loosely based on EMACS  dired, this command provides  facilities
+        for browsing  through  directories, examining  files,  deleting,
+        copying re-naming, etc. with a minimum of typing. The -flag,  if
+        present indicates action to be performed. The extra argument can
+        be a  file name  or search  string. If  necessary file  name  is
+        extracted from  current line in  Ved buffer.  Autoloadable user-
+        defined extensions are supported.
+
+        See HELP * DIRED, * DIRED.SHORT.
+
+
+ved_qdired                                                   [procedure]
+        After extracting file  name, or pattern,  from current line,  it
+        quits  the   current  file   and   then  runs   ved_dired.   See
+        HELP * DIRED.
+
+
+ved_dir [ options ] [ filenames ]                            [procedure]
+        Ved interface to the  VMS "DIR" command.  Uses the same  syntax,
+        and provides the  same options as  "DIR" (because the  arguments
+        options and filenames are passed directly to VMS).
+        See HELP * DIR for examples.
+
+
+veddirdefaults()                                    [procedure variable]
+        VMS only. Called when ved_dir creates a temporary Ved buffer  in
+        which to  display  a directory  listing.  Calls  vedveddefaults,
+        makes the file  unwriteable, and sets  vedindentstep to 20.
+        See LIB * ved_dir.
+
+
+ved_ls  [ flags ] [ filenames ]                              [procedure]
+        Ved interface to the  Unix "ls" command.  Uses the same  syntax,
+        and recognises the  same flags  as "ls"  (because the  arguments
+        flags and filenames are passed directly to Unix).
+        See HELP * LS for examples.
+
+
+vedlsdefaults()                                     [procedure variable]
+        UNIX only. Called when ved_ls creates a temporary Ved buffer  in
+        which to  display  a directory  listing.  Calls  vedveddefaults,
+        makes the file unwriteable, and sets vedindentstep to 8.
+        See LIB * ved_ls.
+
+
+ved_purge [ filenames ]                                      [procedure]
+ved_del                                                      [procedure]
+        The command  ved_purge  uses  ved_ls  (on  Unix  platforms),  or
+        ved_dir (on VMS platforms), to  create a directory listing,  and
+        then suggests that  the user should  mark unwanted files  with a
+        `*`, and then delete them, by calling ved_del followed by either
+        ved_shell (Unix)  or  ved_dodcl  (VMS). See HELP * PURGE.
+
+
+
+2.4  Miscellaneous
+------------------
+ved_cd directory                                             [procedure]
+        Makes the named directory  the current  working directory.  With
+        no argument, makes the current directory the same as your  login
+        directory. See also HELP * CD.
+
+
+ved_cdiff                                                    [procedure]
+        Compare  two  Ved  files  ignoring  characters  in  the   string
+        ved_cdiff_ignore, the default being:
+
+           '\s\t\n\r'  -> ved_cdiff_ignore;
+
+        Compare ved_diff. HELP * CDIFF.
+
+
+ved_diff                                                     [procedure]
+        Compare current file and next  file from top of stack,  starting
+        at current line in each. Stops as soon as lines that differ  are
+        found in the two files, and  sets the command to be  "nextsame".
+        Compare ved_cdiff. HELP * DIFF.
+
+
+ved_files                                                    [procedure]
+        Print  out  information  about  current  files  in  the  editor.
+        Indicates whether they need compiling  or writing etc. See  also
+        TEACH * FILES.
+
+
+ved_nextdiff                                                 [procedure]
+        Like ved_diff, but  first moves down  a line in  each file.  See
+        HELP * DIFF.
+
+
+ved_nextsame [ integer ]                                     [procedure]
+        Compares lines in the current file  with lines in the next  file
+        in vedbufferlist  until two  are found  to be  the same,  within
+        limits set  by ved_nextsame_limit  (default 60).  If an  integer
+        argument is given  the limit  is changed, and  then the  command
+        obeyed. If two identical lines are found, the current command is
+        changed to be "nextdiff". See HELP * VED_NEXTSAME.
+
+
+ved_pwd                                                      [procedure]
+        Print current working directory on status line.
+
+
+
+
+-----------------------
+3  Moving Around a File
+-----------------------
+
+These commands enable a user to move directly to a place in the  current
+file, specified  by line  number, feature,  or relative  to the  current
+position.
+
+
+ved_number                                            [pseudo procedure]
+        Move to line number, e.g. <ENTER> 99 to go to line 99.
+
+
+ved_@arg                                              [pseudo procedure]
+        Ved move commands. The arg  argument specifies which line to  go
+        to, thus:
+
+                  arg           go to
+                  ---           -----
+                    a           first line of file
+                    z           last line of file
+                    m           first line of marked range
+                    e           end of marked range
+                  integer       go to line number integer
+                  +integer      go forward by integer lines
+                  -integer      go back by integer lines
+
+        (Note  that  <ENTER> @   actually  invokes  the   user-definable
+        procedure  ved_moveto,  which  by  default  provides  the  above
+        options.)
+
+
+ved_cps                                                      [procedure]
+        Clear position  stack.  Previously  stacked  positions  will  be
+        discarded.
+
+
+ved_moveto where                                             [procedure]
+        Moves to the place in the file specified by the where  argument,
+        which can take the following values:
+
+           where    Meaning
+           -----    -------
+             a      Start of file
+             z      End of file
+             m      Start of marked range
+             e      End of marked range
+            +N      Forward N lines
+            -N      Backward N lines
+             N      Line N
+
+
+ved_cols                                                     [procedure]
+        Causes the current column number  to be displayed on the  status
+        line, instead of  the current line  number (affects the  current
+        file  only).  If  called  again,  the  line  number  display  is
+        restored,  i.e.  calling  it  toggles  the  current  mode.  Uses
+        * vedstatusshowcols.
+
+
+ved_xdn                                                      [procedure]
+        Scroll other window down. Also done by <ESC> <LF> buttons.
+
+
+ved_xup                                                      [procedure]
+        Scroll other window up. Also done by <ESC> <BS> buttons.
+
+
+
+
+-----------------------------------
+4  Search and Substitution Commands
+-----------------------------------
+
+See REF * VEDSEARCH for full details of the following search commands:
+
+    * ved_/      * ved_"          * ved_\         * ved_`
+    * ved_search * ved_backsearch * ved_re_search * ved_re_backsearch
+    * ved_ss     * ved_ww
+
+
+
+4.1  Search and Substitute Commands
+-----------------------------------
+See REF * VEDSEARCH  for  full  details of  the  following  substitution
+commands:
+
+    * ved_gs     * ved_gsr     * ved_gsp
+    * ved_gsl    * ved_s       * ved_sgs    * ved_sgsr
+
+
+
+
+----------------------
+5  Formatting Commands
+----------------------
+
+These are commands available  from Ved to  justify, indent, or  re-align
+lines of text or code within a file.
+
+      5.1   Justification Commands
+      5.2   Moving Lines of Text
+      5.3   Moving Blocks of Text
+      5.4   Moving the Cursor
+
+
+
+5.1  Justification Commands
+---------------------------
+ved_fill                                                     [procedure]
+        Justify marked range as if in  text file (whether it is or  not)
+        See ved_j, ved_jcp, ved_jp, ved_fp.
+
+
+ved_fp                                                       [procedure]
+        Fill  current  paragraph  (even  if  in  a  program  file).  See
+        ved_fill.
+
+
+ved_gobble                                                   [procedure]
+        Remove excess  spaces from  the marked  range, leaves  a  single
+        space between words. Can be used to undo ved_jj.
+
+
+ved_j                                                        [procedure]
+        "Justify" marked range. If it's a program file runs ved_tidy  to
+        indent   program   text.   Otherwise   runs   ved_fill,    which
+        right-justifies  text  without  right-alignment.  See  ved_fill,
+        ved_tidy. For text  files, uses  vedleftmargin, and  vedlinemax.
+        for program files uses vedindentstep.
+
+
+ved_jcp                                                      [procedure]
+        Justify current procedure, using ved_tidy.
+
+
+ved_jj                                                       [procedure]
+        Fully "Justify"  marked range.  Aligns left  and right  margins,
+        uses vedleftmargin, and vedlinemax.
+
+
+ved_jjp                                                      [procedure]
+        Fully justify current paragraph.
+
+
+ved_jp                                                       [procedure]
+        Justify current paragraph if text file, procedure otherwise.
+
+
+ved_jrefmr [column]                                          [procedure]
+        This command is used for justifying REF file identifier entries.
+        It right-justifies the text in the marked range (like  * ved_jj)
+        ignoring any  lines with  format-spaces and  graphic-characters.
+        The left column of the justified text is specified by column. If
+        column is  not  specified  a  default  of  eight  is  used.  See
+        REF * REFFORM for more information on formatting REF files.
+
+
+
+5.2  Moving Lines of Text
+-------------------------
+ved_ac                                                       [procedure]
+        Centres each  line  in  marked  range  between  left  and  right
+        margins.
+
+
+ved_al                                                       [procedure]
+        Aligns first character  of each  line in marked  range with  the
+        left margin.
+
+
+ved_ar                                                       [procedure]
+        Aligns last  character of  each line  in marked  range with  the
+        right margin.
+
+
+ved_centre [ string ]                                        [procedure]
+        Puts string at centre of current line. If string is empty or  is
+        '.', moves existing line of  text to centre. Uses  vedleftmargin
+        and vedlinemax.
+
+
+ved_right [ string ]                                         [procedure]
+        Puts string at right of current line, as defined by  vedlinemax.
+        If there's no  argument, it moves  all the text  on the  current
+        line to the right.
+
+
+
+5.3  Moving Blocks of Text
+--------------------------
+ved_bc                                                       [procedure]
+        Moves the marked range left or right so that the longest line of
+        the range is centred between the two margins. See HELP * FORMAT.
+
+
+ved_bl N                                                     [procedure]
+        Moves the  marked  range  N  characters  to the left. N defaults
+        to 1.
+
+
+ved_br N                                                     [procedure]
+        Moves the  marked  range  N characters  to the right. N defaults
+        to 1.
+
+
+ved_ljmr [ integer ]                                         [procedure]
+        Left Justify  Marked range,  by shifting  text in  marked  range
+        integer spaces to the left. If no argument is given, it defaults
+        to the current value  of vedleftmargin. If  0, then all  leading
+        spaces are removed. Otherwise at most integer leading spaces are
+        deleted. This preserves relative indentation. If the argument is
+        a negative integer, then the marked range is shifted that number
+        of spaces  to  the  right. Compare  ved_bl  and  ved_br.  ved_bl
+        complains if some lines cannot be shifted left whereas  ved_ljmr
+        ignores them.
+
+
+
+5.4  Moving the Cursor
+----------------------
+ved_mc N                                                     [procedure]
+        Move N characters to right, or to left if N negative.
+
+
+ved_mw N                                                     [procedure]
+        Move N  words right.  Like ved_mc  but uses  vedwordright.  E.g.
+        stops on ' and ";;;" .
+
+
+
+
+----------------------
+6  Indexing Facilities
+----------------------
+
+The <ENTER> newindex  command enables the  user to build  an index  to a
+file, with  section  headers that  provide  direct access  to  specified
+sections.
+
+
+ved_g                                                        [procedure]
+        Used to find information in  HELP and TEACH files provided  with
+        an  index  (either   by  the   new  ved_newindex   or  the   old
+        ved_indexify).
+
+
+ved_newindex [ sp | nosp ]                                   [procedure]
+        Builds or  updates  a new-style  index  from header  lines  in a
+        documentation file. The new-style index lines are recognised  by
+        <ENTER> g.
+
+        Header lines in  the file  are recognised  as one  of the  three
+        types listed below,  in each  case 'underlined'  by a  following
+        line starting with (at least 3) G- graphics characters (they may
+        also be  'overlined' with  G- characters  as well,  but this  is
+        optional):
+
+            Level   Format
+            -----   ------
+              1     DD text
+
+                    where DD is one or two digits starting at column  1,
+                    e.g.
+
+                    5  Major Heading
+
+              2     DD.DD text
+
+                    where DD.DD  is a  sequence of  digits  containing a
+                    `.`, starting  at column  1 and  not extending  past
+                    column 5, e.g.
+
+                    5.3  Minor Heading
+
+              3     ... text
+
+                    e.g.
+
+                    ...  Minor Sub-heading
+
+        The index  lines  constructed  for  each  of  these  types,  and
+        recognised by ved_g, appear as follows:
+
+        Col 12345678901234567890
+
+             DD   text
+                  DD.DD text
+                        ... text
+
+        where the spacing between the numeric part and the text part  is
+        adjusted to produce the above alignment. E.g, the index for  the
+        examples given would appear as:
+
+              5   Major Heading
+                  5.3   Minor Heading
+                        ... Minor Sub-heading
+
+        The header lines themselves are also adjusted to have a standard
+        spacing between the  two parts (enabling  ved_g to search  for a
+        fixed translation of any index line).
+
+        The "underlining" of the headers  with G- characters is  assumed
+        to be of  two types: (a)  full-width (extending to  at least  70
+        columns), and (b) extending to less  than or equal the width  of
+        the header line itself.
+
+        Where the underline is  shorter in lines of  type (b), only  the
+        the initial width(underline) characters  of the header line  are
+        used as  the  index  line  (this  enables  such  lines  to  have
+        additional annotation on the right which will not appear in  the
+        index). Lines of type (b)  then have their underlining  adjusted
+        to conform  with any  adjustments tp  the header  (as well  as a
+        preceding "overlining" line if present).
+
+        Character attributes on  the header lines  are preserved in  the
+        index lines.
+
+        The index  is constructed  either with  or without  blank  lines
+        separating each level 1 index line from the preceding line. This
+        is controlled  as  follows:  If  the  optional  sp  argument  is
+        present, extra spacing is added; if nosp is present, spacing  is
+        not added. Otherwise, the default  is to add spacing, unless  an
+        existing index is being replaced, in which case the style of the
+        old index is maintained.
+
+        From Version 15+, ved_newindex also  makes each index line  be a
+        text action (see Embedded  Text Actions in REF * VEDPROCS).  All
+        index line characters have the  active attribute added, and  the
+        command string  '(SN)g'  is  attached  to  the  first  non-space
+        character on  each  line.  The  same is  done  for  the  initial
+        (numeric plus spaces) part of each header line, with the command
+        '(S)g;;;back to index' attached.
+
+
+ved_newheading [ help|ref ] [ r ]                            [procedure]
+        Make the current line a section header. See * ved_newindex for a
+        description of header line formats.
+
+        Giving the  help  argument will  cause  the lines  around  major
+        headings to extend the length  of the screen (see  HELP * VEDSET
+        for an  example.) Giving  the ref  argument will  produce  major
+        headings like those seen  in this file.  If neither argument  is
+        specified  ved_newheading  attempts  to  guess  the  appropriate
+        setting.
+
+        If the optional r (for  renumber) is specified every heading  in
+        the current  file is  updated  so the  major and  minor  section
+        numbers are contiguous.
+
+        The number and type of the heading used depends on the preceding
+        heading.  Major  and  minor  section  numbers  are   incremented
+        appropriately. If the  previous header line  started with  '...'
+        (it was a sub-heading), this is inserted at the beginning of the
+        current header line.
+
+        Old style  REF  & HELP  headers  (produced by  ved_heading)  are
+        automatically converted into the new style by ved_newheading.
+
+
+ved_heading                                                  [procedure]
+        Insert leading and trailing hyphens  to make section header  for
+        old-style HELP or TEACH file.
+
+
+ved_indexify                                                 [procedure]
+        Adds an old-style index in form required for ved_g in a TEACH or
+        HELP file.
+
+
+
+
+---------------------------------------
+7  Controlling the Marked Range Markers
+---------------------------------------
+
+These commands are available to manipulate the range markers.
+
+
+ved_crm                                                      [procedure]
+        Clear range mark. Don't alter buffer, just remove mark.
+
+
+ved_mbe                                                      [procedure]
+        "Mark" current file from Beginning to End.
+
+
+ved_mbf                                                      [procedure]
+        "Mark" from beginning of file.
+
+
+ved_mbp                                                      [procedure]
+        "Mark" from beginning of procedure.
+
+
+ved_mcp                                                      [procedure]
+        "Mark" whole of current procedure.
+
+
+ved_mef                                                      [procedure]
+        "Mark" to end of file.
+
+
+ved_mep                                                      [procedure]
+        "Mark" to end of current procedure.
+
+
+ved_mark range_name                                          [procedure]
+        Calls * ved_mark_named_range with
+
+                consword(range_name)
+
+        as argument, to mark the range named by range_name.
+
+
+
+
+-----------------------
+8  Text Editor Commands
+-----------------------
+
+These are all of  the text editor facilities,  not related to search  or
+justification of text. (See separate  sections for information on  those
+facilities.) All these commands can also be used on program files.
+
+      8.1   Deletion and Retrieval Commands
+      8.2   Copying (Transcribing) and Moving Text
+      8.3   Changing Case
+      8.4   Changing Character Attributes
+      8.5   Current Character
+      8.6   Setting a Text Action
+      8.7   Miscellaneous
+
+
+
+8.1  Deletion and Retrieval Commands
+------------------------------------
+ved_clear                                                    [procedure]
+        Delete  everything  from the current  file.  Can be retrieved by
+        ved_y.
+
+
+ved_cut                                                      [procedure]
+        Removes the text between the two most recently saved  ("pushed")
+        positions   on   vedpositionstack,   to   a   temporary   buffer
+        (vvedcut_dump),  from   where  it   can  be   recovered   (using
+        ved_splice), repeatedly if necessary.
+
+
+ved_d                                                        [procedure]
+        Delete marked range,  and copy into  vveddump. Compare  ved_cut.
+        Data can  be  retrieved from  vveddump  and inserted  after  the
+        cursor, using ved_y, repeatedly if necessary.
+
+
+ved_da                                                       [procedure]
+        Like ved_d, but append to vveddump.
+
+
+ved_dc [ N ]                                                 [procedure]
+        With no argument, deletes the character under the cursor.  Given
+        an integer  N, deletes  the N  characters to  the right  of  the
+        cursor. If N is negative, the  abs(N) characters to the left  of
+        the cursor are deleted.
+
+
+ved_de                                                       [procedure]
+        Delete from  current cursor  position to  End of  line (same  as
+        vedcleartail).
+
+
+ved_deof                                                     [procedure]
+        Delete to end of file, from current line, inclusive.
+
+
+ved_dl [ - ] N                                               [procedure]
+        Delete N lines, counting up if negative.
+
+
+ved_ds string                                                [procedure]
+        Delete from  current  position  up to  but  not  including  next
+        occurrence of string. Uses ved_cut.
+
+
+ved_dsb string                                               [procedure]
+        Delete between current position and beginning of last occurrence
+        of string.
+
+
+ved_dw [ - ] N                                               [procedure]
+        Delete N words, counting left if negative.
+
+
+ved_splice                                                   [procedure]
+        For use with ved_cut. Copy  text from vvedcut_dump into  current
+        file immediately after current  cursor location. (Unlike  ved_y,
+        which inserts it  after the current  line.) See ved_cut,  ved_y,
+        ved_yankl, ved_yankw.
+
+
+ved_yankc                                                    [procedure]
+        Copy marked range into the command file. See HELP * VEDCOMMANDS.
+
+
+ved_y  [ linenum ]                                           [procedure]
+        Copy contents of vveddump into current file after current  line,
+        or after  linenum if  supplied.  (See ved_copy,  ved_d,  ved_da,
+        ved_tr, ved_splice, ved_cut.) For example
+
+                <ENTER> y 0
+
+        will insert vveddump at beginning of file.
+
+
+ved_yankl                                                    [procedure]
+        Copy contents of  vvedlinedump after current  line. Can be  used
+        after deleting a line, to get it back.
+
+
+ved_yankw                                                    [procedure]
+        Copy contents of  vvedworddump into current  line after  cursor.
+        vvedworddump contains  last text  deleted by  word left  delete,
+        word right delete, delete line to left, or delete line to right.
+
+
+
+8.2  Copying (Transcribing) and Moving Text
+-------------------------------------------
+ved_ca                                                       [procedure]
+        Copy and Append marked range.  Text in marked range is  appended
+        to vveddump. See ved_copy.
+
+
+ved_copy                                                     [procedure]
+        Copy  the  marked  range  into  vveddump.  See  ved_ca,   ved_y,
+        ved_splice, ved_copy.  Unlike ved_ca  this over-writes  previous
+        value of vveddump.
+
+
+ved_m                                                        [procedure]
+        Move marked range to after current line.
+
+
+ved_mi [ filename ]                                          [procedure]
+        Move the marked range In from the file filename into the current
+        file, or  from the  last file  edited if  filename omitted.  See
+        HELP * INOROUT and ved_mo, ved_ti, ved_to.
+
+
+ved_ml [ - ] N                                               [procedure]
+        Move N lines down (up if negative). N defaults to 1.
+
+
+ved_mo [ filename ]                                          [procedure]
+        Move the marked range  Out from the current  file into the  file
+        filename, or  the  last file  edited  if filename  omitted.  See
+        HELP * INOROUT, ved_mi, ved_ti, ved_to.
+
+
+ved_over                                                     [procedure]
+        Overlays a block of text from the marked range, to the block  at
+        the cursor position.
+
+
+ved_t                                                        [procedure]
+        Transcribe marked range to after current line.
+
+
+ved_tr                                                       [procedure]
+        A synonym  for  ved_t, which  copies  the marked  range  to  the
+        cursor.
+
+
+ved_ti [ filename ]                                          [procedure]
+        Transcribe In the marked  range from the  file filename, or  the
+        last file edited if filename is omitted. See HELP * INOROUT.
+
+
+ved_to [ filename ]                                          [procedure]
+        Transcribe Out the  marked range  of the current  file into  the
+        file filename (at the  cursor position in  the latter), or  last
+        file edited if filename is omitted. See HELP * TO.
+
+
+
+8.3  Changing Case
+------------------
+ved_capword [ N ]                                            [procedure]
+        Calls vedcapword N times. N defaults to 1. Each call makes  sure
+        first character  of current  word is  upper case  and  remainder
+        lower case. Then moves to next word. Can be assigned to a key.
+
+
+ved_ccw [ N ]                                                [procedure]
+        Change Case of Words. Changes the case of the characters in  the
+        next N  words, where  N defaults  to 1  if not  given. See  also
+        ved_lcw and ved_ucw.
+
+
+ved_lcw [ N ]                                                [procedure]
+        Lower  case  words.  Transforms  next  N  words to  lower  case.
+        N defaults to 1. See ved_ucw.
+
+
+ved_lcl [ N ]                                                [procedure]
+        Lower case lines. Like lcw, but for lines. Moves to next line.
+
+
+ved_lcr                                                      [procedure]
+        Lower case range. Transform marked range to lower case.
+
+
+ved_ucw [ N ]                                                [procedure]
+        Upper  Case  Words.  Transforms  next  N  words to  upper  case.
+        N defaults to 1. See ved_lcw.
+
+
+ved_ucl [ N ]                                                [procedure]
+        Upper Case Lines.  Like ved_ucw but  transforms lines. Moves  to
+        next line.
+
+
+ved_ucr                                                      [procedure]
+        Upper Case Range. Transform marked range to upper case.
+
+
+
+8.4  Changing Character Attributes
+----------------------------------
+Ved is able to represent  attributes such as "bold", "underline",  and a
+colour number  (0 to  7) for  each  character in  the buffer.  There  is
+currently a single Ved command for setting or changing these attributes,
+ved_chat, described below. (For program use, there is also a syntax  for
+specifying  attributes  in  Pop-11  strings  and  character   constants,
+described in REF * ITEMISE.)
+
+Where any character in a line has non-zero attributes, that line in  the
+Ved buffer is represented by a  dstring rather than an ordinary one.  (A
+dstring is an alternate form of string which maintains an extra byte for
+each character to  hold the  attribute bits  -- see  Display Strings  in
+REF * STRINGS.) On the  other hand,  when a file  is written,  character
+attributes  are  translated  to  special  sequences  containing  control
+characters, which are then  translated back to  attribute bits when  the
+file is read in again. See Ved File Representation in REF * VEDPROCS for
+more details.
+
+Note that  the way  in which  a particular  attribute will  display  (or
+whether it displays at all), is terminal-dependent. (This is  controlled
+by the procedure * vedscreencharmode,  whose definition will change  for
+different screens.)
+
+For  example,  on  VT100-compatible  screens,  the  attributes   "bold",
+"underline" and "blink" will display, but "alt font" (generally used for
+italic) will display  as underlining.  The same  is true  for xterm  Ved
+(except for "blink", which  displays  as bold).
+
+Aside from colour on monochrome  screens, XVed is capable of  displaying
+all attributes.  Note  that  by  default, "alt  font"  will  display  as
+underlining; to make it display as  italic, you need to set the  altFont
+resource for the window to a  suitable italic-style font -- see  General
+Window Settings in REF * XVED.
+
+As regards the use of the colour numbers 1 to 7, Ved uses the convention
+that the  even-numbered colours  2, 4  and 6  are foreground-only  (i.e.
+characters drawn in these colours have the normal colour 0  background),
+while the odd-numbered colours  1, 3, 5 and  7 change the background  as
+well. This allows  a sensible  interpretation for  colour on  monochrome
+screens/terminals, namely that even colours  show up as normal,  whereas
+odd colours display as inverse video.
+
+For XVed, you  can change  the actual  colours used  for any  particular
+colour number; again, see General Window Settings in REF * XVED.
+
+From Poplog Version 15+, a  new attribute 'active' has been  introduced:
+this is  used  to  delineate  the extent  of  text  containing  embedded
+commands (see Embedded Text Actions in REF * VEDPROCS). It also modifies
+the colour number,  giving 8 additional  colours 0A -  7A (the  even/odd
+convention applies to these also).
+
+Note that if  in doubt as  to the  set of attributes  on any  particular
+character,  you  can  use  the  command  <ENTER>  cc  to  display   them
+symbolically (see ved_cc in this file).
+
+                            WARNING
+    DON'T attempt to use attributes  on program code, except  inside
+    comments. While this will not  cause problems for code  compiled
+    directly from a Ved  buffer (e.g. with  <ENTER> l, or  loading a
+    marked range, etc), it WILL when written to a file and  compiled
+    outside of Ved.
+
+    This  is  because  the   extra  characters  used  to   represent
+    attributes in files will appear  to compilers as spurious  code,
+    and will  cause  compilation  errors.  Using  attributes  inside
+    comments is quite safe, however, since in this context the extra
+    characters will be ignored.
+
+
+ved_chat scope attr                                          [procedure]
+        CHanges ATtributes on characters.
+
+        The scope argument is  a  letter or -letter specifying the scope
+        of the change, as follows:
+
+             c     Current character
+             w     Current word
+             l     Current line
+             -c    Last character
+             -w    Last word
+             -l    Last line
+             r     All characters in the current marked range
+             s     All characters in the current XVed selection
+             f     All characters in the current file
+
+        (Note that there should be no space between the "minus" and  the
+        letter). For r, s  and f the  cursor position remains  unchanged
+        afterwards; for the  others, the  cursor is moved  to after  the
+        scope in which the change is  made, i.e. to the next  character,
+        word or line  (if `-`  is present,  this means  the cursor  will
+        finish up where  it was). Note  that -w will  only apply to  the
+        preceding word if the current position is in between two words.
+
+        attr specifies the attribute(s) to  be set, added or removed  on
+        each character  within scope,  and is  a sequence  of  attribute
+        letters, optionally preceded by `+`, `-` or `~`.
+
+        An initial + means ADD the given attributes to any currently  on
+        each character;  an  initial  -  means  REMOVE  them  from  each
+        character (but  leaving  any  other  attributes  unchanged);  an
+        initial ~  means  INVERT the  given  attributes. None  of  these
+        present means SET each character to have just those attributes.
+
+        The allowable attribute letters/numerals are identical to  those
+        used to  specify attributes  in  Pop-11 strings  and  characters
+        constants (see  Backslash in  Strings &  Character Constants  in
+        REF * ITEMISE), as follows:
+
+            Letter/num   Meaning
+            ----------   -------
+              b          bold
+              u          underline
+              a or i     alt font/italic
+              f          blink (flash)
+              A          active (selects colours 0A - 7A)
+              0 to 7     colour number 0 to 7
+
+        Note that when a non-zero colour number is specified, the effect
+        with + is to just set that colour, with - to remove any  colour,
+        and with ~ to toggle between that colour and no colour.
+
+        For example,
+
+            <ENTER> chat w bi2
+
+        would change  the  current  word  to  bold  italic  in  colour 2
+        (removing any other attributes), whereas
+
+            <ENTER> chat w +bi2
+
+        would replace the colour number with 2, and add bold and  italic
+        to any existing attributes.
+
+
+ved_ul [ mark [ toggle ] ]                                   [procedure]
+        This command scans the marked  range taking special action  when
+        the following characters are encountered:
+
+            #   replace with a space and mark the next word for
+                underlining
+
+            $   replace  with space and  change mode: underline all
+                words unless  preceded  by  # (until  another  $  is
+                encountered - then change back)
+
+        ved_ul may optionally  be given  a single character  mark as  an
+        argument, which then is  used instead of  #. A second  character
+        toggle, if supplied, is used instead of $.
+
+
+
+ved_highlight                                                [procedure]
+        The <ENTER>  highlight  command can  be  used to  highlight  all
+        syntax words apart from those in comments and those in the  list
+        highlight_exceptions whose default definition is
+
+        global vars
+            highlight_exceptions =
+                [% "(", ")", "[", "]", "{", "}", ";", ":", ",", ".", "%",
+                    "->", """, "^", "^^", "!" %];
+
+        If the user has already assigned a value to highlight_exceptions
+        that value is used.
+
+        The program uses a very  simple algorithm going through all  the
+        text items in the file that are not included in comments and  if
+        they are  syntax words  but  not in  the  above list,  they  are
+        underlined, using the command
+
+            veddo(highlight_commandstring);
+
+        where the default value of highlight_commandstring is defined by
+
+        global vars
+            highlight_commandstring = 'chat -w u';
+
+        If the user has already assigned a value to that variable it  is
+        used instead of the default command string. For example, to  use
+        bold instead of underlining you can put the folling in your file
+        $poplib/vedinit.p
+
+            global vars
+                ;;; highlight using bold
+                highlight_commandstring = 'chat -w b';
+
+        For additional options, e.g. use of colour, see REF * ved_chat
+
+        NOTE: Syntax words will be  highlighted even if they they  occur
+        quoted in lists, or between word quotes.
+
+                                WARNING
+        The warning  given above  about  compiling code  with  character
+        attributes set is repeated here:
+
+        DON'T attempt to use attributes  on program code, except  inside
+        comments. While this will not  cause problems for code  compiled
+        directly from a Ved  buffer (e.g. with  <ENTER> l, or  loading a
+        marked range, etc), it WILL when written to a file and  compiled
+        outside  of  Ved.  (For  further  details  see  the  section  on
+        character attributes).
+
+        To undo the highlighting before saving a file use
+
+            <ENTER> strip
+
+
+
+8.5  Current Character
+----------------------
+ved_cc [ d ]                                                 [procedure]
+        Displays information about the  Current Character at the  cursor
+        position.
+
+        With no  argument, displays  the character:  special  characters
+        such as control  characters and Ved  graphics and special  space
+        characters are shown by name.  Any attributes the character  has
+        are listed  (along  with 'HAS  DATA'  if the  character  has  an
+        embedded data item attached to it).
+
+        With the d argument, any embedded data item on the character  is
+        displayed, or 'NO DATA' if  it has none. (Strings are  displayed
+        surrounded by string quotes to distinguish them from words.)
+
+        (See * ved_ic for inserting special characters.)
+
+
+ved_ic [ char | dd | d= chars | d: expression ]              [procedure]
+        Insert Character.
+
+        This is used with the char argument to insert special characters
+        such as control  characters and Ved  graphics and special  space
+        characters at the current cursor position. With the dd, d= or d:
+        arguments, it deletes  or inserts embedded  data on the  current
+        character. Without any argument, it calls ved_cc to display  the
+        current character instead.
+
+        To insert a character, the char argument may be
+
+          # anything for which strnumber will return an integer (e.g. an
+            integer or Pop-11 character constant);
+
+          # anything for  which strnumber  will return  an integer  when
+            prefixed with backslash and  surrounded by character  quotes
+            (i.e. any valid backslash sequence in a character  constant,
+            but without the initial backslash or character quotes).
+
+        For a full description of the allowable backslash sequences, see
+        REF * ITEMISE, Backslash in Strings & Character Constants.
+
+        For example,
+
+            <ENTER> ic 26
+            <ENTER> ic e          = <ENTER> ic `\e`
+            <ENTER> ic G+         = <ENTER> ic `\G+`
+
+        You can also insert a  character with attributes, although  note
+        in this case that  if the actual  character requires a  (second)
+        backslash, this must be present. E.g.
+
+            <ENTER> ic [b3]G      = <ENTER> ic `\[b3]G`
+
+        inserts a bold "G" in colour 3, but to insert a graphics "cross"
+        with attributes requires a backslash before the G:
+
+            <ENTER> ic [b3]\G+    = <ENTER> ic `\[b3]\G+`
+
+        char may also be one of 'DEL', 'ESC', 'FF', 'FORM FEED' or 'CTRL
+        X' (in either upper or  lower case) to insert the  corresponding
+        control characters, i.e.
+
+            <ENTER> ic ESC     = <ENTER> ic esc      = <ENTER> ic e
+            <ENTER> ic FF      = <ENTER> ic ff       = <ENTER> ic ^L
+            <ENTER> ic DEL     = <ENTER> ic del      = <ENTER> ic ^?
+            <ENTER> ic CTRL X  = <ENTER> ic ctrl x   = <ENTER> ic ^X
+
+        etc.
+
+        (Note that  when a  control character  is inserted,  it will  be
+        display as  the  character  in  vedscreencontrolmark,  which  is
+        normally the graphics "degree" sign `\Go`.)
+
+        Embedded Data
+        Supplying the dd, d= or d: arguments leaves the actual character
+        value unchanged, but changes the embedded data on the character.
+
+        dd means delete any embedded data.
+
+        d= chars means embed the string chars on the character, e.g.
+
+            <ENTER> ic d= shooting star
+
+        would embed the  string 'shooting  star' (note  that any  spaces
+        immediately following d=  are ignored). If  nothing follows  d=,
+        nullstring is inserted.
+
+        d: expression means embed  the item produced  by evaluating  the
+        Pop-11 expression (which must produce a string or a word). E.g.
+
+            <ENTER> ic d: "foo"
+
+        would embed the word "foo".
+
+
+ved_inc char_or_word                                         [procedure]
+        Inserts the given char at the cursor position. If given a  word,
+        then the value (a character  code) of the Pop-11 variable  named
+        word is inserted.
+
+
+
+8.6  Setting a Text Action
+--------------------------
+
+ved_tact [ = [ chars ] | : expression ]                      [procedure]
+        Sets the command on a Text ACTion. See Embedded Text Actions  in
+        REF * VEDPROCS for a description of active segments.
+
+        The current cursor position must be somewhere within one of  the
+        active segment(s) delineating the  textual extent of the  action
+        to be updated (either the first segment, or a continuation).
+
+        In all  cases, ved_tact  first calls  * ved_text_action_data  to
+        find the appropriate place to embed the command (i.e. the  first
+        non-space character of  the first  segment), and  then sets  the
+        cursor to that position.
+
+        With no argument, ved_tact just displays any current command, by
+        calling <ENTER> cc d.
+
+        The interpretation of  the = argument  depends on whether  there
+        are any following chars:  if chars are  present, this means  set
+        the command to the string chars, e.g.
+
+            <ENTER> tact = ved myfile
+
+        would set the command to the string 'ved myfile' (note that  any
+        spaces immediately following = are ignored).
+
+        With no chars, = means edit an existing command string. If there
+        is an existing command string with characters chars, the command
+
+            tact = chars
+
+        is put  on  the  status  line:  this  can  then  be  edited  and
+        re-inserted by typing <RETURN>.
+
+        If there is no existing command, or the command is not a string,
+        the =  argument is  ignored  and any  existing command  is  just
+        displayed with <ENTER> cc d.
+
+        The argument : expression  means set the  action command to  the
+        item produced by  evaluating the Pop-11  expression (which  must
+        produce a non-empty string, or a word). E.g.
+
+            <ENTER> tact : "setpop"
+
+        would set the command to the word "setpop".
+
+        (Note  that  because  an  empty  string  is  an  active  segment
+        continuation marker, ved_tact does not allow you to set an empty
+        string as the command on an  action. If for any reason you  need
+        to insert a continuation marker manually, this can be done  with
+        <ENTER> ic  d=. You  can remove  a continuation  marker (or  any
+        other data) from a character with <ENTER> ic dd.)
+
+
+ved_mksref [ o ] [ scope ]                                   [procedure]
+        MaKe Section REFerence.
+
+        This command makes  a hotlink (text  action) that when  executed
+        will  find   a   given   ved_newindex   section   heading   in a
+        documentation file.
+
+        The target file containing the section heading may be either (a)
+        the current file (o argument absent)  or (b) some other file  (o
+        argument present). In the  latter case, the  other file must  be
+        the second  in vedbufferlist  (i.e.  the one  that  vedswapfiles
+        would make the current file).
+
+        In both cases, the required  section heading in the target  file
+        must be  indicated  by marking  the  corresponding  ved_newindex
+        index line for it (i.e. the marked range in the target file must
+        consist of a single index line).
+
+        The text action for  the hotlink will then  be either (a) a  Ved
+        search command for the section  heading, or (b) a  documentation
+        edit command with an attached  search command. (For (b),  line 1
+        of the target file must begin with HELP, REF, DOC etc,  followed
+        by the name  of the  file; this is  used to  construct the  edit
+        command for the file.)
+
+        The displayed text  (to which  the text action  is attached)  is
+        either constructed  and inserted  automatically at  the  current
+        cursor position (when  scope is absent),  or is specified  via a
+        * ved_chat scope.
+
+        In the latter  case, ved_chat is  called with scope  to add  the
+        attribute colour  2A to  the displayed  text. (Note  that  scope
+        cannot be r to specify the marked range.)
+
+        If scope is absent, the text inserted automatically is
+
+            section-description [ in doc-ref ]
+
+        where section-description is the active segment (attributes bold
+        italic colour 2A) with  the text action  attached. For case  (b)
+        the 'in doc-ref' part is also added, where doc-ref is a separate
+        active segment in the usual "*" doc ref format.
+
+
+ved_mkdref                                                   [procedure]
+        MaKe Documentation REFerence.
+
+        With the cursor positioned anywhere  inside a "*" doc  reference
+        of the form
+
+                doctype * name
+
+        (e.g. HELP  * FOO),  this command  adds the  standard  character
+        attributes to the reference. doctype is made italic, the  spaces
+        surrounding the "*" are changed to Ved no-break spaces  (`\Ss`),
+        and the whole reference has colour 2A added.
+
+
+
+8.7  Miscellaneous
+------------------
+
+ved_ifsp [ scope ] [ ss_char ]                               [procedure]
+        Insert Format SPaces (for use when preparing REF files).
+
+        This command  inserts  format-control (`\Sf`)  or  prompt-marker
+        (`\Sp`) spaces at the beginning of each line in the given scope.
+        The special space  character overwrites  column 1  of each  line
+        (which must contain an ordinary space, Sf or Sp already).
+
+        scope may be one of:
+
+             l    Current line
+             -l   Last line
+             r    All lines in the current marked range
+
+        If omitted, scope defaults to r, i.e. the marked range.
+
+        ss_char specifies the kind of space to be inserted:
+
+            f       Format-control (Sf)
+            p       Prompt-marker  (Sp)
+            -       Remove any special space, write an ordinary space.
+
+        The default for ss_char if omitted is f.
+
+        (<ENTER> ifsp is normally used in conjunction with <ENTER> dssp,
+        which allows all the special spaces in a file to be displayed as
+        visible characters -- see * ved_dssp below.)
+
+
+ved_smr [ -f ] [ n ]                                         [procedure]
+        Sort the marked range in alphabetical order, treating each  line
+        as a  string  of characters.  If  given the  argument  -f,  fold
+        uppercase letters  onto lower,  thus ignoring  case  differences
+        when sorting. The  optional integer  argument n can  be used  to
+        specify a (space-separated) field number to sort on.
+
+
+ved_sw                                                       [procedure]
+        Transpose  two  characters to the left of cursor. (Best assigned
+        to a key).
+
+
+ved_swl                                                      [procedure]
+        Swap current word with word on left. Uses space as delimiter.
+
+
+ved_swr                                                      [procedure]
+        Swap current word with word on right. Uses space as delimiter.
+
+
+ved_slrhs                                                    [procedure]
+        When this command is  given on a  line containing an  assignment
+        arrow (* ->) it produces a copy of the line with the text on the
+        left  and  right  of  the  arrow  swapped  around  (without  any
+        identprops which were on the original line.) This can be used to
+        quickly create the synopsis line for the updater of a  procedure
+        in a REF entry, see REF * REFFORM.
+
+
+ved_strip                                                    [procedure]
+        Strips all special Ved encodings  from the current buffer  (i.e.
+        removes all  character attributes,  Ved special  characters  and
+        embedded data), resulting  in a  plain ASCII  equivalent of  the
+        file.
+
+        This command simulates the effect of writing out the file with a
+        value of 1 for * vedwriteoutplain,  and then reading it back  in
+        again. That  is,  * vedfile_line_consumer is  used  (with  plain
+        argument 1) to  'write' the  buffer lines to  an internal  area,
+        which are  then 'read  back' with  * vedfile_line_repeater  (and
+        substituted for the original buffer lines).
+
+        (Note that the 'reading  back' of the lines  is affected by  the
+        value of * vedreadinplain, as when reading in any file.)
+
+
+
+
+--------------------
+9  Printing Commands
+--------------------
+
+These commands can be used to print files from inside Ved.
+
+
+ved_lp                                                       [procedure]
+ved_lpmr                                                     [procedure]
+        These  commands  provide  a  Ved  interface  to  the  Unix  "lp"
+        facility. See HELP * LP, HELP * LPMR.
+
+
+ved_lpr                                                      [procedure]
+ved_lprmr                                                    [procedure]
+        These commands  provide  a  Ved  interface  to  the  Unix  "lpr"
+        facility. See HELP * LPR, HELP * LPRMR.
+
+
+ved_print [ flags ] [ files ]                                [procedure]
+        Operating system independent command  to print the current  file
+        or a set of named files. For full details see HELP * VED_PRINT.
+
+
+ved_hprint [ flags ] [ files ]                               [procedure]
+        Like  ved_print  but  with  the  "-h"  (header)  flag  set;  any
+        arguments are passed verbatim to ved_print.
+
+
+ved_printmr  [ flags ]                                       [procedure]
+ved_rngprint [ flags ]                                       [procedure]
+        Operating system independent command  to print the marked  range
+        from the current file. For full details see HELP * VED_PRINT.
+
+
+
+
+-------------------------
+10  Program File Commands
+-------------------------
+
+These are the  commands available  for dealing with  program files.  The
+previous commands may all also be used with program files. Also included
+here are commands that enable the user to make simple additions to  Ved.
+Some additional relevant commands are included in other sections in this
+file, e.g. ved_gsp, ved_mbp, ved_mep, ved_mcp.
+
+See REF * VEDPROCS for fuller details on tailoring Ved.
+
+      10.1  Aids to Programming
+      10.2  Compilation Commands
+      10.3  Program Editing Commands
+      10.4  Moving Around and Searching Program Files
+      10.5  Miscellaneous
+
+
+
+10.1  Aids to Programming
+-------------------------
+ved_define                                                   [procedure]
+        Insert format for procedure definition.
+
+
+ved_if                                                       [procedure]
+        Insert format for conditional statement
+
+
+ved_repeat                                                   [procedure]
+        Insert format for REPEAT statement
+
+
+ved_unless                                                   [procedure]
+        Insert format for unless statement.
+
+
+ved_until                                                    [procedure]
+        Insert format for until statement.
+
+
+ved_while                                                    [procedure]
+        Inserts  a  skeleton   "while  ...   endwhile"  statement.   See
+        HELP * WHILE.
+
+
+ved_mm                                                       [procedure]
+        Move  to  Matching  end.  Uses  vedopeners  and  vedclosers   to
+        recognise opening and closing brackets.  E.g. If cursor is  just
+        before "if", <ENTER> mm moves it to after matching endif.
+
+
+ved_mp                                                       [procedure]
+        Match parenthesis. Moves to the  bracket matching the one  under
+        the cursor. Works in either direction.
+
+
+ved_wiggle [ opening-bracket closing-bracket ]               [procedure]
+        Makes  the  cursor  automatically   wiggle  over  the   matching
+        opening-bracket  when   the   closing-bracket  is   typed.   See
+        HELP * VED_WIGGLE for full details.  For setting up wiggling  in
+        your "vedinit.p" file, use * vedsetwiggle.
+
+
+ved_wmp                                                      [procedure]
+        "wiggle" matching parenthesis or other bracket.
+
+
+
+10.2  Compilation Commands
+--------------------------
+ved_c                                                        [procedure]
+        Compile all program  files (ie.  files with  extension .p,  .lsp
+        etc.) and exit from Ved, to Pop-11, Prolog, or Lisp, etc, unless
+        * ved_pop_back_file is non-false.
+
+
+ved_c1                                                       [procedure]
+        Just compile (load) one file, the current file and exit from Ved
+        to Pop-11, Prolog, etc. Compiles the file even if its unchanged.
+        See HELP * ved_pop_back_file.
+
+
+ved_ccomp arguments                                          [procedure]
+        Run C compiler and read output into Ved. See HELP * CCOMP.
+
+
+ved_fcomp arguments                                          [procedure]
+        Available only on Unix, this runs the f77 fortran compiler.  See
+        HELP * FCOMP, * PIPEUTILS.
+
+
+ved_l                                                        [procedure]
+        Like ved_c, but doesn't exit from Ved.
+
+
+ved_l1                                                       [procedure]
+        Like ved_l, but compiles only current file (even if unchanged)
+
+
+ved_lcp                                                      [procedure]
+        Load current procedure. Uses ved_lmr.
+
+
+ved_lmr                                                      [procedure]
+        Load (compile) marked  range from edit  buffer. See  HELP * LMR.
+        Any  output  produced   goes  into  the   current  file   unless
+        vedlmr_print_in_file is  false,  or an  alternative  file  name.
+        readline is re-defined to work  in the editor. Compare  ved_lcp,
+        ved_l, ved_l1.
+
+        Note that if  ved_lmr is used  to compile interactive  commands,
+        i.e. programs that read input  with readline, charin, etc,  then
+        this will  invoke  "immediate  mode" on  the  output  file  (see
+        HELP * IM).
+
+
+ved_load filename                                            [procedure]
+        Loads the file filename.
+
+
+ved_pcmr                                                     [procedure]
+        Prolog_compile marked range.  Can be used  for Prolog  programs.
+        Compiles in re_consult mode.
+
+
+ved_plx                                                      [procedure]
+        Writes all files that need  writing, compiles any program  files
+        that need  compiling,  and  call  Prolog  on  the  current  file
+        (exiting Ved).
+
+
+ved_uses libname                                             [procedure]
+        Loads the library libname if not already loaded.
+
+
+ved_x                                                        [procedure]
+        Write all changed files, compile them, then return to the  outer
+        language compiler.
+
+        Equivalent to ved_w(); ved_c(); See ved_c, ved_x1.
+
+
+ved_x1                                                       [procedure]
+        write then compile the current  file, then consult the value  of
+        * ved_pop_back_file (qv).
+
+
+
+10.3  Program Editing Commands
+------------------------------
+ved_dcp                                                      [procedure]
+        Delete current procedure, and copy into vveddump.
+
+
+ved_delout                                                   [procedure]
+        Removes all  lines  which start  '**\s' from  the  current  file
+        (assuming that  these are  output lines  produced by  the Pop-11
+        print arrow => ).
+
+
+ved_tidy                                                     [procedure]
+        Do indentation on marked range. (For Pop-11 programs.) See  also
+        ved_jp,  ved_jcp,   ved_fill,   ved_j.  Controlled   by   global
+        variables: vedopeners,  vedclosers,  vedbackers,  vedforwarders,
+        vedvarskeywords. See HELP * MARK.
+
+
+ved_mbl                                                      [procedure]
+        Mark beginning of current list. Uses ved_gbl. Will break line if
+        needed to ensure beginning of list is on separate line.
+
+
+ved_mcl                                                      [procedure]
+        Mark current list. Uses ved_mbl and ved_mel. Will break lines if
+        needed.
+
+
+ved_mel                                                      [procedure]
+        Mark end  of current  list.  Uses ved_gel.  Will break  line  if
+        needed to ensure end of list is on separate line.
+
+
+
+10.4  Moving Around and Searching Program Files
+-----------------------------------------------
+ved_f name                                                   [procedure]
+        Uses  * vedfindpdheader to  search  the  current  file  for  the
+        definition of a procedure called name.
+
+
+ved_gbl                                                      [procedure]
+        Go to beginning of current list. Skips embedded lists.  Searches
+        for `[` in Pop-11 source files and `(` in Lisp source files.
+
+
+ved_gel                                                      [procedure]
+        Go to end of  current list. Skips  embedded lists. Searches  for
+        `[` in Pop-11 source files and `(` in Lisp source files.
+
+
+ved_gol                                                      [procedure]
+        Go out of the current list. Skips  embedded lists. Searches  for
+        `[` in Pop-11 source files and `(` in Lisp source files.
+
+
+ved_grep [ flags ] string filename [ filename ]              [procedure]
+ved_grep [ flags ] filename
+ved_grep [ flags ]
+        Search the files for those  containing the string. On Unix, runs
+        grep and on VMS runs search  with the given arguments and  reads
+        the output into a temporary non-writeable Ved file. The optional
+        flags argument is supported only in the Unix version; this  also
+        admits more options, described in HELP * VED_GREP.
+
+
+
+10.5  Miscellaneous
+-------------------
+ved_errs                                                     [procedure]
+        Switch whether LMR errors go in file. See HELP * LMR.
+
+
+ved_output                                                   [procedure]
+        Used to alter vedlmr_print_in_file. See HELP * LMR.
+
+
+ved_wtype                                                    [procedure]
+        Display information about syntactic properties of the object  to
+        the right of cursor in Ved buffer.
+
+
+
+
+---------------------------
+11  Immediate Mode Commands
+---------------------------
+
+In "immediate" (or "interactive") mode,  every time the <RETURN> key  is
+pressed, the current line  is handed to the  current compiler (that  is,
+the compiler procedure for the current subsystem), and copied to the end
+of the file if  not already there. Any  output produced is spliced  into
+the file.  If the  variable  vedcrinteractive is  made false, then  this
+behaviour of <RETURN>  is disabled  and ved_lmr  must be  used to  input
+marked ranges instead.
+
+For  more   details,   see   HELP * IM,  and   Ved-Buffer   Devices   in
+REF * VEDPROCS.
+
+
+ved_end_im                                                   [procedure]
+        This command terminates "immediate mode" in a file.
+
+        (More specifically, it causes "end of file" to be passed to  the
+        first suspended process waiting  for Ved-buffer device input  in
+        the list vedprocwait.)
+
+        In the default key mapping (see HELP * VEDKEYS), ved_end_im  is
+        mapped onto the sequence <ESC> Ctrl-Z.
+
+
+ved_im  [ filename ]                                         [procedure]
+        Starts "immediate mode" compilation in the file filename,  which
+        defaults to "output.p" if omitted. See HELP * IM.
+
+
+ved_imdcl [ filename ]                                       [procedure]
+        (VMS Only.) Starts "immediate  mode" DCL command  interpretation
+        in the file  filename, which defaults  to "dclfile" if  omitted.
+        See HELP * DCL_COMPILE.
+
+
+ved_imcsh [ filename ]                                       [procedure]
+        (Unix   only.)   Starts   "immediate   mode"   cshell    command
+        interpretation in the file filename, which defaults to "cshfile"
+        if omitted. See HELP * IMCSH.
+
+
+ved_imsh [ filename ]                                        [procedure]
+        (Unix  only.)  Starts  "immediate  mode"  Bourne  shell  command
+        interpretation in the file filename, which defaults to  "shfile"
+        if omitted. See HELP * IMSH.
+
+
+ved_noprompts                                                [procedure]
+        Remove "prompt characters" from the current file, replacing them
+        by spaces.  See  HELP * VED_NOPROMPTS.
+
+
+ved_switchmode_im                                            [procedure]
+        Switches between two modes by  toggling the true/false value  of
+        the variable  vedcrinteractive.  If  this is  true  then  in  an
+        "immediate mode" file, pressing <RETURN> will input the  current
+        line to the compiler,  etc. If false,  then <RETURN> behaves  as
+        normal (i.e. calls  inserts a  newline); in  this case,  ved_lmr
+        must be used to input a marked range.
+
+
+
+
+-----------------------------------------
+12  Operating System Interaction Commands
+-----------------------------------------
+
+      12.1  UNIX Interaction Commands
+      12.2  Commands to Spawn Sub-Processes
+
+
+
+12.1  UNIX Interaction Commands
+-------------------------------
+ved_csh command                                              [procedure]
+        Runs the command command and  reads the output into a  temporary
+        Ved buffer. See HELP * PIPEUTILS.
+
+
+ved_cshfile                                                  [procedure]
+        This command enables execution of  CSH scripts from within  Ved.
+        See HELP * VED_CSHFILE for details.
+
+
+ved_killcsh                                                  [procedure]
+        This command kills any CSH child processes spawned from Ved. See
+        HELP * KILLCSH for details.
+
+
+ved_killsh                                                   [procedure]
+        This command kills any SH processes from Ved. See HELP * KILLCSH
+
+
+ved_shfile                                                   [procedure]
+        This command enables  execution of SH  scripts from within  Ved.
+        See HELP * VED_CSHFILE for details.
+
+
+ved_rsh   machine command                                    [procedure]
+ved_remsh machine command                                    [procedure]
+        Runs the command command on the remote machine machine and reads
+        the output into a temporary Ved buffer. See HELP * PIPEUTILS.
+
+
+ved_sh  command                                              [procedure]
+        Runs the  shell  command command  and  reads the  output  into a
+        temporary Ved buffer. (UNIX only.) See HELP * PIPEUTILS.
+
+
+ved_stop                                                     [procedure]
+        Suspend current Poplog process, taking you
+        back to the shell. If the process is re-run, then the Ved screen
+        is restored properly. See HELP * STOP.
+
+
+
+12.2  Commands to Spawn Sub-Processes
+-------------------------------------
+Like some of the  search commands, these do  not actually correspond  to
+procedures whose names start with  "ved_". However they are  represented
+here as if they did for the sake of uniformity.
+
+
+ved_! [ command ]                                     [pseudo procedure]
+        UNIX only. Run command in a  sub-process. This is like ved_%  or
+        ved_$ depending on value of the SHELL environment variable.  See
+        ved_obey (UNIX only).
+
+
+ved_$ [ command ]                                     [pseudo procedure]
+        Obey an operating system command  command via a sub-process.  On
+        UNIX run command  as a "sh"  command. On  VMS obey it  as a  DCL
+        command. If no command is  given spawn an interactive shell  (in
+        Unix) or DCL  (in VMS)  command. On  VMS terminate  with "q"  or
+        "logout". Compare ved_obey.
+
+
+ved_% [ command ]                                     [pseudo procedure]
+        UNIX  only.  Obey  the  command  as  a  "cshell"  command   in a
+        sub-process. If  no  command  is  given,  then  spawn  a C-shell
+        process. (Compare ved_stop, ved_obey.)
+
+
+ved_: popcode                                         [pseudo procedure]
+        Runs procedure  vedcompilevedargument,  which obeys  popcode  as
+        Pop-11 code.  Any  results left  on  stack will  be  printed  on
+        command line, or  at bottom  of screen  if there  is not  enough
+        space.
+
+
+ved_shell                                                    [procedure]
+        UNIX only.  Treats  the current  file  as a  sequence  of  shell
+        commands, and obeys them (using the procedure sysobey).
+
+
+ved_dodcl                                                    [procedure]
+        VMS only. Treats the current file as a sequence of DCL commands,
+        and obeys them (using the procedure sysobey).
+
+
+
+
+---------------------------------
+13  Altering Your Ved Environment
+---------------------------------
+
+These commands allow a degree of control over the local environment,  by
+allowing definition of  macros, and  setting of  control variables.  See
+also  REF * VEDVARS,  and   REF * VEDPROCS  for   details  of   extended
+tailoring.
+
+      13.1  Finding Out About Your Environment
+      13.2  Setting Text Boundaries
+      13.3  Setting Variable Values
+      13.4  Miscellaneous
+
+
+
+13.1  Finding Out About Your Environment
+----------------------------------------
+ved_hk                                                       [procedure]
+        Prompts user  to  press key(s),  then  prints the  name  of  the
+        associated procedure, if any. See also ved_hkey.
+
+
+ved_hkey                                                     [procedure]
+        Prompts user to press key(s),  then prints a description of  the
+        associated procedure. See also HELP * ved_hkey, and * ved_hk.
+
+
+ved_hkeys                                                    [procedure]
+        Using vedkeymapname, this procedure  displays a HELP file  which
+        shows how Ved uses the keyboard of the terminal currently  being
+        used. ved_hkeys is  the default  value of  vedhelpkey, which  is
+        usually bound to the key marked "Help", if the terminal has one.
+
+
+
+13.2  Setting Text Boundaries
+-----------------------------
+ved_lcol arg                                                 [procedure]
+        Sets the  left margin  to be  column number  arg (if  arg is  an
+        integer) or  to the  current cursor  column (if  arg is  not  an
+        integer, say the empty string '').  If arg is '?', displays  the
+        current left margin setting.
+
+
+ved_margin [ N ]                                             [procedure]
+        Assign N to vedleftmargin. If  no number given, then use  cursor
+        position.
+
+
+ved_rcol  [ N ]                                              [procedure]
+        Assign N  to vedlinemax.  If no  number given,  then use  cursor
+        position.
+
+
+ved_ruler                                                    [procedure]
+        Inserts a "ruler" detailing margins and tab settings in a marked
+        range above the current line.
+
+
+ved_indent [ N ]                                             [procedure]
+        Alter the value of * vedindentstep  to N. Default is 4.  Affects
+        tab conversion.
+
+
+ved_linemax [ N ]                                            [procedure]
+        Sets vedlinemax to  be N.  This represents the  position in  the
+        line where an automatic line break will occur. With no argument,
+        gives the current setting.
+
+
+ved_ll                                                       [procedure]
+        For VT100 terminals with long line modes. Sets terminal in  long
+        line mode and adjusts Ved accordingly. LIB * ved_ll for  details
+        of dealing with  terminals without the  "Advanced Video  Option"
+        fitted.
+
+
+ved_screenwidth N                                            [procedure]
+        Set  the  width  of  the  screen  (according  to  the   variable
+        vedscreenwidth) to N.
+
+
+ved_tabify                                                   [procedure]
+        Changes a file or  Ved buffer  so that  leading spaces  (or  all
+        spaces) are converted to tabs. See HELP * TABIFY.
+
+
+ved_tabs                                                     [procedure]
+        Switch conversion  of tabs  on  output. I.e.  not(vednotabs)  ->
+        vednotabs.
+
+
+
+13.3  Setting Variable Values
+-----------------------------
+ved_autosave [mins | reset | off]                            [procedure]
+        These commands turn on or off or control a facility that enables
+        all changed files  to be saved  to disk every  mins minutes. For
+        full details see HELP * ved_autosave.
+
+        (Compare * vedautowrite, * ved_autowrite.)
+
+
+ved_autowrite [ N ]                                          [procedure]
+        With no  argument, simply  interrogates the  current setting  of
+        vedautowrite (ie the number of changes a file can suffer  before
+        a backup is written to disc).  With an argument, sets the  value
+        of vedautowrite. Setting  it to zero  will disable  autowriting.
+
+        Compare * ved_autosave.
+
+
+ved_break                                                    [procedure]
+        Toggles the value of vedbreak between true and false.
+
+
+ved_set variable [ item ]                                    [procedure]
+        With only one  argument, toggles  the named  variable. With  two
+        arguments, sets the value of variable to be item.
+
+
+ved_static                                                   [procedure]
+        Toggle the value of vedstatic, which controls static mode.
+
+
+ved_window [ Nlines ]                                        [procedure]
+        Alters the size of  the current Ved window  to be Nlines  lines.
+        With no arguments, defaults to  the value of vedstartwindow.  If
+        Nlines is replaced by the "?" character the current size of  the
+        window is reported on the  status line. (Note: Second window  is
+        still size vedstartwindow  instead of 24  - Nlines. This  causes
+        seriously weird side effects!)
+
+        The ved_window  command is  extended in  XVed to  alter  several
+        different window attributes. See HELP * VED_WINDOW once XVed has
+        been loaded.
+
+
+ved_ws [ Nlines ]                                            [procedure]
+        If no  argument  is  supplied,  reports  the  current  value  of
+        vedstartwindow. Otherwise assigns Nlines to vedstartwindow,  and
+        redisplays the current Ved window accordingly.
+
+
+
+13.4  Miscellaneous
+-------------------
+ved_dk                                                       [procedure]
+        Define new function for Key sequence. See HELP * DK.
+
+
+ved_dm name                                                  [procedure]
+        Define a new edit macro ved_name. See HELP * VEDMACROS.
+
+
+
+
+---------------
+14  Mail in Ved
+---------------
+
+These commands enable  the user  to send mail,  and manipulate  incoming
+messages. See HELP * VED_MAIL for full details or the relevant  appendix
+in the new Ved User Guide.
+
+
+ved_ccm                                                      [procedure]
+        Delete  current  message.  Uses  ved_mcm  to  mark  the  message
+        (searches for From Username  lines) and ved_d  to delete it,  so
+        the message may be retrieved using ved_y.
+
+
+ved_gm                                                       [procedure]
+        Go  to  message.  Used  in  file  produced  by  * ved_mdir.  See
+        * ved_mail.
+
+
+ved_mail                                                     [procedure]
+        Spawns a subprocess  to interact  with the  host machine's  mail
+        system See TEACH * MAIL, HELP * MAIL.
+
+
+mail                                                            [syntax]
+        Invoke ved_mail from Pop-11.
+
+
+ved_mcm                                                      [procedure]
+        Mark Current Message in UNIX mail file. (Or mbox)
+
+
+ved_mdir                                                     [procedure]
+        Make Directory for Unix mail file in current Ved buffer.
+
+
+ved_reply [ arg ]                                            [procedure]
+        Reply  to  current  message in  UNIX  mail file  only.  See also
+        HELP * VED_REPLY.
+
+
+ved_Reply [ arg ]                                            [procedure]
+        Like ved_reply, but send to all original recipients.
+
+
+ved_send name1,name2,... etc                                 [procedure]
+        Send the current file as mail to named users. See HELP * SEND.
+
+
+ved_sendmr                                                   [procedure]
+        Like ved_send, but sends only marked range. See HELP * SEND.
+
+
+
+
+-----------------
+15  Time Commands
+-----------------
+
+ved_alarm  [hh:mm[ss]]                                       [procedure]
+        The Ved screen clock also supports an alarm facility. Without an
+        argument, this command displays the time for which the alarm  is
+        set. If given an argument, the  alarm is set to that time.  (The
+        seconds are optional. Without  them, the alarm  goes off in  the
+        latter part of the minute specified.)
+
+
+ved_clock [ int ]                                            [procedure]
+ved_clock secs [ int ]
+        (UNIX Only). This invokes LIB * ved_clock to display time on the
+        status line,  updated  at  regular intervals,  as  described  in
+        HELP * VED_CLOCK. The first form toggles the display on and off.
+        The second  form  specifies that  seconds  should be  shown  and
+        updated every INT  seconds. The  third form does  the same,  but
+        with no argument toggles display of seconds on and off.
+
+
+ved_date  [ linenum ]                                        [procedure]
+        Displays the current date and  time (as returned by  sysdaytime)
+        on the command line,  or if any argument  is given, the date  is
+        inserted into the current file at the cursor position. See  also
+        HELP * DATE.
+
+
+ved_secs                                                     [procedure]
+        When on,  the Ved  screen  clock defaults  to hh:mm  (hours  and
+        minutes). This command adds/removes seconds from the display.
+
+
+ved_time                                                     [procedure]
+        Prints the  current  date and  time  (and timezone....)  on  the
+        command  line,  in  the  format  returned  by  sysdaytime.   See
+        HELP * TIME.
+
+
+
+
+---------------------------------
+16  Multiple Commands on One Line
+---------------------------------
+
+ved_do D command1 D command2 ...                             [procedure]
+        Allows multiple Ved commands to be executed in a single command.
+        <ENTER> do must  be followed immediately  by a single  delimiter
+        character D which will then separate subsequent commands on  the
+        line. D must therefore not occur  in the commands, and must  not
+        be a space character. E.g. with D = semicolon
+
+            <ENTER> do;/fred/;mc -5; dc 3;@+6
+
+        does: search  for  'fred',  move  back  5  characters,  delete 3
+        characters, then move on 6 lines.
+
+
+
+
+--------------------------
+17  Miscellaneous Commands
+--------------------------
+
+ved_closeall                                                 [procedure]
+        In XVed, closes (makes iconic) all windows.
+
+
+ved_draw                                                     [procedure]
+        Toggles Ved interactive drawing mode. Drawing mode allows you to
+        draw boxes and tables using the standard Ved graphics characters
+        like:
+
+               -----------------------------
+               | ABC |----------+----------|
+               -----------------------------
+
+        <ENTER> draw toggles the state  of interactive Ved drawing.  The
+        first time you do this, drawing is turned on for the current Ved
+        buffer, and a message saying:
+
+                DRAWING ON (DEL to DELETE, RETURN to STOP)
+
+        is shown on the status line. Note that the drawing mode is local
+        to each Ved buffer -- doing <ENTER> draw in one Ved buffer  does
+        not effect other Ved buffers.
+
+        When   drawing   is   on,    you   can   use   your    character
+        up/down/left/right keys, or the  keys h (left)  j (down) k  (up)
+        and l (right) to move the drawing cursor around. As you move the
+        cursor, line graphics  characters are left  behind. If you  move
+        the cursor left or right  you get horizontal lines. Likewise  up
+        or down  movement  produces  vertical lines.  You  can  use  the
+        spacebar to delete line characters. Ved will automatically  join
+        horizontal and vertical line segments for you using corner,  'T'
+        and '+' junctions to produce clean looking boxes and tables.
+
+        Pressing DELETE will change the message to:
+
+                DELETING ON (DEL to DRAW, RETURN to STOP)
+
+        Thereafter moving the cursor will cause the character under  the
+        cursor to be  deleted. Pressing  DELETE again  restores the  old
+        behaviour.
+
+        While you  are drawing,  you cannot  insert standard  characters
+        into your Ved buffer (this is to help you remember that you  are
+        in drawing mode).  To go back  to typing mode,  hit <RETURN>  to
+        stop drawing.
+
+        Alternatively, you can use <REDO> to redo the ved_draw  command,
+        making it easy to toggle between drawing mode and normal mode.
+
+
+ved_dssp [ on | off ]                                        [procedure]
+        Display Special SPaces.
+
+        Enables Ved special space characters  in the current file to  be
+        displayed as visible  characters --  see Special  Spaces Etc  in
+        REF * VEDPROCS. (The command  has no  affect on  the display  of
+        special spaces in other files.)
+
+        on means make  the spaces visible;  off means set  them back  to
+        normal display (i.e.  as ordinary spaces).  With neither on  nor
+        off, the current mode is toggled.
+
+        When on, the spaces are displayed as the following characters:
+
+           Char    Name                        Displayed As
+           ----    ----                        ------------
+           Ss      Ved no-break space          .  (centred dot `\G.`)
+           Sn      ISO Latin no-break space    .  (centred dot `\G.`)
+           Sp      format-control space        f  (bold `f` colour 5)
+           Sp      prompt-marker space         p  (bold `p` colour 7)
+           St      trailing space              S  (bold `S` colour 3)
+
+        (Note that in monochrome, colours 3, 5, and 7 display as inverse
+        video.)
+
+
+ved_mafw                                                     [procedure]
+        For system use only.
+
+
+ved_obey                                                     [procedure]
+        For system use.  Gives its argument  minus  first  character  to
+        * sysobey.
+
+
+ved_pop [ ss_name ]                                          [procedure]
+        With no  argument,  simply exits  Ved  and returns  to  whatever
+        language system was in use when Ved was invoked. If a  subsystem
+        name ss_name  is  supplied,  then exits  Ved  and  replaces  the
+        top-level language  compiler  outside  of  Ved  with  the  named
+        subsystem compiler (which must be already be loaded, of course).
+
+        In either  case,  the  current  Ved buffer  and  list  of  files
+        vedbufferlist remain intact.
+
+
+ved_popwc                                                    [procedure]
+ved_popwcmr                                                  [procedure]
+        Count words in a file or marked range using a slightly  modified
+        pop itemiser; see HELP * WORDCOUNT.
+
+
+ved_strips                                                   [procedure]
+        Interface for the * SOLVER library package. See TEACH * STRIPS.
+
+
+ved_vcalc                                                    [procedure]
+        Interface for library * VCALC. See HELP * VCALC.
+
+
+ved_idprops [identprops]                                     [procedure]
+        Inserts an the specified  identprops string in bold-italic  text
+        at the  far  right  of  the  current  line  enclosed  in  square
+        brackets.  If  identprops  is  not  present  then  any  existent
+        identprops on the current line are used. If there is no  current
+        identprops on the line, then the last identprops entry  inserted
+        by ved_idprops is used (this defaults to "procedure".)
+
+
+ved_wc                                                       [procedure]
+ved_wcmr                                                     [procedure]
+        Count words in file, or in marked range. See HELP * WC.
+
+
+
+
+--------------------------------
+18  Information on Tailoring Ved
+--------------------------------
+
+The rest  of this  file is  concerned with  information for  experienced
+users who are interested in tailoring Ved, by defining new commands.  It
+can be safely ignored by new users.
+
+Some examples of  Ved extensions appear  in HELP * INITIAL.EX with  many
+more examples available in the directory:
+
+        $usepop/pop/lib/ved UNIX
+        $USEPOP:[POP.LIB.VED] VMS
+
+(See DOC * SYSSPEC for more information on Poplog directory structure)
+
+      18.1  Command Line and Argument Processing
+      18.2  Analysing the Argument String
+
+
+
+18.1  Command Line and Argument Processing
+------------------------------------------
+The procedure veddocommand is invoked  when the <RETURN> key is  pressed
+while the cursor is on the status line. It causes the command line to be
+analysed, and the required command to be obeyed.
+
+The command line is  separated into two strings,  these are the  command
+portion C and the argument portion A.
+
+In most  cases the  separation between  C and  A depends  on the  Pop-11
+itemiser rules, which means that in  some cases no intervening space  is
+required. However, special  treatment is  given to  commands that  begin
+with one of the following characters:
+
+    \ / " ` : $ % ! @
+
+In these cases special commands are invoked as described in the note  on
+special commands in the overview.
+
+In  all  other cases, the string ved_ is prefixed to the command  string
+C and the result given to consword  to create the name of a Ved  command
+procedure, which  may  be a  user-defined  procedure, or  an  autoloaded
+procedure, and the procedure is then run, or an 'UNKNOWN COMMAND'  error
+reported. (See HELP * AUTOLOAD)
+
+The characters in the string C are all converted to lower case. Thus all
+the Ved  <ENTER> commands  can be  given  in upper  or lower  case.  The
+argument string is  not converted, except  in the case  of HELP,  TEACH,
+REF, DOC and SHOWLIB commands, unless the command has a mixture of upper
+and lower case. Further information  about the command line is  provided
+in HELP * VEDCOMMANDS.
+
+
+
+18.2  Analysing the Argument String
+-----------------------------------
+The command procedure has  access to the whole  command string as it  is
+held in the global  variable vedcommand. The argument  string A is  held
+held  (without  leading   tabs  or  spaces)   in  the  global   variable
+vedargument. It may be recognised as empty, by the test:
+
+        vedargument = nullstring
+
+If the argument is meant to be a number, the procedure strnumber can  be
+used to convert it, e.g.
+
+        strnumber(vedargument) -> number;
+
+See REF * strnumber.
+
+If the argument string is to be broken into a list of separate items, it
+is possible to use the code:
+
+        sysparse_string(vedargument) -> list;
+
+See REF * sysparse_string.
+
+
+
+
+--- C.all/ref/vedcomms
+--- Copyright University of Sussex 1996. All rights reserved.

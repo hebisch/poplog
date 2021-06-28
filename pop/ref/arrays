@@ -1,0 +1,672 @@
+REF ARRAYS                                          John Gibson Feb 1996
+
+        COPYRIGHT University of Sussex 1996. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<      ARRAY PROCEDURES       >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+This REF file  details the  procedures which  deal with  the array  data
+structure. It introduces array structures  and how they are  implemented
+in Poplog. There is also a section  on sparse arrays, which can be  used
+for  storing   associations   between  arbitrary   objects   (see   also
+REF * PROPS).
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+
+  2   Predicates On Arrays
+
+  3   Obtaining Array Parameters
+
+  4   Constructing New Arrays
+
+  5   Generic Data Structure Procedures on Arrays
+
+  6   Miscellaneous
+      6.1   Storing Arrays on Disk
+
+  7   Examples of Arrays
+
+  8   Sparse Arrays
+      8.1   Examples of Sparse Arrays
+
+  9   Related Documentation
+
+
+
+---------------
+1  Introduction
+---------------
+
+Arrays are data  structures which  enable information to  be stored  and
+accessed on  the  basis of  a  set  of integer  subscripts,  where  each
+subscript corresponds to a  separate 'dimension' of  the array; thus  an
+N-dimensional array requires N such subscripts to access or update  each
+of its elements.
+
+    A one dimensional array is analogous to a vector except that vectors
+can be indexed  only from  1 to their  length, whereas  arrays can  have
+bounds covering  arbitrary  ranges  of  integers.  (For  information  on
+vectors  also  see  REF * VECTORS,  * INTVEC,  * STRINGS,  * DATA,   and
+REF * KEYS.)
+
+    Because  computer   memory   cannot  directly   represent   multiple
+dimensions, the elements of  an array actually have  to be stored in  an
+underlying 1-dimensional  structure (e.g.  a vector),  each position  in
+which corresponds to a particular set of N subscript values. The task of
+the array accessing  mechanism is therefore  to convert a  given set  of
+N-dimensional subscripts  into the  appropriate 1-dimensional  subscript
+for accessing this structure.
+
+    In Poplog, arrays are implemented as special procedures  constructed
+by newanyarray.  Such a  procedure for  an N-dimensional  array  takes N
+arguments,  and  includes  within  it  the  arrayvector,  that  is,  the
+underlying 1-dimensional structure  in which the  elements of the  array
+are in reality stored (which, despite  its name, need not actually  be a
+vector although it usually is). When called, e.g.
+
+        array(sub1, sub2, ..., subN)
+
+the array  procedure  performs  the  computation  of  the  1-dimensional
+subscript from the N values given, and supplies this to the  appropriate
+access procedure for  the arrayvector structure  (which then returns  or
+updates the specified element).
+
+    An array  may have  any number  of elements  in a  given  dimension,
+subscripted by any suitable  range of integers. That  is, an array  with
+say, 30 in a particular dimension is not restricted to using  subscripts
+1 to 30,  but can  use 0 to  29, 5  to 34, -10  to 19,  etc. An  array's
+dimensions are  specified to  newanyarray by  supplying its  boundslist,
+i.e. a list of the minimum and maximum subscripts in each dimension  (of
+length 2 * N for an N-dimensional array). When called, array  procedures
+mishap if any  of their subscript  arguments is not  in the  appropriate
+range.
+
+    When using an array in general, it is not necessary to know how  its
+elements are arranged in the arrayvector; however, this does need to  be
+known when the latter needs to  be processed separately from the  array.
+While in principle  many different  schemes are  possible, Poplog  (like
+most systems) provides just two: arraying 'by row' or 'by column'. Since
+the terms 'row' and 'column'  only make sense for 2-dimensional  arrays,
+we shall not attempt to define them, but simply say that 'by row'  means
+the elements are stored with subscripts increasing in significance  from
+left  to  right,   and  'by  column'   with  subscripts  increasing   in
+significance  from  right   to  left.  That   is,  letting  array   be a
+3-dimensional array with subscripts 1 -  3 in each dimension, the  order
+of the 3 * 3 * 3 = 27 elements in its arrayvector with the two different
+schemes would be as follows:
+
+    Arrayvector Subscript          By Row             By Column
+    ---------------------          ------             ---------
+             1                  array(1, 1, 1)      array(1, 1, 1)
+             2                  array(2, 1, 1)      array(1, 1, 2)
+             3                  array(3, 1, 1)      array(1, 1, 3)
+             4                  array(1, 2, 1)      array(1, 2, 1)
+             5                  array(2, 2, 1)      array(1, 2, 2)
+             6                  array(3, 2, 1)      array(1, 2, 3)
+             7                  array(1, 3, 1)      array(1, 3, 1)
+             8                  array(2, 3, 1)      array(1, 3, 2)
+             9                  array(3, 3, 1)      array(1, 3, 3)
+             10                 array(1, 1, 2)      array(2, 1, 1)
+             ...                ...                 ...
+             26                 array(2, 3, 3)      array(3, 3, 2)
+             27                 array(3, 3, 3)      array(3, 3, 3)
+
+Note that  (as mentioned  above), the  arrayvector of  an array  is  not
+limited to  being an  actual vector-class  structure. The  arguments  to
+newanyarray allow the specification of any 'virtual' vector, in terms of
+an 'vector init'  procedure and a  'subscriptor' procedure;  newanyarray
+then calls the 'init' procedure  with an appropriate length argument  to
+construct the arrayvector initially, and  the array procedure then  uses
+the 'subscriptor' to store and retrieve elements.
+
+    Note also that  two or more  arrays can  be made to  share the  same
+arrayvector structure,  either in  whole or  in part  (for example,  one
+array can be a sub-array of another).
+
+    While arrays are  limited to  storing associations  between sets  of
+integers and  arbitrary  values,  Poplog also  provides  mechanisms  for
+storing associations  between arbitrary  objects  -- see  Sparse  Arrays
+below  and  REF * PROPS.   See  also   REF * PROCEDURE  for   procedures
+applicable to arrays as procedures in general.
+
+
+
+
+-----------------------
+2  Predicates On Arrays
+-----------------------
+
+As mentioned above, arrays are procedures: thus isprocedure is true  for
+any array, and the datakey of an  array will be the same as the  datakey
+of any procedure. (See REF * KEYS.)
+
+
+isarray(item) -> array                                       [procedure]
+        Returns a  true result  if  item is  either an  array  procedure
+        itself,  or  is  a  closure   of  one  through  any  number   of
+        sub-closures (i.e. the  pdpart of item  is examined  recursively
+        until a non-closure is found, and then this is tested for  being
+        an array). If item is an array procedure, or one is found inside
+        a nest of closures, then that is returned, otherwise false.
+
+        (This enables closures  of arrays  to be  recognised as  arrays,
+        e.g. if array  is 3-dimensional array  then isarray will  return
+        array when applied to the 2-dimensional array array(%2%), etc.)
+
+
+isarray_by_row(array) -> bool                                [procedure]
+        Returns true if  the array  array is  arrayed by  row, false  if
+        arrayed by column.
+
+
+
+
+-----------------------------
+3  Obtaining Array Parameters
+-----------------------------
+
+boundslist(array) -> bounds_list                             [procedure]
+        Given an array array,  returns its list  of minimum and  maximum
+        subscripts in each dimension.
+
+
+arrayvector(array) -> arrayvec                               [procedure]
+arrayvec -> arrayvector(array)
+        Returns/updates the  1-dimensional structure  used to  hold  the
+        elements of the  array array.  The updater checks  that the  new
+        arrayvec is the same data type as the old.
+
+
+arrayvector_bounds(array) -> min_sub -> max_sub              [procedure]
+        Returns the minimum  and maximum  subscripts used  by the  array
+        array on  its arrayvector.  (Generally, min_sub  will be  1  and
+        max_sub will be the number of  elements in the array; this  will
+        not be the case, however, when array is actually a sub-array  of
+        the arrayvector.)
+
+
+array_subscrp(array) -> subscr_p                             [procedure]
+        Returns the subscriptor procedure used to access elements in the
+        arrayvector of the array array.
+
+
+
+
+--------------------------
+4  Constructing New Arrays
+--------------------------
+
+newanyarray  is  the  basic  procedure  for  constructing  arrays.   For
+historical and  other  reasons,  the arguments  to  this  procedure  are
+somewhat complicated, in that it can take a number of optional arguments
+in various combinations. Essentially  though, the pieces of  information
+it requires to construct a new array are quite straightforward, viz
+
+    # A 2 * N list of minimum  and maximum subscripts for each of  the N
+      dimensions (the  boundslist).  This is  used  to derive  both  the
+      number of dimensions, and the size in each dimension (and thus the
+      total number of elements in the array).
+
+    # A specification for the  arrayvector to hold  the elements of  the
+      array, and a subscriptor procedure with which to access and update
+      it. These two  can be  specified in  a number  of different  ways,
+      either as separate arguments or by a single argument which implies
+      values for both together.
+
+Other optional pieces  of information can  specify whether the  elements
+are to be arrayed by row or by column, an initialisation for each  array
+element, and (when the  new array is  to be a  sub-array of an  existing
+one),  the  starting  offset  of  the  new  array  within  the  existing
+arrayvector.
+
+
+newanyarray(bounds_list, element_init, arrayvec_spec,        [procedure]
+    subscr_p, arrayvec_offset, by_row) -> array
+        This procedure constructs and returns a new N-dimensional  array
+        procedure array (where N >= 0). Its arguments are as follows:
+
+        bounds_list
+            A list of 2 * N integers whose elements are alternately  the
+            minimum and maximum subscript in each dimension, i.e.
+
+                [% min1, max1, min2, max2, ..., minN, maxN %]
+
+            This  argument  is  always  required.  An  empty  boundslist
+            specifies  a  0-dimensional  array  (an  object  which  when
+            applied to zero subscripts returns its single value).
+
+        element_init
+            This argument is optional,  and specifies an  initialisation
+            for  each  array  element:  its  interpretation  depends  on
+            whether it is a procedure or not.
+
+            If a procedure, it is assumed to take N subscript  arguments
+            and to return a (possibly different) initialising value  for
+            each position in the array. newanyarray will then initialise
+            the array  by  applying  the  procedure  in  turn  to  every
+            combination of subscripts, i.e.
+
+                 element_init(sub1, sub2, ..., subN)
+                     -> array(sub1, sub2, ..., subN)
+
+            (Note that the order in which the combinations of subscripts
+            are generated is UNDEFINED).
+
+            Otherwise, if element_init is not a procedure, every element
+            of the array is simply initialised to that value.  (However,
+            to distinguish it from  bounds_list, this argument must  not
+            be a list -- if you wish to initialise the elements to  some
+            list, you  must  use  a procedure  returning  the  list,  as
+            above.)
+
+        arrayvec_spec
+            This  argument  is  always   required,  and  specifies   the
+            arrayvector structure to  be used to  store the elements  of
+            the array. It must supply either an existing structure, or a
+            procedure to construct a new  one: for the former the  value
+            may be either
+
+                (a) an actual vector-class structure (e.g. full  vector,
+                    string, intvec, shortvec, etc);
+
+                (b) an array procedure whose arrayvector is to be used;
+
+            while for the latter it may be
+
+                (c) a 'vector init' procedure p (which will be called as
+
+                      p(size) -> arrayvec
+
+                    where size is the number of elements in the array);
+
+                (d) a vector-class key whose class_init procedure is  to
+                    be used (see REF * DEFSTRUCT, * KEYS).
+
+            All cases except  (c) also implicitly  supply a  subscriptor
+            procedure  for  the  structure,  making  the  next  argument
+            (subscr_p) optional; for case (c), subscr_p must be present.
+
+            If an existing structure  is specified with  (a) or (b),  it
+            must of course be large enough to accommodate the new  array
+            elements.
+
+            Note that if element_init is omitted, the initial values  of
+            the  array  elements  will  depend  upon  the  arrayvec_spec
+            argument (i.e. for a new structure they will be whatever the
+            init procedure  initialises them  to,  and for  an  existing
+            structure they will have their current values).
+
+        subscr_p
+            A subscriptor procedure for accessing and updating  elements
+            of the arrayvector,  i.e. a  procedure with  updater of  the
+            form
+
+                subscr_p(subscript, arrayvec) -> element
+                element -> subscr_p(subscript, arrayvec)
+
+            This argument may always be supplied, but is essential  only
+            when arrayvec_spec specifies a  'vector init' procedure;  in
+            all  other  cases,  i.e.  an  existing  array,  an  existing
+            vector-class structure or vector-class key, the  subscriptor
+            procedure derived from that is used if subscr_p is omitted.
+
+        arrayvec_offset
+            An optional integer argument specifying the starting  offset
+            of the new array's elements within an existing array  vector
+            got from arrayvec_spec (i.e. this argument is illegal in all
+            cases where a new arrayvector  has to be constructed).  Note
+            that this is an offset, not a subscript, i.e. 0 means  start
+            at the first element (the default), 1 at the second, etc.
+
+            The existing structure must  be large enough to  accommodate
+            all the array elements starting at the given offset.
+
+        by_row
+            An optional argument specifying  whether the array  elements
+            are to be arrayed by row or by column: if supplied, it  must
+            be a  boolean,  true meaning  by  row or  false  meaning  by
+            column. If  omitted, the  value of  poparray_by_row is  used
+            instead.
+
+
+poparray_by_row -> bool                                       [variable]
+bool -> poparray_by_row
+        This boolean variable controls the  order in which the  elements
+        of an array produced by newanyarray are stored in its underlying
+        vector, and supplies the default  value for the BY_ROW  argument
+        (q.v.).
+
+
+newarray(bounds_list, element_init) -> full_array            [procedure]
+        This procedure provides a  simpler interface to newanyarray  for
+        constructing arrays of full items, and is just
+
+                newanyarray(% vector_key %)
+
+        i.e. use standard full vectors to store the array elements  (see
+        REF * VECTORS).
+
+
+newsarray(bounds_list, element_init) -> char_array           [procedure]
+        Same as newarray,  but using strings  rather than full  vectors,
+        i.e.
+
+                newanyarray(% string_key %)
+
+        (see REF * STRINGS).
+
+
+
+
+----------------------------------------------
+5  Generic Data Structure Procedures on Arrays
+----------------------------------------------
+
+The  generic   data  structure   procedures  described   in   REF * DATA
+(datalength, appdata,  explode, fill,  and others  defined in  terms  of
+those) can all be applied to arrays:  they treat an array as the set  of
+its arrayvector  elements between  the  minimum and  maximum  subscripts
+given by the arrayvector_bounds. Thus, for example, if
+
+        arrayvector_bounds(array) -> min_sub -> max_sub
+
+then datalength(array) will be
+
+        max_sub - min_sub + 1
+
+Similarly, appdata(array, p) will apply the procedure p to the value  of
+each arrayvector element from min_sub to max_sub inclusive, and so on.
+
+    The procedure copy when  applied to an array  copies both the  array
+procedure  and  its  arrayvector  (so   that  the  copy  is   completely
+independent of the original).
+
+
+
+
+----------------
+6  Miscellaneous
+----------------
+
+in_array                                                        [syntax]
+        This * FOR_FORM allows  iteration over data  in arrays, much  as
+        other forms allow iteration over data in lists and vectors.
+        Its format is:
+
+            for var1, var2, ...
+                with_index ivar
+                in_array array1, array2, ...
+                updating_last n
+                in_region list
+                of_dimension d
+            do
+                statement-sequence
+            endfor
+
+        See HELP * in_array for details.
+
+
+arrayscan(boundslist, p)                                     [procedure]
+        Given a boundlist  of array minimum  and maximum subscripts  (as
+        supplied to newanyarray, etc), applies the procedure p to  every
+        combination of subscripts  in that range  (ordered 'by  column',
+        i.e.  with  the  last  subscript  varying  fastest).  For   each
+        combination, p is given a list of subscripts of length N,  where
+        boundslist is of length 2 * N. For example, the following
+
+            arrayscan([3 5 1 3], spr);
+
+        will produce
+
+            [3 1] [3 2] [3 3] [4 1] [4 2] [4 3] [5 1] [5 2] [5 3]
+
+        The for-forms * in_array and * in_region provide alternatives to
+        this.
+
+
+6.1  Storing Arrays on Disk
+---------------------------
+The libraries LIB * ARRAYFILE  and LIB * DATAFILE may  be used to  store
+arrays on disk, and be subsequently read back into Poplog. arrayfile  is
+the more efficient and space-economical procedure; however, it can  only
+be  used  on  arrays  whose  arrayvector  is  a  'byte-accessible'  data
+structure. datafile should be used to save arrays whose arrayvector is a
+full vector.
+
+
+arrayfile(filename) -> array                                 [procedure]
+arrayfile(filename, array) -> array
+array -> arrayfile(filename)
+        Stores the array array in the disk file named by filename, using
+        a special  (machine-specific) data  format. The  arrayvector  of
+        array  must  be  a   byte-accesible  structure.  The   following
+        information is recorded:
+
+            # The number of dimensions, and bounds, of array
+            # The dataword of the array's arrayvector
+            # Whether array is ordered by row or column
+            # The contents of the arrayvector of array
+
+        In its non-updater form, arrayfile reads the information  stored
+        in filename, and returns a new array constructed from it. If the
+        optional second argument array is  specified, the data saved  in
+        filename is  written  into it;  no  new array  is  created.  See
+        HELP * ARRAYFILE for examples.
+
+
+The procedure datafile is documented in REF * datafile.
+
+
+
+
+---------------------
+7  Examples of Arrays
+---------------------
+
+The following:
+
+        constant procedure
+            multab = newarray([1 12 1 12], nonop *);
+
+will create and assign to multab a  12 x 12 2-dimensional array each  of
+whose elements  can  be a  full  Poplog  item, and  where  each  element
+subscripted by I, J is initialised to I * J (in other words, multab is a
+multiplication table):
+
+        multab(4, 3) =>
+        ** 12
+
+To turn an existing string of "noughts-and-crosses" into an array:
+
+        constant procedure
+            oxo = newanyarray([1 3 1 3], '0 X X00 X');
+
+        cucharout(oxo(1, 3));
+        0
+
+If, in the  previous example, we  make the  array by row  instead of  by
+column, the mapping between  subscripts and positions  in the string  is
+"reversed":
+
+        constant procedure
+            oxo2 = newanyarray([1 3 1 3], '0 X X00 X', false);
+
+        cucharout(oxo2(1, 3));
+        X
+
+
+
+
+----------------
+8  Sparse Arrays
+----------------
+
+It is  sometimes necessary  to use  large arrays  in which  many of  the
+elements will all have some default value, and only relatively few  will
+have a 'significant' value, i.e. different from the default. Represented
+as ordinary arrays,  such 'sparse'  arrays are very  wasteful of  space,
+since  the  arrayvector  must  allow  storage  cells  for  each  element
+corresponding to a given combination of subscripts, and yet many or most
+of these will just repeat the default value.
+
+    Rather than using  an vector-type  structure to  hold the  elements,
+Poplog sparse  arrays  are therefore  implemented  as  multi-dimensional
+properties, that is, they use a tree of properties to associate each set
+of  subscripts  to  a  value  (see  REF * PROPS  for  a  description  of
+properties). This means  that only  the 'significant'  elements take  up
+space, and  moreover,  the  'subscripts' are  not  restricted  to  being
+integers, but can  be any  Poplog items. (Although  this approach  saves
+space, it  does however  mean that  accessing sparse  array elements  is
+slower than for ordinary arrays.)
+
+    A sparse array can also have an 'active default' -- i.e. a procedure
+that is run to  decide what the  default value of  an element should  be
+when  it  has  not  been  assigned  a  value  explicitly;  for   certain
+applications this can save even more space.
+
+
+newanysparse(dimensions, default_item)     -> sparse_array   [procedure]
+newanysparse(dimensions, default_p, apply) -> sparse_array
+        Constructs  and  returns  a   new  N-dimensional  sparse   array
+        procedure (where N >= 1). This can be called as
+
+            sparse_array(sub1, sub2, ..., subN) -> element
+            element -> sparse_array(sub1, sub2, ..., subN)
+
+        to access or update the element associated with a given set of N
+        'subscripts' (which  can be  any  items at  all, but  note  that
+        subscript equality is on the basis of ==, not =).
+
+        The dimensions argument  specifies the number  of dimensions  N,
+        either directly as an  integer or as an  N-element list. In  the
+        latter case, the elements  of the list  are integers giving  the
+        table sizes  to be  used for  the properties  employed for  each
+        dimension; in  the former  case, when  dimensions is  simply  an
+        integer, the table size in  each dimension defaults to 20.  (The
+        table size for a property affects how fast items are accessed in
+        it -- see REF * PROPS.  For maximum speed  it should be  roughly
+        the 'size', i.e. number of  different subscript values, in  each
+        dimension; also, subscripts are dealt  with from right to  left,
+        so that putting  'larger' dimensions  to the  left of  'smaller'
+        ones will increase efficiency.)
+
+        The remaining argument(s) specify the default value for elements
+        of  the  array:  in  the  first  form  of  the  call,  the  item
+        default_item is the fixed default  value for every element.  The
+        second form specifies an  'active default' procedure  default_p,
+        and  to  distinguish  this  from   the  first  form  (in   which
+        default_item could be  a procedure), the  last argument must  be
+        the procedure apply.  default_p is  expected to  be a  procedure
+        which takes N 'subscript' arguments and returns a default value,
+        i.e.
+
+                default_p(sub1, sub2, ..., subN) -> value
+
+        (this is comparable to a procedure specified as the element_init
+        argument to newanyarray).
+
+
+newsparse(dimensions) -> sparse_array                        [procedure]
+        This is a  simpler version  of newanysparse which  has the  word
+        "undef" as a fixed default_item, i.e. same as
+
+                newanysparse(%"undef"%)
+
+
+
+8.1  Examples of Sparse Arrays
+------------------------------
+The first example is an sparse  array representing points in 3-D  space,
+where each element in the array is a list of points to which that  point
+is connected  to; each  point is  defaults to  being connected  just  to
+itself:
+
+        define lconstant here(x, y, z);
+            lvars x, y, z;
+            [[^x ^y ^z]]
+        enddefine;
+
+        constant procedure
+            connected = newanysparse(3, here, apply);
+
+In this array, each cell  contains a list of  the points it is  directly
+connected to:
+
+        connected(1, 2, 3) =>
+        ** [[1 2 3]]
+        connected(8, 9, 10) =>
+        ** [[8 9 10]]
+
+Some explicit connectivity can then be added:
+
+        [8 9 10] :: connected(1, 2, 3) -> connected(1, 2, 3);
+
+        connected(1,2,3) =>
+        ** [[8 9 10] [1 2 3]]
+
+The second example creates  a sparse array in  which the 3  'dimensions'
+are English words,  foreign languages,  and modalities,  and where  each
+element is the translation  of the English  word into the  corresponding
+language  and  modality   (the  default   value  being   false  for   no
+translation):
+
+        constant procedure
+            dictionary = newanysparse(3, false);
+
+        "bonjour" -> dictionary("hello", "french", "polite");
+        "ola" -> dictionary("hello", "spanish", "familiar");
+
+        dictionary("hello", "french", "polite") =>
+        ** bonjour
+        dictionary("hello", "french", "vulgar") =>
+        ** <false>
+
+
+
+
+------------------------
+9  Related Documentation
+------------------------
+
+REF * DATA
+    Information on Poplog data types and how they are represented.
+
+REF * KEYS
+    Describes the information  associated with each  data type and  some
+    general procedures for  manipulating data and  creating fast  access
+    procedures.
+
+REF * VECTORS
+    Describes standard  full  vectors  (vectors  containing  any  Poplog
+    items).
+
+REF * INTVEC
+    Describes intvecs (vectors  containing 32 bit  signed integers)  and
+    shortvecs (vectors containing 16 bit signed integers).
+
+REF * STRINGS
+    Describes byte vectors.
+
+REF * PROPS
+    Information  on  properties   (hash-tables,  indexed  by   arbitrary
+    objects).
+
+REF * DEFSTRUCT
+    Describes syntax for creating new vector or record classes.
+
+HELP * ARRAYS
+    An introduction to arrays in Pop-11.
+
+HELP * NEWMAPPING
+    Describes a particular type of  property for associating items  with
+    structures on the basis of structure equality.
+
+
+
+--- C.all/ref/arrays
+--- Copyright University of Sussex 1996. All rights reserved.

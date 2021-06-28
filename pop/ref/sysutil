@@ -1,0 +1,922 @@
+REF SYSUTIL                                         John Gibson Apr 1994
+
+        COPYRIGHT University of Sussex 1994. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<   UNIX UTILITY PROCEDURES   >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+These procedures  perform  miscellaneous functions  within  the  system,
+including interfacing  to Unix  facilities not  directly concerned  with
+input/output (for  which  see REF * SYSIO).  Some  of these  are  direct
+interfaces to Unix system calls, etc, while others are in form that  can
+be made compatible across all Poplog implementations.
+    See also  REF * ASYNC  for  procedures concerned  with  Unix  signal
+handling.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Username and Environment Variable Processing
+
+  2   Filename Processing
+
+  3   Directory Manipulation
+
+  4   Unix Processes
+
+  5   Running Shell Commands
+
+  6   Termcap Interface
+
+
+
+-----------------------------------------------
+1  Username and Environment Variable Processing
+-----------------------------------------------
+
+sysgetpasswdentry(user_id) -> entry                          [procedure]
+sysgetpasswdentry(user_id, spec) -> entry
+        This procedure accesses information about a given user from  the
+        password file '/etc/passwd'  (see passwd(5)  and getpwent(3)  in
+        the Unix Programmers Manual).
+
+        user_id is  either a  user  login name  (a  string), or  a  user
+        identification (an integer); in all cases, false is returned  if
+        the specified user cannot be found.
+
+        Without a second  spec argument, the  procedure returns a  (new)
+        standard full vector containing the broken-down fields from  the
+        password entry line, subscripted thus:
+
+           1   Name (login name, contains no upper case) (string).
+           2   Encrypted password (string).
+           3   User's identification (integer).
+           4   User's group identification (integer).
+           5   This is called 'pw_quota' (always 0 at present).
+           6   This is called 'pw_comment' (always an empty string).
+           7   User's real name, office, phone extension etc (string).
+           8   Initial working directory (string).
+           9   Program to use as login shell (string).
+
+        If specified, the spec argument  selects variations on this,  as
+        follows:
+
+        If spec is  standard full vector  of length >=  2, then that  is
+        used instead of creating a new one (for as many of the fields as
+        it will hold), and is again returned as the result.
+
+        If on the other hand spec is a vector of length 1, containing an
+        integer from 1 - 9, then only the field selected by that integer
+        is returned.
+
+        Finally, spec  may be  true,  in which  case  the whole  of  the
+        password entry  line  is  returned as  a  string  (this  doesn't
+        include fields 5 and  6, which aren't  actually in the  password
+        file).
+
+
+sysgetusername(user_id) -> name_string                       [procedure]
+        Uses sysgetpasswdentry to select field 7 (user's real name)  for
+        the user  specified by  user_id, and  then returns  the  leading
+        substring of  this upto  the first  comma (or  the whole  string
+        otherwise), which is assumed to be the real name part.
+
+
+systranslate(string)        -> trans_string                  [procedure]
+systranslate(string, flags) -> trans_string
+trans_string -> systranslate(string)
+trans_string -> systranslate(string, flags)
+        Provides or updates a translation  of the string string,  either
+        as a  user login  name  to login  directory, or  an  environment
+        variable name to its value, as follows:
+
+         #  If the first  character of  string is `~`  (tilde) then  the
+            remaining substring of string  is taken to  be a user  login
+            name. The user's  login directory  is returned  as a  string
+            (using sysgetpasswdentry, see above),  or false if the  user
+            is non-existent. An empty  user name (i.e. string  = ~ )  is
+            interpreted   as    the    current   user    (and    returns
+            systranslate('HOME')).
+
+            A first character of ~ is not allowed with the updater.
+
+         #  Otherwise, the whole string string (or string excluding  the
+            first character if this is $ (dollar)) is interpreted as  an
+            environment  variable  name.   The  strings   in  the   list
+            popenvlist are searched,  and if  one is found  of the  form
+
+                'string=trans_string'
+
+            then  the  substring  trans_string  is  returned,  otherwise
+            false.
+
+            For the updater, any existing entry in popenvlist for string
+            is first  removed;  if  trans_string is  false,  no  further
+            action  is  taken,  otherwise  a  new  entry  of  the   form
+            'string=trans_string' is added to popenvlist.
+
+        For compatibility with the VMS version, this procedure allows an
+        optional integer flags argument (which is ignored).
+
+
+popenvlist -> list                                            [variable]
+list -> popenvlist
+        Holds a list of the  environment variable strings passed to  the
+        Poplog system on  startup, i.e. a  list of strings  of the  form
+        'name=value' where name is a variable name and value its  value.
+        systranslate uses this to  translate an environment variable  to
+        its value (see above).
+
+
+popusername -> string                               [protected variable]
+        This variable is initialised on Poplog startup to be the  string
+        got from  systranslate('USER')  (or  systranslate('LOGNAME')  in
+        System V), i.e. the name of the current user.
+
+
+
+
+----------------------
+2  Filename Processing
+----------------------
+
+sysfileok(filename) -> trans_filename                        [procedure]
+sysfileok(filename, true) -> (trans_filename, dsk_sub, dir_sub,
+                                    nam_sub, ext_sub, ver_sub)
+        This procedure is called by most procedures in Poplog which take
+        a filename argument; it performs translations on filenames,  and
+        (in the  second form  of  the call  with extra  argument  true),
+        returns a parse of the result. The translations performed on the
+        (string/word) filename are as follows:
+
+        First, if the filename filename  begins with the character ~  or
+        the character $, then the substring from the that character upto
+        the next character  before a /  (or to  the end of  the name  if
+        there isn't one), is replaced by systranslate on that  substring
+        (thus environment variables and  user names can  be used at  the
+        beginning of filenames). E.g.
+
+                sysfileok('~johng/ref') =>
+                ** /cog/johng/ref
+
+                sysfileok('$popautolib/nl.p') =>
+                ** /poplog/pop/lib/auto/nl.p
+
+        Second,    sysfileok    truncates    filenames    longer    than
+        pop_max_filename_len characters  (see below).  This is  done  in
+        such a way that  any file 'extension'  or trailing hyphens  on a
+        'back' file name are preserved, e.g.
+
+              sysfileok('$popautolib/cleargensymproperty.p-') =>
+              ** /poplog/pop/lib/auto/cleargensym.p-
+
+        When a 2nd  argument of  true is  supplied, sysfileok  returns 5
+        integers in addition to the  translated filename. These are  the
+        starting subscripts within trans_filename  of its last 5  fields
+        (the first field starting  at subscript 1),  where the 6  fields
+        are:
+
+           Num   Subscr    Field
+           ---   ------    -----
+            1    1         Host machine (part to ! before first /)
+            2    dsk_sub   Disk (in Unix, always empty)
+            3    dir_sub   Directory (upto and including last /)
+            4    nam_sub   Name (part after last / and before last dot)
+            5    ext_sub   Extension (part after and including last dot)
+            6    ver_sub   Version (zero or more trailing hyphens)
+
+        Where a field is empty, the subscript for that field equals  the
+        subscript for  the next  field, or  datalength(trans_filename)+1
+        for the last (the version). Thus the length of any field is  its
+        subscript    subtracted     from    the     next,    or     from
+        datalength(trans_filename)+1 for the version. E.g
+
+             substring(ext_sub, ver_sub-ext_sub, trans_filename)
+
+        will extract the extension, whereas
+
+             datalength(trans_filename)+1 -> END_SUB;
+             substring(nam_sub, END_SUB-nam_sub, trans_filename)
+
+        will extract the name, extension and version.
+
+
+pop_max_filename_len -> int                         [protected variable]
+int -> pop_max_filename_len
+        System variable. Holds  the maximum  length of  a filename.  The
+        procedure sysfileok uses it to ensure that filenames are  within
+        the permissible length, truncating where necessary.
+
+
+sys_fname(filename) -> parse_vec                             [procedure]
+sys_fname(filename, n) -> field_n
+sys_fname(filename, n, m) -> fields_n_to_m
+        This procedure provides a convenient interface to the parsing of
+        filename fields performed by  sysfileok. It creates (and  caches
+        in an internal temporary property), a 6-element vector parse_vec
+        holding the results of sysfileok(filename,true), i.e.
+
+            consvector(sysfileok(filename,true), 6) -> parse_vec;
+
+            parse_vec -> temp_prop(filename);
+
+        Repeated calls of sys_fname with the same (==) filename argument
+        will then reuse  a stored  parse_vec for that  name if  possible
+        (the property is of type "tmpclr", so all entries are cleared by
+        garbage collections).
+
+        The first form of the call, with only a filename argument,  just
+        returns parse_vec.
+
+        In the second and third forms, one or two integer field  numbers
+        n, m in the range 1 -  6 may be specified to extract either  the
+        n-th field,  or fields  n to  m inclusive,  from the  translated
+        filename. (In the latter case n must be less than or equal to m;
+        n = m is the same as n alone). For example,
+
+            sys_fname(filename, 4)   = name
+            sys_fname(filename, 4,5) = name and extension
+
+        (Note that  since sys_fname  uses substring  to extract  fields,
+        it's guaranteed that nullstring is returned for an empty field).
+
+
+sys_fname_path (filename) -> path                            [procedure]
+sys_fname_nam  (filename) -> nam                             [procedure]
+sys_fname_name (filename) -> name                            [procedure]
+sys_fname_namev(filename) -> namev                           [procedure]
+sys_fname_extn (filename) -> extn                            [procedure]
+        Closures of  sys_fname for  useful fields  or field  ranges,  as
+        follows:
+
+               Pdr      Num     Fields
+               ---      ---     ------
+               path     1,3     host + disk + dir
+               nam      4       name
+               name     4,5     name + extension
+               namev    4,6     name + extension + version
+               extn     5       extension
+
+        (N.B. Because the  location of  a file  in VMS  is described  by
+        fields 1 to  3, it is  essential to use  sys_fname_path for  the
+        'directory' of a file, not field  3 alone, if you want to  write
+        portable Poplog  programs. In  Unix, the  disk field  is  always
+        empty, and only special-purpose programs will expect to have  to
+        deal with filenames containing a non-empty host field.)
+
+
+dir dir_>< filename1 -> filename2                           [operator 4]
+        Concatenates a  directory path  dir onto  a filename  filename1.
+        Both arguments may  be either  a word  or a  string; the  result
+        filename2 is their concatenation (using sys_><),  with a / added
+        in between if  dir doesn't  already end with  one and  filename1
+        doesn't already start with one. E.g.
+
+              '$popautolib' dir_>< 'sort.p' =>
+              ** $popautolib/sort.p
+
+              'foo/baz' dir_>< nullstring =>
+              ** foo/baz/
+
+              nullstring dir_>< 'foo/baz' =>
+              ** foo/baz
+
+        Note that if filename1  is empty, then  the result will  always
+        end with a /, EXCEPT when dir is empty also.
+
+
+sys_file_match(file_spec, def_spec, fvec, flags)             [procedure]
+                                        -> filename_rep
+        This procedure can be used to  find all file names that  match a
+        given file  specification  file_spec.  It returns  a  file  name
+        repeater, i.e. a procedure which each time it is called produces
+        the next actual  file name  matching file_spec,  or <termin>  if
+        there are no more. The arguments are as follows:
+
+        file_spec
+            This is  the  file specification  string.  It is  first  run
+            through   sysfileok,   which    means   that   an    initial
+            $environment-var is translated, as is an initial  ~username.
+            It can then contain normal shell-type wildcard characters as
+            follows:
+
+                *                   match 0 or more characters;
+                ?                   match any single character;
+                [abcA-Z]            match any of a,b,c or A-Z, etc;
+                [^abcA-Z]           match any character but a,b,c or
+                                    A-Z, etc;
+                {patt1,patt2,...}   match any of patt1, patt2, ...
+                                    (each patt may contain wildcards).
+
+            Note that as usual, `.` at the beginning of a name part must
+            be matched explicitly. (However, {?,.} or {*,.*} may be used
+            instead of ? or * to get around this.)
+
+            In addition, there are two other special wildcards:
+
+            The first is concerned with the Poplog convention of  naming
+            'back' files by  appending 1 or  more trailing hyphens  (see
+            pop_file_versions  in  REF * SYSIO):  this  is  `#`,   which
+            matches the  start  position  of  0  or  more  trailing  `-`
+            characters on the  end of  a file name.  (Thus for  example,
+            '*#' would match only file  names with no trailing  hyphens,
+            whereas '*#-*' would match names with at least one  trailing
+            hyphen.)
+
+            The other special  wildcard is '...'  for a directory  name,
+            which means match all sub-directories recursively, e.g.
+
+                    '/foo/.../baz/*.p'
+
+            would match all '*.p' files in any directories called  'baz'
+            anywhere in the tree from /foo downwards.
+
+        def_spec
+            The file  specification file_spec  is considered  to  have 3
+            parts, namely path,  name and  version (the  last being  a #
+            character plus  anything  following  it);  if  present,  the
+            corresponding parts  of  the  default  specification  string
+            def_spec are  then used  to  fill in  the missing  parts  of
+            file_spec. For example, if file_spec was '*.ph' (having only
+            the name part),  and def_spec  was $usepop/.../*.p#  (having
+            all three parts), then  the actual specification used  would
+            be
+
+                    '$usepop/.../*.ph#'
+
+        fvec
+            A standard full vector or false. If fvec is a vector, then a
+            * sys_file_stat is performed  on each  file name  generated,
+            using fvec  as  the vector  in  which to  store  the  status
+            information.  In  this   case  the   repeater  returned   by
+            sys_file_match produces two results,  the file name and  the
+            status information, like this:
+
+                    filename_rep() -> (stat, filename);
+
+            There is  a complication  in the  case where  filename  is a
+            symbolic link. If  the "follow  symbolic links"  bit of  the
+            flags argument to  sys_file_match (see below)  is set,  then
+            the data  in stat  refers  to the  file  pointed to  by  the
+            symbolic link. If  the "follow symbolic  links" flag is  not
+            set, however, then stat is status information about the link
+            itself.
+
+            If fvec is false then only the file name is returned, i.e
+
+                    filename_rep() -> filename;
+
+            (unless the "strip" bit of the  flags argument is set -- see
+            below).
+
+        flags
+            An integer argument, in which bits 0 - 1 have the  following
+            meanings:
+
+                Bit     Meaning
+                ---     -------
+                 0      If set, strip directory pathnames
+
+                 1      If set, follow symbolic links when calling
+                        sys_file_stat (see above)
+
+            The flags argument may also be a boolean. true is equivalent
+            to 2:01  ("strip"  set), and  false  is equivalent  to  2:00
+            ("strip" not set).
+
+            The significance  of  bit  1  ("follow  symbolic  links") is
+            discussed above in the section on the fvec parameter.
+
+            If the "strip"  bit (bit 0)  is set, the  directory part  of
+            each file name is stripped and only returned in between  the
+            stream of file names,  whenever the directory path  changes.
+            When this happens, the repeater  returns false for the  file
+            name and a second result for the path. Thus when "strip"  is
+            set, the repeater should be used as follows:
+
+                 until (filename_rep() ->> filename) == termin do
+                    if filename then
+                        <process file name>
+                        -> stat  (if fvec a vector)
+                    else
+                        -> path;
+                        <process directory path>
+                    endif
+                  enduntil;
+
+            Note that unless path is empty, it will always end with /.
+
+            If however  the  "strip" bit  is  not set,  the  file  names
+            returned by the repeater are  the full file names, with  the
+            directory path included in each.
+
+
+sys_match_filename()                                         [procedure]
+sys_matchin_dir()                                            [procedure]
+        System procedures used by sys_file_match.
+
+
+sys_search_unix_path(name, unix_path) -> filename            [procedure]
+        Searches the  $PATH-style directory  list unix_path  for a  file
+        called name, returning  the full  pathname if  found, and  false
+        otherwise. For example, under  SunOS, with a conventional  value
+        of $PATH:
+
+            sys_search_unix_path('lpr',systranslate('PATH')) =>
+            ** /usr/ucb/lpr
+
+
+systmpfile(dir, prefix, suffix) -> filename                  [procedure]
+        Generates a new unique file name in the given directory dir.
+
+        If dir is false,  the default temporary  directory given by  the
+        environment variable  $TMPDIR  is used,  or  '/tmp' if  that  is
+        undefined. If dir is an  empty string, the current directory  is
+        used.
+
+        prefix should be  a string  which identifies  the program  which
+        needs the temporary  file, and  suffix should  be the  extension
+        required. Example:
+
+            systmpfile('/foo', 'load', '.o') =>
+            ** /foo/load6x21564.o
+
+
+sysobjectfile(filename) -> object_filename                   [procedure]
+sysobjectfile(filename, want_archive) -> archive_filename
+        Generates and returns  an object file  name (or library  archive
+        file name if  want_archive is  supplied and true)  based on  the
+        given source file name. The file name that is generated includes
+        information about  the  type  of machine  and  operating  system
+        currently being used, and will be of the form:
+
+            <source file name> _ <machine type> . <suffix>
+
+        The <machine  type>  part of  the  name is  generated  from  the
+        contents of sys_machine_type. The <suffix> is normally '.o'  (or
+        '.a' if an  archive file name  is being generated)  but will  be
+        '.so' on SPARC  machines running  Solaris 2.x, and  '.sl' on  HP
+        9000 machines running HP-UX 9.x.
+
+        For example, on a Sun 4 running SunOS 4.x:
+
+            sysobjectfile('test.c') =>
+            ** test_sun3.o
+
+            sysobjectfile('libtest', true) =>
+            ** libtest_sun3.a
+
+        but on a Sun 4 running Solaris 2.x
+
+            sysobjectfile('test.c') =>
+            ** test_sun4r5.so
+
+
+
+
+-------------------------
+3  Directory Manipulation
+-------------------------
+
+current_directory -> string                                   [variable]
+string -> current_directory
+        This (active) variable holds the current directory as a  string:
+        assigning to  it  changes  the current  Unix  directory  of  the
+        process. On  assignment,  an empty  string  is replaced  by  the
+        string got from
+
+                systranslate('HOME')
+
+
+popdirectory -> string                              [protected variable]
+        This variable is initialised on Poplog startup to be the  string
+        got from
+
+                systranslate('HOME')
+
+        i.e. the current user's home directory.
+
+
+sysfilemode(filename) -> int                                 [procedure]
+int -> sysfilemode(filename)
+        Returns or sets the protection value on a file filename.
+
+
+sysisdirectory(filename) -> bool                             [procedure]
+        Returns true if  filename is  a directory,  false otherwise.  An
+        empty string is equivalent to '.'.
+
+
+syslink(old_filename, new_filename) -> bool                  [procedure]
+syslink(old_filename, new_filename, follow_symlinks) -> bool
+        Creates a  hard  link  named  new_filename  to  the  file  named
+        old_filename,  where  old_filename  and  new_filename  are  both
+        strings.
+
+        The optional follow_symlinks argument specifies whether symbolic
+        links should be recursively  deferenced. The most general  value
+        is an integer,  in which bit  0 = 1  means dereference  symbolic
+        links on old_filename, and bit 1  = 1 means dereference them  on
+        new_filename. A boolean  may also  be supplied,  true being  the
+        same as 1 (deref old_filename only), amd false being the same as
+        0 (the default if follow_symlinks is omitted).
+
+        (Note that  it  is  an  error  if  new_filename  exists,  unless
+        follow_symlinks specifies bit 1 = 1  and the name is a  symbolic
+        link pointing to a nonexistent file.)
+
+        If the call fails merely because old_filename doesn't exist then
+        false is returned, but any other failure produces a mishap. true
+        is returned if the link was successfully created.
+
+
+syssymlink(old_filename, new_filename) -> bool               [procedure]
+syssymlink(old_filename, new_filename, follow_symlinks) -> bool
+        As for syslink, but  creates a symbolic link  instead of a  hard
+        one (note that in this case false can never be returned  because
+        it isn't necessary  for old_filename to  exist for the  symbolic
+        link to be created).
+
+        In Unix systems that don't support Berkeley symbolic links  this
+        procedure just mishaps.
+
+
+sysunlink(filename) -> bool                                  [procedure]
+sysunlink(filename, follow_symlinks) -> bool
+        Unlinks the directory entry for  the file named filename,  where
+        filename is a string.
+
+        If the optional  boolean follow_symlinks argument  is true,  and
+        filename is a symbolic link, then the link is first  recursively
+        dereferenced; if false (the default  when omitted), this is  not
+        done.
+
+        If the call  fails merely  because filename  doesn't exist  then
+        false is returned, but any other failure produces a mishap. true
+        is returned if filename was successfully unlinked.
+
+
+sysdelete(filename) -> bool                                  [procedure]
+sysdelete(filename, follow_symlinks) -> bool
+        Deletes the file with  filename string filename, returning  true
+        if successful, false if the file doesn't exist.
+
+        This procedure is essentially  the opposite of syscreate,  which
+        in particular means it 'moves forward' any back file versions of
+        filename that exist. (See pop_file_versions in REF * SYSIO.)
+
+        Unless the optional third argument follow_symlinks is specified,
+        and false, sysdelete  will follow symbolic  links, i.e.  given a
+        symbolic link as argument it will delete the file pointed to  by
+        the link, not the link itself.
+
+
+sys_file_copy(filename1, filename2)                          [procedure]
+        Copies the file  named filename1  (which must exist)  to a  file
+        named filename2.  Note that  this  procedure uses  syscreate  to
+        create the  new  file,  and  thus  maintains  back  versions  of
+        filename2 according to pop_file_versions.
+
+
+sys_file_move(old_filename, new_filename)                    [procedure]
+sys_file_move(old_filename, new_filename, follow_symlinks)
+        Renames the  file  named  old_filename  (which  must  exist)  as
+        new_filename, except that it COPIES  the file (deleting the  old
+        one) when either  (a) new_filename  refers to  a different  file
+        system from old_filename (in  which case a  new hard link  isn't
+        possible), or (b) new_filename exists already and has more  than
+        1 link (thus it preserves links to new_filename).
+
+        Note that,  whether  it  renames or  copies,  back  versions  of
+        new_filename are maintained according to pop_file_versions.
+
+        The optional follow_symlinks argument specifies whether symbolic
+        links should be recursively  deferenced. The most general  value
+        is an integer,  in which bit  0 = 1  means dereference  symbolic
+        links on old_filename, and bit 1  = 1 means dereference them  on
+        new_filename. A boolean  may also  be supplied,  true being  the
+        same as 1 (deref old_filename only), amd false being the same as
+        0 (the default if follow_symlinks is omitted).
+
+
+sys_dir_size(dir) -> n_kbytes                                [procedure]
+        Returns the  number of  kilobytes occupied  by dir  and all  the
+        files and sub-directories within dir. Files which have  multiple
+        links are  only counted  once. sys_dir_size  is similar  to  the
+        shell command UNIX * du.
+
+
+
+
+-----------------
+4  Unix Processes
+-----------------
+
+sys_fork(will_do_wait)        -> pid                         [procedure]
+sys_fork(will_do_wait, ast_p) -> pid
+        Forks the current Poplog process, producing a new child  process
+        which is an exact  copy of the current  one. In the parent,  the
+        call of sys_fork returns with  the child  pid; in  the child  it
+        returns false.
+
+        will_do_wait is a boolean  argument which indicates whether  you
+        will (at some later point) call  sys_wait to wait for the  child
+        process to terminate: true = yes, false = no.
+
+        (If will_do_wait is true and you do not call sys_wait, you  will
+        leave a  'zombie' process  record in  Poplog's internal  process
+        list; on the  other hand, if  the argument is  false and you  do
+        call sys_wait, a mishap  will result. Note  that Poplog does  an
+        automatic Unix waitpid system call for every child process  when
+        it dies, regardless of  the value of  will_do_wait. Thus you  do
+        not have to sys_wait for a child merely to avoid creating a Unix
+        zombie.)
+
+        ast_p is an optional asychronous trap procedure. If supplied, it
+        will  be   executed  asychronously   when  the   child   process
+        terminates, with the  child pid  and exit  status as  arguments,
+        i.e.
+
+                ast_p(pid, status)
+
+        (See  Asynchronous  Trap  Procedures  in  REF * ASYNC  for  full
+        details of the ast_p  argument, which may also  be a pair  whose
+        front is the procedure.)
+
+        Executing sys_fork causes the process specific destroy  property
+        sys_process_destroy_action to be  cleared in  the child  process
+        (see REF * PROPS for details).
+
+        See also popdevin,  popdevout and popdeverr  in REF * SYSIO  for
+        details on reassigning standard I/O.
+
+
+sys_vfork(will_do_wait)        -> pid                        [procedure]
+sys_vfork(will_do_wait, ast_p) -> pid
+        Forks the current Poplog process, producing a new child  process
+        which 'borrows' the  address space  of the  current one  until a
+        sysexit or sysexecute is performed; until this happens, only the
+        open files of the two processes are different.
+
+        sys_vfork is  therefore used  ONLY in  the situation  where  the
+        purpose of forking is to immediately sysexecute another image in
+        the child, possibly after redirecting the standard input  and/or
+        output etc (and  is quicker than  sys_fork because Unix  doesn't
+        have to copy the  whole Poplog process). Using  it in any  other
+        way will crash the system  -- in particular, the procedure  that
+        calls sys_vfork must not exit when running as the child (this is
+        the same limitation placed on the  use of the vfork system  call
+        in C).
+
+        In the parent, the call of sys_vfork returns with the child pid;
+        in the child it returns false.
+
+        The arguments to sys_vfork are the same as for sys_fork.  (Note,
+        however, that when  Poplog is running  inside a vfork'ed  child,
+        the arguments to  a another sys_fork  or sys_vfork are  ignored.
+        This is  because the  vfork'ed  process is  not expected  to  do
+        anything but exit after the second fork.)
+
+
+sys_wait(pid_or_list_or_false) -> (pid, status)              [procedure]
+        Waits for  the  termination  of  child  process(es)  created  by
+        sys_fork or  sys_vfork  with  will_do_wait  argument  true.  The
+        Process IDentification number  and exit status  of a dead  child
+        are returned.
+
+        The argument may be
+
+          # a child process pid, meaning wait for that child;
+
+          # a list of child process pids, meaning wait for the first  of
+            those children to die;
+
+          # false,  meaning  wait  for  any  child  process  created  by
+            sys_fork  or  sys_vfork   (this  option   is  provided   for
+            compatibility with the old  version of sys_wait, and  should
+            not generally be used).
+
+        Each call of sys_wait  returns the pid  and (integer) status  of
+        the first specified child to die, waiting for this to happen  if
+        necessary (with syshibernate).
+
+        A  mishap  will   result  if  there   are  no  child   processes
+        corresponding to the  argument, or  none that  have not  already
+        been waited for. A  mishap also results if  you attempt to  wait
+        for a  process created  with a  false will_do_wait  argument.
+
+        Note  that  if  sys_wait  is  abnormally  exited  while   inside
+        syshibernate (e.g. by a mishap  or Ctrl-C), the process or  list
+        of processes given  by pid  will have  their will_do_wait  flags
+        unset. Those process(es)  cannot then be  waited for again.  You
+        may wish  to  locally  define interrupt  to  be  identfn  before
+        calling sys_wait.
+
+
+sysexecute(file, arg_list, env_list)                         [procedure]
+sysexecute(file, arg_list, env_list, dev_list)
+        Does a UNIX * execve  (or * execvp) system  call, i.e. runs  the
+        executable file in place of the current Poplog image, passing it
+        the strings  in  arg_list  as  arguments,  and  the  strings  in
+        env_list as environment variables.
+
+        file may be either a  filename string directly, or one  inside a
+        reference (i.e. consref(string)); in the latter case, execvp  is
+        used instead of  execve (meaning that  for a relative  pathname,
+        the PATH environment variable is searched for the file).
+
+        The list arg_list should begin  with the zero-th argument  (i.e,
+        that usually used for the name of the program).
+
+        If env_list is false then it is replaced by the current value of
+        popenvlist (see above).
+
+        All files opened by Poplog have the Unix 'close on execute' flag
+        set automatically. This  means that  on a  sysexecute all  files
+        will be closed,  except that by  default, sysexecute unsets  the
+        flag for  the three  standard  devices popdevin,  popdevout  and
+        popdeverr. To keep  other files  open, dev_list  is an  optional
+        (non-empty) list of  devices whose  associated file  descriptors
+        are to be left open across  the execve system call; the flag  is
+        cleared for each device in this list.
+
+
+poppid -> int                                       [protected variable]
+        Contains the Process IDentification number of the current Poplog
+        process.
+
+
+
+
+-------------------------
+5  Running Shell Commands
+-------------------------
+
+sysobey(string)                                              [procedure]
+sysobey(string, shell)
+sysobey(file, arg_list)
+        In the first two  forms, obeys the string  string as a shell  or
+        cshell command (by forking a  child process). The integer  shell
+        is an ASCII character code  controlling which shell is used,  as
+        follows:
+
+                `$`   /bin/sh
+                `%`   /bin/csh
+                `!`   the value of systranslate('SHELL')
+
+        If shell is absent, /bin/sh is assumed.
+
+        In the third form  it forks a child,  calls * sysexecute on  the
+        executable file with argument  strings arg_list, and then  calls
+        * sys_wait for the child.
+
+        In all cases, the exit status  of the child process is saved  in
+        pop_status.
+
+
+sysobeylist(command_list)                                    [procedure]
+        Given a list of commands strings command_list, runs
+
+                sysobey(string, `!`)
+
+        on each string in the list.
+
+
+pop_status -> int                                             [variable]
+int -> pop_status
+        This variable  is set  to  the (integer)  exit status  of  child
+        processes run by sysobey.
+
+
+pipein(file, arg_list, want_rep) -> dev_or_char_rep          [procedure]
+        Forks a  child  process,  and then  calls  * sysexecute  on  the
+        executable file with argument strings arg_list.
+
+        The standard output of  the child is made  the output side  of a
+        pipe; the input side of this  is returned in the parent  process
+        as either  a  device  (want_rep  false)  or  character  repeater
+        procedure (want_rep true). See HELP * PIPEUTILS.
+
+
+pipeout(char_source, file, arg_list, wait)                   [procedure]
+        Forks a  child  process,  and then  calls  * sysexecute  on  the
+        executable file with argument strings arg_list.
+
+        The standard input  of the  child is  made the  input side  of a
+        pipe, and the data got from char_source is written to the output
+        side. char_source may be either
+
+          # A character  repeater  directly,  or a  valid  argument  for
+            discin to  produce one  (in  which case  it is  replaced  by
+            discin(char_source)). The character repeater is then  called
+            until it returns <termin>,  each character being written  to
+            the pipe.
+
+          # A reference containing a procedure p (i.e. consref(p)) which
+            takes an  output device  as  argument. In  this case,  p  is
+            simply applied to the output  pipe device, i.e. p(dev),  and
+            should write the data directly to it.
+
+        If the  boolean wait  argument is  true, pipeout  waits for  the
+        child  to  finish  before   returning;  otherwise,  it   returns
+        immediately. (Note  that  in the  latter  case, it  also  does a
+        second fork to prevent the creation of a zombie process.)
+
+        For more information on pipes see HELP * PIPEUTILS.
+
+
+
+
+--------------------
+6  Termcap Interface
+--------------------
+
+termcap_getentry(term) -> bool                               [procedure]
+        Reads the  termcap entry  for  the terminal  type named  by  the
+        string or word term.  The result is true  if the entry was  read
+        successfully and  false  otherwise.  The entry  is  read  into a
+        static area, so only one entry can be active at a time.
+
+
+termcap_name -> string                                 [active variable]
+        The name of the  currently active termcap  entry (a string),  or
+        false if  none. Assigning  to this  variable has  the effect  of
+        calling termcap_getentry  to  read the  named  termcap  entry; a
+        mishap occurs unless the call returns true.
+
+
+termcap_getflag(cap) -> bool                                 [procedure]
+termcap_getnum(cap) -> int                                   [procedure]
+termcap_getstring(cap) -> string                             [procedure]
+        Get the value of  the capability cap  from the currently  active
+        termcap entry. cap  should be  a two-character  string or  word:
+        'am', 'li', 'cm' etc. All  three procedures return false if  the
+        capability is  unsupported or  unrecognised or  if there  is  no
+        currently active termcap entry.
+
+
+termcap_compile(string, n, delay) -> p                       [procedure]
+termcap_compile(string, n, delay, out_p) -> p
+        Compiles a termcap string into  a procedure, decoding any  delay
+        specifications and parameter escapes. string is the string to be
+        compiled,  normally   the  result   of   a  previous   call   to
+        termcap_getstring.  n  is  the  integer  number  of   parameters
+        expected by the string, typically zero, but could be (say) 2 for
+        the 'cm' (cursor motion) capability. delay determines how  delay
+        specifications are to  be treated.  It can  take three  possible
+        values:
+
+            Value    Meaning
+            -----    -------
+            false    all delays are ignored;
+
+            integer  constant delays are decoded correctly, but variable
+                     delays are multiplied once-and-for-all by the given
+                     value and thereafter treated as constant;
+
+            true     full treatment of delays. An extra integer argument
+                     is added to the result procedure, being the  number
+                     of lines affected by the operation; this is ignored
+                     by strings involving constant  delays, but is  used
+                     as a multiplier for variable delays.
+
+        The result procedure p has the form
+
+            procedure(ARG-1, ..., ARG-n, AFFCNT);
+                ....
+            endprocedure
+
+        where ARG-1, ...,  ARG-n are  the n parameters  expected by  the
+        string and  AFFCNT  is  the  number of  lines  affected  by  the
+        operation: this  will  be present  only  when delay  is  true. p
+        outputs  all  literal  characters  from  the  original   string,
+        together with  those arguments  selected by  parameter  escapes.
+        Delays are implemented by outputting a sufficient number of  pad
+        characters, the exact  number depending on  the output speed  of
+        the terminal as  determined at  the time the  termcap entry  was
+        read.
+
+        out_p is an optional output procedure to be used by p. It may be
+        an actual procedure or a procedure variable name; the default is
+        "rawcharout".
+
+        As a  special case,  the argument  n may  be given  as false  to
+        indicate  that  string  is  not  parameterised.  In  this   case
+        termcap_compile will  try  to  return  a  string  rather  than a
+        procedure, the string being a copy of string but with any  delay
+        specifications  replaced  by  the  appropriate  number  of   pad
+        characters. The  result will  still be  a procedure  however  if
+        delay is  true  and  string does  require  variable  amounts  of
+        padding.
+
+        Note that compilation of a procedure result makes use of VM code
+        planting instructions, so termcap_compile  should not be  called
+        generally unless inside  a call of  sysCOMPILE. For details  see
+        REF * VMCODE.
+
+
+
+--- C.unix/ref/sysutil
+--- Copyright University of Sussex 1994. All rights reserved.

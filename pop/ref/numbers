@@ -1,0 +1,1219 @@
+REF NUMBERS                                        John Gibson Feb 1995
+
+       COPYRIGHT University of Sussex 1995. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<    PROCEDURES ON NUMBERS    >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+This file  describes  all the  Poplog  number types  and  procedures  to
+operate on  them.  For  information on  the  textual  representation  of
+different kinds of numbers in Pop-11 see REF * ITEMISE.
+    All the Poplog  arithmetic operations described  in this file  check
+the types of their arguments at run  time in order to determine what  to
+do. Fast,  non-checking (hence  more efficient)  integer operations  are
+described in REF * FASTPROCS.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Overview
+      1.1   Note on Terminology
+      1.2   Fast integer operations
+      1.3   Computation on Real Numbers
+      1.4   Complex Numbers
+      1.5   Conventions for Formal Parameters of Procedures
+
+  2   Predicates Relating to Numbers
+
+  3   Comparisons on Numbers
+
+  4   Number Representation
+
+  5   Arithmetic Operations
+
+  6   Rational and Integer Specific Operations
+
+  7   Complex Specific Operations
+
+  8   Mathematical Functions
+
+  9   Trigonometric Functions
+
+ 10   Bitwise/Logical Integer Operations
+
+ 11   Random Numbers
+
+ 12   Floating_Point Utilities
+
+ 13   Numeric Constants
+      13.1  Integer
+      13.2  Floating-Point
+
+ 14   Miscellaneous
+
+
+
+-----------
+1  Overview
+-----------
+
+From Version 12  of Poplog, support  is provided for  all the  numerical
+data types  and  associated  functions  specified  by  the  Common  LISP
+standard. This  includes  integers,  bigintegers,  decimals,  ddecimals,
+ratios and complex numbers.
+
+This REF file describes the Pop-11 interface to these facilities, which,
+while differing in some  minor respects from  the Common LISP  standard,
+(and of course employing different names for procedures in many  cases),
+is essentially an upward-compatible version of it. For a description  of
+the Clisp version see Guy L. Steele, Common LISP: The Language,  Chapter
+12.
+
+For information  on the  textual representation  of different  kinds  of
+numbers in Pop-11 see REF * ITEMISE.
+
+All the Poplog arithmetic  operations described in  this REF file  check
+the types of their arguments at run  time in order to determine what  to
+do. Fast,  non-checking (hence  more efficient)  integer operations  are
+described in REF * FASTPROCS.
+
+
+1.1  Note on Terminology
+------------------------
+In this document the term 'integer'  means either a simple integer  or a
+biginteger, except  where  explicitly qualified  as  one or  the  other;
+'integral' means the same in  the nominal sense, or 'integer-valued'  as
+an adjective. Similarily,  'real' means  'non-complex', or  'non-complex
+number' - it does NOT carry the meaning of 'floating-point number'  used
+by some programming languages.
+
+
+1.2  Fast integer operations
+----------------------------
+All Poplog  arithmetic operations  described below  check the  types  of
+their arguments at run time in order to determine what to do. This gives
+great flexibility  in  writing generic  procedures,  but can  mean  that
+efficiency is  sacrificed.  As  a partial  solution  fast,  non-checking
+integer operations are provided. These are described in REF * FASTPROCS.
+Further   information    concerning   efficiency    is   available    in
+HELP * EFFICIENCY.
+
+
+1.3  Computation on Real Numbers
+--------------------------------
+Overall,  the  number   types  in  Poplog   provide  three  classes   of
+representation:
+
+      # rational  (simple  integers,  bigintegers  and  ratios)
+      # simple floating-point  (decimals)
+      # double-length floating-point (ddecimals)
+
+These classes are orthogonal in the  sense that a given real number  has
+exactly one  representation in  each  format (the  representation  being
+exact for rational, and approximate for floating-point).
+
+In particular for rationals, this implies that integers, bigintegers and
+ratios are mutually disjoint in terms of the numbers they represent, and
+that no two ratios represent the  same number unless they have the  same
+numerator and denominator. In other words, a ratio is always reduced  to
+its lowest common terms, by dividing numerator and denominator by  their
+greatest common divisor; if this makes  the denominator equal to 1,  the
+result  is  the  integer  numerator  (this  is  the  rule  of  'rational
+canonicalisation'). Any integral result  from a computation will  always
+produce a simple  integer (rather  than a biginteger)  if it  can be  so
+represented.
+
+With very few exceptions, numerical  procedures are 'generic', that  is,
+will accept any kind  of numbers as arguments.  For all procedures  that
+perform  a  rational-type  function  (i.e.  excluding  'irrational'   or
+'transcendental' functions like  sqrt, log,  etc), rational  argument(s)
+will cause the computation to be done using rational arithmetic, and the
+result will be rational. Otherwise, when the function is irrational,  or
+one or  more  of the  arguments  is floating-point,  all  arguments  are
+converted to double-length floating-point and the computation  performed
+with double-float  arithmetic  (this  is  the  rule  of  'floating-point
+contagion'). The result  will be  a floating-point  whose actual  format
+depends on the value of the variable popdprecision (see the  description
+of this below).
+
+
+1.4  Complex Numbers
+--------------------
+Complex numbers always have  both real and imaginary  parts of the  same
+representation class, and so may similarily be sub-divided into rational
+complex, simple-float-complex and double-float-complex. Aside from those
+irrational functions  that can  produce  a complex  result from  a  real
+argument (sqrt applied to a negative real, for example), the only way of
+constructing complex numbers is  with the operators  +: and -:  ('plus i
+times' and  'minus i  times'). These  obey the  same rules  as for  real
+arithmetic: with both arguments rational or rational-complex the  result
+is a rational-complex; if either argument is floating or  float-complex,
+the result is a float-complex whose format depends on popdprecision.
+
+The  only   rider   to   this   is   the   rule   of   'rational-complex
+canonicalisation', which prevents the  production of a  rational-complex
+number with a  0 imaginary part.  Instead, the result  is just the  real
+part of  the number.  Note that  this does  not apply  to  float-complex
+numbers, which can have a 0.0 imaginary part.
+
+Most numerical  procedures  allow  complex or  mixed  real  and  complex
+arguments. In a similar  way to the  rational/float distinction for  the
+real case, computations  are done  in real arithmetic  producing a  real
+result if  all  arguments  are  real, or  otherwise  all  arguments  are
+converted to complex and  the operation performed  in complex to  give a
+complex result (the rule of 'complex contagion').
+
+
+1.5  Conventions for Formal Parameters of Procedures
+----------------------------------------------------
+Except in those cases where the arguments or results of a procedure  are
+sufficiently complicated to require names that describe their  function,
+rather than just their type, the following conventions are used:
+
+        Convention                Data type
+        ----------                ---------
+        item                      anything
+        bool                      a boolean, true or false
+        num, num1, num2           any number, including complex
+        real, real1, real2        any number except complex
+        N                         a simple integer
+        int, int1, int2           any integer, simple or big
+        float, float1, float2     a decimal or ddecimal
+
+
+
+
+---------------------------------
+2  Predicates Relating to Numbers
+---------------------------------
+
+isinteger(item) -> bool                                      [procedure]
+        Returns true if item is a simple integer, false otherwise.
+
+
+isbiginteger(item) -> bool                                   [procedure]
+        Returns true if item is a biginteger, false otherwise.
+
+
+isintegral(item) -> bool                                     [procedure]
+        Returns true if item is a simple integer or a biginteger,  false
+        otherwise.
+
+
+isratio(item) -> bool                                        [procedure]
+        Returns true if item is a ratio, false otherwise.
+
+
+isrational(item) -> bool                                     [procedure]
+        Returns true  if item  is a  simple integer,  a biginteger  or a
+        ratio, and false otherwise.
+
+
+isdecimal(item) -> bool                                      [procedure]
+        Returns  true  if  item  is  a  decimal  or  a  ddecimal,  false
+        otherwise.
+
+
+issdecimal(item) -> bool                                     [procedure]
+        Returns true if item is a simple decimal, false otherwise.
+
+
+isddecimal(item) -> bool                                     [procedure]
+        Returns true if item is a ddecimal, false otherwise.
+
+
+isreal(item) -> bool                                         [procedure]
+        Returns true  if item  is  any number  except a  complex,  false
+        otherwise.
+
+
+iscomplex(item) -> bool                                      [procedure]
+        Returns true if item is a complex number, false otherwise.
+
+
+isnumber(item) -> bool                                       [procedure]
+        Returns true if item is any kind of number, false otherwise.
+
+
+
+
+-------------------------
+3  Comparisons on Numbers
+-------------------------
+
+num1  =   num2  ->  bool                                    [operator 7]
+num1  /=  num2  ->  bool                                    [operator 7]
+        On  numbers,  these  operators   compare  their  arguments   for
+        mathematical equality and inequality respectively.
+
+        Different types of rationals (integers, bigintegers and  ratios)
+        can never represent the same number  and so can never be  equal;
+        comparisons between floating-point (decimals and ddecimals)  and
+        between  floating-point   and  rationals   first  convert   both
+        arguments to double float.
+
+        The same rules apply to the comparison of the real and imaginary
+        parts of a  complex numbers.  Note that a  real number  compared
+        with a complex number will be  equal only if the complex  number
+        is a float-complex with 0.0 imaginary part (since the  imaginary
+        part of a rational  complex must always  be non-zero). See  also
+        REF * DATA, HELP * EQUAL.
+
+
+real1  <   real2  ->  bool                                  [operator 6]
+real1  <=  real2  ->  bool                                  [operator 6]
+real1  >   real2  ->  bool                                  [operator 6]
+real1  >=  real2  ->  bool                                  [operator 6]
+        These operators compare their first argument to be  respectively
+        less than, less than or equal, greater than, and greater than or
+        equal  to  their  second  argument,  where  comparisons  between
+        different number  types are  performed  as for  = and  /=.  Both
+        arguments must be real numbers.
+
+
+max(real1, real2)  ->  greatest                              [procedure]
+min(real1, real2)  ->  least                                 [procedure]
+        max returns the greatest of its two arguments and min the least,
+        where 'greatest' means closest to positive infinity, and 'least'
+        means closest to negative infinity. Both arguments must be  real
+        numbers.
+
+
+num1  ==#  num2  ->  bool                                   [operator 7]
+        Returns true  if  num1 and  num2  are identical  (i.e.  ==),  or
+        numbers of  the same  representational type  and numeric  value.
+        Decimals and  ddecimals are  NOT considered  to be  of the  same
+        type. Two complex numbers  are ==# if their  real parts are  ==#
+        and their imaginary parts are ==# .
+
+
+
+
+------------------------
+4  Number Representation
+------------------------
+
+popdprecision -> bool_or_word                                 [variable]
+bool_or_word -> popdprecision
+        The value of  this variable controls  the production of  results
+        from floating-point computations, in combination with the  types
+        of the  arguments supplied  to the  relevant procedure.  In  the
+        following, "decimal"  includes  decimal-complex  and  "ddecimal"
+        includes  ddecimal-complex   (when  a   complex   floating-point
+        operation is involved):
+
+            Value       Effect
+            -----       ------
+            false       Simple decimal results are always produced.
+
+            the word    A ddecimal  result is  produced only  if one  or
+            "ddecimal"  other (or the only) argument was ddecimal. (This
+                        is the behaviour specified by Common LISP.)
+
+            any other   Same  as  the   previous  case,  except   that a
+                        ddecimal result  is also  produced when  neither
+                        argument  is   a   simple  decimal,   i.e.   all
+                        argument(s) are ddecimal or rational.
+
+        (Note that  in NO  case is  there an  increase in  precision  of
+        floating point computations if all arguments are simple  decimal
+        to start with.)
+
+        The default value of popdprecision is false.
+
+
+pop_reduce_ratios -> bool                                     [variable]
+bool -> pop_reduce_ratios
+        It was stated above that a ratio result is always reduced to its
+        lowest common terms (and therefore to an integral result if  the
+        denominator becomes 1). However, in situations where a  rational
+        computation  is  being  performed  that  involves  a  number  of
+        intermediate results,  the continual  reduction of  intermediate
+        values can be time-consuming; this boolean variable is therefore
+        provided to enable  reduction to  be turned off  (by setting  it
+        false).
+
+        Although  unreduced  ratios   will  give   correct  results   in
+        computation, comparisons on them  may not do  so (e.g. 2/2  will
+        not come out = to 1),  so this facility must be used  CAREFULLY:
+        pop_reduce_ratios should only  be set false  inside a  procedure
+        that has it  as a dynamic  local, and you  should always  ensure
+        that the variable is returned to true before producing the final
+        result of a computation.
+
+
+number_coerce(num1, to_num) -> num2                          [procedure]
+        Produces a number num2 which is the number num1 converted to the
+        representation  class   (i.e.   rational,  simple   decimal   or
+        double-float ddecimal) of the number to_num.
+
+        Firstly, no new number is constructed unless necessary; thus  if
+        the class  of  num1 already  matches  that of  to_num,  num1  is
+        returned unchanged.  Otherwise,  conversion from  one  class  to
+        another proceeds.
+
+        Conversion from rational  form to floating-point  form, or  from
+        one float format to the other,  takes place in the obvious  way.
+        For conversion  from floating-point  to rational,  the float  is
+        assumed to be  completely accurate, and  a mathematically  equal
+        rational number is returned.
+
+        If num1  is complex,  then num2  is the  complex number  got  by
+        applying number_coerce  recursively to  the real  and  imaginary
+        parts of num1, i.e.
+
+            number_coerce(realpart(num1), to_num)
+                +: number_coerce(imagpart(num1), to_num) -> num2
+
+        If the second argument  to_num is itself  complex, then num1  is
+        coerced to a  complex number of  the same representation  class,
+        i.e. the result is computed as
+
+            realpart(to_num) -> to_num;
+            number_coerce(realpart(num1), to_num)
+                +: number_coerce(imagpart(num1), to_num) -> num2
+
+        where imagpart will fill  in an appropriate  zero value for  the
+        imaginary part if num1 is real.
+
+
+
+
+------------------------
+5  Arithmetic Operations
+------------------------
+
+num1  +  num2  ->  num3                                     [operator 5]
+num1  -  num2  ->  num3                                     [operator 5]
+num1  *  num2  ->  num3                                     [operator 4]
+num1  /  num2  ->  num3                                     [operator 4]
+        These operators respectively add, subtract, multiply and  divide
+        their arguments,  which may  be  any numbers.  The type  of  the
+        result depends  on  the  rules  of  floating-point  and  complex
+        contagion as described above. In particular, note that  dividing
+        one integer by another produces a  ratio when the result is  not
+        exact.
+
+
+-  num1  ->  num2                                           [operator 1]
+        As a prefix operator, - is equivalent to negate(num1).
+
+
+divid  //   divis  ->  (rem, quot)                          [operator 4]
+divid  div  divis  ->  quot                                 [operator 2]
+divid  rem  divis  ->  rem                                  [operator 2]
+        The two results returned by the operator // are defined by
+
+                intof(divid / divis) -> quot
+
+        and
+
+                divid - (quot * divis) -> rem
+
+        where the arguments may be  any numbers, including complex.  The
+        two results may be obtained separately with div (quot only)  and
+        rem (rem only).
+
+
+divid  mod  divis  ->  mod                                  [operator 2]
+        Returns divid modulo  divis, where  both numbers  must be  real.
+        This is defined as
+
+            divid rem divis -> rem;
+            if (divis > 0 and rem < 0) or (divis < 0 and rem >= 0) then
+                rem+divis -> mod
+            else
+                rem -> mod
+            endif
+
+        (i.e. the result always has the same sign as the divisor).
+
+
+intof(num) -> int                                            [procedure]
+        For num real, intof truncates  its argument to an integer,  i.e.
+        it returns the  integer of  the same sign  as num  and with  the
+        largest magnitude such that abs(int) <= abs(num). For a  complex
+        number, the result  is the integral  complex number obtained  by
+        applying intof to its parts, i.e.
+
+                intof(realpart(num)) +: intof(imagpart(num))
+
+
+fracof(num) -> frac                                          [procedure]
+        The fractional part of num, defined as
+
+                num - intof(num)
+
+
+round(num) -> int                                            [procedure]
+        For num real, rounds num to an integer by taking  intof(num+1/2)
+        if num  is  positive, or  intof(num-1/2)  otherwise. If  num  is
+        complex, the result is
+
+                round(realpart(num)) +: round(imagpart(num))
+
+
+abs(num) -> real                                             [procedure]
+        Returns the absolute  value of num,  which (except for  complex)
+        will always be a number of  the same type. For any complex  num,
+        the result will be a floating-point real, computed as
+
+                sqrt( realpart(num)**2 + imagpart(num)**2 )
+
+
+negate(num1) -> num2                                         [procedure]
+        Returns the negation of num1, which  will always be a number  of
+        the same type.
+
+
+sign(num) -> sign                                            [procedure]
+        For num real, sign returns -1, 0  or 1 of the same type as  num,
+        depending on whether num is  negative, zero or positive. If  num
+        is complex, the result is  a floating-point complex number  such
+        that
+
+                abs(sign) = 1.0, phase(sign) = phase(num)
+
+
+
+
+-------------------------------------------
+6  Rational and Integer Specific Operations
+-------------------------------------------
+
+checkinteger(item, low_int, hi_int)                          [procedure]
+        Checks item to be a (simple) integer within the range  specified
+        by lower  bound  low_int  and upper  bound  hi_int  (inclusive).
+        Either or both bounds may be false to indicate no upper or lower
+        limit. If  all conditions  are satisfied  the procedure  returns
+        with no action, otherwise a mishap occurs.
+
+        (Note that * fi_check is  a faster version  that does not  check
+        its second and  third arguments are  integers, and also  returns
+        item if it is an integer within the given range.)
+
+
+gcd_n(int1, int2, ..., intN, N) -> gcd                       [procedure]
+        Computes the greatest common divisor  of the all the N  integers
+        int1, int2,  ..., intN,  where the  number N  itself (a  simple
+        integer >= 0) appears as the rightmost argument. If N = 0,  then
+        gcd = 0; if N = 1, then gcd = int1.
+
+
+lcm_n(int1, int2, ..., intN, N) -> lcm                       [procedure]
+        Computes the least  common multiple  of the all  the N  integers
+        int1, int2,  ..., intN,  where  the number  N itself  (a  simple
+        integer >= 0) appears as the rightmost argument. If N = 0,  then
+        lcm = 1; if N = 1, then lcm = int1.
+
+
+destratio(rat)   -> (numerator, denominator)                 [procedure]
+numerator(rat)   -> numerator                                [procedure]
+denominator(rat) -> denominator                              [procedure]
+        These procedures return the numerator and denominator parts of a
+        rational number,  either  together  (destratio),  or  separately
+        (numerator  and  denominator).  When   rat  is  integral,   then
+        numerator = rat, and denominator = 1.
+
+
+
+
+------------------------------
+7  Complex Specific Operations
+------------------------------
+
+num1  +:  num2  ->  num3                                    [operator 5]
+num1  -:  num2  ->  num3                                    [operator 5]
+        These two  operators  are  the basic  way  of  creating  complex
+        numbers. Effectively, they both  multiply their second  argument
+        by "i" (the positive square root of -1), and then either add the
+        result to  (+:)  or subtract  the  result from  (-:)  the  first
+        argument.
+
+
++: num1  ->  num2                                           [operator 1]
+-: num1  ->  num2                                           [operator 1]
+        As prefix operators, +: and -: are equivalent to  unary_+:(num1)
+        and unary_-:(num1) respectively.
+
+
+unary_+:(num1)  ->  num2                                     [procedure]
+unary_-:(num1)  ->  num2                                     [procedure]
+        Single-argument versions  of +:  and  -:, which  multiply  their
+        argument by i and -i respectively.
+
+
+conjugate(num1) -> num2                                      [procedure]
+        Returns the complex conjugate of its argument. The conjugate  of
+        a real number is itself, while for a complex number it is
+
+                realpart(num1) -: imagpart(num1)
+
+        i.e. a  complex  number  with the  same  realpart,  but  negated
+        imagpart.
+
+
+destcomplex(num) -> (realpart, imagpart)                     [procedure]
+realpart(num)    -> realpart                                 [procedure]
+imagpart(num)    -> imagpart                                 [procedure]
+        These procedures  return  the  real  and  imaginary  parts  of a
+        complex number,  either  together (destcomplex),  or  separately
+        (realpart and imagpart). When num is real, then realpart =  num,
+        and a zero of the same type as num is returned for imagpart.
+
+
+
+
+-------------------------
+8  Mathematical Functions
+-------------------------
+
+The procedures  in  this  section, as  well  as  most of  those  in  the
+following section  on  trigonometric  procedures,  compute  mathematical
+functions whose definitions on the complex plane necessitate choices  of
+branch cuts and principal values. See the section Branch Cuts, Principal
+Values and Boundary Conditions  in Chapter 12 of  Steele for details  of
+these.
+
+
+sqrt(num) -> sqrt                                            [procedure]
+        Returns the (principal) square root of num. This will be a  real
+        floating-point  if   num  is   real  and   non-negative,   and a
+        float-complex otherwise.
+
+
+log(num) -> log                                              [procedure]
+        Returns the natural (base e) logarithm of num, which must not be
+        a zero of any kind. If num is real and non-negative, the  result
+        is a  real floating-point.  Otherwise, it  is the  float-complex
+        number
+
+                log(abs(num)) +: phase(num)
+
+
+log10(num) -> log                                            [procedure]
+        Returns the base 10 logarithm of  num, which must not be a  zero
+        of any kind. Defined as
+
+               log(num) / log(10)
+
+
+exp(num) -> exponent                                         [procedure]
+        Returns e  raised to  the power  num,  where e  is the  base  of
+        natural logarithms.  The  result  is  a  floating-point  if  the
+        argument is real, or a float-complex otherwise.
+
+
+base **  power -> exponent                                  [operator 3]
+        Returns base raised to the power power, where either may be  any
+        numbers (except that base must not  be zero if power is zero  of
+        any type other than integer 0).
+
+        If  power  is  an  integer,  the  computation  is  performed  by
+        successively  multiplying  powers  of  base;  thus  if  base  is
+        rational, the result will be exact.  If power is integer 0,  the
+        result is always a 1 of the same type as base.
+
+        Otherwise, if power is not an integer, the result is computed as
+
+               exp(power * log(base))
+
+
+
+
+--------------------------
+9  Trigonometric Functions
+--------------------------
+
+All the procedures in this section take an angle as argument, or  return
+one as a  result. In  both cases,  the units  of the  angle (radians  or
+degrees) are controlled by the boolean variable popradians (this applies
+equally when the angle is complex).
+
+The following diagram of the real  plane is provided as a  visualisation
+aid (angles are given in radians):
+
+
+             Quadrant II       |        Quadrant I
+            x < 0, y >= 0      |      x >= 0, y >= 0
+         pi/2 < angle <= pi    |    0 <= angle <= pi/2
+                               |
+                               |
+                        pi-A   |  A
+                             \ | /
+                ---------------+--------------
+                             / | \
+                      -(pi-A)  |  -A
+                               |
+                               |
+             Quadrant III      |       Quadrant IV
+             x < 0, y < 0      |      x >= 0, y < 0
+         -pi < angle < -pi/2   |    -pi/2 <= angle < 0
+
+
+(The above is particularly useful in relation to arctan2.)
+
+
+popradians -> bool                                            [variable]
+bool -> popradians
+        This boolean variable specifies whether the angle arguments  for
+        trigonometric procedures such  as sin,  cos etc  are in  radians
+        (true) or degrees (false). Similarily, it controls the units  of
+        angle results produced by procedures like arcsin, arccos, etc.
+
+        Note that  the  default  value  is  false,  implying  angles  in
+        degrees.
+
+
+phase(num) -> realangle                                      [procedure]
+        Returns the  complex  phase angle  of  num as  a  floating-point
+        quantity. This will be in the range
+
+                - pi < realangle <= pi    (radians)
+               - 180 < realangle <= 180   (degrees)
+
+        If num is real, then realangle = 0.0. This procedure is  defined
+        as
+
+                arctan2(destcomplex(num))
+
+
+cis(realangle) -> num                                        [procedure]
+        Returns the float-complex number
+
+                cos(realangle) +: sin(realangle)
+
+        (the name cis standing for 'cos + i sin'). Note that this is the
+        same as
+
+                exp(+: realangle)
+
+        ONLY  when  popradians  is  true  (because  the  latter   always
+        interprets realangle in radians).
+
+
+sin(angle) -> num                                            [procedure]
+cos(angle) -> num                                            [procedure]
+tan(angle) -> num                                            [procedure]
+        These procedures compute the sine, cosine and tangent of  angle.
+        The result is a floating-point,  or a float-complex if angle  is
+        complex.
+
+
+arcsin(num) -> angle                                         [procedure]
+arccos(num) -> angle                                         [procedure]
+arctan(num) -> angle                                         [procedure]
+        These procedures compute the  arcsine, arccosine and  arctangent
+        of num. For num complex, the result is a float-complex. For  num
+        real, it  is a  real float,  except in  the case  of arcsin  and
+        arccos when abs(num) > 1.
+
+        For arctan, it is an error if num = +:1 or -:1.
+
+
+arctan2(real_x, real_y) -> realangle                         [procedure]
+        Computes the arctangent of real_y / real_x, but using the  signs
+        of the two numbers to derive quadrant information. The result is
+        a floating-point number in the range
+
+                - pi < realangle <= pi    (radians)
+               - 180 < realangle <= 180   (degrees)
+
+        (see diagram above). When real_x =  0 and real_y = 0 the  result
+        is defined (arbitrarily) to be 0.0.
+
+
+sinh(angle) -> num                                           [procedure]
+cosh(angle) -> num                                           [procedure]
+tanh(angle) -> num                                           [procedure]
+        These procedures compute the hyperbolic sine, hyperbolic  cosine
+        and hyperbolic tangent of angle. The result is a floating-point,
+        or a float-complex if angle is complex.
+
+
+arcsinh(num) -> angle                                        [procedure]
+arccosh(num) -> angle                                        [procedure]
+arctanh(num) -> angle                                        [procedure]
+        These procedures  compute  the  hyperbolic  arcsine,  hyperbolic
+        arccosine and hyperbolic arctangent of num. For num complex, the
+        result is a float-complex.  For num real,  the result will  be a
+        real float, except in the following cases:
+
+                arccosh:  num < 1
+                arctanh:  abs(num) > 1
+
+        For arctanh, it is an error if num = 1 or -1.
+
+
+pi -> float                                                   [constant]
+        This constant  is the  best  ddecimal approximation  to  "pi", =
+        3.14159....
+
+
+
+
+--------------------------------------
+10  Bitwise/Logical Integer Operations
+--------------------------------------
+
+These procedures  enable  integers to  be  manipulated as  bit  patterns
+representing two's-complement values,  where bit position  N has  weight
+2**N (i.e. bits are numbered  from 0 upwards). Note that  (conceptually,
+at any rate), the sign bit of an integer is extended indefinitely to the
+left. Thus everywhere above its most significant bit, a positive integer
+has 0 bits and a negative integer has 1 bits.
+
+
+int1 && int2 -> int3                                        [operator 4]
+        The result  of  this  operation  is the  logical  "and"  of  the
+        integers int1 and int2, i.e. there is a 1 in the result for each
+        bit position for which there is a 1 in both int1 and int2.
+
+
+int1 &&~~ int2 -> int3                                      [operator 4]
+        The result of this  operation is the logical  "and" of int1  and
+        the logical complement of int2, i.e. there is a 1 in the  result
+        for each bit position for which there is a 1 in int1 and a 0  in
+        int2. (Same as int1 && (~~int2)  -- useful for clearing bits  of
+        int1 set in int2).
+
+
+int1 || int2 -> int3                                        [operator 4]
+        The result of this  operation is the  logical "inclusive or"  of
+        int1 and int2,  i.e. there is  a 1  in the result  for each  bit
+        position for which there is a 1 in either int1 or int2.
+
+
+int1 ||/& int2 -> int3                                      [operator 4]
+        The result of this  operation is the  logical "exclusive or"  of
+        int1 and int2,  i.e. there is  a 1  in the result  for each  bit
+        position for which there is a 1  in either int1 or int2 but  not
+        in both.
+
+
+~~ int1 -> int2                                             [operator 4]
+        Produces the logical complement of the integer int1, i.e.  there
+        is a 1 in the result for each bit position for which int1 has 0.
+        It is always true that
+
+                ~~ int = -(int + 1)
+
+
+int1  <<  N -> int2                                         [operator 4]
+        Produces the  bit  pattern  of  int1  shifted  left  by  (simple
+        integer) N positions; a  negative value for  N produces a  right
+        shift.
+
+
+int1  >>  N -> int2                                         [operator 4]
+        Gives the bit pattern of int1 shifted right by (simple  integer)
+        N positions; a negative value for N implies a left shift.
+
+
+int1  &&/=_0  int2  ->  bool                                [operator 6]
+int1  &&=_0   int2  ->  bool                                [operator 6]
+        These two operators are equivalent to the boolean expressions
+
+                int1 && int2 /== 0
+                int1 && int2  == 0
+
+        but  are  more  efficient  (and  avoid  producing   intermediate
+        results).
+
+
+testbit(int, N) -> bool                                      [procedure]
+bool -> testbit(int, N) -> newint
+        This procedure and its updater enable the testing and setting or
+        clearing of the bit at position  N in the integer int. The  base
+        procedure returns the state  of bit N as  a boolean value,  true
+        for 1 and false  for 0.
+
+        The updater (which is somewhat unusual for an updater in that it
+        returns a result)  produces a  new integer newint  which is  int
+        with bit N set to  1 or cleared to 0  as specified by the  input
+        bool argument (which may  in fact be  any item, false  meaning 0
+        and anything else meaning 1).
+
+
+integer_leastbit(int) -> N_or_false                          [procedure]
+        Returns the bit position N  of the least-significant bit set  in
+        the integer int (equivalently,  N is the highest  power of 2  by
+        which int divides exactly). false is returned for int 0.
+
+
+integer_length(int) -> N                                     [procedure]
+        Returns the length in bits of int as a two's-complement integer.
+        That is, N is the smallest integer such that
+
+                int  <   ( 1 << N)     if int >= 0
+                int  >=  (-1 << N)     if int < 0
+
+        Put another way: if int is non-negative then the  representation
+        of int as  an unsigned integer  requires a field  of at  least N
+        bits; alternatively,  a  minimum of  N+1  bits are  required  to
+        represent int as a signed integer, regardless of its sign.
+
+
+integer_bitcount(int) -> N                                   [procedure]
+        Counts the  number  of  1  or 0  bits  in  the  two's-complement
+        representation of int. If int  is non-negative, N is the  number
+        of 1 bits; if int is negative, it is the number of 0 bits. (Note
+        that, owing to the sign extension, there are an infinite  number
+        of 0 bits  in a  non-negative integer or  1 bits  in a  negative
+        integer.) It is always the case that
+
+               integer_bitcount(int) = integer_bitcount(-(int+1))
+
+
+integer_field(size, position) -> access_p                    [procedure]
+        This procedure is used  to create accessing/updating  procedures
+        for  sub-bitfields  within   integers,  and   provides  a   more
+        convenient (and more efficient) way of manipulating such  fields
+        than by masking and shifting with the operators && and >>, etc.
+
+        Given a specification  of a bitfield  in terms of  its width  in
+        bits  size,  and  lowest  bit  position  position  (both  simple
+        integers), it returns a procedure access_p. When this is applied
+        to any integer it extracts the binary value represented by  bits
+        position to  position+size-1  within the  integer  (shifting  it
+        right by position bits to align it at bit 0). That is,
+
+                access_p(int) -> field_value
+
+        If the  size argument  is >  0, the  field is  taken to  contain
+        unsigned (positive or zero values) only;  if size < 0, then  the
+        field is signed,  and upon  extraction, the highest  bit of  the
+        field is extended as the sign bit of the resulting value (cf the
+        corresponding convention used by conskey).
+
+        The updater of access_p, on the other hand, takes a field  value
+        and an integer, and returns a new integer in which the  contents
+        of the field bits are replaced by the given value (but which has
+        the same bits everywhere else). That is:
+
+                field_value -> access_p(int) -> newint
+
+        Note  that  the  updater  makes   no  check  on  the  range   of
+        field_value; bits 0  to size-1  of field_value  are masked  out,
+        shifted up,  and inserted  into the  field position  (and it  is
+        therefore irrelevant in this context whether the field is signed
+        or unsigned).
+
+        A further feature is that access_p  and its updater can be  made
+        to merely mask out or mask  in the field bits, without  shifting
+        the value down or up. That  is, upon extraction the field  value
+        is left aligned at bit position  in the result; the input  value
+        for updating  is  assumed  to be  similarily  aligned.  This  is
+        achieved by supplying a second argument of false to access_p  or
+        its updater, i.e.
+
+             access_p(int, false)  -> unshifted_field_value
+             unshifted_field_value -> access_p(int, false) -> newint
+
+        Note also that in this case,  extraction of a signed field  will
+        NOT cause it to be sign-extended.
+
+
+
+
+------------------
+11  Random Numbers
+------------------
+
+The value of the variable ranseed is used as the seed for the generation
+of random  numbers,  each random  number  generated using  one  or  more
+successive seed  values  (depending  on the  type  of  the  INT_OR_FLOAT
+argument to  random0  and random).  The algorithm used to generate  each
+successive seed value is
+
+        ranseed fi_* 524269 fi_+ 32749 -> ranseed
+
+which (since  all  current implementations  use  30 bits  for  a  simple
+integer) produces a result modulo  2**30. This algorithm has a  verified
+cycle length of 2**30, i.e.  it will produce every possible  combination
+of 30 bits before repeating a number.
+
+
+random0(int_or_float) -> random                              [procedure]
+        Given a  strictly-positive integer  or floating-point  argument,
+        this procedure generates a  random number of  the same type,  in
+        the range
+
+                0 <= random < int_or_float
+
+        where the distribution of random will be approximately  uniform.
+        The value of the  variable ranseed is used  as the seed for  the
+        generation process,  and  is  replaced with  a  new  seed  value
+        afterwards.
+
+
+random(int_or_float) -> random                               [procedure]
+        Same as random0, except that whenever the latter would  return 0
+        or 0.0, the original argument int_or_float is returned  instead.
+        It can thus be defined as
+
+                random0(int_or_float) -> random;
+                if random = 0 then int_or_float else random endif;
+
+        Hence the range of the result is 0 < random <= int_or_float  for
+        a float, or 1 <= random <= int_or_float for an integer.
+
+
+ranseed -> n_or_false                                         [variable]
+n_or_false -> ranseed
+        This variable is used  to hold the next  seed for generation  of
+        random numbers by random0 or  random, both of which  side-effect
+        it. If  set to  false, it  will be  re-initialised to  a  random
+        simple integer  the next  time either  procedure is  called  (by
+        using sys_real_time).  Otherwise,  its value  must  always  be a
+        simple integer.
+
+
+
+
+----------------------------
+12  Floating_Point Utilities
+----------------------------
+
+The  procedures  in  this  section  provide  the  means  to   manipulate
+floating-point   numbers,   and   make    possible   the   writing    of
+machine-independent floating-point  software. Note  that none  of  these
+procedures are affected by the value of popdprecision.
+
+
+float_decode(float, want_int) -> (mantissa, expo, sign)      [procedure]
+        This procedure takes a floating-point number and splits it  into
+        its component parts, i.e. mantissa, exponent and sign.
+
+        The exponent expo  is always  an integer;  the boolean  argument
+        want_int controls whether  the mantissa mantissa  and sign  sign
+        are returned as floats or integers.
+
+        sign represents the sign, and is  returned either as a float  or
+        an integer. For want_int  false, it is 1.0  or -1.0 of the  same
+        type as the argument, and with the same sign (note that sign  is
+        1.0 for 0.0). For want_int true, it is 1 or -1 (1 for 0.0).
+
+        Denoting the  radix of  the floating-point  representation  by b
+        (see pop_float_radix below), expo is  the integer power of b  by
+        which mantissa must be multiplied to regain the magnitude of the
+        original number.
+
+        mantissa itself is the absolute value of the number with
+
+                b ** expo
+
+        divided out, and can be returned in one of two ways: If want_int
+        is false, then mantissa is returned as a float of the same type,
+        in the range
+
+                1/b <= mantissa < 1
+
+        Otherwise, mantissa is is returned as an integer, scaled by
+
+                b ** float_precision(float)
+
+        (that  is,  so   that  the  least   significant  digit  in   the
+        representation of float is scaled to unity in the result).  If P
+        = float_precision(float) we then have
+
+                b ** (P-1) <= mantissa < b ** P
+
+        Thus whether the mantissa is returned as a float or an  integer,
+        it will always be the case that
+
+                mantissa * (b ** expo) = abs(float)
+
+        (Note that this holds also when float = 0.0, since in this  case
+        expo = 0, and mantissa is 0.0 or 0 depending on want_int.)
+
+
+float_scale(float1, expo) -> float2                          [procedure]
+        This provides a more efficient way of scaling a float by a power
+        of the floating-point radix 'b' than by using ** (and avoids any
+        intermediate overflow  or underflow  that could  occur with  the
+        latter). It returns
+
+                float1 * (b ** expo)
+
+        as a  floating-point  of the  same  type. If  the  final  result
+        overflows or underflows (i.e. the absolute value of the exponent
+        is too large for the representation), then false is returned.
+
+        For example,  this procedure  can be  used in  conjunction  with
+        float_sign  to  put  back   together  a  floating-point   number
+        decomposed with float_decode. That is, after
+
+           float_decode(float, false) -> (mantissa, expo, sign)
+
+        one can use
+
+           float_sign(sign, float_scale(mantissa, expo))
+
+        to retrieve the original number.
+
+
+float_sign(sign_float, float1) -> float2                     [procedure]
+        Returns a  floating-point number  float2 of  the same  type  and
+        absolute value as float1,  but which has the  sign of the  float
+        sign_float.
+
+        The argument float1 may also be  false. In this case, float2  is
+        returned as  a  1.0  or  -1.0  of the  same  type  and  sign  as
+        sign_float.
+
+
+float_digits(float) -> digits                                [procedure]
+        Returns,  as  an  integer,   the  number  of  radix-'b'   digits
+        represented in the floating-point format of the argument.  (I.e.
+        digits has only two  possible values, one  for decimals and  one
+        for ddecimals. In all current Poplog implementations, b = 2  and
+        ddecimal digits is 53 or 56;  decimal digits is 50 on Alpha  OSF
+        and 22 on other platforms.)
+
+
+float_precision(float) -> sigdigits                          [procedure]
+        Same as  float_digits, except  that  the number  of  significant
+        radix-'b' digits  in  the  argument is  returned.  Since  Poplog
+        floating-point decimals  and  ddecimals are  always  normalised,
+        this will in fact be identical to float_digits(float), with  the
+        single exception that float_precision(0.0) = 0 for either  float
+        type.
+
+
+
+
+---------------------
+13  Numeric Constants
+---------------------
+
+This section  describes  constants that  define  the ranges  of  numbers
+available in various representation classes.
+
+
+13.1  Integer
+-------------
+
+int_parameters                                                 [library]
+        This is a library; to use  any of the constants it defines,  you
+        must load it explicitly with
+
+                uses int_parameters;
+
+        It defines  the  following  parameter constants,  all  of  whose
+        values relate to the particular implementation of Poplog in use:
+
+
+pop_max_int                                                   [constant]
+        The largest (i.e.  most positive) integer  value represented  in
+        immediate format (as an integer).
+
+
+pop_min_int                                                   [constant]
+        The smallest (i.e. most  negative) integer value represented  in
+        immediate format (as an integer).
+
+
+13.2  Floating-Point
+--------------------
+
+float_parameters                                               [library]
+        This is a library; to use  any of the constants it defines,  you
+        must load it explicitly with
+
+                uses float_parameters;
+
+        It defines  the  following  parameter constants,  all  of  whose
+        values relate to the particular implementation of Poplog in use:
+
+
+pop_most_positive_decimal                                     [constant]
+        The greatest  positive  value representable  in  simple  decimal
+        format.
+
+
+pop_least_positive_decimal                                    [constant]
+        The  smallest   positive  (non-zero)   value  representable   in
+        simple decimal format.
+
+
+pop_least_negative_decimal                                    [constant]
+        The least negative value (i.e. closest to zero) representable in
+        simple decimal format.
+
+
+pop_most_negative_decimal                                     [constant]
+        The most  negative value  (i.e.  closest to  negative  infinity)
+        representable in simple decimal format.
+
+
+pop_most_positive_ddecimal                                    [constant]
+pop_least_positive_ddecimal                                   [constant]
+pop_least_negative_ddecimal                                   [constant]
+pop_most_negative_ddecimal                                    [constant]
+        Same as the above for double-length ddecimal format.
+
+
+pop_plus_epsilon_decimal                                      [constant]
+pop_plus_epsilon_ddecimal                                     [constant]
+        These are the  smallest positive  numbers in  each format  which
+        when added to 1.0 of the  same format produce a value not  equal
+        to 1.0. I.e. for each format, the smallest positive e such that
+
+               number_coerce(1, e) + e /= 1.0
+
+        is  true.   (N.B.  For   ddecimal   format,  this   depends   on
+        popdprecision not being false.)
+
+
+pop_minus_epsilon_decimal                                     [constant]
+pop_minus_epsilon_ddecimal                                    [constant]
+        Same as before, but subtracting from 1.0 instead of adding, i.e.
+        for each format the smallest positive e such that
+
+                number_coerce(1, e) - e /= 1.0
+
+        is true.
+
+
+pop_float_parameters -> fvec                                  [constant]
+        This  is  a  full  vector  that  holds  all  the  floating-point
+        constants given above, and which the latter uses to define  each
+        value as a separate  constant. You are not  advised to use  this
+        directly (since its format may change); always access the values
+        via LIB * FLOAT_PARAMETERS.
+
+
+pop_float_radix -> int                                        [constant]
+        This  integer  constant  is  the  radix  of  the  floating-point
+        representation (= 2 in all current Poplog implementations).
+
+
+
+
+-----------------
+14  Miscellaneous
+-----------------
+
+linearfit(list) -> (m, c)                                    [procedure]
+        Takes a list  of pairs of  numbers representing co-ordinates  of
+        points, works out the best straight line through the points, and
+        returns its  slope m,  and its  Y-intercept c.  For vertical  or
+        nearly lines it will produce an error. See LIB * LINEARFIT.
+
+
+integer_key    -> key                                         [constant]
+biginteger_key -> key                                         [constant]
+ratio_key      -> key                                         [constant]
+decimal_key    -> key                                         [constant]
+ddecimal_key   -> key                                         [constant]
+complex_key    -> key                                         [constant]
+        Structure  keys  for   simple  integers,  bigintegers,   ratios,
+        decimals, ddecimals and complex numbers (see REF * KEYS).
+
+
+
+--- C.all/ref/numbers
+--- Copyright University of Sussex 1995. All rights reserved.

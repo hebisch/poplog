@@ -1,0 +1,860 @@
+REF STRINGS                                         John Gibson Nov 1995
+
+      COPYRIGHT University of Sussex 1995. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<   STRINGS AND CHARACTERS    >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+This REF file explains the character set used by Poplog, the  predicates
+which can be used on these characters and how characters can be  located
+in strings: the  available string creation  and manipulation  procedures
+are listed  (note that  some string  procedures are  also applicable  to
+words). Procedures and  predicates relating to  other string forms,  the
+'dstring' and 'vedstring' are also described.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+
+  2   Character Sets
+
+  3   Predicates on Characters
+
+  4   Locating Characters in Strings
+
+  5   Predicates on Strings
+
+  6   Constructing Strings
+
+  7   Accessing String Characters
+
+  8   Display Strings ('Dstrings')
+
+  9   Generic Datastructure/Vector Procedures on (D)Strings
+
+ 10   Vedstrings
+
+ 11   Regular Expression Pattern Matching
+
+ 12   Miscellaneous
+
+
+
+---------------
+1  Introduction
+---------------
+
+Strings in  Poplog are  indexable  1-dimensional arrays  of  characters,
+where each character is an integer value that (generally) represents  an
+ASCII/ISO Latin code for a particular symbol. As with all Poplog  vector
+classes, subscript values for strings number from 1 upwards.
+
+An ordinary  string provides  one  byte to  hold each  character,  which
+permits a value in  the range 0  - 16:FF (i.e. 0  - 255). However  (from
+Poplog Version 14.11), characters as integers are actually allowed to be
+24-bit, in the range 0 - 16:FFFFFF (0 - 16777215).
+
+Nominally, the  bottom (least-significant)  16  bits are  the  character
+code, while  the  most significant  8  bits represent  other  attributes
+pertaining to the character, as shown:
+
+         23            16 15                              0
+        ---------------------------------------------------
+        |   Attributes   |        Character Code          |
+        ---------------------------------------------------
+
+However, characters  assigned  into  strings  are  restricted  to  8-bit
+character codes, i.e. actually look thus:
+
+         23            16 15            8 7               0
+        ---------------------------------------------------
+        |   Attributes   |       0       | Character Code |
+        ---------------------------------------------------
+
+(There is currently no data type for storing 16-bit character codes, but
+the layout of integer  characters is designed to  allow for this in  the
+future.)
+
+The attribute part cannot be stored in ordinary strings, and is  ignored
+for operations on these:  a character accessed  from an ordinary  string
+will have  a zero  attribute part,  and assigning  a character  into  an
+ordinary string  will ignore  any attributes.  Thus you  need not  worry
+about the attribute bits unless your program needs to process 'dstrings'
+(which are the alternate form of strings that allow the attributes to be
+stored and retrieved -- see Display Strings below).
+
+String creation and manipulation procedures available are listed  below;
+note that some string procedures are also applicable to words.
+
+An (ordinary) string is  a particular built-in  instance of the  general
+class of vectors which can be constructed using conskey or the  defclass
+syntax construct;  see  REF * KEYS,  REF * DEFSTRUCT  for  details,  and
+REF * DATA for procedures applicable to strings as vectors in general.
+
+(N.B.  Like  all  byte  vectorclasses,  strings  are  guaranteed  to  be
+null-terminated, that is,  to have a  0 byte following  the last  actual
+byte of the string. While this is irrelevant to internal Poplog use,  it
+means that  strings  can  be  passed to  external  C  functions  without
+modification.)
+
+
+
+
+-----------------
+2  Character Sets
+-----------------
+
+From Poplog Version 14.11, support is provided for using the ISO Latin 1
+character set  (which  is a  superset  of ASCII,  defining  extra  8-bit
+character codes in the range 16:A0 - 16:FF).
+
+Use of Latin 1 is  indicated by the variable pop_character_set  having a
+value of (ASCII character) `1`, which is its default. (Potentially, this
+could be set to  `2`, `3`, or  `4` to indicate  the alternate Latin  2 -
+Latin 4  sets, or  some other  character for  other sets,  but there  is
+currently only support for Latin 1.)
+
+Note that in  previous versions of  the system, use  of 8-bit  character
+codes was difficult  owing to  the fact that  any code  greater than  or
+equal to  16:80 was  interpreted  as a  graphics  character by  the  Ved
+editor. This restriction has now been removed by defining a standard set
+of graphics characters in the range 16:81 - 16:9F, which do not conflict
+with ISO Latin (see Ved Standard Graphics Characters in REF * VEDPROCS).
+
+The new graphics characters  do not conflict with  the old ones  either,
+but the  old ones  can  only be  interpreted when  pop_character_set  is
+false. (However, nothing in  Poplog uses the old  ones any more,  except
+for  the  old  graphcharsetup   library.  This  remains  for   backwards
+compatibility, and if used, sets pop_character_set false.)
+
+
+pop_character_set                                             [variable]
+        This  variable  contains  either  false  or  an  integer   ASCII
+        character code indicating the current character set in use.
+
+        Currently only the value `1` is supported, meaning the ISO Latin
+        1 character set (this is its default value).
+
+        The value of this variable affects the procedures
+
+               # isuppercode
+               # islowercode
+               # isalphacode
+               # uppertolower
+               # lowertoupper
+
+        as well as the Pop-11 itemiser (see REF * ITEMISE). As described
+        above, a  non-false  value also  prevents  the Ved  editor  from
+        interpreting 8-bit characters as old-style graphics characters.
+
+
+
+
+---------------------------
+3  Predicates on Characters
+---------------------------
+
+As stated above,  a character  is a  24-bit unsigned  integer; thus  the
+following procedures will all  return false for any  integer not in  the
+range 0 <= I <= 16:FFFFFF. The character-code part tested is the  bottom
+16 bits of the integer (i.e. they will also return false for any integer
+that has a non-zero value in bits 8-15).
+
+The characters  recognised  as  upper  and lower  case  letters  by  the
+procedures isuppercode  and islowercode  (as  well as  uppertolower  and
+lowertoupper)  are  the  ASCII   values  plus  the  additional   Latin 1
+characters when pop_character_set has the value ASCII `1`.
+
+Note that in Latin 1 there are  two letters which do not have  alternate
+case equivalents  (german  double s  and  y dieresis).  isuppercode  and
+islowercode return true only  for letters that  have an alternate  case,
+and hence these  two are excluded.  However, isalphacode recognises  all
+letters.
+
+    Letter type       ASCII              Latin 1
+    -----------       -----              -------
+    upper case      16:41 - 16:5A      16:C0 - 16:D6
+                                       16:D8 - 16:DE
+
+    lower case      16:61 - 16:7A      16:E0 - 16:F6
+                                       16:F8 - 16:FE
+
+    other                              16:DF
+                                       16:FF
+
+
+isuppercode(item) -> bool                                    [procedure]
+        Returns true if item is a character whose character-code part is
+        an upper case letter (see above), or false otherwise.
+
+
+islowercode(item) -> bool                                    [procedure]
+        Returns true if item is a character whose character-code part is
+        a lower case letter (see above), or false otherwise.
+
+
+isalphacode(item) -> bool                                    [procedure]
+        Returns true if item is a character whose character-code part is
+        a letter (see above), or false otherwise.
+
+
+isnumbercode(item) -> bool                                   [procedure]
+        Returns true if item is a character whose character-code part is
+        the ASCII/ISO Latin code for a digit (i.e. in the range  16:30 -
+        16:39), or false otherwise.
+
+
+
+
+---------------------------------
+4  Locating Characters in Strings
+---------------------------------
+
+These procedures all search strings for the normal ASCII/ISO Latin  part
+(i.e. bottom eight bits) of a character char.
+
+
+locchar(char, N, string) -> M_or_false                       [procedure]
+        Searches the string  (or word)  string for  the character  char,
+        starting the search at the N-th character of string. Returns the
+        subscript M  at  which  char  was  found,  or  false  otherwise.
+        E.g:
+
+            locchar(`a`, 1, 'the cat sat on the mat') =>
+            ** 6
+            locchar(`a`, 7, 'the cat sat on the mat') =>
+            ** 10
+            locchar(`a`, 22, 'the cat sat on the mat') =>
+            ** <false>
+
+
+strmember(char, string) -> M_or_false                        [procedure]
+        Same as locchar(char, 1,  string), i.e. returns the  subscript M
+        at which char first  occurs in the string  (or word) string,  or
+        false otherwise.
+
+
+locchar_back(char, N, string) -> M_or_false                  [procedure]
+        As locchar,  except  that  the  search  is  performed  BACKWARDS
+        starting from the N-th character. E.g:
+
+            locchar_back(`a`, 22, 'the cat sat on the mat') =>
+            ** 21
+            locchar_back(`a`, 20, 'the cat sat on the mat') =>
+            ** 10
+            locchar_back(`a`, 5, 'the cat sat on the mat') =>
+            ** <false>
+
+
+skipchar(char, N, string) -> M_or_false                      [procedure]
+        Searches the string  (or word)  string for  any character  OTHER
+        than char, starting at the N-th character. Returns the subscript
+        M at which a  character other than char  was found, or false  if
+        every character from the N-th onwards was a char. E.g:
+
+            skipchar(`*`, 1, '*** HELLO ***') =>
+            ** 4
+            skipchar(`*`, 11, '*** HELLO ***') =>
+            ** <false>
+
+
+skipchar_back(char, N, string) -> M_or_false                 [procedure]
+        As skipchar,  except  that  the search  is  performed  BACKWARDS
+        starting from the N-th character. E.g:
+
+            skipchar_back(`*`, 13, '*** HELLO ***') =>
+            ** 10
+            skipchar_back(`*`, 3, '*** HELLO ***') =>
+            ** <false>
+
+
+
+
+------------------------
+5  Predicates on Strings
+------------------------
+
+Note that most  of the  procedures in  this section  taking an  argument
+specified as string or sub_string will  accept words in place of any  of
+their string arguments (isstring of course returns false for words).
+
+All procedures in this section  compare only the normal ASCII/ISO  Latin
+parts of characters in substrings.
+
+See also REF * vedissubitem.
+
+
+isstring(item) -> bool                                       [procedure]
+        Returns true if item is a string (or a dstring), false if not.
+
+
+check_string(item)                                           [procedure]
+        Mishaps if item is not a (d)string.
+
+
+issubstring(sub_string, N, string) -> M_or_false             [procedure]
+issubstring(sub_string, string) -> M_or_false
+        Searches the string  (or word)  string, starting  from its  N-th
+        character, for a substring equal  to the string sub_string  and,
+        if found,  returns  the  subscript  M of  string  at  which  the
+        matching substring begins; otherwise it  returns false. If N  is
+        not given, it defaults to 1. E.g:
+
+            issubstring('the', 1, 'all the cats') =>
+            ** 5
+            issubstring('the', 6, 'all the cats') =>
+            ** <false>
+
+
+issubstring_lim(sub_string, N, startlim, endlim, string)     [procedure]
+                                                -> M_or_false
+        Same as issubstring, but the match is constrained to start on or
+        before the  subscript startlim,  and  to end  on or  before  the
+        subscript endlim.  The startlim  or  endlim constraints  may  be
+        disabled by supplying false for either argument, e.g.
+
+            issubstring_lim(sub_string, N, false, false, string)
+
+        is just the same as issubstring. Examples:
+
+            issubstring_lim('the', 1, 5, false, 'all the cats') =>
+            ** 5
+            issubstring_lim('the', 1, 4, false, 'all the cats') =>
+            ** <false>
+            issubstring_lim('the', 1, false, 7, 'all the cats') =>
+            ** 5
+            issubstring_lim('the', 1, false, 6, 'all the cats') =>
+            ** <false>
+            issubstring_lim('the', 1, 5,     7, 'all the cats') =>
+            ** 5
+
+
+isstartstring(sub_string, string) -> M_or_false              [procedure]
+        If the  string  (or  word)  string  starts  with  the  substring
+        sub_string then returns subscript 1, otherwise false. E.g:
+
+            isstartstring('ban', 'banana') =>
+            ** 1
+            isstartstring('ban', 'abandon') =>
+            ** <false>
+
+        (This procedure is the same as
+
+            issubstring_lim(sub_string, 1, 1, false, string)
+
+        but quicker.)
+
+
+ismidstring(sub_string, string) -> M_or_false                [procedure]
+        If sub_string is a substring of the string (or word) string, but
+        does not start on the first  character of string nor end on  the
+        last, then this  returns the  subscript at  which the  substring
+        starts, otherwise false. E.g.
+
+            ismidstring('ban', 'banana') =>
+            ** <false>
+            ismidstring('ban', 'abandon') =>
+            ** 2
+
+
+
+isendstring(sub_string, string) -> M_or_false                [procedure]
+        If  the  string  (or  word)  string  ends  with  the   substring
+        sub_string, then  returns  the  subscript  M  of  sub_string  in
+        string, otherwise false. E.g:
+
+            isendstring('ing', "working") =>
+            ** 5
+            isendstring('ing', 'ng') =>
+            ** <false>
+
+
+hassubstring(string, sub_string) -> M_or_false               [procedure]
+hassubstring(string, N, sub_string) -> M_or_false
+        Same as
+
+            issubstring(sub_string, 1, string)
+            issubstring(sub_string, N, string)
+
+        respectively (i.e. N  defaults to 1).
+
+
+hasendstring(string, sub_string) -> M_or_false               [procedure]
+        Same as isendstring(sub_string, string).
+
+
+hasmidstring(string, sub_string) -> M_or_false               [procedure]
+        Same as  ismidstring(sub_string, string)  (embedded  substring).
+
+
+hasstartstring(string, sub_string) -> M_or_false             [procedure]
+        Same as isstartstring(sub_string, string).
+
+
+alphabefore(string1, string2) -> bool_or_1                   [procedure]
+        This procedure takes  two strings  (or words)  as arguments  and
+        returns true if the first  is alphabetically before the  second,
+        or false if the  first is alphabetically  after the second.  The
+        integer 1  is returned  if  the strings  have exactly  the  same
+        characters. For example:
+
+            alphabefore("cat", "dog") =>
+            ** <true>
+            alphabefore("dog", "cat") =>
+            ** <false>
+            alphabefore('cat', 'catch')=>
+            ** <true>
+            alphabefore("cat", "cat") =>
+            ** 1
+
+
+
+
+-----------------------
+6  Constructing Strings
+-----------------------
+
+consstring(char1, char2, ..., charN, N) -> string            [procedure]
+        Returns a string  string constructed from  the next N  character
+        values on the user stack (where  the topmost value on the  stack
+        will be at the highest subscript in the string).
+
+
+inits(len) -> string                                         [procedure]
+        Returns a newly created string of length len containing all zero
+        (i.e. NUL) characters. (See also initvectorclass in REF * DATA.)
+
+
+substring(N, len, string) -> sub_string                      [procedure]
+sub_string -> substring(N, len, string)
+        The base procedure returns a string sub_string consisting of the
+        len characters of the string string starting from the  character
+        at subscript N. Note  that nullstring is  returned for an  empty
+        substring.
+
+        string may also be a word (but  the result is still a string  --
+        see subword in REF * WORDS if you want a word result).
+
+        The updater  copies  the  first len  characters  of  the  string
+        sub_string into the  string string starting  at subscript N.  In
+        this case sub_string may also be a word, but not string.
+
+
+lowertoupper(item1) -> item2                                 [procedure]
+        For item1 a (d)string, word or integer character, returns a  new
+        item of  the  same  type  with any  ASCII/ISO  Latin  codes  for
+        lowercase  letters  converted  to  their  uppercase  equivalent.
+        Otherwise just returns item1. For example:
+
+            lowertoupper(`a`) =>
+            ** 65                         ;;; i.e. `A`
+            lowertoupper('hello') =>
+            ** HELLO
+            lowertoupper(`A`) =>
+            ** 65
+            lowertoupper([any old list]) =>
+            ** [any old list]
+
+        (Note  that  ISO   Latin  letters  are   recognised  only   when
+        pop_character_set has an appropriate value -- see Predicates  on
+        Characters above.)
+
+
+uppertolower(item1) -> item2                                 [procedure]
+        For item1 a (d)string, word or integer character, returns a  new
+        item of  the  same  type  with any  ASCII/ISO  Latin  codes  for
+        uppercase characters  converted to  their lowercase  equivalent.
+        Otherwise just returns item1. For example:
+
+            uppertolower(`A`) =>
+            ** 97                         ;;; i.e. `a`
+            uppertolower('HELLO') =>
+            ** hello
+            uppertolower(`a`) =>
+            ** 97
+            uppertolower([any old list]) =>
+            ** [any old list]
+
+        (Note  that  ISO   Latin  letters  are   recognised  only   when
+        pop_character_set has an appropriate value -- see Predicates  on
+        Characters above.)
+
+
+strlowercase(struct2) -> struct2                             [procedure]
+struppercase(struct1) -> struct2                             [procedure]
+        These are defined as
+
+            mapdata(struct1, uppertolower) -> struct2
+            mapdata(struct1, lowertoupper) -> struct2
+
+        respectively, and  so will  work  on a  vector of  strings,  for
+        example (but uppertolower and lowertoupper are always quicker on
+        individual strings).
+
+
+
+
+------------------------------
+7  Accessing String Characters
+------------------------------
+
+deststring(string) -> (char1, ..., charN, N)                 [procedure]
+        Destructs the string string, i.e. puts all its characters on the
+        stack, together  with its  length N  (in other  words, does  the
+        opposite of consstring). E.g.
+
+                deststring('abcd') =>
+                ** 97 98 99 100 4
+
+
+subscrs(N, string) -> char                                   [procedure]
+char -> subscrs(N, string)
+        Returns or updates the N-th character char of the string string.
+
+        Since  subscrs  is  also  the  class_apply  of  a  string   (see
+        REF * KEYS), this may also be called as
+
+                string(N) -> char
+                char -> string(N)
+
+
+
+
+-------------------------------
+8  Display Strings ('Dstrings')
+-------------------------------
+
+From Poplog 14.11,  integer character  values have been  extended to  24
+bits (as described in the Introduction above).  A new datatype has  been
+introduced to  allow  the storage  and  retrieval of  24-bit  characters
+containing 8  character-code bits  plus 8  attribute bits,  i.e. in  the
+form:
+
+         23            16 15            8 7               0
+        ---------------------------------------------------
+        |   Attributes   |       0       | Character Code |
+        ---------------------------------------------------
+
+The new datatype is  a display string ('dstring'):  this is a  structure
+whose first part  is identical  to an  ordinary string  in all  respects
+(apart from having a  different key), but which  has a second,  parallel
+set of bytes appended to it.
+
+The second set of bytes is used to store the attribute parts (top  eight
+bits) of characters, while the first set store the bottom eight bits  as
+normal. This scheme  allows a dstring  to behave as  an ordinary  string
+when required, but is completely transparent in the sense that accessing
+or updating a dstring character is simply in terms of a 24-bit integer.
+
+For ordinary  string operations,  strings  and dstrings  are  completely
+interchangeable. Except  where otherwise  indicated, all  normal  string
+procedures will  treat dstrings  as ordinary  strings (i.e.  ignore  the
+attribute parts),  including isstring,  which  recognises both.  On  the
+other hand, all  dstring procedures  treat ordinary strings  as if  they
+were dstrings with all-zero attribute bytes.
+
+Note that  the basic  system does  not give  any interpretation  to  the
+attribute bits  in characters.  However, the  Ved editor  uses  dstrings
+(where necessary)  to represent  characters  having attributes  such  as
+'bold', 'underlined', etc (the purpose  for which dstrings were  added).
+See INCLUDE * VEDSCREENDEFS for the attribute bits defined by Ved.
+
+
+isdstring(item) -> bool                                      [procedure]
+        Returns true if item is a dstring, false if not. Note that false
+        is returned for ordinary strings.
+
+
+consdstring(char1, char2, ..., charN, N)       -> dstring    [procedure]
+consdstring(char1, char2, ..., charN, N, sopt) -> dstring
+consdstring(string) -> dstring
+        The first two forms of this procedure return a (d)string dstring
+        constructed from the next N  character values on the user  stack
+        (where the topmost  value on the  stack will be  at the  highest
+        subscript in the string).
+
+        The optional boolean argument sopt says whether to optimise  the
+        result to  an ordinary  string  if the  attribute parts  of  all
+        characters are zero (true = yes, false = no). NOTE that sopt  is
+        TRUE by default, i.e. unless  given false for sopt,  consdstring
+        will always return an ordinary string if it can.
+
+        The third form allows a string to be converted to a dstring:  if
+        string is  an  ordinary  string then  the  result  dstring  is a
+        dstring with  the same  character codes  but all-zero  attribute
+        bytes; if string is already a dstring, then that is returned.
+
+
+initdstring(len) -> dstring                                  [procedure]
+        Returns a newly  created dstring  of length  len containing  all
+        zero (i.e. NULL) characters.
+
+
+subdstring(N, len, dstring)       -> sub_dstring             [procedure]
+subdstring(N, len, dstring, sopt) -> sub_dstring
+sub_dstring -> subdstring(N, len, dstring)
+        The base procedure returns a (d)string sub_dstring consisting of
+        the len characters  of the (d)string  dstring starting from  the
+        character at subscript  N. nullstring is  returned for an  empty
+        substring. dstring may also be a word (but the result is still a
+        (d)string).
+
+        As with  consdstring, the  optional boolean  argument sopt  says
+        whether to  optimise the  result to  an ordinary  string if  the
+        attribute parts of all characters in sub_dstring are zero  (true
+        = yes, false  = no).  Note that sopt  is TRUE  by default,  i.e.
+        unless given false  for sopt, subdstring  will always return  an
+        ordinary string if it can.
+
+        The updater copies  the first  len characters  of the  (d)string
+        sub_dstring into the (d)string dstring starting at subscript  N.
+        If dstring is an ordinary string this procedure does exactly the
+        same as  substring (i.e.  ignores attributes);  if dstring  is a
+        dstring but  sub_dstring  an  ordinary  one,  the  corresponding
+        attribute bytes in dstring are zeroed.
+
+        As with  the updater  of substring,  sub_dstring may  also  be a
+        word, but not dstring.
+
+
+destdstring(dstring) -> (char1, ..., charN, N)               [procedure]
+        Destructs the (d)string dstring, i.e. puts all its characters on
+        the stack, together with  its length (in  other words, does  the
+        opposite of consdstring).
+
+
+subscrdstring(N, dstring) -> char                            [procedure]
+char -> subscrdstring(N, dstring)
+        Returns or  updates the  N-th character  char of  the  (d)string
+        dstring. (If dstring is an ordinary string, the char returned by
+        the base  procedure  will  have zero  attribute  bits.  For  the
+        updater, if dstring  is an ordinary  string it is  an error  for
+        char to have non-zero attribute bits.)
+
+        Since  subscrdstring  is  the  class_apply  of  a  dstring  (see
+        REF * KEYS), this may also be called as
+
+                dstring(N) -> char
+                char -> dstring(N)
+
+
+
+
+--------------------------------------------------------
+9  Generic Datastructure/Vector Procedures on (D)Strings
+--------------------------------------------------------
+
+The   generic   datastructure   procedures   described   in   REF * DATA
+(datalength, appdata, explode,  fill, copy, etc)  are all applicable  to
+strings  and   dstrings,   as   are  the   generic   vector   procedures
+(initvectorclass, move_subvector, sysanyvecons,  etc) also described  in
+that file.
+
+Note that the  operator <> can  be used to  concatenate (d)strings  with
+(d)strings;  the   result  is   a  dstring   if  either   argument   is.
+move_subvector  from  a  dstring  to  an  ordinary  string  ignores  the
+attribute bytes in  the source, while  moving from a  string to  dstring
+zeros the corresponding attributes in the destination.
+
+Note also that the default class_= procedure for dstrings is the same as
+for ordinary strings,  i.e. compares  only the  character-code parts  of
+each character.  (There  is currently  no  procedure that  compares  the
+attribute parts.)
+
+
+
+
+--------------
+10  Vedstrings
+--------------
+
+Vedstrings are a notional data type designed for use in the Ved  editor.
+They are actually strings or dstrings (and in the future possibly other,
+e.g. 16-bit, string types), but in  addition allow for the embedding  of
+an arbitrary data  item on each  character in the  string (that is,  the
+association of an item with each subscript position in the string). This
+association is maintained via the property vedstring_data_prop.
+
+When a character with associated data is accessed from a vedstring,  the
+return value is a pair of the form
+
+        conspair(integer-char, data-item)
+
+rather than the ordinary integer-char when there is no associated  data.
+Similarily, such a pair may be  assigned into a character position  in a
+vedstring to  set the  associated  data item  along with  the  character
+(assigning integer-char alone removes any data item). The argument vchar
+in the descriptions below  thus means either  an integer character  or a
+pair as above.
+
+Note that only the procedures described below maintain the embedded data
+in vedstrings; other generic operations such as copy, <> or explode will
+just treat them as strings, and the result will lose any embedded  data.
+Thus for example, to copy a vedstring use
+
+        copy(vstring) -> new_vstring;
+        if vedstring_data_prop(vstring) ->> vec then
+            copy(vec) -> vedstring_data_prop(new_vstring)
+        endif;
+
+or alternatively,
+
+        subvedstring(1, datalength(vstring), vstring) -> new_vstring;
+
+etc.
+
+(Note also that Pop-11 quoted string syntax allows for the  construction
+of  vedstrings,  provided  the  associated  data  items  are  themselves
+(d)strings -- see  REF * ITEMISE. As  a Ved  buffer line,  this form  of
+vedstring is the only type that can be written to a file by Ved.)
+
+
+consvedstring(vchar1, vchar2, ..., vcharN, N) -> vstring     [procedure]
+        Returns a vedstring  vstring constructed from  the next N  vchar
+        character values on the user  stack (where the topmost value  on
+        the stack will be at the highest subscript in the string).
+
+
+destvedstring(vstring) -> (vchar1, ..., vcharN, N)           [procedure]
+        Destructs the vedstring vstring, i.e. puts all its characters on
+        the stack, together with its length.
+
+
+subvedstring(N, len, vstring) -> sub_vstring                 [procedure]
+sub_vstring -> subvedstring(N, len, vstring)
+        The base procedure returns a vedstring sub_vstring consisting of
+        the len characters plus embedded  data of the vedstring  vstring
+        starting from  the  character  at  subscript  N.  nullstring  is
+        returned for an empty substring. vstring may also be a word (but
+        the result is still a (d)string).
+
+        The updater copies the first  len characters plus embedded  data
+        of the vedstring sub_vstring into the vedstring vstring starting
+        at subscript N.
+
+        As with  the updater  of substring,  sub_vstring may  also  be a
+        word, but not vstring.
+
+
+subscrvedstring(N, vstring) -> vchar                         [procedure]
+vchar -> subscrvedstring(N, vstring)
+        Returns or updates  the N-th  character vchar  of the  vedstring
+        vstring.
+
+        (N.B. Since a vedstring is  not a distinct datatype, you  cannot
+        access a vedstring character with the Pop-11 form
+
+                vstring(N) -> vchar
+
+        This will always just give the integer character.)
+
+
+vedstring_data_prop(vstring) -> vec_or_false                 [procedure]
+        The property used to hold embedded data items for vedstrings. If
+        a string  has any  embedded  data, vedstring_data_prop  for  the
+        string is a full vector of the form
+
+            {% sub1, data1, ..., subN, dataN %}
+
+        meaning that each item dataI  is associated with subscript  subI
+        in the string. The subscripts appear in order, i.e. sub1 <  sub2
+        < ... < subN.
+
+
+
+
+---------------------------------------
+11  Regular Expression Pattern Matching
+---------------------------------------
+
+REF * REGEXP describes  the  Poplog facilities  for  performing  regular
+expression pattern matching on strings. Regular expressions allow you to
+perform powerful string searching operations using a set of 'wildcards'.
+
+
+
+
+-----------------
+12  Miscellaneous
+-----------------
+
+See also * stringin in REF * CHARIO for constructing character repeaters
+from strings.
+
+
+strnumber(string_or_word) -> num_or_false                    [procedure]
+        If the characters of  the string or word  argument form a  valid
+        number  according  to   the  lexical  syntax   rules  given   in
+        REF * ITEMISE, then that  number is  returned, otherwise  false.
+        E.g.
+
+            strnumber('123') =>
+            ** 123
+
+        returns the integer 123. Note that character constants are valid
+        as integers, e.g.
+
+            strnumber('`a`') =>
+            ** 97
+
+
+sys_parse_string(string)          -> (substr1, ..., substrN) [procedure]
+sys_parse_string(string, sepchar) -> (substr1, ..., substrN)
+sys_parse_string(string, p)          -> (item1, ..., itemN)
+sys_parse_string(string, sepchar, p) -> (item1, ..., itemN)
+        Given a string (or word)  string, this procedure breaks it  into
+        substrings delimited  by either  (a) the  character sepchar  (if
+        supplied), or  (b) by  whitespace characters  (spaces, tabs  and
+        newlines) if sepchar is absent.  The substrings are returned  on
+        the stack.
+
+        If a procedure  p is  supplied as  an optional  second or  third
+        argument, it is  applied to  each substring as  it is  produced,
+        i.e.
+
+                p(substr)
+
+        p may then either return the substring, or some other item(s) in
+        its place.
+
+
+sysparse_string(string, try_strnumber) -> list               [procedure]
+sysparse_string(string)                -> list
+        Similar to sys_parse_string splitting on whitespace, but returns
+        a list instead of separate substrings.
+
+        If the optional  boolean argument try_strnumber  is false,  this
+        procedure is the same as
+
+                [% sys_parse_string(string) %]
+
+        If try_strnumber is true (the  default when omitted), it is  the
+        same as
+
+                [% sys_parse_string(string,
+                            procedure(substr);
+                                lvars substr;
+                                strnumber(substr) or substr
+                            endprocedure)
+                %]
+
+        i.e. every substring  for which  strnumber returns  a number  is
+        replaced by that number.
+
+
+nullstring -> string                                          [constant]
+        The value of this constant is a string of 0 characters.
+
+
+string_key -> key                                             [constant]
+dstring_key -> key                                            [constant]
+        These constants holds  the key structures  for ordinary  strings
+        and dstrings. (see REF * KEYS).
+
+
+
+--- C.all/ref/strings
+--- Copyright University of Sussex 1995. All rights reserved.

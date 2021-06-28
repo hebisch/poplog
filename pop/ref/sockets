@@ -1,0 +1,611 @@
+REF SOCKETS                                         John Gibson Jun 1995
+
+        COPYRIGHT University of Sussex 1995. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<        UNIX SOCKET          >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<         INTERFACE           >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+      1.1   Socket Devices
+
+  2   Socket Names
+      2.1   Unix
+      2.2   Internet
+            ... host-spec
+            ... port-spec
+
+  3   Types of Socket
+      3.1   Stream Sockets
+      3.2   Datagram Sockets
+
+  4   Socket Creation
+
+  5   Accessing & Assigning Socket Names
+
+  6   Sending and Receiving Messages
+
+  7   Miscellaneous
+
+
+
+---------------
+1  Introduction
+---------------
+
+LIB * UNIX_SOCKETS is a set of procedures for creating and operating  on
+Unix sockets. Before using  any procedures, the  library must be  loaded
+with
+
+    uses unix_sockets;
+
+The  include   file  INCLUDE * UNIX_SOCKETS   defines  various   integer
+constants for use with these procedures.
+
+This file describes only the Poplog interface to the socket  facilities;
+it does not  attempt to provide  a tutorial on  sockets in general  (for
+which, see the Unix documentation).
+
+
+1.1  Socket Devices
+-------------------
+In Poplog,  sockets are  represented by  system devices.  As with  other
+procedures that  create  system  devices (i.e.  sysopen,  syscreate  and
+syspipe), all procedures that create a  new socket take an argument  org
+to specify  certain aspects  of sysread  and syswrite's  behaviour  when
+applied to it.  See Opening  System Devices in  REF * SYSIO for  further
+details.
+
+Note that the procedure  * sys_device_wait implements the  UNIX * select
+system call,  and can  be used  to multiplex  I/O on  sockets and  other
+devices. (Alternatively, asynchronous  processing can  be effected  with
+* sys_async_io.)
+
+
+
+
+---------------
+2  Socket Names
+---------------
+
+Socket address  families are  defined by  the integer  AF_ constants  in
+INCLUDE * UNIX_SOCKETS. Most  Unix systems  support only  two, the  Unix
+(AF_UNIX) and Internet (AF_INET) families.
+
+By default, the procedures in  LIB * UNIX_SOCKETS also only support  Pop
+socket name representations for these two. However, all name translation
+is effected through the property * sys_socket_name_trans, which could be
+extended to provide name translation for other domains if required.
+
+
+2.1  Unix
+---------
+AF_UNIX socket names are just ordinary Unix filenames (i.e. strings). As
+usual in Poplog, input filenames are run through * sysfileok to  perform
+any environment variable translation, etc.
+
+
+
+2.2  Internet
+-------------
+AF_INET socket names consist  of a host-spec,  which specifies the  host
+address, and an optional port-spec,  specifying the port number at  that
+host (port-spec defaults to 0 when omitted).
+
+An Internet socket name is therefore  a host-spec alone, or a  2-element
+list:
+
+        [ host-spec  port-spec ]
+
+...  host-spec
+--------------
+host-spec may be one of the following:
+
+      # A host name string, e.g.
+
+              'rsuna.crn.cogs.susx.ac.uk'
+
+        The   given   name   is   translated   to   an   address   using
+        UNIX * gethostbyname.
+
+      # A string giving a numeric Internet address in dot notation, e.g.
+
+              '192.33.16.1'
+
+        The string is given to  UNIX * inet_addr to produce an  address.
+        (Note that inet_addr is tried first on any string beginning with
+        a digit; if this returns an error, gethostbyname is tried.)
+
+      # The word  "*", meaning  the wildcard  address INADDR_ANY.  (Used
+        with a port-spec  to set a  local socket name,  where any  local
+        host address will do.)
+
+      # An integer Internet address directly (in host byte order).
+
+      # A 2-element vector of the form
+
+              { network  local-network-address }
+
+        where network  is  an integer  or  a network  name  string,  and
+        local-network-address is an integer.
+
+        A network name string  is translated to  a network number  using
+        UNIX * getnetbyname. In either case, the integer network  number
+        is then  combined  with  the  local-network-address  part  using
+        UNIX * inet_makeaddr.
+
+...  port-spec
+--------------
+When present, port-spec takes the following values:
+
+      # An integer port number.
+
+      # An  Internet  service  name.  This  is  either  a  string,  or a
+        2-element vector
+
+            { service-name  protocol-name }
+
+        where service-name is a string and protocol-name is a word.  The
+        given  service  is   translated   to   a   port   number   using
+        UNIX * getservbyname (qualified by the optional protocol-name if
+        present).
+
+        For example,
+
+            [ 'mc.site.ac.uk' 'nntp' ]
+            [ 'rsuna.crn.cogs.susx.ac.uk' {'daytime' udp} ]
+
+        (A protocol-name vector  can also have  an explicit port  number
+        instead of  service-name.  This  is useful  for  specifying  the
+        protocol  to  sys_socket_to_service  when  a  non-standard  port
+        is being used.)
+
+
+Note that  those procedures  below  which return  a socket  name  always
+return the host address part of an AF_INET name as a string in  Internet
+dot notation.
+
+
+
+
+------------------
+3  Types of Socket
+------------------
+
+The type argument to sys_socket specifies the communication semantics of
+the socket being  created, and  is one  of the  integer SOCK_  constants
+defined in INCLUDE * UNIX_SOCKETS (or an equivalent ASCII character, see
+below).
+
+Most  Unix  systems  support  only  stream  (SOCK_STREAM)  and  datagram
+(SOCK_DGRAM) types:
+
+
+3.1  Stream Sockets
+-------------------
+SOCK_STREAM sockets are connection-based 2-way byte streams (like  2-way
+pipes). Connections  are  established  asymmetrically,  with  one  party
+acting as server, and the other as client.
+
+The server process must execute code such as the following:
+
+    ;;; Create a control socket (n.b. ASCII `S` = SOCK_STREAM)
+
+    lvars control_sock = sys_socket(af, `S`, false);
+
+    ;;; Assign a known name local_server_name to the local name of the
+    ;;; control socket, and start listening for connections. (For
+    ;;; Internet, local_server_name is often [* port], meaning any
+    ;;; local hostname at port port.)
+
+    local_server_name -> sys_socket_name(control_sock, 5);
+
+    ;;; Then repeatedly accept connections on the control socket.
+    ;;; Each connection creates a new socket for actually communicating
+    ;;; with the client.
+
+    repeat
+        lvars comm_sock = sys_socket_accept(control_sock, org);
+
+        ;;; process each comm_sock, e.g. add it to a list of connections
+    endrepeat;
+
+To make a connection, each client process creates a socket, and  assigns
+remote_server_name to its sys_socket_peername:
+
+    lvars comm_sock = sys_socket(af, `S`, org);
+    remote_server_name -> sys_socket_peername(comm_sock);
+
+sysread and  syswrite are  then used  to  read and  write data  on  each
+communications socket.
+
+
+3.2  Datagram Sockets
+---------------------
+SOCK_DGRAM sockets implement datagrams, i.e. connectionless messages  of
+a fixed maximum length:
+
+    ;;; Create a datagram socket (n.b. ASCII `D` = SOCK_DGRAM)
+
+    lvars sock = sys_socket(af, `D`, org);
+
+    ;;; Optionally establish a local name for it.
+
+    local_name -> sys_socket_name(sock);
+
+Messages may then be sent using syswrite or sys_socket_send:
+
+    ;;; Send a message to remote_name -- this can be done with either
+    ;;; sys_socket_send ...
+
+    sys_socket_send(sock, message, datalength(message), 0, remote_name);
+
+    ;;; ... or with syswrite after assigning a remote_name to
+    ;;; sys_socket_peername.
+
+    remote_name -> sys_socket_peername(sock);
+    syswrite(sock, message, datalength(message));
+
+Messages are received with sysread or sys_socket_recv. In both cases, if
+a remote_name has  been assigned to  sys_socket_peername, only  messages
+from there will be accepted (otherwise,  they will be received from  any
+sender):
+
+    ;;; Receive a message -- this can be done with either
+    ;;; sys_socket_recv if the sender's name is required ...
+
+    sys_socket_recv(sock, buff, datalength(buff), 0, true)
+                                            -> (nread, remote_name)
+
+    ;;; ... or with sysread otherwise.
+
+    sysread(sock, buff, datalength(buff)) -> nread;
+
+See Sending and Receiving Messages below for more details.
+
+
+
+
+------------------
+4  Socket Creation
+------------------
+
+sys_socket(af, type, org)           -> sock                  [procedure]
+sys_socket(af, type, protocol, org) -> sock
+        Creates a  socket sock  (a system  device). See  Opening  System
+        Devices in REF * SYSIO for a description of the org argument.
+
+        af is  the  address/protocol family,  and  must be  one  of  the
+        integer AF_  constants defined  in INCLUDE * UNIX_SOCKETS.  Most
+        Unix systems support only the  AF_UNIX and AF_INET domains;  the
+        af argument for these may also  be given as the ASCII  character
+        constants `u` and `i` respectively.
+
+        type specifies the  communication semantics of  the socket,  and
+        must  be  one  of  the   integer  SOCK_  constants  defined   in
+        INCLUDE * UNIX_SOCKETS.   Most   Unix   systems   support   only
+        SOCK_STREAM   (connection-based   2-way   byte   streams),   and
+        SOCK_DGRAM (datagrams, i.e. connectionless, unreliable  messages
+        of a fixed maximum length). These  two may also be specified  as
+        the ASCII character constants `S` and `D` respectively.
+
+        The  optional  protocol  argument   may  specify  a   particular
+        transmission protocol to  be used. (That  is, where possible  --
+        normally, only a single protocol exists to support a  particular
+        socket type within  a given  family, and  this will  be used  by
+        default.) If  supplied, protocol  must be  a word.  This can  be
+        either a protocol name, in which case UNIX * getprotobyname will
+        be called to translate it to  a protocol number, or it may  be a
+        protocol number directly (but again, as a word, e.g. "'123'").
+
+        For example,
+
+            vars sock = sys_socket(`i`, `S`, false);
+
+        creates an Internet stream socket (default protocol "tcp").
+
+        See also UNIX * socket.
+
+
+sys_socket_pair(af, type, org)           -> (sock1, sock2)   [procedure]
+sys_socket_pair(af, type, protocol, org) -> (sock1, sock2)
+        Creates a pair of unnamed sockets sock1 and sock2, each of which
+        is  already  connected  to  the  other.  The  two  sockets   are
+        indistinguishable.
+
+        The arguments are  the same  as for  sys_socket above.  However,
+        Unix only implements  this call for  the AF_UNIX address  family
+        (where if type is SOCK_STREAM, sock1 and sock2 are just the same
+        as two-way pipes).
+
+        See also UNIX * socketpair.
+
+
+sys_socket_accept(sock, org) -> conn_sock                    [procedure]
+        Accepts server-side connections on a stream socket sock.
+
+        sock must  have  a local  name  assigned and  be  listening  for
+        connections, i.e. the call
+
+            local_name -> sys_socket_name(sock, qlen);
+
+        must previously have been made.
+
+        The connection  is made  on  a new  socket conn_sock,  which  is
+        returned.  conn_sock  inherits  its  address  family,  type  and
+        protocol (and option settings) from sock, and uses the given org
+        argument. sys_socket_peername  may be  applied to  conn_sock  to
+        determine the name of the connected peer.
+
+        See also UNIX * accept.
+
+
+sys_socket_to_service(serv_name, org) -> sock                [procedure]
+        A convenience routine for connecting to an Internet service at a
+        given host.
+
+        serv_name must be an AF_INET socket name containing an  Internet
+        service name for the port spec (or an explicit port number  with
+        a protocol -- see Socket Names: Internet above).
+
+        sys_socket is then called (with  last argument org) to  create a
+        socket sock for  address family  AF_INET. sock  is created  with
+        type  SOCK_STREAM  or  SOCK_DGRAM,  according  to  whether   the
+        protocol used by  the service  is "tcp"  or "udp"  respectively.
+
+        (Note that providing it supplies a service name, serv_name  need
+        not    specify    an     explicit    protocol    name,     since
+        UNIX * getservbyname returns  this  information along  with  the
+        port number. However, it must specify a protocol name if a  port
+        number is given.)
+
+        The  socket  is  then   connected  by  assigning  serv_name   to
+        sys_socket_peername for sock.
+
+        For example
+
+          vars nntp_sock =
+                sys_socket_to_service(['mc.site.ac.uk' 'nntp'], false);
+
+        would connect to the 'nntp' news server at host 'mc.site.ac.uk'.
+
+
+
+
+-------------------------------------
+5  Accessing & Assigning Socket Names
+-------------------------------------
+
+sys_socket_name(sock) -> name_or_false                       [procedure]
+name -> sys_socket_name(sock)
+name -> sys_socket_name(sock, qlen)
+        Returns or  assigns  the local  name  of the  socket  sock.  For
+        SOCK_STREAM sockets, the updater optionally starts listening for
+        server-side connections.
+
+        The base procedure returns the  local name of sock (as  supplied
+        by UNIX * getsockname), or false if the socket is unnamed.
+
+        The updater  assigns name  to  be the  local  name of  sock  (by
+        calling UNIX * bind). The socket must  not have a name  assigned
+        already.
+
+        For stream sockets,  the optional integer  argument qlen may  be
+        supplied. After assigning the name,  the updater will then  call
+        UNIX * listen on sock to start listening for client  connections
+        (allowing for  a  maximum  of qlen  connection  requests  to  be
+        queued).  Connections  on  sock   may  then  be  accepted   with
+        * sys_socket_accept.  (Note  that  queued  but  not-yet-accepted
+        connections  on   sock  behave   as   'input'  in   respect   of
+        * sys_input_waiting and  * sys_device_wait. * sys_async_io  with
+        condition argument 0  can also be  used to provide  asynchronous
+        notification of connections on sock.)
+
+
+sys_socket_peername(sock) -> name_or_false                   [procedure]
+name -> sys_socket_peername(sock)
+name -> sys_socket_peername(sock, changes_p)
+name -> sys_socket_peername(sock, retries)
+name -> sys_socket_peername(sock, changes_p, retries)
+        Returns or assigns the peername of the socket sock.
+
+        The base procedure returns the peername of sock (as supplied  by
+        UNIX * getpeername), or false  if the socket  has no  associated
+        peer.
+
+        The updater assigns name to be the peername of sock (by  calling
+        UNIX * connect). The  effect  of this  depends  on the  type  of
+        socket, as follows:
+
+        Datagram Sockets
+        For SOCK_DGRAM sockets, peername assignment sets the address  to
+        which datagrams will be sent (with syswrite, or  sys_socket_send
+        with no destination specified). It constrains datagrams received
+        (with sysread or sys_socket_recv) to come from that address. You
+        can change the peername at any time (or assign false to dissolve
+        any association).
+
+        Stream Sockets
+        For SOCK_STREAM sockets, assigning a peername makes a ('client')
+        connection to  the designated  address; this  can be  done  only
+        once. For  a  connection  to  be  established,  the  peer  (i.e.
+        'server') must be  listening for connections  at the  designated
+        address (see sys_socket_name  above), and must  then accept  the
+        connection (see sys_socket_accept).
+
+        However, a connection may be temporarily refused, for example if
+        the server's queue of pending (not yet accepted) connections  is
+        full. For this reason,  the updater of sys_socket_peername  will
+        retry upto  retries  times to  make  the connection  (where  the
+        optional integer retries argument defaults to 5 if omitted). The
+        procedure waits one second before each retry.
+
+        For  Unix-related  reasons,  each  connect  failure  (i.e.  Unix
+        ECONNREFUSED error), causes the Unix file descriptor  associated
+        with sock to become unusable for further operations. The updater
+        of sys_socket_peername is therefore obliged to open a new socket
+        before trying  again,  and to  replace  the sock  device's  file
+        descriptor with the new one.
+
+        As a  result,  any  assignments previously  made  to  sock  with
+        sys_socket_option will be  lost. To surmount  this problem,  the
+        optional changes_p argument may be supplied: this is applied  to
+        sock before each connection attempt (including the first). Hence
+        any  sys_socket_option  assignments   that  need  doing   before
+        connection should be put into a changes_p procedure.
+
+        Note   that   for   all   types   of   socket,   assigning    to
+        sys_socket_peername   also   causes   the   local   name   (i.e.
+        sys_socket_name) of the socket to be assigned a value if it does
+        not already have one (the value is chosen by Unix).  Client-side
+        SOCK_STREAM sockets do not usually bother assigning an  explicit
+        local name, but if this has been done, sys_socket_peername  will
+        preserve  the  assignment  across  any  new  socket  descriptors
+        created during connection retries.
+
+
+
+
+---------------------------------
+6  Sending and Receiving Messages
+---------------------------------
+
+For most purposes, sysread and  syswrite are sufficient for reading  and
+writing sockets. However, these cannot be used
+
+      # For out-of-band data on stream sockets.
+
+      # When receiving datagrams on a datagram socket with no associated
+        peername (and which can therefore receive from any sender),  and
+        where the sender address of each message is required (e.g.  so a
+        reply can be sent). Although sysread will read such messages, it
+        will not provide the sender addresses.
+
+        (Note that syswrite  can be  used to send  messages to  multiple
+        destinations    by    assigning    different    peernames     to
+        sys_socket_peername. syswrite  cannot  be  used  on  a  datagram
+        socket with no associated peername.)
+
+The procedures sys_socket_recv and sys_socket_send are provided to  cope
+with the  above cases.  Unlike  sysread and  syswrite, they  provide  no
+internal Poplog buffering of data.
+
+
+sys_socket_recv(sock, buff, nbytes, flags, false)            [procedure]
+                                            -> nread
+sys_socket_recv(sock, buff, nbytes, flags, true)
+                                            -> (nread, from_name)
+        Provides an interface to UNIX * recv and * recvfrom for  reading
+        messages from the socket sock.
+
+        buff is a string into which at most nbytes bytes of data will be
+        read (starting at subscript 1).  The flags argument is  either 0
+        or one  or  more  of  the  integer  MSG_  constants  defined  in
+        INCLUDE * UNIX_SOCKETS or'ed together.
+
+        The number of bytes nread  that were actually read is  returned.
+        If the  last  argument  is  false,  this  is  the  only  result;
+        otherwise the sender's address from_name is returned as well.
+
+
+sys_socket_send(sock, buff, nbytes, flags, to_name)          [procedure]
+        Provides an interface  to UNIX * send and  * sendto for  writing
+        messages to the socket sock.
+
+        buff is a string from which nbytes bytes of data will be written
+        (starting from subscript 1). The  flags argument is either 0  or
+        one  or  more   of  the  integer   MSG_  constants  defined   in
+        INCLUDE * UNIX_SOCKETS or'ed together.
+
+        The to_name argument is  either the name  of the destination  to
+        which the message should be sent, or false; in the latter  case,
+        the  socket   must  have   had  a   destination  assigned   with
+        sys_socket_peername.
+
+
+
+
+----------------
+7  Miscellaneous
+----------------
+
+sys_socket_option(sock, option) -> bool_or_int               [procedure]
+bool_or_int -> sys_socket_option(sock, option)
+        Provides an interface to UNIX * getsockopt and * setsockopt  for
+        accessing and updating socket-level and Internet TCP options  on
+        a socket sock.
+
+        option must be one  of the integer SO_  or (for Internet  stream
+        sockets) TCP_ contants  defined in INCLUDE * UNIX_SOCKETS.  With
+        the exception of SO_LINGER, all supported options have  either a
+        boolean or an integer value, e.g.
+
+            sys_socket_option(sock, SO_REUSEADDR) =>
+            ** <false>
+            true -> sys_socket_option(sock, SO_REUSEADDR);
+
+            sys_socket_option(sock, TCP_MAXSEG) =>
+            ** 536
+
+        For SO_LINGER,  the  value is  false  if the  linger  option  is
+        disabled, and an integer timeout value in seconds otherwise:
+
+            sys_socket_option(sock, SO_LINGER) =>
+            ** <false>
+            1 -> sys_socket_option(sock, SO_LINGER);
+
+        Options for other protocol levels are not supported.
+
+
+sys_socket_shutdown(sock, how)                               [procedure]
+        Shuts down all or part of a full-duplex connection on the socket
+        sock. Allowed values for how are
+
+            how     Meaning
+            ---     -------
+             0      Disallow further reads or receives.
+             1      Disallow further writes or sends.
+             2      Disallow both reads and writes.
+
+        See also UNIX * shutdown.
+
+
+sys_socket_name_trans(af) -> trans_p                         [procedure]
+trans_p -> sys_socket_name_trans(af)
+        This is a  property which maps  a given address  family af  to a
+        procedure-with-updater  trans_p  for  translating  between   Pop
+        socket names and Unix addresses for that family.
+
+        By default, only procedures for the AF_UNIX and AF_INET  domains
+        are defined.  A new  procedure trans_p  for some  other  address
+        family must have the form
+
+            trans_p(name) -> (namebuff, namesize)
+            (namebuff, namesize) -> trans_p() -> name
+
+        i.e. the base procedure takes a name name and returns  namebuff,
+        namesize, while the updater takes namebuff, namesize and returns
+        name.
+
+        name is whatever Pop object(s) are being used to represent names
+        in the given domain.
+
+        namebuff and  namesize  are the  external  representation  (i.e.
+        appropriate sockaddr struct)  of the  name as  supplied to  Unix
+        routines  such  as   bind,  connect.  namebuff   should  be   an
+        "exptr_mem" structure  (as  produced  by  * initexptr_mem),  and
+        namesize the size in bytes as expected by the Unix routines.
+
+        See LIB * UNIX_SOCKETS for the corresponding AF_UNIX and AF_INET
+        procedures.
+
+
+
+
+--- C.unix/ref/sockets
+--- Copyright University of Sussex 1995. All rights reserved.

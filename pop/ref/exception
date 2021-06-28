@@ -1,0 +1,669 @@
+REF EXCEPTION                                       John Gibson Apr 1996
+
+        COPYRIGHT University of Sussex 1996. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<          EXCEPTION          >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<          PROCEDURES         >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+This file documents the Poplog exception handling facilities.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Overview
+
+  2   Raising an Exception
+
+  3   Handling Exceptions
+
+  4   Printing Exceptions
+
+  5   Exception ID Strings
+      5.1   Standard Exception Classes
+            ... arith
+            ... control
+            ... exsys
+            ... mem
+            ... name
+            ... syntax
+            ... type
+
+  6   Exceptions Raised
+
+
+
+-----------
+1  Overview
+-----------
+
+An exception condition arises when a  program detects that an error  (or
+possible error, etc) has  occurred during its  execution. A program  can
+signal   an   exception   by   calling   sys_raise_exception,   allowing
+user-definable handler procedures (or standard system handlers) to  deal
+with the problem.
+
+The arguments to sys_raise_exception comprise
+
+  # a severity code;
+  # an (optional) ID string that identifies the particular exception;
+  # a message string together with any associated data items.
+
+The severity code recognises four levels of severity, namely
+
+  # Information
+  # Warning
+  # Recoverable error
+  # Error
+
+The variable procedure pop_exception_handler represents the first  stage
+of exception handling, and may be redefined, either locally or globally.
+sys_raise_exception calls all current (dynamically local) definitions of
+this procedure, until one  returns true to say  that it has handled  the
+exception  (or  performs   an  abnormal  exit).   A  true  return   from
+pop_exception_handler indicates that  sys_raise_exception should  return
+to its caller,  and normal program  execution should continue  (however,
+this is  only  permissible  for  Information,  Warning  and  Recoverable
+error).
+
+If all current definitions  of pop_exception_handler return false  (i.e.
+do not  wish to  handle the  exception), then  sys_exception_handler  is
+called as  a backstop.  This provides  a second-stage  variable  handler
+pop_exception_final,  which  is   called  in   the  same   way  as   for
+pop_exception_handler.
+
+However,  at  the  sys_exception_handler  stage,  it  is  assumed   that
+continuing with normal  program execution  after an error  is no  longer
+possible, and that  'handling' an  error will consist  (for example)  of
+printing  an  appropriate  message.  Thus  while  a  true  return   from
+pop_exception_final prevents  any further  handlers from  being  called,
+sys_exception_handler always finishes  by either (a)  returning true  to
+sys_raise_exception for Information or Warning, or (b) calling interrupt
+for errors. (But, as with pop_exception_handler, pop_exception_final has
+the option of performing an abnormal exit.)
+
+The  backstop  for  pop_exception_final  is  sys_exception_final,  which
+merely calls pop_pr_exception and returns true.
+
+The normal sequence of events  in processing an exception is  summarised
+by  the  following  diagram  (where   ...  means  calling  all   current
+definitions until one returns true):
+
+
+  sys_raise_exception --
+                       |
+pop_exception_handler ... sys_exception_handler --
+                       |                         |
+                       |    pop_exception_final ... sys_exception_final
+                       |                         |          |
+                       |                         |   pop_pr_exception
+                       |                         |          |
+                       |---------<--------(I,W)--+----<------
+                       |                         |
+                       |                       (R,E)
+                       |                         |
+                     return                  interrupt
+                  (I,W,R only)
+
+
+Note that pop_exception_handler is  intended to be  used to handle  (and
+recover from) specific  exceptions only. All  'bulk' handling of  errors
+should be done with pop_exception_final.
+
+For  this  reason,  no  part  of  the  system  ever  locally   redefines
+pop_exception_handler, which  is therefore  completely free  for use  by
+user programs. (The system does locally redefine pop_exception_final  in
+some contexts.)
+
+
+
+
+-----------------------
+2  Raising an Exception
+-----------------------
+
+sys_raise_exception(item1, ..., itemN, N,                    [procedure]
+                                mess, idstring, severity)
+sys_raise_exception(item1, ..., itemN, N, mess, severity)
+sys_raise_exception(mess, itemlist, severity)
+        Raises an exception condition, and calls user-defined  exception
+        handlers in pop_exception_handler to deal with it.
+
+        The arguments are as follows:
+
+            item1, ..., itemN, N
+                Zero or more data items  involved in the exception,  and
+                the number  N  of  them:  these  are  dependent  on  the
+                particular exception.
+
+                (For backward compatibility, the  last form of the  call
+                allows item1 ... itemN to  be passed in a list  itemlist
+                following the  mess  argument.  This  call  form  cannot
+                supply an idstring argument, and is now deprecated.)
+
+            mess
+                A message string describing  the exception (or a  vector
+                whose  first  element  is   the  message  string).   See
+                * sys_pr_message  for   a  full   description  of   this
+                argument.
+
+            idstring
+                A  string  whose  characters  identify  the   particular
+                exception  (defaults  to  nullstring  if  omitted).  See
+                Exception ID Strings below.
+
+            severity
+                An integer ASCII character code specifying the  severity
+                of the exception: `I` = Information, `W` = Warning,  `R`
+                = Recoverable error, `E` = Error.
+
+        sys_raise_exception searches up the call stack for dynamic local
+        definitions of  the  variable  procedure  pop_exception_handler,
+        starting with its current value. Each handler procedure P  found
+        is called with all the given arguments, i.e.
+
+            P(item1, ..., itemN, N, mess, idstring, severity)
+
+        A handler may do one of three things:
+
+        (1) Return false to  say that  it does  not want  to handle  the
+            condition. sys_raise_exception will then continue by calling
+            the next handler.  In addition  to false,  the handler  must
+            also leave  item1  ...  itemN  on the  stack  for  the  next
+            handler, i.e.
+
+                P(...) -> (item1, ..., itemN, false)
+
+            (Note that, if required, the code
+
+                repeat N times subscr_stack(N) endrepeat;
+
+            can be  used to  duplicate item1  ... itemN  on top  of  the
+            stack.)
+
+        (2) Return true to  say it  has handled the  condition. In  this
+            case,  sys_raise_exception  will  return  normally  to   its
+            caller.
+
+            This is not permissible for severity = `E` (and results in a
+            recursive error  with idstring  'exception-illret:control').
+            For a recoverable error  `R`, the handler must  additionally
+            leave on the  stack any results  expected by the  particular
+            error.
+
+        (3) Perform an abnormal exit  out of sys_raise_exception,  using
+            exitfrom, chainfrom, setpop etc.
+
+        If all  locally-defined  handlers return  false,  the  top-level
+        value of  pop_exception_handler  is  run;  by  default  this  is
+        * sys_exception_handler, but  if  this is  also  redefined,  and
+        returns false, sys_exception_handler is run anyway.
+
+        (N.B. If another  exception is raised  while calling a  handler,
+        the recursive call of  sys_raise_exception will call only  those
+        handlers that have not  yet been tried  by outer invocations  of
+        sys_raise_exception.)
+
+
+mishap(item1, ..., itemN, N, mess, idstring)                  [procedure]
+mishap(item1, ..., itemN, N, mess)
+mishap(mess, itemlist)
+        This procedure is  sys_raise_exception(% `E` %),  i.e. raise  an
+        error.
+
+
+
+
+----------------------
+3  Handling Exceptions
+----------------------
+
+pop_exception_handler(item1, ..., itemN, N,         [procedure variable]
+                mess, idstring, severity) -> bool
+        A user-definable first-stage handler for exceptions. All current
+        definitions    of     this    procedure     are    called     by
+        * sys_raise_exception (described  above). Its  default value  is
+        sys_exception_handler.
+
+
+sys_exception_handler(item1, ..., itemN, N,                  [procedure]
+                            mess, idstring, severity)
+        This procedure is  the default  value of  pop_exception_handler,
+        called by  sys_raise_exception.  See  * sys_raise_exception  for
+        details of the arguments.
+
+        sys_exception_handler searches  up the  call stack  for  dynamic
+        local definitions of the variable procedure pop_exception_final,
+        starting with its current value. Each handler procedure P  found
+        is called with all the given arguments, i.e.
+
+            P(item1, ..., itemN, N, mess, idstring, severity)
+
+        A handler may do one of three things:
+
+        (1) Return false to say that  the next handler should be  tried.
+            In addition to false, the handler must also leave item1  ...
+            itemN on the stack for the next handler, i.e.
+
+                P(...) -> (item1, ..., itemN, false)
+
+        (2) Return true to say no further handlers should be called.
+
+        (3) Perform an abnormal exit  using exitfrom, chainfrom,  setpop
+            etc.
+
+        If all  locally-defined  handlers return  false,  the  top-level
+        value  of  pop_exception_final  is  run;  by  default  this   is
+        * sys_exception_final,  but  if  this  is  also  redefined,  and
+        returns false,  sys_exception_final  is run  anyway  (this  will
+        always return true).
+
+        (N.B. If another exception is raised while calling a  handler, a
+        recursive call  of sys_exception_handler  will call  only  those
+        handlers that have not  yet been tried  by outer invocations  of
+        sys_exception_handler.)
+
+        After calling the  handlers, sys_exception_handler just  returns
+        if   severity   =   `I`   or   `W`   (i.e.   returns   true   to
+        sys_raise_exception).
+
+        Otherwise, for errors,  the procedure in  * interrupt is  called
+        (and if that  returns, * setpop). Before  calling interrupt  (in
+        fact,  before   calling   the   pop_exception_final   handlers),
+        * pop_exit_ok is set  to false  if the standard  input is  not a
+        terminal. (Since  the default  value  of interrupt  under  these
+        circumstances is  sysexit, this  guarantees that  an error  will
+        result in an error status being returned to the operating system
+        -- see REF * SYSTEM.)
+
+
+pop_exception_final(item1, ..., itemN, N,           [procedure variable]
+                mess, idstring, severity) -> bool
+        A user-definable  final  handler  for  exceptions.  All  current
+        definitions    of     this    procedure     are    called     by
+        * sys_exception_handler (described above). Its default value  is
+        sys_exception_final.
+
+
+sys_exception_final(item1, ..., itemN, N,                    [procedure]
+                            mess, idstring, severity)
+        This procedure  is  the default  value  of  pop_exception_final,
+        called by * sys_exception_handler.
+
+        It simply calls * pop_pr_exception with the given arguments, and
+        then returns true to sys_exception_handler.
+
+
+
+
+----------------------
+4  Printing Exceptions
+----------------------
+
+All the default Poplog routines for printing mishap and warning messages
+use the procedure sys_pr_message  to print the message,  as well as  the
+current file, line number and other useful information.
+
+
+pop_pr_exception(item1, ..., itemN, N,              [procedure variable]
+                        mess, idstring, severity)
+        A variable procedure called by * sys_exception_final to print an
+        error or warning message for an exception. Its default value  is
+        sys_pr_exception. (However,  the procedure  sys_pr_exception  is
+        only required  for  backward compatibility  reasons;  otherwise,
+        pop_pr_exception would default to sys_pr_message.)
+
+
+pop_default_pr_exception(item1, ..., itemN, N,      [procedure variable]
+                        mess, idstring, severity)
+        If this variable  has a non-undef  value (i.e. not(isundef))  it
+        will be assigned to pop_pr_exception in contexts where otherwise
+        a system procedure would be locally assigned.
+
+        In  particular  inside  Ved,  pop_pr_exception  has  the   value
+        ved_pr_exception. However, in  immediate mode,  sys_pr_exception
+        is assigned to it instead,  and inside ved_lmr is is  assigned a
+        special procedure which displays  certain mishaps on the  status
+        line, etc. In both these contexts pop_default_pr_exception  will
+        be used instead, if defined by the user (e.g. in your init.p  or
+        vedinit.p file).
+
+
+sys_pr_exception(item1, ..., itemN, N,                       [procedure]
+                        mess, idstring, severity)
+        This procedure  is  necessary only  for  backward  compatibility
+        reasons, namely  to call  the obsolete  procedures prmishap  and
+        prwarning (i.e. when the exception  relates to one of them,  and
+        that one  is set  to something  other than  its default  value).
+        Otherwise, sys_pr_exception just calls sys_pr_message.
+
+
+sys_pr_message(item1, ..., itemN, N,                          [procedure]
+                        mess, idstring, severity)
+        Prints a  message (usually  for  an exception),  outputting  the
+        characters through * cucharerr.
+
+        The arguments are as follows:
+
+            item1, ..., itemN, N
+                Zero or more 'culprit' data  items, and the number N  of
+                them:   these   are   dependent   on   the    particular
+                message/exception.
+
+            mess
+                A message string to be printed. Alternatively, it may be
+                a 2- or  3-element vector  whose  first element  is  the
+                message string, and whose second or third element(s) are
+                a header_string and an integer detail_level, i.e.
+
+                    { message_string header_string detail_level }
+
+                If not supplied, header_string defaults to 'NOTE -'  for
+                severity = `I`, to 'WARNING -'  for severity = `W`,  and
+                to 'MISHAP -' otherwise.
+
+                If not supplied, detail_level defaults to 4 for severity
+                = `I` or `W`, and to  5 otherwise. Note that the  actual
+                detail level must be 0-5, and only the bottom 4 bits  of
+                detail_level are used for  this; the remaining bits  can
+                specify a number  of newlines  to be  output before  the
+                message (e.g. 16:14 means 1 newline, detail level 4).
+
+                In all cases,  the actual  detail level used  is got  by
+                maximising the  argument  (or default)  value  with  the
+                value of the variable pop_message_min_detail.
+
+                The actual message string used is got by processing  the
+                given  string  (together  with  the  idstring  argument)
+                through the  variable procedure  pop_message_trans.  (By
+                default, this just returns the same string.)
+
+            idstring
+                A  string   whose  characters   identify  a   particular
+                message/exception (see Exception ID Strings below).
+
+            severity
+                An integer ASCII character code specifying the  severity
+                of  the  message/exception:  `I`  =  Information,  `W` =
+                Warning, `R`  = Recoverable  error, `E`  = Error.  (This
+                procedure does not distinguish between `R` and `E`.)
+
+        The full format of the message printed by sys_pr_message is
+
+            ;;; header_string message_string
+            ;;; INVOLVING:  item1 item2 ... itemN
+            ;;; FILE     :  popfilename  LINE NUMBER poplinenum
+            ;;; COMPILING:  names of procedures being compiled
+            ;;; DOING    :  pdprops of procedures currently executing
+
+        (popfilename and  poplinenum  are associated  with  the  current
+        input list proglist -- see REF * PROGLIST.)
+
+        The detail level controls how many  of the 5 lines are  printed:
+        if 0, only the header string is  printed; if 5, all 5 lines  are
+        printed. Note that the INVOLVING  line is present only if  there
+        are 1  or more  culprits, the  FILE line  is present  only  when
+        popfilename is true, and the COMPILING line is present only when
+        the Poplog VM is not at execute level.
+
+        message_string is  printed using  * sys_message_printf, with  an
+        argument  list  containing  item1   ...  itemN.  (That  is,   if
+        message_string starts with a % character, the string without the
+        initial %  is  printed using  printf,  otherwise the  string  is
+        printed  literally.)  Only  the  remaining  items  returned   by
+        sys_message_printf (i.e those  not picked up  by printf %  field
+        specifiers) will be used as culprits for the INVOLVING line.
+
+        See also  * popsyscall,  * pop_mishap_doing_lim,  * popmessages,
+        * popmishaps, * popwarnings.
+
+
+pop_message_trans(message_string, idstring)         [procedure variable]
+                                  -> message_string
+        Called by sys_pr_message (with its idstring argument) to perform
+        any required translation  of a  message_string before  printing.
+        The   default   value   is   erase   (i.e.   return   the   same
+        message_string).
+
+
+pop_message_min_detail -> int                                 [variable]
+int -> pop_message_min_detail
+        The  given  (or  default)  detail  level  in  sys_pr_message  is
+        maximised with the value in this variable. Its default value  is
+        0; setting it  to 4 (for  example) will cause  warnings such  as
+        DECLARING VARIABLE to print everything but the DOING line.
+
+
+popsyscall -> bool                                            [variable]
+bool -> popsyscall
+        Controls which procedures  currently executing  are included  in
+        the DOING list for messages produced by sys_pr_message.
+
+        If false (the  default), only procedures  whose pdprops are  not
+        false and which  are not "uninteresting"  are printed (where  an
+        "uninteresting" procedure is one whose pdprops are not "setpop",
+        or a word being with  'sys', 'ved', 'wved', 'xved', 'subsys'  or
+        'pop11_'.
+
+        For a true value, all procedures are printed. If the true  value
+        is additionally an integer, then system procedures whose pdprops
+        are false are printed as their hexadecimal addresses.
+
+        (In addition, a true value  causes sys_pr_message to print  each
+        invocation of  * sys_raise_exception  starting on  a  new  line,
+        followed  by  the  idstring  argument  of  that  invocation   in
+        parentheses.)
+
+
+pop_mishap_doing_lim -> false_or_int                          [variable]
+false_or_int -> pop_mishap_doing_lim
+        Controls the number of procedures  printed in the DOING list  of
+        messages produced by sys_pr_message.
+
+        If false (the default),  all currently executing procedures  are
+        included;  otherwise  it  should   be  a  positive  integer   N,
+        specifying that only the most recent N callers are to be shown.
+
+        If set to 0, the DOING list is not printed at all.
+
+
+popmessages -> list_or_false                                  [variable]
+list_or_false -> popmessages
+        Each time sys_pr_message is called to print a message it  puts a
+        summary of the message  (as a list of  items) it this  variable.
+        This can be disabled by assigning false to popmessages. (Default
+        value []).
+
+
+popmishaps -> list_or_false                                   [variable]
+list_or_false -> popmishaps
+        Each time sys_pr_message  is called  to print  an error  message
+        (i.e. severity `R` or `E`) it puts in this variable a summary of
+        the message printed (as list  of items); this is overwrites  any
+        previous mishap  message.  You  can prevent  the  message  being
+        stored by assigning false to popmishaps. (Default value []).
+
+
+popwarnings -> list_or_false                                  [variable]
+list_or_false -> popwarnings
+        When sys_pr_message  is called  to  print a  DECLARING  VARIABLE
+        warning message by * sysdeclare (that is, a warning message with
+        idstring 'vm-ident:name-ref-none'),  the  name  of  the  culprit
+        identifier is added to this list.
+
+        The initial value of  popwarnings is [].  If popwarnings is  set
+        false, no list is created.
+
+
+
+
+-----------------------
+5  Exception ID Strings
+-----------------------
+
+The idstring  argument to  sys_raise_exception and  other procedures  in
+this file is a string  whose characters identify a particular  exception
+condition.
+
+The general format of an idstring is a context part separated by a colon
+from a class part, i.e.
+
+        context:class
+
+The context  part  specifies  the  context  or  facility  in  which  the
+exception  occurred,   while  the   class   part  provides   a   generic
+classification of the type of error, etc.
+
+Each part may be further subdivided by hyphens into as many  hierachical
+components as required, i.e.
+
+        context-subcontext-subsubcontext:class-subclass-subsubclass
+
+For example, the sysdeclare warning idstring
+
+        vm-ident:name-ref-none
+
+specifies that the problem is in a Poplog VM procedure, and concerns  an
+identifier name; the class of the exception is name, subclass ref (using
+the referent of a name), sub-subclass none (referent does not exist).
+
+Note that the colon in an idstring is considered part of the class, i.e.
+must always be present if class  is non-empty. (An idstring of the  form
+:class indicates a 'generic' error.)
+
+
+
+5.1  Standard Exception Classes
+-------------------------------
+The  system  currently  defines  the  following  standard  classes   for
+exceptions (more will be added in future versions).
+
+
+...  arith
+----------
+Arithmetic errors.
+
+arith-fltovf                                           [exception class]
+        An arithmetic operation resulted in floating-point overflow.
+
+
+arith-div0                                             [exception class]
+        Attempt to divide a rational  number by integer zero (note  that
+        dividing floating-point by zero produces arith-fltovf).
+
+
+...  control
+------------
+
+control                                                [exception class]
+        Some kind of error in the flow of control.
+
+
+...  exsys
+----------
+This class is intended for exceptions relating to external systems,  and
+is further subclassed  by (at least)  the name of  a particular  system.
+(For example,  LIB * ODBC  uses  :exsys-odbc-sqlstate,  where  different
+sqlstate values represent  standard error classes  as defined by  X/Open
+and SQL Access Group.)
+
+
+...  mem
+--------
+These are errors concerning the allocation of memory in some area of the
+system (e.g. heap,  userstack, callstack, etc).  They divide into  limit
+errors (advisory limit reached) and nomore (no more memory available).
+
+mem-limit                                              [exception class]
+        While trying  to allocate  more space  in a  particular area  of
+        memory, the advisory limit on the area's size was reached.
+
+
+mem-nomore                                             [exception class]
+        While trying  to allocate  more space  in a  particular area  of
+        memory, the absolute  (e.g. operating system  imposed) limit  on
+        the area's size was reached.
+
+
+mem-fixedsize                                          [exception class]
+        A fixed size memory area was exhausted.
+
+
+...  name
+---------
+name errors concern the  association between a name  and an object  (its
+referent). The name class subdivides into decl (declaring the name, i.e.
+establishing a referent for it) and ref (using the referent).
+
+name-decl-prot                                         [exception class]
+        A  name  being  declared  already   has  a  referent,  and   the
+        association is protected (i.e. cannot be overridden).
+
+
+name-decl-ambig                                        [exception class]
+        A name  being declared  already  has a  referent, which  can  be
+        overridden, but only if the new referent is sufficently  similar
+        to the  old in  some respect  (which it  is not,  hence the  new
+        declaration is ambiguous).
+
+
+name-ref-inval                                         [exception class]
+        A name was supplied to an operation which uses its referent, but
+        the referent is invalid for the particular operation.
+
+
+name-ref-none                                          [exception class]
+        A name was supplied to an operation which uses its referent, but
+        the name has no referent.
+
+
+...  syntax
+-----------
+
+syntax                                                 [exception class]
+        Any kind of syntactic error in a language.
+
+
+...  type
+---------
+These concern  supplying  the wrong  type  of  data as  argument  to  an
+operation. They are subclassed by  the dataword (or pseudo-dataword)  of
+the type needed.
+
+type-integer                                           [exception class]
+        An argument was not an integer.
+
+
+type-intrange                                          [exception class]
+        An argument was an integer, but out-of-range.
+
+
+type-real                                              [exception class]
+        An argument was not a real number.
+
+
+type-number                                            [exception class]
+        An argument was not a number.
+
+
+
+
+--------------------
+6  Exceptions Raised
+--------------------
+
+This section describes exceptions generated by procedures in this file.
+
+
+exception-illret:control                                  [exception ID]
+        (Error)  A  pop_exception_handler  procedure  returned  true  to
+        sys_raise_exception for severity `E` (which is only allowed  for
+        `I`, `W` and `R`).
+
+
+
+
+--- C.all/ref/exception
+--- Copyright University of Sussex 1996. All rights reserved.

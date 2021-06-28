@@ -1,0 +1,381 @@
+REF PROCESS                                         John Gibson Jul 1995
+
+        COPYRIGHT University of Sussex 1995. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<         PROCESSES           >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+A process  in Poplog  is a  data  structure that  records the  state  of
+execution of a piece of  Poplog program (see also HELP * PROCESS).  This
+file describes processes,  and procedures  to construct  and operate  on
+them.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+
+  2   Predicates on Processes
+
+  3   Constructing Processes
+
+  4   Running, Suspending and Resuming
+
+  5   Generic Data Structure Procedures on Processes
+
+  6   Miscellaneous
+
+  7   Example
+
+
+
+---------------
+1  Introduction
+---------------
+
+A process  in Poplog  is a  data  structure that  records the  state  of
+execution of  a piece  of Poplog  program. The  information stored  in a
+process record comprises the sequence of procedure calls (stack  frames)
+that the  process is  currently inside  (including the  values of  local
+variables of those procedures), and the state of the user stack.
+
+A process is constructed initially in two ways:
+
+    # from a procedure with consproc, in  which case, on running it  for
+      the first time with runproc  (or resume), the procedure is  called
+      in the normal way;
+
+    # from  part   of  the   currently  active   procedure  calls   with
+      consproc_to, in which case execution continues inside the  process
+      after the call to consproc_to.
+
+Thereafter, the process may  suspend itself at any  time, e.g. by  using
+suspend. This causes the current state of execution (all procedure calls
+upto runproc and the  user stack) to be  stored in the original  process
+record -- the  process is then  'swapped out'. The  process may then  be
+re-activated  with  runproc  and  will  continue  execution  immediately
+following the suspend call, after the stored state of execution has been
+reinstated.
+
+    A process can also cause itself to be swapped out by calling  resume
+to resume  another process  in its  place (see  below). There  are  also
+versions of suspend and resume  (ksuspend and kresume) which 'kill'  the
+current process. This means that the  process' state is swapped out  but
+not stored,  the process  record  being marked  as 'dead'.  The  process
+cannot then be run again. (A process is also killed if it does a  normal
+procedure exit to runproc.)
+
+    Note that a process always has its own user stack, which is separate
+from the stack of any  other process or from  the normal stack when  not
+running inside a  process. Thus all  arguments passed into  or out  of a
+process have to  be explicitly  declared in calls  of runproc,  suspend,
+etc. The exception  to this is  when a process  does a normal  procedure
+exit to  runproc, or  exits  abnormally through  runproc with  chain  or
+related procedures: in this case all  values on the process's stack  are
+passed up as results (thus if you leave items on the stack in a  process
+which you  do  not want  passed  back on  normal  or chained  exit,  use
+clearstack to clear the stack first).
+
+    Processes can be used hierarchically, i.e. one process can be run as
+a sub-process of another. While procedures like suspend which  suspend a
+process normally apply only to the current process, they can all take an
+optional  process  argument  specifying   any  running  process  to   be
+(k)suspended. This means that all processes up to and including the  one
+specified are either killed (ksuspend and kresume), or suspended in such
+a way that on  running or resuming the  outer process the whole  process
+chain is  reactivated,  and  control  returns  from  the  original  call
+(suspend and resume). A process chain  like this is also constructed  by
+consproc_to if the calling sequence to the target procedure includes one
+or  more  processes;  when  the  constructed  process  is  run  it  will
+reactivate the whole chain.
+
+    Sub-processes that get  suspended when suspending  an outer  process
+are said to  be 'subsumed'. Subsumed  processes cannot be  run again  in
+their own  right,  but only  by  reactivating the  outer  process  which
+subsumed them.
+
+
+
+
+--------------------------
+2  Predicates on Processes
+--------------------------
+
+isprocess(item) -> bool                                      [procedure]
+        Returns true if item is a process, false if not.
+
+
+isliveprocess(item) -> result                                [procedure]
+        Returns a  true result  if item  is a  live process,  and  false
+        otherwise (i.e. if not a process,  or a dead one). In the  first
+        case, the return is item itself  if item is a currently  running
+        process, or true if the process is suspended. Thus
+
+                    isliveprocess(proc) == proc
+
+        can be used to test whether a process proc is running.
+
+
+
+
+-------------------------
+3  Constructing Processes
+-------------------------
+
+A process is either volatile  or non-volatile. With a volatile  process,
+the saved state held in the process  record is lost when the process  is
+run, so that  the record  is effectively empty  until such  time as  the
+process suspends again. With a non-volatile process, the saved state (as
+it was at the  time of running)  is retained until  the process is  next
+suspended.
+
+    Not retaining the  saved state  means that  data structures  which a
+running process was using at the time of its being run, but which it  no
+longer requires, will be garbage collected -- thus a volatile process is
+more garbage-collection  efficient.  On the  other  hand, if  a  running
+process is abnormally exited due to  an error condition, the system  has
+no choice but to  kill that process unless  it retains a sensible  saved
+state;  thus  a  volatile  process  will  always  be  killed  in   these
+circumstances, but a non-volatile one will survive (providing the  error
+does not actually occur  in the middle of  the process being  suspended,
+since starting to suspend corrupts the old saved state).
+
+    Therefore, use a non-volatile process only if you require to  retain
+the old state while the process is running.
+
+
+consproc(item1, ..., itemN, N, p)           -> proc          [procedure]
+consproc(item1, ..., itemN, N, p, volatile) -> proc
+        The result of  this procedure  is a process  constructed on  the
+        procedure p, with its initial user stack set to contain N  items
+        passed from the  current stack.  When the process  is first  run
+        (with runproc,  resume  or kresume),  the  procedure p  will  be
+        called with  those items  on the  stack, i.e.  the process  will
+        commence with:
+
+                    p(item1, ..., itemN)
+
+        The new process will die when the given procedure returns.
+
+        volatile is an optional boolean argument specifying whether  the
+        process is volatile  or not  (see above). If  not specified  the
+        default is true, i.e. volatile.
+
+
+consproc_to(item1, ..., itemN, N, target_p) -> proc          [procedure]
+consproc_to(item1, ..., itemN, N, target_p, volatile) -> proc
+        Makes the current  calling sequence upto  and including the  the
+        most recent  call  of the  procedure  target_p into  a  process,
+        returning the process record proc for the new (running) process.
+        This  procedure  effectively   'inserts'  a   call  of   runproc
+        immediately above the call of target_p, does a suspend, and then
+        immediately runs the process again with proc passed as argument.
+
+        The  implicit  suspend  automatically  subsumes  any   processes
+        running below the  call of target_p;  these will be  reactivated
+        when proc is run again.
+
+        The user stack  of proc is  then set to  contain N items  passed
+        from the current stack (i.e. the stack as it is AFTER suspending
+        intervening  processes).   To   allow   computation   (in   that
+        environment) of the number of items to be passed, the argument N
+        may also be a  procedure which returns the  number, i.e. N()  is
+        evaluated after suspending intervening processes.
+
+        The argument volatile (and its default) are as for consproc.
+
+
+saveproc() -> proc                                           [procedure]
+        Makes a copy of the state of the current process; the result  is
+        a process record proc which when run will exit from the call  of
+        saveproc with false  as result  instead of  the process  record.
+        Thus saveproc should be used in something like
+
+            if saveproc() ->> proc then
+                ;;; copy returned, running in original
+            else
+                ;;; running in copy
+            endif
+
+        Saving the  state involves  suspending the  current process  and
+        then copying it using copy (see Generic Datastructure Procedures
+        on Processes below).  The original  is then run  again with  the
+        copy passed  as argument.  To  allow the  copy  to be  run  with
+        arguments, saveproc is defined roughly as follows:
+
+           define saveproc();
+               lconstant mark = 'mark';
+               suspend_chain(pop_current_process, 1,
+                         procedure(proc);
+                             lvars proc;
+                             chain(copy(proc), mark, 2, proc, runproc)
+                         endprocedure);
+               if stacklength() /== 0 and dup() == mark then
+                   ;;; running original
+                   ;;; erase mark leaving copy on stack as result
+                   ->
+               else
+                   ;;; running copy
+                   ;;; return false above any other arguments
+                   false
+               endif
+           enddefine;
+
+
+
+
+-----------------------------------
+4  Running, Suspending and Resuming
+-----------------------------------
+
+pop_current_process -> proc_or_false                          [variable]
+proc_or_false -> pop_current_process
+        Always contains the  current process, or  false if no  processes
+        are running. You can thus use
+
+                pop_current_process == proc
+
+        to test if proc is the current process.
+
+
+runproc(item1, ..., itemN, N, proc)                          [procedure]
+        Runs the process proc as a subprocess of the current process (or
+        from outside any process), passing N items from the current user
+        stack to the process  user stack. (If  runproc is used  inside a
+        process, the calling process is not 'swapped out'. All calls  of
+        the outer process  remain in  the calling chain,  BUT the  outer
+        process user stack  is saved (somewhere)  so the called  process
+        still runs with its own stack.)
+
+        Since runproc is the class_apply of processes, this can also  be
+        called as
+
+              proc(item1, ..., itemN, N)
+
+
+suspend(item1, ..., itemN, N)                                [procedure]
+suspend(item1, ..., itemN, N, sus_proc)
+        Suspends the current process (first form), or all processes upto
+        and including the  process sus_proc (second  form), and  returns
+        from the  call of  runproc which  ran the  suspended  process. N
+        items are passed back as results from the current user stack.
+
+        When the suspended process is run again (with runproc, resume or
+        kresume), the call of suspend will return with whatever items on
+        the stack were passed to it by the initiating procedure.
+
+
+suspend_chain(item1, ..., itemN, N, chain_p)                 [procedure]
+suspend_chain(item1, ..., itemN, N, sus_proc, chain_p)
+        Same as suspend, but chains  the procedure chain_p out the  call
+        of runproc which ran the process, instead of just returning from
+        it. (suspend is  thus equivalent to  suspend_chain with  identfn
+        for the chain_p argument.)
+
+
+resume(item1, ..., itemN, N, res_proc)                       [procedure]
+resume(item1, ..., itemN, N, sus_proc, res_proc)
+        Suspends the current process (first form), or all processes upto
+        and including the process sus_proc (second form), and then  runs
+        the process  res_proc  inside  the call  of  runproc  which  was
+        running the suspended  process (thus  the newly-resumed  process
+        replaces the suspended one). N items are passed from the current
+        user stack to the resumed process user stack.
+
+        When the suspended process is run again (with runproc, resume or
+        kresume), the call of resume will return with whatever items  on
+        the stack were passed to it by the initiating procedure.
+
+
+ksuspend(item1, ..., itemN, N)                               [procedure]
+ksuspend(item1, ..., itemN, N, kill_proc)
+        Kills the current  process (first form),  or all processes  upto
+        and including the process  kill_proc (second form), and  returns
+        from the call  of runproc  which ran  the process.  N items  are
+        passed back as results from the current user stack.
+
+
+ksuspend_chain(item1, ..., itemN, N, chain_p)                [procedure]
+ksuspend_chain(item1, ..., itemN, N, kill_proc, chain_p)
+        Same as ksuspend, but chains the procedure chain_p out the  call
+        of runproc which ran the process, instead of just returning from
+        it. (ksuspend is thus equivalent to ksuspend_chain with  identfn
+        for the chain_p argument.)
+
+
+kresume(item1, ..., itemN, N, res_proc)                      [procedure]
+kresume(item1, ..., itemN, N, kill_proc, res_proc)
+        Kills the current  process (first form),  or all processes  upto
+        and including kill_proc (second form), and then runs the process
+        res_proc inside the call of runproc which was running the killed
+        process (thus  the  newly-resumed process  replaces  the  killed
+        one). N items  are passed  from the  current user  stack to  the
+        resumed process user stack.
+
+
+
+
+-------------------------------------------------
+5  Generic Data Structure Procedures on Processes
+-------------------------------------------------
+
+copy can be used to copy a process, but only if it has a runnable  saved
+state. This  means that  a  volatile process  can  be copied  only  when
+suspended; a non-volatile process can  be copied either while  suspended
+or running (in the  latter case the  copy reflects the  state as it  was
+when the process was run, i.e. the last time it was suspended).
+
+After copying,  the  copy and  the  original process  become  completely
+independent of each other.
+
+(At least, this should be the  case. Currently, the system is  deficient
+in that type-3 local lexical  variables of procedures forming a  process
+are not copied,  and may  therefore give rise  to unwanted  interactions
+between  the  copy  and  the  original  in  programs  using  these  (see
+REF * VMCODE for a description of type-3 lvars); this bug will be  fixed
+in a future release of the system. Another current bug is that copying a
+suspended process which  has subsumed  sub-processes does  not copy  the
+subsumed processes, which it should.)
+
+
+
+
+----------------
+6  Miscellaneous
+----------------
+
+process_key -> key                                            [constant]
+        This constant holds the key  structure for process records  (see
+        REF * KEYS).
+
+
+
+
+----------
+7  Example
+----------
+
+The following example creates a process  proc which each time it is  run
+returns the next integer, starting from an initial value n:
+
+        define next(n);
+            lvars n;
+            repeat
+                suspend(n, 1);
+                n+1 -> n
+            endrepeat
+        enddefine;
+
+        vars proc = consproc(23, 1, next);
+
+        runproc(0, proc)=>
+        ** 23
+        runproc(0, proc)=>
+        ** 24
+
+
+
+--- C.all/ref/process
+--- Copyright University of Sussex 1995. All rights reserved.

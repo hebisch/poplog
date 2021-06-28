@@ -1,0 +1,893 @@
+REF LR_PARSER                               Robert Duncan, November 1992
+
+        COPYRIGHT University of Sussex 1992. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<         AN LALR(1)          >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<      PARSER GENERATOR       >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+This file describes an LALR(1)  parser generator library for Pop-11.  It
+assumes a working knowledge of what  such a parser generator can do  and
+what it's good for:  useful background information can  be found in  the
+file HELP * LR_PARSER.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introductory Note
+
+  2   The Basic Library
+
+  3   Generating a Parser
+
+  4   Running the Parser
+
+  5   Running the Parser in Trace Mode
+
+  6   Saving the Parser to a File
+
+  7   The Parser Report File
+
+  8   Investigating the Parser States
+
+
+
+--------------------
+1  Introductory Note
+--------------------
+
+Most Pop-11 programmers will find the syntactic interface to the library
+described in HELP * DEFINE_PARSER  of more immediate  use. The  features
+described here are more likely to  be useful to programmers using  other
+languages or who need to generate parsers dynamically.
+
+
+
+
+--------------------
+2  The Basic Library
+--------------------
+
+None of  the identifiers  described in  this file  are autoloadable.  In
+order to use the library at all, you must first include in your  program
+the line:
+
+    uses lr_parser;
+
+This adds the  LR_PARSER library  directory to  popuseslist and  defines
+some basic utility procedures. Libraries defining specific features  can
+then be  loaded individually  as required.  Each of  the sections  which
+follow is introduced with the  name of the library  you need to load  to
+access the identifiers described in that section.
+
+In the context of this library,  a PARSER is a recordclass object  which
+encodes the LALR(1)  parsing tables for  the grammar from  which it  was
+constructed. A parser is created initially by the procedure lr_build and
+then interpreted (i.e. made to parse) by the procedure lr_parse.
+
+The procedure lr_parser  maintains a  global property  table which  maps
+grammar  names  to  their  associated  parsers.  Whenever  a  parser  is
+constructed  using  lr_build  it  can  optionally  be  added  into  this
+property, after which the grammar name can be used interchangeably  with
+the parser structure  itself. Throughout  this file,  the argument  name
+PARSER is used  to stand  for any item  which lr_parser  would map  to a
+parser structure, i.e. it can be either the parser structure itself,  or
+a grammar name recorded in the lr_parser property.
+
+
+lr_parser(item) -> parser                                    [procedure]
+false -> lr_parser(item)
+        A recogniser for  parsers built by  the library. If  item is  an
+        LALR(1)  parser  structure  generated  by  a  previous  call  to
+        lr_build or if item is the name of such a parser which was built
+        with the  KEEP argument  <true>, then  the parser  is  returned;
+        otherwise <false> is returned. Uses a property table to maintain
+        the mapping from names to parsers. You can assign <false> to the
+        updater to clear the property entry for a particular name.
+
+
+LR_PARSER_DIR -> string                                       [constant]
+        The root  of the  LR_PARSER directory  tree containing  standard
+        sub-directories such as:
+
+            auto
+            lib
+
+        The lib directory is added by the library to popuseslist and the
+        auto directory to popautolist.
+
+
+
+
+----------------------
+3  Generating a Parser
+----------------------
+
+LIB * LR_BUILD defines the LALR(1)  parser generator which  constructs a
+set of parsing tables from the symbolic description of  a  grammar.  The
+library should be loaded using:
+
+    uses lr_build;
+
+
+lr_build(name, tokens, symbols, start_symbol, rules,         [procedure]
+                                resolve_p, keep) -> parser
+        Constructs the LALR(1) parsing tables for the grammar  described
+        by the arguments:
+
+            name
+                The grammar name: this can be any item and plays no role
+                other than to identify the resulting parser.
+
+            tokens
+                The set of terminal symbols (tokens). This may be a list
+                or vector. Any item can be used as a token, but tokens
+                are always compared for equality using the "=="
+                operator, so wherever a particular token occurs (e.g. in
+                a grammar rule) it must always be represented by the
+                identical item. In principle the tokens set should be a
+                true set, containing no duplicates, but this is not
+                checked: subsequent occurrences of the same item are
+                ignored.
+
+            symbols
+                The set of nonterminal symbols. This may be a list or
+                vector. The comments above relating to terminal symbols
+                apply equally to nonterminal symbols, with one extra
+                condition: no item from the tokens set can appear in the
+                symbols set (i.e. no item can be both a terminal and a
+                nonterminal symbol of the same grammar).
+
+            start_symbol
+                The start symbol of the grammar: this must be an item
+                from the symbols set.
+
+            rules
+                The set of productions (grammar rules). This may be a
+                list or vector. A grammar rule is a non-empty list or
+                vector of symbols. The first item in a rule must be a
+                nonterminal symbol and stands for the left-hand-side of
+                the rule; the remaining items make up the
+                right-hand-side of the rule. A rule containing just a
+                single item (the left-hand-side) stands for a null
+                production. A rule cannot contain any item which does
+                not occur in either the tokens or symbols sets.
+
+        The resulting parser is a record structure encoding the  LALR(1)
+        parsing tables  for the  input grammar.  If the  grammar is  not
+        LALR(1) then the  tables will contain  conflicts: the number  of
+        conflicts   can    be    determined    with    the    procedures
+        lr_parser_sr_conflicts and  lr_parser_rr_conflicts.  The  parser
+        also retains  the symbolic  information about  the grammar  from
+        which it was  constructed: the name,  tokens symbols and  rules.
+        These can be recovered using the procedures described below.
+
+        The remaining arguments to lr_build are optional:
+
+            resolve_p
+                A procedure used for resolving conflicts arising from
+                grammars which are not properly LALR(1). It has the call
+                form:
+
+                     resolve_p(ITEM_1, ITEM_2) -> ITEM
+
+                The two arguments represent a single conflict in the
+                parser. For a shift/reduce conflict, ITEM_1 is a
+                terminal symbol standing for the possible shift action
+                and ITEM_2 is a rule standing for the possible
+                reduction; for a reduce/reduce conflict, both items are
+                rules standing for the alternative reductions, ordered
+                such that ITEM_1 always precedes ITEM_2 in the rules
+                set. The result ITEM can be either ITEM_1 or ITEM_2 to
+                indicate a successful resolution of the conflict or else
+                <false> to indicate no resolution. Conflicts
+                successfully resolved are not counted in the parser. For
+                each conflict not resolved, and for every conflict if
+                the resolve_p argument is omitted, a default strategy is
+                applied: in a shift/reduce conflict the shift is chosen,
+                and in a reduce/reduce conflict the rule which occurs
+                first in the rules set is chosen (this is the only case
+                where the order of items in the input is significant).
+                This is functionally equivalent to providing a value of
+                erase for resolve_p, except that conflicts resolved
+                using resolve_p are not counted.
+
+            keep
+                A boolean: if <true> the result parser is added to the
+                lr_parser property keyed under the grammar name. The
+                name can then be used everywhere in place of the parser
+                structure. The default value is <false>.
+
+        The following example constructs the parsing tables for a simple
+        grammar describing expressions in the Lambda calculus.
+
+            uses lr_parser;
+            uses lr_build;
+
+            lr_build(
+                "Lambda",                  ;;; name
+                { VAR \ . ( ) },           ;;; tokens
+                { exp },                   ;;; symbols
+                "exp",                     ;;; start_symbol
+                {{ exp VAR }               ;;; rules
+                 { exp exp exp }
+                 { exp \ VAR . exp }
+                 { exp ( exp ) }},
+                true,                       ;;; keep
+            ) =>
+            ** <parser Lambda>
+
+        This  grammar  is  ambiguous  and  hence  not  LALR(1),  so  the
+        resulting parser  has  conflicts. See  HELP * LR_PARSER  for  an
+        alternative formulation of the grammar.
+
+
+lr_parser_name(parser) -> item                               [procedure]
+lr_parser_terminal_symbols(parser) -> vec                    [procedure]
+lr_parser_nonterminal_symbols(parser) -> vec                 [procedure]
+lr_parser_start_symbol(parser) -> item                       [procedure]
+lr_parser_rules(parser) -> vec                               [procedure]
+        Return the components of the  grammar from which the parser  was
+        built. Note that  the tokens, symbols  and rules components  are
+        always returned as  vectors for faster  indexing, regardless  of
+        the format of the original arguments to lr_build, but the  order
+        of items  within  the vectors  is  identical with  the  original
+        input. For example:
+
+            lr_parser_name("Lambda") =>
+            ** Lambda
+
+            lr_parser_nonterminal_symbols("Lambda") =>
+            ** {exp}
+
+
+lr_parser_sr_conflicts(parser) -> n                          [procedure]
+lr_parser_rr_conflicts(parser) -> n                          [procedure]
+        Return the number of shift/reduce and reduce/reduce conflicts in
+        the parser. A properly  LALR(1) parser will  return 0 for  both.
+        However, conflicts resolved by an explicit RESOLVE_P argument to
+        lr_build are not  counted, so  a parser  may appear  to have  no
+        conflicts even though the grammar was not strictly LALR(1).  For
+        example:
+
+            lr_parser_sr_conflicts("Lambda") =>
+            ** 6
+
+            lr_parser_rr_conflicts("Lambda") =>
+            ** 0
+
+
+lr_strip(parser)                                             [procedure]
+lr_strip(parser, bool)
+        Removes symbolic information from the parser structure. This can
+        considerably reduce  the size  of  the parser,  but  necessarily
+        means that certain features of the library will no longer work.
+
+        By default, the parser is only partially stripped to remove  the
+        rules,  states  and  conflict  information.  This  recovers  the
+        majority of  the  available  space,  but  also  means  that  the
+        following procedures will mishap if applied to the parser:
+
+            # lr_trace
+            # lr_report
+            # lr_state_items
+
+        In addition, the procedures
+
+            # lr_parser_rules
+            # lr_parser_sr_conflicts
+            # lr_parser_rr_conflicts
+
+        will no longer return sensible values.
+
+        If the optional bool argument is given <true> then the parser is
+        fully stripped, which  removes (in  addition to  the above)  the
+        vectors of  terminal and  non-terminal symbols.  This makes  the
+        parser as small as it possibly can be, but also means that  none
+        of the  LR_STATE procedures  can be  expected to  work, and  the
+        procedures
+
+            # lr_parser_terminal_symbols
+            # lr_parser_nonterminal_symbols
+            # lr_parser_start_symbol
+
+        will all return <false>.
+
+
+
+
+---------------------
+4  Running the Parser
+---------------------
+
+LIB * LR_PARSE defines an implementation of the LR(1) parsing  algorithm
+which  interprets  the  PARSER  tables  generated  by lr_build. Load the
+library using:
+
+    uses lr_parse;
+
+
+lr_parse(input_p, reduce_p, parser)                          [procedure]
+        Interprets  the  parser  tables  to  parse  a  stream  of  items
+        generated by  input_p, using  reduce_p to  perform the  semantic
+        actions appropriate to each reduction.
+
+        The input procedure is called each time the parser needs to read
+        an item. It has the call form:
+
+            input_p() -> (ITEM, TOKEN_N)
+
+        where ITEM is  some arbitrary  item, and TOKEN_N  is an  integer
+        number  identifying   to   which  terminal   symbol   the   ITEM
+        corresponds. Terminal symbols are  numbered from 1 according  to
+        their order in the vector
+
+            lr_parser_terminal_symbols(parser)
+
+        A value of  0 is a  special case used  to stand for  the end  of
+        input; any other value is taken to indicate some input error. If
+        the token read leads to a shift action, then ITEM is pushed onto
+        the user stack.
+
+        The reduction  procedure is  called immediately  prior to  every
+        reduce action. It has the call form:
+
+            reduce_p(RULE_N)
+
+        where RULE_N is the  integer number of  the rule being  reduced:
+        rules are numbered from 1 according to their order in the vector
+
+            lr_parser_rules(parser)
+
+        The reduction procedure would typically do a go_on to select  an
+        action appropriate to the rule. There are no restrictions on the
+        actions which can be performed, except that the procedure should
+        be prepared to  take account  of any terminal  symbols from  the
+        right-hand-side of  the rule  which  will have  been  previously
+        shifted  onto   the  user   stack.  If   the  parse   terminates
+        successfully, then  any results  computed by  reduce_p are  left
+        untouched on the stack.
+
+        If the parse fails, either because of an input error or  because
+        the  input  is  not   well-formed,  the  redefinable   procedure
+        lr_parse_error is called.
+
+        The procedure lr_parse is the default class_apply of the  parser
+        structure, allowing a parser to be applied directly:
+
+            parser(input_p, reduce_p)
+
+
+lr_parse_error(item, token_n, state_n)              [procedure variable]
+        Called by lr_parse on a parsing  error. item and token_n are  as
+        returned by the last call to  INPUT_P and state_n is an  integer
+        identifying the current  parsing state. For  an error to  arise,
+        either token_n must be an invalid token number, or else there is
+        no action  for that  token  in the  current state.  The  default
+        behaviour of lr_parse_error is to call
+
+            mishap(item, 1, 'PARSE ERROR')
+
+        but the procedure can  be redefined to  give a more  informative
+        error report.
+
+
+
+
+-----------------------------------
+5  Running the Parser in Trace Mode
+-----------------------------------
+
+LIB * LR_TRACE  defines  an  alternative  implementation  of  the  LR(1)
+parsing algorithm which provides a trace of its actions in a VED buffer,
+useful for debugging. This  library cannot be used  with a parser  which
+has been stripped. Load it using:
+
+    uses lr_trace;
+
+
+lr_trace(input, parser) -> parse_tree                        [procedure]
+lr_trace(input_p, reduce_p, parser)
+        Parses the input according to  the tables encoded in the  parser
+        structure, displaying a trace of its actions.
+
+        The tracer has  two call forms.  In the first  form, input  is a
+        list (possibly dynamic) of items drawn from the parser's  TOKENS
+        set. If the input makes up a sentence of the language which  the
+        parser recognises, then lr_trace returns a parse tree describing
+        its derivation, otherwise it returns <false>. The parse_tree for
+        a successful parse has  the input tokens at  its leaves and  one
+        interior node  for each  reduction which  the parser  performed.
+        These  interior  nodes  are   constructed  by  the   redefinable
+        procedure lr_trace_constree. Its default action is to  construct
+        a list  representing the  rule being  reduced: the  head is  the
+        nonterminal symbol from the left-hand-side of the rule, and  the
+        tail is  a  list  of  sub-trees, one  for  each  symbol  on  the
+        right-hand-side. For example:
+
+            uses lr_trace;
+            lr_trace([ \ VAR . VAR VAR ], "Lambda") =>
+            ** [exp \ VAR . [exp [exp VAR] [exp VAR]]]
+
+        Such a tree can  be displayed graphically  within VED using  the
+        procedure showtree:
+
+            uses showtree;
+            showtree(lr_trace([ \ VAR . VAR VAR ], "Lambda"));
+
+        See HELP * SHOWTREE.
+
+        In its second call form, lr_trace takes two procedure  arguments
+        input_p  and  reduce_p  which  provide  an  input  source  and a
+        reduction procedure  for  the  parser. In  this  mode,  lr_trace
+        simulates the behaviour of lr_parse. This means that the results
+        (if any) returned  by the  parse are  determined exclusively  by
+        reduce_p, and  a parsing  error would  normally cause  a  mishap
+        rather than returning <false>. Refer to the previous section for
+        more details.
+
+        In either case, lr_trace  displays a trace  of its actions  in a
+        VED buffer. The trace output takes the form of a table headed as
+        follows:
+
+             State|          Stack | Input    | Action
+             -----+----------------+----------+-------
+
+        One row is added to  the table for each  step in the parse.  The
+        columns of the table have the following interpretations:
+
+           Column   Meaning
+           ------   -------
+
+            State   the current state
+
+            Stack   the top of the parser's symbol stack: the topmost
+                    item is always at the right-hand end of the field
+
+            Input   the current input item: a blank entry here means
+                    that the parser's choice of action is independent of
+                    the input
+
+            Action  the action chosen for the current state/input
+                    combination
+
+        The  trace  generated  from  the  previous  example  would  look
+        something like the following:
+
+            State|           Stack | Input | Action
+            -----+-----------------+-------+-------
+                1|                 | \     | SHIFT  3
+                3|               \ | VAR   | SHIFT  10
+               10|           \ VAR | .     | SHIFT  11
+               11|         \ VAR . | VAR   | SHIFT  2
+                2|     \ VAR . VAR |       | REDUCE exp --> VAR
+               12|     \ VAR . exp | VAR   | CONFLICT [SHIFT  2]
+                2| \ VAR . exp VAR |       | REDUCE exp --> VAR
+                7| \ VAR . exp exp | $end$ | REDUCE exp --> exp exp
+               12|     \ VAR . exp | $end$ | REDUCE exp --> \ VAR . exp
+                5|             exp | $end$ | SHIFT  6
+                6|       exp $end$ |       | ACCEPT
+
+        The parser always begins in state  1 with nothing on the  stack.
+        The first input item  is the token "\"  which causes a shift  to
+        state 3. The second  row of t he table  thus shows the parser  in
+        state 3, with "\" on the stack. The next three items ("VAR", "."
+        and "VAR") are also shifted: note how items cross from the Input
+        to the Stack field as they are consumed. At row 5 (state 2)  the
+        parser performs a reduction by the rule
+
+            exp --> VAR
+
+        which replaces the  topmost "VAR"  token on the  stack with  the
+        symbol "exp". This is the  default action for state 2  activated
+        for any input item,  hence the empty  Input column. Each  REDUCE
+        action in  the trace  corresponds to  one interior  node in  the
+        resulting parse tree:
+
+            [exp \ VAR .             ;;; REDUCE exp --> \ VAR . exp
+                [exp                 ;;; REDUCE exp --> exp exp
+                    [exp VAR]        ;;; REDUCE exp --> VAR
+                    [exp VAR]]]      ;;; REDUCE exp --> VAR
+
+        Once a parse has run to completion, the last action in the table
+        will either  be  ACCEPT  for  a  successful  outcome,  or  ERROR
+        otherwise.
+
+        Loading the LR_TRACE library also generalises the class_apply of
+        the parser structure to call  lr_trace where possible, but  with
+        the trace output disabled. This allows calls such as:
+
+            lr_parser("Lambda")([ \ VAR . VAR VAR ]) =>
+            ** [exp \ VAR . [exp [exp VAR] [exp VAR]]]
+
+            lr_parser("Lambda")([ \ VAR VAR VAR ]) =>
+            ** <false>
+
+
+lr_trace_tracing -> bool                                      [variable]
+bool -> lr_trace_tracing
+        Determines whether lr_trace should produce any trace output. The
+        default value is <true>; setting it <false> means that  lr_trace
+        will still parse but without tracing.
+
+
+lr_trace_file -> string                                       [variable]
+string -> lr_trace_file
+        Name of  the file  to which  trace output  should be  sent:  the
+        default is 'lr_trace'.
+
+
+lr_trace_file_writeable -> bool                               [variable]
+bool -> lr_trace_file_writeable
+        Controls whether the trace output file should be writeable:  the
+        default value is <false>.
+
+
+lr_trace_state_width -> n                                     [variable]
+n -> lr_trace_state_width
+lr_trace_stack_width -> n                                     [variable]
+n -> lr_trace_stack_width
+lr_trace_input_width -> n                                     [variable]
+n -> lr_trace_input_width
+        Determine the sizes of the  fields in the trace output  diagram:
+        lr_trace_state_width is the number of columns used for the State
+        field, lr_trace_stack_width is  the number of  columns used  for
+        the Stack  field  and  lr_trace_input_width  is  the  number  of
+        columns used for the Input  field. The default value is  <false>
+        for each,  meaning that  the  sizes are  determined  dynamically
+        depending on the width of the  trace output file: the wider  the
+        window, the more  informative the output.  Setting any of  these
+        variables to 0 or less means that the corresponding field is not
+        shown in the trace  output. The Action  field always extends  as
+        far to the right as necessary and cannot be suppressed.
+
+
+lr_trace_constree(symbol, n) -> tree                [procedure variable]
+        Used for constructing interior nodes in the parse tree built  by
+        lr_trace.  Called  once  for  each  reduction,  symbol  is   the
+        left-hand-side symbol of  the rule  being reduced and  n is  the
+        number of symbols on the right-hand-side. The default definition
+        is:
+
+            define vars lr_trace_constree(symbol, n) -> tree;
+                lvars symbol, n, tree = conslist(n);
+                symbol :: tree -> tree;
+            enddefine;
+
+        If redefined,  the procedure  should consume  n items  from  the
+        stack and return  some object representing  the parse tree.  For
+        example, the  procedure  prolog_maketerm  would  be  a  suitable
+        alternative value, using Prolog terms to represent trees.
+
+
+
+
+------------------------------
+6  Saving the Parser to a File
+------------------------------
+
+LIB * LR_OUTPUT writes  a  program  to  regenerate  a  parser  structure
+without using the LR_BUILD library. Load using:
+
+    uses lr_output;
+
+
+lr_output(decl_list, word, parser, output)                   [procedure]
+        Writes to the given output  a Pop-11 program to reconstruct  the
+        parser structure  and bind  it to  word. decl_list  provides  an
+        appropriate declaration for word. The resulting program can only
+        be  loaded  after  the  LR_PARSER  library,  but  is   otherwise
+        self-contained; in  particular, it  does not  need the  LR_BUILD
+        library.
+
+        output can  be  any valid  output  destination: a  file  name, a
+        character consumer or  an output  device. A named  file will  be
+        opened afresh using discout; if the name is a word, it will have
+        the extension '.p' appended automatically.
+
+        The resulting program has the form:
+
+            <declaration> word = <parser> ;
+
+        where <declaration> is generated from the argument decl_list  by
+        the call:
+
+            applist(decl_list, spr);
+
+        It is expected that decl_list should be some meaningful list  of
+        declaration  syntax   words  (such   as  "global",   "constant",
+        "lconstant" etc.) but this is not checked. If decl_list is  nil,
+        then a default declaration of "vars" is assumed.
+
+        For example, the sequence:
+
+            uses lr_output;
+            lr_output([global vars], "lambdaParser", "Lambda", "Lambda")
+
+        creates a  file  called  'Lambda.p' in  the  current  directory,
+        containing a program of the form:
+
+            global vars lambdaParser = <expression> ;
+
+        where <expression> recreates the  Lambda parser without the  use
+        of the LR_BUILD library.
+
+        The full symbolic information in the parser is too complex to be
+        written out reliably, so  is ignored. This  means that a  parser
+        recreated from a program generated  by lr_output will always  be
+        at least partially stripped (regardless of whether the  original
+        was stripped or  not) and  so cannot  be used  for tracing  (see
+        lr_strip above).
+
+        The program does preserve the parser's terminal and non-terminal
+        symbols if these  are present  in the original.  This in  itself
+        poses a problem, in that  symbols can in principal be  arbitrary
+        items which may not have a suitable printing representation. For
+        this reason, the symbols are  written out using the  redefinable
+        procedure lr_output_pr which must be defined in such a way  that
+        its output can be read back in successfully by the compiler.
+
+
+lr_output_pr(item)                                  [procedure variable]
+        Writes an expression to the current output which would  recreate
+        item if compiled by  the Pop-11 compiler.  Used by lr_output  to
+        write out a parser's terminal and nonterminal symbols which  can
+        be arbitrary items.  The generated expressions  are enclosed  in
+        evaluating vector brackets:
+
+            {% ... %}
+
+        separated by commas, and must be evaluable in that context.
+
+        The default version of this procedure handles words, strings and
+        integral numbers.  It should  be redefined  for symbols  of  any
+        other type. The procedure  is always called  in a context  where
+        pop_pr_quotes has  the  value  <false>  and  pr  has  the  value
+        sys_syspr.
+
+
+
+
+-------------------------
+7  The Parser Report File
+-------------------------
+
+LIB * LR_REPORT generates a written  description of the parsing  tables.
+This is essential for understanding conflicts in a parser, and can  also
+be useful when planning error reporting. Information from the report can
+also be determined dynamically using the procedures from  LIB * LR_STATE
+(see below). This library  cannot be used with  a parser which has  been
+stripped.  Load the library with:
+
+    uses lr_report;
+
+
+lr_report(parser, output)                                    [procedure]
+        Writes a summary report on  the parser to the specified  output.
+        The output can be any  valid output destination: a file  name, a
+        character consumer or an output device. A file name can be given
+        as a word  or a string;  on VMS  systems, a word  will have  the
+        extension  '.lis'  appended  automatically.  For  all  but   the
+        smallest of grammars,  the report can  get very large  -- up  to
+        thousands of lines -- so it's generally best to send the  report
+        to a file rather than to the screen.
+
+        The layout of the report is best described with reference to  an
+        example. If you  have compiled the  "Lambda" example above,  you
+        can generate the report for the parser by doing:
+
+            uses lr_report;
+            lr_report("Lambda", 'report');
+
+        The report starts with a brief header which includes the  parser
+        name, the number of states and the number of conflicts. For  the
+        Lambda parser, this looks like:
+
+            Parser Lambda
+            12 states
+            6 shift/reduce conflicts
+            0 reduce/reduce conflicts
+
+        The remainder of the file is taken up with a description of each
+        of the  parser states.  State  number 12  of the  Lambda  parser
+        demonstrates most of the relevant features: you can view this by
+        doing
+
+            <ENTER> pved report
+            <ENTER> /@aState 12/
+
+        The state description is in three parts:
+
+            1)  the set of LR(0) items from which the state was
+                constructed
+
+            2)  the action table
+
+            3)  the goto table
+
+        For Lambda state 12, these appear as follows:
+
+            1)  The LR(0) items
+
+                    [2] exp --> exp <.> exp
+                    [3] exp --> \ VAR . exp <.>
+
+                There are two items, generated from production numbers 2
+                and 3.  These numbers  cross-reference with  the  reduce
+                actions in  the action  table.  The special  symbol  <.>
+                indicates the "dot" position within each item.
+
+            2) The action table
+
+                    ! VAR shift 2
+                    ! VAR reduce 3
+                    ! \ shift 3
+                    ! \ reduce 3
+                    ! ( shift 4
+                    ! ( reduce 3
+                        $default$ reduce 3
+
+                This lists the tokens which  are valid in the state  and
+                shows the action associated with each: an action
+
+                    shift <N>
+
+                means a shift to state <N> and
+
+                    reduce <N>
+
+                means a reduction by rule  <N>. For each reduction,  the
+                associated rule must appear in the item set with the dot
+                at the right-hand end. The special token "$default$"  is
+                a default action to  be taken for  any token not  listed
+                explicitly: this  will always  be a  reduction. Not  all
+                states have a default action in which case any token not
+                listed will cause a parsing error. The `!` character  in
+                the first column of the table indicates a conflict, i.e,
+                where the associated  token has more  than one  possible
+                action in the state (in  this particular state, all  the
+                valid tokens have conflicts).  You can locate  conflicts
+                within VED by doing
+
+                    <ENTER> /@a!
+
+                The table  is  organised  such  that  the  first  action
+                associated with any  token is  the one  the parser  will
+                choose.
+
+            3) The goto table
+
+                    exp goto 7
+
+                This lists the  nonterminal symbols which  are valid  in
+                the state and  their associated  goto transitions.  Some
+                states may have  no goto  transitions, and  there is  no
+                concept of a default transition.
+
+        A final point to  note from the report  is that lr_build  always
+        adds an additional rule to the grammar RULES set of the form:
+
+            $begin$ --> START_SYMBOL $end$
+
+        where "$begin$" and  "$end$" are  special tokens.  This rule  is
+        assigned number [0]; the state constructed from the item
+
+            [0] $begin$ --> START_SYMBOL $end$ <.>
+
+        is the terminal state of the parser.
+
+
+
+
+----------------------------------
+8  Investigating the Parser States
+----------------------------------
+
+LIB * LR_STATE makes available from procedure calls all the  information
+in the parser report file. This  is useful for presenting the report  in
+an  alternative  way  (e.g.  with  a  graphical  display)  or  else  for
+dynamically generating error reports. This library cannot be used with a
+parser which has been stripped. Load with:
+
+    uses lr_state;
+
+
+lr_state_max(parser) -> n                                    [procedure]
+        Returns the largest  valid state number  for the parser.  States
+        are numbered sequentially from 1, so this is also the number  of
+        states within the parser.
+
+
+lr_state_tokens(n, parser) -> (token_list, default)          [procedure]
+        Returns a list of  tokens for which  there are explicit  actions
+        defined in state n of the parser. The boolean default is  <true>
+        if there is also a default  action in this state, implying  that
+        any token  is  valid in  the  state,  but that  all  tokens  not
+        occurring  explicitly  in  the  token_list  share  some  common,
+        default action: this will always  be a reduction. If default  is
+        <false> then  there is  no default  action: only  the tokens  in
+        token_list are valid in  this state, and  any other token  would
+        cause an error.  It follows that  in an error  state (e.g.  in a
+        call to lr_parse_error) default will always be <false>.
+
+        The special value lr_state_end_token  is included in  token_list
+        if the end-of-input marker ("$end$") is valid in state n.
+
+
+lr_state_actions(token, n, parser) -> (shift, reductions)    [procedure]
+        Returns the ACTION table entry (or entries) for a token in state
+        n of the parser: in a  properly LALR(1) parser there will  never
+        be more than one action for any token, but there may be multiple
+        actions in the presence  of conflicts. The  result shift is  the
+        next state  number  if token  has  a shift  action,  or  <false>
+        otherwise. reductions is a  list of the  rule numbers for  which
+        token has reduce  actions. A  rule number  of 0  stands for  the
+        ACCEPT action,  indicating that  state n  must be  the  terminal
+        state of the parser.
+
+        In a  parser which  has been  partially stripped,  all  conflict
+        information will have been removed, so this procedure will never
+        return more than one action.
+
+
+lr_state_shift(token, n, parser) -> shift                    [procedure]
+        Returns the shift result returned by lr_state_actions.
+
+
+lr_state_reduce(token, n, parser) -> reduction               [procedure]
+        Returns the  first  rule  number from  the  list  of  REDUCTIONS
+        returned by lr_state_actions, or <false> if the list is empty.
+
+
+lr_state_end_token -> item                                    [variable]
+item -> lr_state_end_token
+        Special value used  to stand for  the end-of-input marker  (i.e.
+        the "$end$"  symbol  from  the  report  file).  The  default  is
+        <termin>.
+
+
+lr_state_symbols(n, parser) -> symbol_list                   [procedure]
+        Returns a list of  the nonterminal symbols  for which there  are
+        GOTO table entries  in state n  of the parser.  The list may  be
+        empty.
+
+
+lr_state_goto(symbol, n, parser) -> m                        [procedure]
+        Returns the GOTO table entry for a nonterminal symbol in state n
+        of the parser: this will be the next state number or <false> for
+        a blank entry.
+
+
+lr_state_items(n, parser) -> list                            [procedure]
+        Returns a list of the LR(0) items from which the parser  state n
+        was constructed. An item is  represented by a pair of  integers:
+        the front of the pair  is the item rule  number and the back  of
+        the pair is the "dot" position within the rule. The dot position
+        is an index into the rule  with the interpretation that the  dot
+        occurs after the indexed symbol. Because the first symbol of the
+        rule is always  the left-hand-side symbol,  a dot position  of 1
+        implies that the  dot is  at the start  of the  right-hand-side,
+        while a dot  position equal to  the length of  the rule  implies
+        that the dot is at the end.
+
+        For example:
+
+            uses lr_state;
+            lr_state_items(12, "Lambda") =>
+            ** [[2|2] [3|5]]
+
+        This result  corresponds to  the extract  from the  report  file
+        shown above:
+
+            [2] exp --> exp <.> exp
+            [3] exp --> \ VAR . exp <.>
+
+        This procedure will mishap if the parser has been even partially
+        stripped.
+
+
+
+--- C.all/ref/lr_parser
+--- Copyright University of Sussex 1992. All rights reserved.

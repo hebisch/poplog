@@ -1,0 +1,840 @@
+REF SHADOWCLASS                                     R.Evans January 1991
+
+       COPYRIGHT University of Sussex 1991. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<      SHADOWCLASS DATA       >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<         STRUCTURES          >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+LIB * SHADOWCLASS and the underlying  LIB * SHADOWKEY provide a  utility
+designed  to  bridge  the  gap   between  ordinary  Poplog  record   and
+vectorclasses and external class  specifications as used by  * defexacc.
+They allow  the creation  of data  structures which  are  simultaneously
+well-behaved   Poplog   records   (with   proper   Poplog   objects   as
+sub-structures etc.) and flexible  external C-struct-like records,  with
+embedded structs, fixed and variable length arrays (including arrays  of
+structs), etc.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+
+  2   Shadowclass data structures
+
+  3   Shadowclass attributes
+
+  4   LIB SHADOWKEY
+
+  5   LIB SHADOWCLASS
+
+  6   Examples
+
+
+
+---------------
+1  Introduction
+---------------
+
+Ordinary Poplog record and vectorclass definitions provide a wide  range
+of field types allowing many of the struct definitions used by  external
+languages to  be modelled  directly. Furthermore,  use of  fixed-address
+structures allows  complex structures  which contain  pointers to  other
+structures to be constructed in  a manner compatible with most  external
+requirements. However, there remain number of deficiencies in the use of
+Poplog data structures in this way:
+
+    #   Poplog does not allow  'embedded' substructures in a  structure.
+        Substructures are  always POINTERS  to objects  rather than  the
+        fields themselves  'exploded'  into  the  parent  structure.  In
+        languages such  as C,  embedded  substructures are  common:  for
+        example subrecords  (or  fixed-length  arrays)  within  records,
+        arrays   of   subrecords    (or   fixed-length   arrays),    and
+        variable-length arrays  as final  fields in  a record  structure
+        (giving variable length records).
+
+    #   Poplog does not allow  mixed record/vector structures -  records
+        whose final field is a variable-length vector.
+
+    #   It  is  not  particularly  easy  to  build  fixed-address   data
+        structures: standard  constructor  procedures and  syntax  words
+        produce non-fixed structures.
+
+    #   The Poplog and external forms  of the substructure data are  not
+        always the  same, which  can  lead to  bookkeeping  difficulties
+        about retaining references to  the Poplog version. For  example,
+        if an external class object is assigned into an :exptr field  of
+        a structure,  only  the  external_ptr field  is  copied  in.  In
+        particular the parent structure does not maintain a reference to
+        the external  class  object,  so  it  may  inadvertently  become
+        garbage, even though the parent structure is still dependent  on
+        it.
+
+The shadowclass facilities provide  support to overcome these  problems.
+They allow  the  creation  of  fixed-address  external  data  structures
+(external-class Poplog  records  - see  REF * EXTERNAL_DATA)  which  are
+'shadowed' by Poplog records  that retain references  to all the  Poplog
+objects associated  with  the  field contents,  and  they  automatically
+coerce between Poplog and external forms.
+
+
+
+
+------------------------------
+2  Shadowclass data structures
+------------------------------
+
+Like other Poplog dataclass  types, shadowclasses are defined  primarily
+by typespecs.  However  shadowclasses allow  almost  the full  range  of
+typespecs, including  embedded structs,  array fields,  variable  length
+arrays as final fields. In fact, the only restrictions on typespecs  (as
+defined in REF * DEFSTRUCT,  including the  'external data'  facilities)
+are:
+
+    #   procedure specifications are not permitted
+
+    #   'Poplog' vector specifications,  consisting of a simple typespec
+        are not  permitted:  use the  'external' array notation  (:int[]
+        etc) instead.
+
+Such typespecs generally include  specifications for coercion of  values
+between Poplog representation and  external representation (basic  field
+specs, 'implicit  access' and  conversion procedures  etc.). Taken  as a
+whole, a  typespec without  embedded struct  fields provides  a  mapping
+between a  sequence of  Poplog  data items,  and  a formatted  block  of
+external memory,  mediated  by  the value  coercion  specifications.  An
+embedded struct in a typespec corresponds itself to a mapping  between a
+sequence of  Poplog items  and a  subportion of  the block  of  external
+memory. Representing the  sequences of  Poplog items  with vectors,  the
+general picture then is of a mapping between a tree structure of  Poplog
+items - a vector  of 'top-level' fields, with  values for simple  fields
+and subvectors  for embedded  struct  fields -  and  a single  block  of
+formatted external memory. It is  this mapping that shadowclass  records
+represent.
+
+When a shadowclass record is created, a fixed-address area of memory  is
+allocated to hold the external form of the data. Furthermore the  record
+is an  external-class record  whose external_ptr  field points  to  this
+block of memory, so that the record can be used directly as an  external
+instance  of   the  typespec   in   external  procedure   calls,   exacc
+constructions etc.. Thus the record can be treated as though it were  an
+external struct.  In addition,  however, the  tree structure  of  Poplog
+items  is  created  and  used  to  maintain  references  to  the  Poplog
+correlates of the  external data fields.  This allows the  record to  be
+viewed much like an ordinary Poplog  data class - assigning Poplog  data
+items into  fields and  retrieving  them (preserving  strict  identity),
+correct  garbage  collector  behaviour  etc..  So  the  record  can   be
+conveniently viewed as an 'ordinary' Poplog data structure too.
+
+Shadowclass   fields   are   generally   accessed   via   their   Poplog
+representations. If you update  a field, you supply  the Poplog form  of
+that field,  and  the update  procedure  runs the  appropriate  typespec
+converters to update the external representation. If you access a  field
+then by default you  are simply returned  the Poplog representation  (on
+the basis that the  two representations are  by default consistent  with
+each other, and so checking the external form is just a waste of  time).
+However it may well happen that  the external form has been updated  (eg
+by external code), so  that the Poplog  representation is incorrect.  In
+such cases, special 'refreshing' accessors can be used, which coerce the
+external  form  back  into   a  Poplog  form   and  then  return   that.
+Alternatively the entire  structure can be  refreshed from its  external
+form if desired.
+
+A  further  important  feature  of  shadowclasses  is  the  ability   to
+manipulate  embedded  struct  fields  without  creating  spurious   data
+structures. If you access a field which is actually an embedded  struct,
+the shadowclass  routines  (by  default)  create  an  instance  of  that
+embedded struct (which is a COPY,  ie the fields of the embedded  struct
+are copied  into  the  freestanding instance)  and  return  that  (often
+another shadowclass instance). Similarly, on update, an instance of  the
+struct is expected, and  its contents are copied  into the main  struct.
+However this often generates unwanted data structures, especially  since
+'dest' and 'cons' are treated  as though they were access/assignment  to
+all the fields - constructing an array of substructs, for example, would
+involve creating  instances  of all  the  substructs to  initialise  the
+struct, and then probably throwing them all away.
+
+To overcome this, shadowclass allows an alternative format for the  data
+supplied and returned  for its  fields. As well  as this  'constructive'
+format, where substructs are  presented as real  struct records of  some
+sort, it is possible to create 'non-constructive' versions of the access
+procedures. These expect their field  data to be 'recursively  exploded'
+on the stack. That is, they expect all the lowest level simple fields of
+the struct to be presented  (in the right order),  and they fill in  the
+Poplog vector-tree representation and  the external representation  from
+them. Similarly, they  return fields  in exactly the  same format.  This
+allows  fields  to  be  manipulated  without  creating  any  superfluous
+structures.
+
+Note that when  using the non-constructive  format, any variable  length
+structure will have a final  count argument supplied. This count  should
+be the size of the array constituting the variable length field (NOT the
+number of stacked items used to construct it, which may be larger if  it
+consists of recursively exploded embedded structs).
+
+Finally, shadowclass allows the  specification of a record-props  value.
+That  is,  a  value   can  be  specified  which   is  assigned  to   the
+'external_ptr_props' field of every instance of the shadowclass when  it
+is created. This  is used, for  example, by the  X Toolkit libraries  to
+specify props  for  shadowclasses which  conform  with the  'weak'  type
+checking used by the Toolkit interface (see REF * XptDescriptor).
+
+
+
+
+-------------------------
+3  Shadowclass attributes
+-------------------------
+
+consshadowkey and shadowclass both accept lists of attributes which  are
+used to specify the detail of their behaviour. These are ordinary  Pop11
+lists consisting of attribute specifications. Attributes names are words
+and fall into two  groups, those which take  no argument ("fast",  "nc",
+"refresh") and  those which  take an  argment ("props",  "typespec"  and
+"prefix"). Commas between attributes (but  not between an attribute  and
+its argument)  are required  (currently there  are no  checks for  their
+presence, but there may be  in future releases). Attribute testing  uses
+simple list membership - the absence  of an attribute selects a  default
+value, and the presence of superfluous attributes is ignored.
+
+consshadowkey uses  its  attribute list  for  the specification  of  the
+shadowclass instance  props  (using  the  "props"  attribute),  and  for
+specification of  "fast", "nc"  and  "refresh" attributes  for  accessor
+procedures. shadowclass  uses in  addition the  "prefix" and  "typespec"
+attributes for controlling  the names  of variables  initialised by  the
+declaration. shadowclass  allows  multiple  attribute  lists,  each  one
+specifying a combination of parameters  for the class access  procedures
+to be  created. (This  generally only  makes sense  if each  list  has a
+different "prefix" attribute,  otherwise variable assignments  requested
+by later attribute lists simply override those requested by the  earlier
+ones.)
+
+    fast
+        This attribute  controls whether  the procedures  created  check
+        their arguments. If present, access procedures do no checks.  If
+        absent, access  procedures will  check for  an instance  of  the
+        right shadowclass, and subscripters will check the subscript  is
+        in range.
+
+    nc
+        This attribute controls the format of the embedded  substructure
+        data expected and returned by the relevant access procedures. If
+        "nc" is  specified, accessors  are 'non-constructive',  that  is
+        they do not  expect or  create new Poplog  data structures  when
+        embedded structs are  accessed. Instead  they expect/return  the
+        fields of the substructure recursively exploded on the stack. If
+        "nc" is not specified, access procedures expect/return instances
+        of the substructure  as discussed above  (note: these  instances
+        are COPIES of  the substructure  data, not  pointers 'into'  the
+        parent structure).
+
+    refresh
+        This  attribute controls whether accessors 'refresh' the  Poplog
+        representation from the value of  the external one. The  default
+        is not to  refresh, ie to  assume that the  Poplog and  external
+        representations are  consistent with  each other.  A  refreshing
+        subscripter will update the Poplog  value from the external  one
+        before returning it.  (Note: there is  also a refresh  procedure
+        which automatically  refreshes  the entire  structure  from  its
+        external representation).
+
+    props <data>
+        This attribute  specifies  a  value  for  th PROPS argument for
+        consshadowkey,  that  is  a  value  to  be  assigned  to   the
+        'external_ptr_props' of  instances  when they  are  created.  If
+        absent,  the   props  of   instances  will   be  false.   (NOTE:
+        shadowclass  passes  the  FIRST  attribute  list  supplied  to
+        consshadowkey, so  only a  props specification  in this  first
+        list will have any effect.)
+
+    prefix <word>
+        This attribute,  used by  shadowclass only, specifies a prefix
+        to   be  attached   to   the  identifiers   created   by
+        shadowclass which  respect  this attribute  list.  (See  final
+        section of 'LIB  SHADOWCLASS' below  for a  list of  identifiers
+        affected). This allows multiple attribute lists to be  specified
+        (creating multiple sets of procedures), without name clashes. If
+        no prefix  is specified,  no  prefix is  attached to  the  names
+        listed below.
+
+    typespec <word>
+        This  attribute,  used  by  shadowclass  only,  specifies  a
+        typespec name which  is initialised to  the given spec.  Without
+        it, shadowclass  does  not  create any  new  types.  Thus  for
+        instance the following declaration:
+
+            shadowclass fooptr [typespec foo] {a:int, b:int};
+
+        is equivalent to:
+
+            p_typespec foo {a:int, b:int};
+            shadowclass fooptr {:foo};
+
+        Notice here  that  shadowclass, like  exacc,  etc.,  effectively
+        ignores {...} brackets around single unnamed fields.
+
+
+
+
+----------------
+4  LIB SHADOWKEY
+----------------
+
+LIB * SHADOWKEY  provides  the   procedural  interface  to   shadowclass
+construction  and  is  used  by  the  more  convenient  syntactic  form,
+LIB * SHADOWCLASS  (described   below).  The   principal  procedure   is
+consshadowkey,  which  creates  a  new  shadowkey  record.   Shadowclass
+management routines (create, destroy, access etc.) can then be  obtained
+from the key using the routines shadowclass_cons, shadowclass_dest etc..
+This mechanism is designed by analogy  with system keys and their  class
+procedures (class_cons, class_dest etc. - see REF * KEYS). Note  however
+that unlike  keys, shadowkeys  are just  ordinary user  records with  no
+special system status.
+
+
+consshadowkey(name,spec,props) -> shkey                      [procedure]
+        This procedure  creates a  new  shadowkey record,  shkey,  which
+        determines  a  new  shadowclass.  name  is  a  word  giving  the
+        shadowclass a  name (used  for printing  class instances  etc.).
+        spec is a valid data specification, subject to the  restrictions
+        discussed below. props is either an attribute list (as described
+        above) or an  arbitrary non-list Poplog  item. It specifies  the
+        contents of the 'external_ptr_props'  field of new instances  of
+        the class. In the attribute list case, the 'props' attribute (or
+        <false> if  there is  no 'props'  attribute) is  used for  these
+        instance props, otherwise props itself is used.
+
+
+Shadowkey records should be treated  as opaque objects with no  directly
+accessible internal structure. Their primary use is as arguments to  the
+following routines which return the class-specific management routines.
+
+
+shadowclass_recognise(shkey) -> proc                         [procedure]
+        This  procedure   returns  a   recogniser  procedure   for   the
+        shadowclass represented by shkey. That  is, proc is a  procedure
+        which takes  a single  argument and  returns <true>  or  <false>
+        according to whether  that argument  is an  instance of  shkey's
+        shadowclass.
+
+
+shadowclass_cons(shkey,flags) -> proc                        [procedure]
+        This procedure returns a constructor procedure for instances  of
+        the shadowclass represented by shkey. flags is an attribute list
+        which specifies what kind  of constructor procedure is  required
+        (see above). The arguments expected  by proc depend on the  spec
+        of the shadowclass and the data format information contained  in
+        flags  (see  'Attribute  Lists'  above),  and  proc  returns  an
+        instance of shkey as its result. The 'external_ptr_props'  field
+        of the instance created will be set to the value passed as third
+        argument to consshadowkey
+
+
+shadowclass_init(shkey) -> proc                              [procedure]
+        This procedure returns an initialiser procedure for instances of
+        the shadowclass represented by shkey. proc expects no  arguments
+        for a  fixed-length  shadowclass,  and a  single  integer  for a
+        variable  length  shadowclass  (the   length  of  the   variable
+        component). It returns  an instance  of shkey  with full  fields
+        initialised to undef  and :exptr  fields initialised  to a  null
+        external pointer. All  other fields are  initialised by  setting
+        their external  representation  to  zero and  then  setting  the
+        Poplog representation by accessing  the external data using  the
+        typespec for the  field. The 'external_ptr_props'  field of  the
+        instance created  will  be set  to  the value  passed  as  third
+        argument to consshadowkey
+
+
+shadowclass_dest(shkey,flags) -> proc                        [procedure]
+        This procedure returns a  destructor procedure for instances  of
+        the shadowclass represented by  shkey. proc expects an  instance
+        shkey  as  its  single   argument  and  returns  the   component
+        substructures in a format specified  by the flags argument  (see
+        'Attribute Lists' above).
+
+
+shadowclass_fill(shkey,flags) -> proc                        [procedure]
+        This procedure returns  a fill  procedure for  instances of  the
+        shadowclass represented  by  shkey.  proc  expects  an  instance
+        shkey, plus arguments  for constructing  a new  instance in  the
+        format specified by  the flags argument  (see 'Attribute  Lists'
+        above), and updates  the entire shkey  instance with the  values
+        given. It returns the shkey instance.
+
+
+shadowclass_refresh(shkey) -> proc                           [procedure]
+        This procedure returns a refresh procedure for instances of  the
+        shadowclass represented  by  shkey.  proc  expects  an  instance
+        shkey,  which  it  returns,  after  refreshing  the   'internal'
+        representation from the 'external' one (see above).
+
+
+shadowclass_import(shkey) -> proc                            [procedure]
+        This procedure returns an import procedure for instances of  the
+        shadowclass represented by shkey.
+
+        proc expects an external  pointer to an external  representation
+        of the  shkey  shadowclass.  In  the  case  of  variable  length
+        structures the external pointer should be followed by a  length.
+        proc returns an  instance of  the shadowclass  shkey which  will
+        refer to the external representation pointed to by the  external
+        pointer passed to the procedure.
+
+        If the import procedure is called with an external pointer  that
+        has already been imported with proc then the previously imported
+        shadowclass is returned, with its internal field's refreshed  by
+        its   shadowclass_refresh   procedure.   For   variable   length
+        structures  this  only  applys  when  the  previously   imported
+        structure has the same length.
+
+
+shadowclass_subscr(shkey,flags) -> proc                      [procedure]
+        This procedure returns a subscripter procedure for instances  of
+        the shadowclass represented by  shkey. proc expects an  instance
+        of shkey and an  index and returns/updates  that element of  the
+        instance.  The  format  of  the  substructure  returned/expected
+        depends on  the flags  argument (see  'Attribute Lists'  above).
+        NOTE: subscripter procedures currently work for both vector  and
+        record-type structures. However this should not be relied  upon:
+        a future version  of this library  may not support  subscripting
+        into record structures.
+
+
+shadowclass_field(fnum,shkey,flags) -> proc                  [procedure]
+        This procedure returns a field-access procedure for instances of
+        the shadowclass represented by  shkey. proc expects an  instance
+        of shkey and an index  and returns/updates the fnum'th field  of
+        that instance. The format of the substructure  returned/expected
+        depends on the flags argument (see 'Attribute Lists' above).
+
+
+Additional identifiers defined by LIB * SHADOWKEY:
+
+
+shadow_construct -> property                         [constant property]
+        To support the  'constructive' accessors  for embedded  structs,
+        the shadowclass libraries  include a mapping,  shadow_construct,
+        which they use to decide what structure to return/expect for  an
+        embedded struct field. This is a property mapping from  typespec
+        data   structures   to   procedures   for   converting   between
+        non-constructive and constructive formats. The base procedure is
+        a destructor - given an  instance of the substruct structure  it
+        recursively explodes  it  into  its  fields.  The  updater  is a
+        constructor, given the recursively exploded fields it creates an
+        instance. This property is maintained by consshadowkey, so  that
+        every typespec used in a shadowclass will be recognised if  used
+        as a substruct in another shadowclass definition (regardless  of
+        whether a named  type is  created for it,  using the  "typespec"
+        attribute). In addition  it is publically  available and can  be
+        augmented by the user to provide sensible constructive behaviour
+        for non-shadowclass data. Note that look-up uses == on the  spec
+        structure occurring in the parent structure, so two = specs  can
+        have different constructive behaviour, but two instances of  the
+        same NAMED typespec will  have the same constructive  behaviour.
+        Also if no construct procedure is  found for a spec accessed  as
+        an embedded struct, a simple 'vector of Poplog items' format  is
+        returned/expected.
+
+
+shadow_length(shrec) -> len                                  [procedure]
+        This procedure takes  an instance of  a shadowclass and  returns
+        its length, that  is, the  number of  'top-level' components  it
+        has. The  top-level components  are  the immediate  fields  of a
+        record  structure  and  the  individual  elements  of  an  array
+        structure. Embedded arrays count as single top-level fields.
+
+
+shadow_=(item_1, item_2) -> bool                             [procedure]
+        Returns true  if item_1  and item_2  are two  equal  shadowclass
+        records, false  otherwise. For  two  shadowclass records  to  be
+        equal they must  have the  same props, the  same shadowkey,  and
+        have the  same  Pop11/external  representations.  The  procedure
+        -shadow_=- is the  -class_=- procedure  of shadowclass  records.
+        This means that:
+
+            (shadow_=(foo,baz))
+
+        is the same as
+
+            (foo = baz)
+
+        NOTE: when two shadowclass records are equal, it means they have
+        the same content, NOT the same address. For example:
+
+            shadowclass int_ptr { :int };
+
+            (consint_ptr(1) = consint_ptr(1)) =>
+            ** <true>
+
+        This is because both shadowclass  records have the same  content
+        (ie, the integer 1). But:
+
+            (consint_ptr(1) == consint_ptr(1)) =>
+            ** <false>
+
+        This is because the two records have different addresses.
+
+
+isshadow(item) -> bool                                       [procedure]
+        Returns true if item is a shadowclass record, false otherwise.
+
+
+
+
+------------------
+5  LIB SHADOWCLASS
+------------------
+
+shadowclass                                                     [syntax]
+        Used to construct new shadowclasses. It uses consshadowkey  (see
+        above) to create a new  shadowkey structure for the  shadowclass
+        being  defined,  and  then  assigns  to  identifiers  both   the
+        shadowkey itself  and some  of the  'shadowclass' procedures  it
+        contains, as specified by the <attributes> field.
+
+        The construct has the form
+
+           shadowclass <declaration> <name> <attributes> <typespec> ;
+
+        with the following parts:
+
+        <declaration>
+            Specifies the declaration for the identifiers to receive the
+            key and the procedures, and is identical in all respects  to
+            the  declaration  in  a  define  header,  including  default
+            declarations  when  omitted.  (Except  that  dlocal  is  NOT
+            allowed, and if "procedure" identprops are specified  either
+            explicitly or by default, this applies only to the procedure
+            identifiers, not to the key identifier.)
+
+        <name>
+            The name of the new class (a word).
+
+        <attributes>
+            This is  optional; if  present it  is one  or more  (square)
+            bracketed  lists  of  attributes  for  the  shadowclass  and
+            associated procedures. Permissible attributes are  described
+            in 'Attribute Lists' above. The default value is []  causing
+            'ordinary' checking accessors to be declared and created.
+
+            Multiple attribute lists can be used to specify the creation
+            of  several   groups   of  procedures   (eg   checking   and
+            non-checking versions), in one call of shadowclass.
+
+            NOTE: Attribute lists are read  using listread, so '^',  '%'
+            etc. are not interpreted. However an attribute list can also
+            be a literal list in proglist, allowing constructs such as
+
+                shadowclass foo #_< [props ^myprops] >_# ...
+
+        <typespec>
+            A <typespec>  as described  above. If  this is  a  structure
+            (i.e. {...}  ) it  specifies a  record class,  otherwise  it
+            should be an  array spec  (eg :int[]  - NOTE:  the use  of a
+            'bare' typespec to denote an array is not permitted).
+
+            This <typespec>  part is  also  optional. When  present,  it
+            triggers the  creation  of  a new  shadowclass,  that  is, a
+            shadowkey  record   and  associated   class  procedures   as
+            discussed  below.  If  omitted,   and  there  is   already a
+            shadowclass associated with  <name> (at compile-time),  this
+            declaration can  be used  to create  access procedures  with
+            different attributes. For example, the following will create
+            checking versions of the access procedures a and b:
+
+                shadowclass foo {a:full, b:full};
+
+            Subsequently this:
+
+                shadowclass foo [nc, prefix nc_];
+
+            will  create   non-constructive   versions  for   the   same
+            shadowclass. (Note the  specification of  the prefix  "nc_".
+            Without  this,  the  non-constructive  procedures  would  be
+            assigned  as  REDEFINITIONS  of  the  variables  a  and  b.)
+            Alternatively these two operations can be combined into:
+
+                shadowclass foo [] [nc, prefix nc_] {a:full, b:full};
+
+            When no <typespec> is  supplied, the <declaration> part  (if
+            present) is  taken  to  apply only  to  the  new  procedures
+            created, not the shadowkey itself. This allows, for example,
+            the creation of lconstant access procedures for a  permanent
+            shadowclass.
+
+            If no <typespec>  is given, and  the named shadowclass  does
+            not already exist, a mishap results.
+
+            Finally, if  the  "typespec" attribute  is  specified,  then
+            shadowclass declares the spec associated with the class as a
+            typespec  using  p_typespec  or  l_typespec,  depending   on
+            <declaration>. (The "typespec" attribute can be used both in
+            an initial shadowclass declaration, to name the given  spec,
+            or in a 'repeat' declaration  without a typespec, to  give a
+            name  to  the  underlying   spec  of  an  already   existing
+            shadowclass).
+
+
+The identifiers declared  and initialised by  shadowclass fall into  two
+sets. Firstly  there are  identifiers  declared if  a new  shadowkey  is
+created (ie if <typespec> is present). For a shadowclass named X,  these
+identifiers are:
+
+        Identifier      Value
+        ----------      -----
+        X_shadowkey     (class shadowkey)
+        isX             (recogniser procedure)
+        importX         (importer procedure)
+        initX           (initialiser procedure)
+        refreshX        (refresh procedure)
+
+
+Then there  are  identifiers whose  names  and data  formats  depend  on
+settings in attribute  lists. If a  prefix P is  specified (the  default
+prefix is empty, ie no prefix), the following are always created
+
+        Identifier      Value
+        ----------      -----
+        PconsX          (constructor procedure)
+        PdestX          (destructor  procedure)
+        PfillX          (fill  procedure)
+
+The following is specific to vector shadowclasses,
+
+        Identifier      Value
+        ----------      -----
+        PsubscrX        (subscripter procedure with updater)
+
+(NOTE: unlike defclass, the non-checking  subscripter is NOT created  by
+default, but only by specific request). For records, each field name  in
+the structure  defines an  identifier  of that  name (prefixed  with  P)
+containing the field access/update procedure (if a field name is omitted
+from the structure definition, no identifier is generated). If a typspec
+name T is specified, then the typespec :T is also created.
+
+
+
+
+-----------
+6  Examples
+-----------
+
+Suppose we  have a  C struct  type,  foo, consisting  of just  two  ints
+declared thus (in C):
+
+    typedef foo { int a,b; };
+
+Our goal is to construct shadowclasses for the basic struct foo,  arrays
+of foo, embedded foo's etc..
+
+First we note that the Poplog notation for the typespec of the struct is
+as follows:
+
+    { a:int, b:int }
+
+So the simplest approach using shadowclass is simply to declare:
+
+    shadowclass fooptr { a:int, b:int };
+
+This creates  a  shadowkey  for  the fooptr  class,  and  the  following
+identifiers, (all global vars):
+
+    # fooptr_shadowkey
+    # isfooptr
+    # importfooptr
+    # initfooptr
+    # refreshfooptr
+    # consfooptr
+    # destfooptr
+    # fillfooptr
+    # a
+    # b
+
+Using these we can create and access instances of foo's, thus:
+
+    consfooptr(1,2) -> myfoo;
+    a(myfoo) =>
+    ** 1
+    3 -> b(myfoo);
+    myfoo =>
+    ** <fooptr 1 3>
+
+Notice that we have called the shadowclass fooptr, rather than foo. This
+is because that is  really what it  is - the object  held in myfoo  is a
+POINTER to a foo struct (Poplog cannot directly manipulate structs,  but
+only pointers to them). Of course nothing prevented us calling the class
+just 'foo', but it  is conceptually cleaner  to be accurate,  especially
+when we introduce type specs below.
+
+The fooptr records manipulated by  the above procedures can be  accessed
+directly in Poplog, or passed  as arguments to external procedures  (any
+procedure expecting a (foo *) argument), or imported as the result of an
+expternal procedure which  returns a  (foo *).  So suppose  we have  two
+simple C procedures which swap the arguments in a foo struct. The  first
+does an in situ swap, while the  second returns a copy of the foo,  with
+the arguments swapped.
+
+    typedef foo {int a,b;};
+
+    void swap1(fp)
+    foo * fp;
+    {   int tmp;
+        tmp = fp->a;
+        fp->a = fp->b;
+        fp->b = tmp;
+    }
+
+    foo * swap2(fp1)
+    foo * fp1;
+    {   foo fp2;
+        fp2.a = fp1->b;
+        fp2.b = fp1->a;
+        return(&fp2);
+    }
+
+A suitable exload declaration for these routines might look like this:
+
+    exload 'swap' ['swap.o']
+
+        swap1(1),
+        swap2(1):exptr,
+
+    endexload;
+
+We might call swap1 as follows:
+
+    consfooptr(1,2) -> myfoo;
+    exacc swap1(myfoo);
+    myfoo =>
+    ** <fooptr 1 2>
+    ;;; here the external values of myfoo have been swapped, but the
+    ;;; Poplog representation doesn't know about it, so it looks
+    ;;; unchanged - we must refresh myfoo to get the right result
+    refreshfooptr(myfoo) -> ;
+    myfoo =>
+    ** <fooptr 2 1>
+
+And for swap2, it might look like this:
+
+    consfooptr(1,2) -> myfoo1;
+    exacc swap2(myfoo1) -> ep;
+    ;;; exacc itself will just return an external pointer result, but
+    ;;; we can import it into a fooptr record
+    importfooptr(ep) -> myfoo2;
+    myfoo2 =>
+    ** <fooptr 2 1>
+
+An alternative, neater way of using swap2 would be like this:
+
+    exload 'swap' ['swap.o']
+
+        swap2(1):exptr#importfooptr,
+
+    endexload;
+
+    consfooptr(1,2) -> myfoo1;
+    exacc swap2(myfoo1) -> myfoo2;
+    ;;; here the import is handled automatically by the declared type
+    ;;; of swap2's result
+    myfoo2 =>
+    ** <fooptr 2 1>
+
+All the above can be achieved without reference to the foo typespec. But
+to create, for example, an array of foo records, we want to write:
+
+    shadowclass foolist :foo[];
+
+As things stand we cannot do this, because the type :foo is not defined.
+However we can define it thus:
+
+    shadowclass fooptr [typespec foo];
+
+This is a repeat declaration for  fooptr - requesting the creation  of a
+typespec called foo  for the  underlying spec  of the  fooptr class.  We
+could have  added the  [typespec foo]  attrribute list  to the  original
+definition to achieve the same thing. Its effect is as if we had said
+
+    p_typespec foo {a:int, b:int};
+
+So now our  foolist shadowclass declaration  will be fine.  Furthermore,
+the subscriptor  procedure will  create/expect  fooptr records  for  the
+elements of the array. So we might write code like this:
+
+    consfooptr(1,2) -> myfoo1;
+    consfooptr(3,4) -> myfoo2;
+    consfoolist(myfoo1,myfoo2,2) -> myfoolist;
+    myfoolist =>
+    ** <foolist {1 2} {3 4}>
+    myfoolist(2) =>
+    ** <fooptr 3 4>
+
+Notice here that when myfoolist is printed the embedded foo structs  are
+printed as simple vectors. This is in fact how shadowclass stores  them.
+But the subscriptor  procedure returns fooptr  records. Note that  these
+records are created anew on each access  - myfoolist(2) is = but not  ==
+myfoo2.
+
+Clearly this creation of fooptr structs is quite wasteful in many cases.
+to avoid it,  we can use  non-constructive accessors. First  we have  to
+create them, using a repeat shadowclass declaration for foolist:
+
+    shadowclass foolist [nc, prefix nc_];
+
+here,  we  use  the  same  typespec  as  previously,  but  request   the
+nonconstructive versions of the accessor procedures. And we specify that
+their names should  be prefixed  with nc_  (so they  don't override  our
+normal accessors.  So now  we have  nc_consfoolist, nc_destfoolist,  and
+nc_subscrfoolist, which we can use like this:
+
+    nc_consfoolist(1,2,3,4,2) -> myfoolist;
+    myfoolist =>
+    ** <foolist {1 2} {3 4}>
+    nc_subscrfoolist(2,myfoolist) =>
+    ** 3 4
+
+Here, instead  of  expecting/returning fooptr  records,  the  procedures
+expect their  (recursively exploded)  contents on  the stack.  Note  the
+final count arg in nc_consfoolist is still 2, because there are  still 2
+foo records to  be built,  but since each  has two  fields, there  are 4
+items on the  stack to construct  them. The subscriptor  just dumps  the
+contents onto the stack. So foo records could be moved around within the
+array without creating any superfluous fooptr records like this:
+
+    nc_subscrfoolist(1,myfoolist) -> nc_subscrfoolist(2,myfoolist);
+
+Another use of explicit typespecs is that you can use defexacc to create
+'raw' accessor functions for shadowclass records. Thus the following
+
+    defexacc raw :foo;
+
+will create procedures raw_a and raw_b which access the EXTERNAL data of
+a fooptr  record (or  any external  pointer class  object) directly.  As
+before, the  refresh  procedures  may  be  needed  to  keep  the  Poplog
+representations in sync.
+
+Finally, note that the declaration part of shadowclass allows lexical as
+well as permanent  scoping for  the identifiers created.  So suppose  we
+have a global shadowclass fooptr as before:
+
+    shadowclass fooptr {a:int, b:int};
+
+and we want to talk about arrays of foos, but only inside one procedure.
+We can do this:
+
+    define myproc;
+        shadowclass lconstant fooptr [typespec foo];
+        shadowclass lconstant foolist [],[nc, prefix nc_] :foo[];
+
+        ;;; here we have standard and non-constructive procs for
+        ;;; foolists
+
+        <code>
+    enddefine;
+
+
+
+
+--- C.all/ref/shadowclass
+--- Copyright University of Sussex 1991. All rights reserved.

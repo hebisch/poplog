@@ -1,0 +1,732 @@
+REF PROLOG                      Simon Nichols & Robert Duncan, July 1987
+                                     Revised Simon Nichols, October 1990
+
+        COPYRIGHT University of Sussex 1993. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<      THE PROLOG SYSTEM      >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+This REF  file  describes aspects  of  the implemention  of  the  Prolog
+Subsystem in Poplog.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   The Prolog Memory Area
+      1.1   The Continuation Stack
+      1.2   The Trail
+
+  2   Prolog Datatypes
+
+  3   Accessing Clauses
+
+  4   Variable Instantiation and Unification
+
+  5   Prolog VM Instructions
+      5.1   Backtracking
+      5.2   Unification
+
+  6   Invoking Prolog
+
+  7   Variable Declarations
+
+
+
+-------------------------
+1  The Prolog Memory Area
+-------------------------
+
+In addition  to the  heap, the  user stack  and the  call stack,  Poplog
+maintains an extra  area of memory  exclusively for the  use of  Prolog.
+This contains two extra  Prolog stacks: the  continuation stack and  the
+trail. This area of memory, like the others, is dynamic, and so will  be
+expanded as required; a  maximum limit for its  expansion is set by  the
+variable pop_prolog_lim (and a trace of its size and usage can be got by
+assigning the  value  2:1000  (8)  to the  variable  popgctrace  --  see
+REF * SYSTEM). The size of the area can also be set explicitly with  the
+variable pop_prolog_size.
+
+(NOTE, however,  that the  size of  the prolog  area cannot  be  changed
+(either automatically  or  with pop_prolog_size)  during  callback  from
+external functions  -- the  section  Restrictions on  Operations  Inside
+Callback: Prolog in REF * EXTERNAL explains this.)
+
+
+pop_prolog_lim -> nwords                                      [variable]
+nwords -> pop_prolog_lim
+        The integer value of this  variable controls the maximum  number
+        of Poplog words to  which the system will  expand the area  used
+        for the continuation stack and trail (default value 16000). When
+        this limit is reached, the mishap
+
+            'MEMORY LIMIT (pop_prolog_lim) EXCEEDED'
+
+        occurs. However, assigning too  large a value to  pop_prolog_lim
+        can also result in the mishap
+
+            'ROM: NO MORE MEMORY AVAILABLE (needing prolog area space)'
+
+        indicating that  there  is no  more  memory available  from  the
+        operating  system   for  the   prolog  area.   In  all   current
+        implementations the prolog  area is actually  maintained in  the
+        same region as the call stack,  which means that too high  usage
+        of space in the latter can prevent expansion of the prolog area.
+        See the discussion  under pop_callstack_lim in  REF * PROCEDURE,
+        and also popmemlim in REF * SYSTEM.
+
+
+pop_prolog_size -> nwords                                     [variable]
+nwords -> pop_prolog_size
+        This (active) variable returns  the size of  the prolog area  in
+        Poplog words, or sets it to a new size.
+
+        When setting, if nwords is greater than the current size and the
+        system is  unable  to fulfil  the  request due  to  insufficient
+        memory, the NO  MORE MEMORY AVAILABLE  mishap (described  above)
+        results. If the request succeeds, pop_prolog_lim is increased as
+        necessary, i.e.
+
+            max(nwords, pop_prolog_lim) -> pop_prolog_lim
+
+        If nwords is smaller than  the minimum required for the  current
+        contents of the area, then the size is set to the minimum.
+
+
+
+1.1  The Continuation Stack
+---------------------------
+The execution  model used  by  Poplog Prolog  is that  of  "continuation
+passing", described  fully  in DOC * CONTINUATION.  In  this  technique,
+procedures are given an additional  argument called a continuation.  The
+continuation is a closure which describes whatever computation needs  to
+be performed once  the called  procedure has  successfully finished  its
+computation:  the  procedure  invokes   the  continuation  rather   than
+returning.
+
+    The usefulness of  this model  is that  it enables  us to  implement
+success and failure in terms of whether or not a procedure call returns.
+If the procedure successfully completes its computation, it invokes  its
+continuation; if it fails, it returns.
+
+Consider the following Prolog procedure:
+
+        p(X) :- q(X), r(X).
+        p(X) :- s(X).
+
+In the continuation passing model,  it could be represented (in  theory)
+by the following Pop-11 procedure,  where C represents the  continuation
+passed to p:
+
+        define p(X, C);
+            q(X, r(% X, C%));
+            s(X, C);
+        enddefine;
+
+A call of this procedure can be interpreted as meaning:
+
+        Prove p(X) and if it is true, do the continuation C.
+
+This is accomplished by passing to q both X and a continuation which, if
+q succeeds, passes X and the  original continuation C across to r.  If r
+succeeds, C will be invoked. If q  or r fails, q will eventually  return
+(i.e. backtracking will have  occurred). In that case,  X and C will  be
+passed to s. If s succeeds it will  call C; if it fails it will  return,
+and p will fail.
+
+    The continuation passing model is the model of Prolog that users are
+expected to  have, and  Pop-11/Prolog  mixed-language code  is  normally
+written in terms  of it  (see prolog_unifyc, below).  However, the  real
+Prolog implementation does not pass continuation closures as  arguments,
+but instead makes  use of a  dedicated stack -  the continuation  stack.
+Before a  procedure  is  called,  a  number  of  items  which  form  its
+continuation are pushed  onto this  stack. Essentially  what happens  is
+that for a procedure which is the compiled form of a clause with N terms
+in its body, N - 1 sets of items are pushed onto the continuation stack.
+These correspond to the second up to the Nth terms. Each set consists of
+a count of the number of items  pushed (which is equal to one more  than
+the number of arguments to be passed to the procedure) the procedure and
+any arguments.  These  are pushed  in  the following  order  (assuming M
+arguments):
+
+        count (M + 1)       <-- top of continuation stack
+        argument 1
+        ...
+        argument M
+        procedure
+
+After each set  consisting of  count, arguments and  procedure has  been
+pushed, the procedure corresponding to the first term in the body of the
+clause is called.
+
+A Pop-11 procedure  which more closely  represents the Prolog  procedure
+above is thus:
+
+        define p(X);
+            PLOG_SAVE;
+            prolog_push_continuation(X, r, 2);
+            q(X);
+            PLOG_RESTORE;
+            s(X);
+            PLOG_RESTORE;
+        enddefine;
+
+PLOG_SAVE  and  PLOG_RESTORE   are  hypothetical   syntax  words   which
+correspond to  the  VM instructions  sysPLOG_SAVE  and  sysPLOG_RESTORE.
+These instructions  create  a  choice  (backtrack)  point  (see  below).
+prolog_push_continuation is a  system procedure and  is not for  general
+use.
+
+    The continuation stack  pointer is  saved at each  choice point  and
+restored if, through backtracking, the choice point is returned to.
+
+
+
+1.2  The Trail
+--------------
+The trail records all assignments made to Prolog variables. It too  is a
+stack. Variables are represented by objects of type prologvar (see below
+in the section on datatypes), and whenever one of these is assigned  to,
+it is pushed  onto the trail.  At each  choice point, a  pointer to  the
+current top of the trail is saved. Whenever the Prolog system backtracks
+through a  choice point,  the  old trail  pointer  is restored  and  any
+variables pushed  onto  the trail  after  that  point are  reset  to  be
+undefined.
+
+    Another effect of backtracking  is to free  prologvars which are  no
+longer accessible to  active procedures.  A free-list  of prologvars  is
+maintained for this  purpose: once  backtracking has  returned past  the
+point at which a prologvar  was first created, it  is put back onto  the
+free-list for later re-use. The garbage collector can short-circuit some
+of this variable collection: when it sweeps the trail, if it  encounters
+a prologvar which has no outstanding choice points between the point  of
+its creation and  the point of  its most recent  instantiation, then  it
+will collect that prologvar  as garbage. This is  safe, because if  ever
+backtracking  should  return  to  the  point  where  the  variable   was
+instantiated, it must also pass the point at which it was created and so
+free the variable for re-use. This means that the variable will never be
+rebound in  the  remainder of  its  lifetime, and  so  is  effectively a
+constant.  When  the  garbage   collector  collects  the  variable,   it
+dereferences  it  first,  and  any   reachable  references  to  it   are
+overwritten with  its dereferenced  value. This  process saves  time  on
+backtracking and compacts the space used by the trail and by Prolog data
+structures in the heap.
+
+
+prolog_barrier_apply(p)                                      [procedure]
+        Applies the procedure p in such a way as to isolate it from  any
+        outstanding invocations of  Prolog procedures. This  is done  by
+        placing "barriers" on  the Prolog continuation  stack and  trail
+        which serve to mark the beginning of the Prolog area  accessible
+        to p;  any  existing  trailed variables  or  outstanding  choice
+        points become invisible to p.  This is of importance when  using
+        Prolog in conjunction with the Poplog process mechanism. If  the
+        situation arises  where several  live  processes are  all  using
+        Prolog procedures, the  barriers serve to  divide up the  Prolog
+        area  correctly  between  them,  marking  those  parts  of   the
+        continuation stack and trail which need to be saved and restored
+        with each process. The standard  entry points into Prolog  (such
+        as prolog_compile  and prolog_invoke,  defined when  the  Prolog
+        system is loaded) call this procedure internally and so are safe
+        for general use.  However, whenever a  process is created  which
+        calls  lower-level   Prolog  operations   explicitly  (such   as
+        prolog_assign,  prolog_unify  etc.)  then   prolog_barrier_apply
+        should be called as the first action when that process is run.
+
+
+prolog_reset()                                               [procedure]
+        Reinitialises  the  Prolog  memory   area,  and  the   prologvar
+        free-list and variable numbering.  This must be done  whenever a
+        Prolog computation terminates  abnormally. The procedure  setpop
+        always runs prolog_reset.
+
+
+
+
+-------------------
+2  Prolog Datatypes
+-------------------
+
+Poplog provides two special datatypes for Prolog support.
+
+    The datatype  PROLOGVAR is  used to  represent variables  in  Prolog
+terms. The structure of a prologvar is identical to that of a  reference
+(see REF * RECORDS), with  a single  field containing the  value of  the
+variable (an  uninstantiated prologvar  has itself  as its  value).  The
+class of prologvars is special however,  as extra support is needed  for
+their efficient allocation and garbage collection and for management  of
+the trail (see the description of  the trail above). There is no  direct
+access available to the contents of a prologvar except via fast_cont; in
+normal usage,  prolog  variables  should  only  be  manipulated  by  the
+higher-level procedures  prolog_deref, prolog_assign  and similar  which
+take proper account of their special requirements.
+
+    The datatype PROLOGTERM represents general complex terms in  Prolog.
+A prologterm is characterised by a functor  (which is a word) and a  set
+of arguments, where  the number  of arguments (the  arity) is  variable.
+Currently  a  prologterm  is   an  ordinary  vectorclass  object   whose
+class_subscr procedure is prolog_arg_nd (see REF * KEYS), but this  does
+not give proper access to the functor part of a term and may be  changed
+in later versions of Poplog.
+
+    These datatypes, together with the integers, are sufficient for  the
+representation of  all  pure Prolog  data.  The existing  Prolog  system
+though is more liberal in its interpretation of data both for efficiency
+and to simplify the interface between Prolog and other Poplog languages.
+Thus the following special cases are made:
+
+     #  Prolog  terms  with  functor  "./2"  are  represented  as Poplog
+        pairs so that lists  in Prolog are the  same as lists in  Pop-11
+        (see REF * LISTS);
+
+     #  Prolog atoms, which could be modelled as prologterms with  arity
+        0, are in fact represented more simply as words;
+
+     #  all other Poplog datatypes are legal in Prolog, but are  treated
+        as atomic;  i.e.  they cannot  be  decomposed into  parts.  Like
+        ordinary atoms, these atomic objects can be considered as  terms
+        with no arguments.
+
+    When handling Prolog  data, it  is important  to keep  in mind  this
+special interpretation imposed  by the Prolog  system. In the  following
+list of  procedures,  those  which begin  with  "prolog_"  respect  that
+interpretation and so  are recommended  for general  use; the  remaining
+procedures operate on  the concrete datatypes  prologterm and  prologvar
+and must be used with care.
+
+    An extra level of complexity is added when variables are included in
+terms. Data structures built by Prolog will typically contain chains  of
+variables, and to obtain  the true structure it  is necessary to  remove
+these chains by dereferencing.  The basic procedure to  use for this  is
+prolog_deref which  will follow  a chain  of prologvars  and return  the
+common value to which they are all bound; prolog_full_deref will  remove
+all the variable chains  from a term.  Standard procedures which  access
+parts of Prolog terms are provided with dereferencing built in, as  this
+is the generally more useful behaviour. Raw, non-dereferencing  versions
+are also available  however, and  such procedures are  indicated by  the
+suffix "_nd" in their names.
+
+
+consprologterm(word, n) -> prologterm                        [procedure]
+        Constructs and returns a prologterm with functor word and  arity
+        n, the arguments being taken from the next n items on the stack.
+
+
+destprologterm(prologterm)                                   [procedure]
+        Destructs prologterm, leaving its arguments, its functor and its
+        arity  on   the   stack   (i.e.  it   does   the   opposite   of
+        consprologterm).
+
+
+initprologterm(n) -> prologterm                              [procedure]
+        Creates and returns a prologterm with functor undef and arity n,
+        and whose arguments are all initialised to 0.
+
+
+isprologterm(item) -> bool                                   [procedure]
+        Returns <true> if item is a prologterm, <false> if not.
+
+
+isprologvar(item) -> bool                                    [procedure]
+        Returns <true> if item is a prologvar, <false> if not.
+
+
+prolog_appargs(item, p)                                      [procedure]
+        Applies the procedure p to each dereferenced prolog argument  of
+        item in turn (cf. prolog_appargs_nd).
+
+
+prolog_appargs_nd(item, p)                                   [procedure]
+        Applies the procedure p to each prolog argument of item, without
+        dereferencing (cf. prolog_appargs).
+
+
+prolog_arg(n, term) -> item                                  [procedure]
+        Dereferences and  returns  the  Nth  argument  of  the  pair  or
+        prologterm term  (cf. prolog_arg_nd).  n must  be less  than  or
+        equal to the arity of term.
+
+
+prolog_arg_nd(n, term) -> item                               [procedure]
+item -> prolog_arg_nd(n, term)
+        Returns or updates the  Nth argument of  the pair or  prologterm
+        term without dereferencing (cf. prolog_arg). n must be less than
+        or equal to the arity of term.
+
+
+prolog_args(item)                                            [procedure]
+        Puts all  the dereferenced  prolog arguments  of item  onto  the
+        stack  (cf.  prolog_args_nd).  A  call  of  this  procedure   is
+        equivalent to
+
+            prolog_appargs(item, identfn)
+
+
+prolog_args_nd(item)                                         [procedure]
+        Puts all the  prolog arguments  of item onto  the stack  without
+        dereferencing them (cf. prolog_args).  A call of this  procedure
+        is equivalent to
+
+            prolog_appargs_nd(item, identfn)
+
+
+prolog_arity(item) -> n                                      [procedure]
+        Returns the prolog arity n of item;  if item is not a pair  or a
+        prologterm then n will be 0.
+
+
+prolog_checkspec(item_1, item_2, n) -> bool                  [procedure]
+        Returns <true>  if item_1,  interpreted as  a prolog  term,  has
+        functor item_2 and arity n; returns <false> otherwise. If item_1
+        is a prologterm, then item_2 and n must be the real functor  and
+        arity of that term; if item_1 is a pair, then item_2 must be the
+        word "." and n must be 2;  for any other item_1, item_2 must  be
+        identically equal to item_1 and n must be 0.
+
+
+prolog_complexterm(item) -> bool                             [procedure]
+        Returns <true> if item is either a pair or a prologterm, <false>
+        if not.
+
+
+prolog_deref(item_1) -> item_2                               [procedure]
+        If item_1  is  a prologvar  it  is dereferenced  and  its  value
+        returned; any other item is simply returned. Dereferencing  does
+        not extend to any sub-components of (the dereferenced value  of)
+        item_1 (cf. prolog_full_deref).
+
+
+prolog_full_deref(item_1) -> item_2                          [procedure]
+        Returns a fully  dereferenced version of  item_1, such that  the
+        only prologvars remaining in item_2 are uninstantiated ones. Any
+        sub-components of item_1 which contain prologvars will be copied
+        during the dereferencing, but other, non-variable components may
+        not be.
+
+
+prolog_functor(item_1) -> item_2                             [procedure]
+word -> prolog_functor(prologterm)
+        When used as an accessor, returns the prolog functor of  item_1.
+        If item_1 is  a prologterm, then  its real functor  (a word)  is
+        returned; if item_1 is a pair, then the word "." is returned; if
+        item_1 is any other datatype, then the item itself is  returned.
+        When  used  as   an  updater,  prolog_functor   works  only   on
+        prologterms; there are few  circumstances in which changing  the
+        functor of a term can be justified.
+
+
+prolog_maketerm(item_1, n) -> item_2                         [procedure]
+        Creates and returns a term with prolog functor item_1 and prolog
+        arity n, the arguments being taken from the next n items on  the
+        stack. If n is 0 then item_1 is returned; if item_1 is the  word
+        "." and n is 2, then  a pair is returned; otherwise item_1  must
+        be a word and a prologterm is returned (cf. consprologterm).
+
+
+prolog_newvar() -> prologvar                                 [procedure]
+        Creates and returns a new, uninstantiated prologvar.
+
+
+prolog_termspec(item_1) -> n -> item_2                       [procedure]
+        Returns the prolog arity  and the prolog  functor of item_1.  If
+        item_1 is a prologterm then n and item_2 will be the real  arity
+        and functor of the term;  if item_1 is a  pair then n will  be 2
+        and item_2  will be  the word  "."; otherwise  n will  be 0  and
+        item_1 will be returned as item_2.
+
+
+prolog_undefvar(item) -> bool                                [procedure]
+        Returns <true> if item  is an uninstantiated prologvar,  <false>
+        if not. item  is not  dereferenced, so this  may return  <false>
+        where
+
+            isprologvar(prolog_deref(item))
+
+        would return <true>.
+
+
+prolog_var_number(prologvar) -> n                            [procedure]
+prolog_var_number(false)
+        When applied to an  uninstantiated prologvar, this returns  some
+        integer n. The value of n may vary between applications, but any
+        two prologvars which are sharing will always return the same  n,
+        i.e. this procedure defines an equivalence on prologvars. (It is
+        primarily used for  generating the  printing representations  of
+        variables.) When applied to the value <false>, the numbering  is
+        reset so that subsequent calls  will resume counting from 1.  If
+        applied to any other datatype, <false> is returned.
+
+
+prologterm_key -> key                                         [constant]
+        The key for objects of type prologterm.
+
+
+prologvar_key -> key                                          [constant]
+        The key for objects of type prologvar.
+
+
+
+
+--------------------
+3  Accessing Clauses
+--------------------
+
+prolog_clause(i, word, n) -> prologterm                      [procedure]
+prolog_clause(i, word, n) -> word
+        Returns the Ith clause from the predicate with functor word  and
+        arity n.  Clauses  are  indexed  from 1.  A  clause  is  usually
+        represented by a  prologterm, except  in the case  of a  nullary
+        unit clause,  which is  represented  by a  word. If  either  the
+        predicate or the specified  clause doesn't exist,  prolog_clause
+        returns nil.
+
+
+
+
+-----------------------------------------
+4  Variable Instantiation and Unification
+-----------------------------------------
+
+These next procedures provide for the instantiation of prologvars.  This
+may be done explicitly via prolog_assign or implicitly through a call to
+the unifier. In either case, each assignment done both updates the value
+field of the prologvar and keeps a record of the assignment on the trail
+so that it may be undone  if backtracking ever returns past that  point.
+The bindings can only be undone,  however, if a proper choice point  has
+been established before the  assignments are made. In  fact, due to  the
+trail compaction performed by  the garbage collector (explained  above),
+prologvars assigned to before a choice point has been established  (i.e.
+before  the  first  sysPLOG_SAVE  has  been  executed)  are  effectively
+constants; they will be  elided at the next  garbage collection and  any
+references to  them  replaced  with their  current  values.  An  example
+demonstrates this effect:
+
+            prolog_vars X;
+            prolog_assign(X, "cat");
+            X =>
+            ** <prologvar cat>
+
+            sysgarbage();
+            X =>
+            ** cat
+
+
+prolog_assign(prologvar, item)                               [procedure]
+        Updates the value of prologvar  to be item and pushes  prologvar
+        onto the trail  for resetting  on backtracking.  No checking  or
+        dereferencing is done,  so this  procedure should  only be  used
+        when the condition
+
+            prolog_undefvar(prologvar)
+
+        is true (cf. prolog_assign_check).
+
+
+prolog_assign_check(prologvar, item)                         [procedure]
+        A checking  version of  prolog_assign;  this performs  the  same
+        operations but will mishap unless the condition
+
+            prolog_undefvar(prologvar)
+
+        is true.
+
+
+prolog_unify(item_1, item_2) -> bool                         [procedure]
+        Returns <true> if item_1 unifies with item_2, <false> if not. If
+        the unification succeeds, any prologvars  in the two items  will
+        be instantiated in such a way that the condition
+
+            prolog_full_deref(item_1) = prolog_full_deref(item_2)
+
+        is true. If the unification fails, some or all of the prologvars
+        in the  two items  may still  be instantiated.  In either  case,
+        instantiated  variables  will  not  be  reset  until  the   next
+        PLOG_RESTORE is done (cf. prolog_unifyc).
+
+
+prolog_unifyc(item_1, item_2, p)                             [procedure]
+        Attempts the unification of item_1 and item_2, and if successful
+        calls  the  procedure  p.  (p   is  the  continuation  for   the
+        unification - see above.) A  proper choice point is created  for
+        the unification using sysPLOG_SAVE  and sysPLOG_RESTORE so  that
+        if p is called,  any prologvars in item_1  and item_2 which  are
+        instantiated by the  unification remain so  for the duration  of
+        that call. Once  p has returned,  or if it  is never invoked  at
+        all, any variable bindings created by the unification are  reset
+        before the call of prolog_unifyc  itself returns. Thus a  caller
+        of this procedure will  see no difference  in item_1 and  item_2
+        before and after the call.
+
+
+
+
+-------------------------
+5  Prolog VM Instructions
+-------------------------
+
+Two distinct sets of Prolog VM  instructions are provided. One works  in
+conjunction with  the  continuation  stack  and  trail  to  support  the
+creation of choice points and  backtracking; the other provides  special
+purpose unification code for efficient head-matching of clauses.
+
+
+5.1  Backtracking
+-----------------
+The instruction  sysPLOG_SAVE creates  a choice  point. A  call of  this
+procedure causes the state of the Prolog procedure being compiled to  be
+saved on entry  to that  procedure. The  state is  represented by  three
+variables: the  continuation  stack  pointer, the  trail  pointer  and a
+pointer to  the next  free Prolog  variable. A  call of  sysPLOG_RESTORE
+causes these state variables to be  restored to their saved values,  and
+thus implements backtracking to the previous choice point.
+
+
+sysPLOG_SAVE()                            [protected procedure variable]
+        Marks  the  procedure  currently  being  compiled  as  a  Prolog
+        procedure. This  ensures  that the  Prolog  state  (continuation
+        stack pointer,  trail  pointer and  next-free-variable  pointer)
+        will  be  saved  on  each  entry  to  the  procedure,  and  that
+        appropriate portions of the Prolog memory area will be saved  if
+        ever the procedure is included as part of a process record. Only
+        one call of this instruction  has any practical effect  inside a
+        procedure, and two calls cannot  be made without an  intervening
+        sysPLOG_RESTORE.
+
+
+sysPLOG_RESTORE()                         [protected procedure variable]
+        Restores the state of the continuation stack and trail from  the
+        current saved values.  The trail  is unwound back  to the  saved
+        position, and all the variables removed from it are reset to  be
+        undefined. The  pointer  to  the  next  free  variable  is  also
+        restored. This procedure  cannot be called  without a  preceding
+        call to sysPLOG_SAVE.
+
+
+sysPLOG_RESTART(label)                    [protected procedure variable]
+        Re-saves the state of the continuation stack and trail, and  the
+        pointer to  the next  free Prolog  variable; then  jumps to  the
+        label label. Used when a second choice point is to be set up  by
+        a procedure, e.g. when a  tail-recursive call is optimised  to a
+        backward jump.
+
+
+
+5.2  Unification
+----------------
+Some arguments to the Prolog VM unification instructions are  QUALIFIED;
+that is, the  interpretation of  an argument (and  therefore its  value)
+depends on the value  of another argument -  the argument QUALIFIER.  An
+argument qualifier  may  assume one  of  the following  values:  <true>,
+<false>, a word  or an integer.  The effect of  these upon the  argument
+which is qualified is as follows:
+
+    Argument    Effect
+    --------    ------
+    <true>      the item it qualifies denotes  a word which is the  name
+                of a variable which needs to be pushed (using sysPUSH);
+
+    <false>     the item it qualifies denotes a constant which needs  to
+                pushed (using sysPUSHQ);
+
+    a word      which  is  the  name  of  a  selector  procedure   (e.g.
+                fast_front) which is applied to the item it qualifies;
+
+    an integer  which is  used to  subscript the  Prolog term  which  it
+                qualifies.
+
+More than one argument of an  instruction may be qualified (there  being
+one qualifier per qualified argument).
+
+
+sysPLOG_ARG_PUSH(item, item_qualifier)    [protected procedure variable]
+        Plants code to  push (on  to the  user stack)  either item,  the
+        value of the (lexical/permanent) identifier associated with  the
+        word  item,  or  some  component  of  the  datastructure   item,
+        depending on the value of item_qualifier (see above).
+
+
+sysPLOG_IFNOT_ATOM(item, item_qualifier,  [protected procedure variable]
+            atom, atom_qualifier, fail_label)
+        Plants a PLOG_IF_NOT_ATOM instruction: this will
+
+           # dereference item (qualified by item_qualifier) if it is a
+             Prolog variable;
+
+           # unify item and atom (qualified by atom_qualifier) using a
+             restricted form of unification where atom must be an
+             atom which does not require dereferencing;
+
+           # jump to the label fail_label if the unification fails.
+
+
+sysPLOG_TERM_SWITCH(item, item_qualifier, [protected procedure variable]
+            term, var_label, fail_label)
+        Plants a PLOG_TERM_SWITCH instruction: this will
+
+           # dereference item (qualified by item_qualifier) if it is a
+             Prolog variable;
+
+           # jump to the label var_label if item is an uninstantiated
+             Prolog variable;
+
+           # compare the functor of term with the functor of item
+             otherwise, and jump to fail_label if they are different.
+
+
+
+
+------------------
+6  Invoking Prolog
+------------------
+
+The Prolog system may  be invoked either in  top-level mode, where  each
+term read is  executed as a  goal, or  in assert mode,  where terms  are
+interpreted as clauses to be added into the database.
+
+
+prolog                                                  [macro variable]
+        Switches subsystem from Pop-11 to Prolog top-level,  autoloading
+        the Prolog system if necessary.
+
+
+prolog_compile(stream)                                       [procedure]
+        Only available when the Prolog system is loaded, this  procedure
+        compiles Prolog program text  from the character source  stream.
+        Calling prolog_compile  from  Pop-11  is  the  same  as  doing a
+        reconsult from Prolog: clauses are added to the database  rather
+        than executed, and new procedure definitions supersede  existing
+        definitions of the same name. stream may be one of:
+
+          # A character repeater procedure;
+
+          # A string  or  word  representing a  filename  (the  filename
+            "user" or 'user' is treated  as a synonym for the  character
+            repeater charin);
+
+          # A device record.
+
+        The compiler does an  initial "see" on the  file it is given  to
+        make it the current input stream.
+
+
+
+
+------------------------
+7  Variable Declarations
+------------------------
+
+prolog_lvars                                    [library macro variable]
+        Declares  lexical   variables  initialised   to   uninstantiated
+        prologvars. See HELP * PROLOG_LVARS.
+
+
+prolog_vars                                     [library macro variable]
+        Declares  permanent  variables  initialised  to   uninstantiated
+        prologvars. See HELP * PROLOG_VARS.
+
+
+
+
+--- C.all/ref/prolog
+--- Copyright University of Sussex 1993. All rights reserved.

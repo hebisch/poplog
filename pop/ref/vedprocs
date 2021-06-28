@@ -1,0 +1,4000 @@
+REF VEDPROCS                              Dan Perri & Aaron Sloman, 1989
+                                           Updated John Gibson, Nov 1995
+
+     COPYRIGHT University of Sussex 1995. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<    VED SYSTEM PROCEDURES    >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+This file lists  most of the  Ved system procedures:  some of these  are
+built into  the Poplog  system, others  are autoloadable  library  files
+defined in the Pop-11 library  $popvedlib. Some of these procedures  are
+mapped to Ved logical keys.
+    Additional Ved  procedures are  described in  REF * VEDCOMMS  (which
+deals with Ved <ENTER> commands) and REF * VEDTERMINALS (Screen  control
+and key  mappings). REF * VEDSEARCH  gives a  comprehensive overview  of
+searching in Ved.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+      1.1   Ved Buffers
+      1.2   Real-File and Pseudo-File Buffers
+      1.3   Note on Line/Column Coordinates
+
+  2   File/Buffer Management
+      2.1   filearg Argument to vededit, vedopen and vedreadfile
+      2.2   Creating/Selecting Buffers
+      2.3   Ved Initialisation Procedures
+      2.4   Per-File Initialisation Procedures
+      2.5   Quitting a File
+
+  3   Reading and Writing Files
+      3.1   Ved File Representation
+            ... Character Attributes
+            ... Special Characters
+            ... Embedded Strings & Words
+      3.2   Reading
+      3.3   Writing
+
+  4   Ved Buffer Utilities
+
+  5   Refreshing All or Part of a Ved Window
+
+  6   Changing or Testing Cursor Location
+
+  7   Ved Input and Output
+      7.1   Low Level
+      7.2   Higher Level
+      7.3   Mapping Input Characters to Procedures
+
+  8   The Ved Main Loop
+
+  9   Inserting and Deleting Text
+      9.1   Inserting
+      9.2   Deleting
+
+ 10   The Command/Status Line
+
+ 11   Text Editor Functions
+
+ 12   Searching Procedures
+
+ 13   Program Editor Functions
+
+ 14   Window Management
+
+ 15   Screen Management
+
+ 16   Ved Special Characters
+      16.1  Graphics Characters
+      16.2  Special Spaces Etc
+
+ 17   Ved-Buffer Devices and "Immediate Mode"
+
+ 18   Marked Range
+
+ 19   Embedded Text Actions
+      19.1  Constructing Text Actions
+      19.2  Standard Text Actions
+
+ 20   Miscellaneous Utilities
+      20.1  Bracket Matching
+
+ 21   User-Definable Procedures
+
+ 22   Other Facilities
+      22.1  Procedures for Acting on Rectangular Blocks of Text
+      22.2  Reading Output from a Shell Command into a Ved Buffer (Unix Only)
+
+
+
+---------------
+1  Introduction
+---------------
+
+1.1  Ved Buffers
+----------------
+The unit of editing  in Ved, a  buffer, is stored  in a Ved  file/buffer
+structure, which has a  large number of fields  (currently 35) to  store
+the values of all  associated variables. For more  details refer to  the
+section Variables Associated With Each Ved File in REF * VEDVARS.
+
+One field holds the value of vedbuffer, which stores the content of  the
+file itself. vedbuffer is a vector with one element for each line of the
+file, where each element is  a vedstring (string or dstring)  containing
+that line.
+
+(Dstrings are an alternate  form of string  allowing attributes such  as
+'bold' and  'underline' to  be  represented for  each character  --  see
+Display Strings in  REF * STRINGS. A  vedstring is a  string or  dstring
+which may have embedded  data associated with any  of its characters  --
+see Vedstrings in REF * STRINGS.)
+
+The file structure for the current  file is held in the active  variable
+ved_current_file. When  assigned  to,  it automatically  saves  the  Ved
+global variables in the current file structure, and then assigns all the
+globals from the new file structure.
+
+The Ved  file structure  for each  currently active  file is  stored  in
+vedbufferlist. (See also * ved_rb in REF * VEDCOMMS).
+
+
+1.2  Real-File and Pseudo-File Buffers
+--------------------------------------
+Ved buffers can  represent edits of  actual disk files,  or they can  be
+'pseudo  files'.  Once  created,  this  distinction  is  encoded   for a
+particular buffer  by  the value  of  the variable  veddirectory,  which
+contains either  a  directory string  for  a  real file,  or  false  for
+anything else.
+
+However, the real/pseudo distinction is initially determined by the name
+under which the  buffer is  created (the  value of  the buffer  variable
+vedcurrent). On the basis  that no (sensible) filename  for a real  file
+will contain a  space character,  a buffer  whose vedcurrent  contains a
+space is deemed to be  a pseudo file. (Note  that this accords with  the
+fact that the basic command for editing real files, <ENTER> ved,  treats
+space-separated parts in its argument as indicating multiple files to be
+edited, and thus cannot create or select any buffer with a space in  its
+name.)
+
+Hence the setting  of veddirectory is  determined by whether  vedcurrent
+contains a space. For a real  filename without a space, veddirectory  is
+set to  the directory  path string  needed to  make vedcurrent  into  an
+absolute pathname. (I.e. nullstring  if vedcurrent is already  absolute,
+or  current_directory  otherwise.  The  full  pathname  is  assigned  to
+vedpathname.)
+
+For a pseudo-file with a space  in the name, veddirectory is set  false.
+Such a buffer can be one of two types:
+
+  # A 'working' text buffer. This exists only inside Ved, and cannot  be
+    written to  disk. (At  least,  not directly  --  a command  such  as
+    <ENTER> wr can be  used to write  all or part  of the contents  to a
+    specified file.) Such buffers can  be created with <ENTER> work  (or
+    an existing buffer changed to one with <ENTER> name -w).
+
+  # A special-purpose  buffer  for  which 'writing'  has  a  nonstandard
+    meaning. (Such  buffers  have  a special  value  for  the  procedure
+    ved_write_current_file, which will transform the buffer text in some
+    way when  'written', and  may or  may not  involve actually  writing
+    something to disk.)
+
+
+1.3  Note on Line/Column Coordinates
+------------------------------------
+There are three different sets  of co-ordinates used by Ved  procedures:
+buffer  co-ordinates  (vedline,  vedcolumn),  window  co-ordinates,  and
+screen coordinates (vedscreenline, vedscreencolumn)
+
+Some of the procedures (e.g. vedjumpto) take a line and a column in  Ved
+buffer co-ordinates. I.e. the line is counted from the beginning of  the
+file, and the column from the beginning of the current line of text. The
+variables vedline and vedcolumn indicate the current location in  buffer
+coordinates. The variable vedlineoffset indicates how many lines of text
+are above the visible portion of the buffer.
+
+Buffer co-ordinates are  represented below simply  as line, col,  line1,
+col1, etc.
+
+Some of the procedures (e.g. vedwindowpoint) take a line and a column in
+WINDOW coordinates. I.e. the  status line is line  1, the first  visible
+line of text  is line 2.  Similarly the leftmost  column of the  window,
+reserved for "range"  marks (See  HELP * MARK) is window  column 1,  and
+window column 2 is the first column  available for text. If the text  in
+the window has scrolled left, then vedcolumnoffset indicates by how many
+columns it has scrolled. If Ved is being used to display two windows  at
+once on the same screen (e.g. on a VDU, or a single X window), then  the
+variable vedscreenoffset represents  the location of  the first line  of
+the current window  relative to the  screen. E.g.  it is 0  for the  top
+window and for the lower window it  is the size of the upper window,  in
+lines.
+
+Window co-ordinates are represented as wline, wcol, etc.
+
+Some of the procedures  (e.g. vedscreenxy) take a  line and a column  in
+screen coordinates, where the  top left corner of  the screen is  line 1
+column 1.  However, in  a multi-window  screen managed  by Sunview  or X
+windows, the screen co-ordinates refer to the window used by the current
+process, or  the  current Ved  window  if  each Ved  file  has  separate
+windows.  The  variables  vedscreenline  and  vedscreencolumn  represent
+current location on the "screen".
+
+Screen coordinates are represented as sline, scol.
+
+The following equations hold, in virtue of the above comments:
+
+        wline   = vedline - vedlineoffset + 1
+        wcol    = vedcolumn - vedcolumnoffset + 1
+
+        wline   = vedscreenline - vedscreenoffset
+
+There is  (at  present)  no vedscreencolumnoffset,  which  is  why  only
+horizontal divisions within a screen are supported.
+
+
+
+
+-------------------------
+2  File/Buffer Management
+-------------------------
+
+2.1  filearg Argument to vededit, vedopen and vedreadfile
+---------------------------------------------------------
+The procedure vedreadfile is called by vededit and vedopen to make a new
+Ved buffer, and  takes an  argument filearg  to specify  how the  buffer
+should be constructed. This  argument may also be  given to vededit  and
+vedopen, and is passed to vedreadfile in the case where the buffer  does
+not already exist.  (Additionally for  vededit, filearg can  be used  to
+control how the buffer window is initially displayed.)
+
+The filearg argument to all three procedures takes the following values:
+
+  (1) A file, that is, a filename  string or a device open for  reading.
+      This may appear  either by itself,  or as the  first element  of a
+      list in one of the forms
+
+              [ file vedfileprops ]
+              [ file vedfileprops subsystem_varname ]
+              [ file vedfileprops " subsystem ]
+
+      Except in the case where file  names a nonexistent file (OR,  is a
+      pseudo-filename containing a  space -- see  above), the  vedbuffer
+      lines of the new Ved buffer  will be read by calling vedreadin  on
+      file (and collecting up the resultant strings in a vector).
+
+      If file is nonexistent or  a pseudo-filename, vedbuffer is set  to
+      an empty vector (and the new result from the procedure vedreadfile
+      will be true -- note that new will be false in all other cases).
+
+  (2) A reference containing a 2 or 3 element vector whose first element
+      is any of the above, i.e.
+
+              consref( { file_or_list ...} )
+
+      If the second  element of  this vector is  false, file_or_list  is
+      just processed as for case (1).
+
+      Otherwise, the second element must be a procedure get_buffer_p  to
+      create  the  actual  Ved  buffer.  Regardless  of  the  value   of
+      file_or_list, this will be called as
+
+              get_buffer_p(setting_on_screen) -> vedbuffer
+
+      that is, the procedure is expected to return the actual  vedbuffer
+      vector.  (The   setting_on_screen   value  is   as   supplied   to
+      vedreadfile, and will be true for vededit, false for vedopen.)
+
+      Irrespective of  the second  element's value,  if the  vector  has
+      non-false third  element,  this  is supplied  by  vededit  as  the
+      initarg argument to the  call of vedsetonscreen  to display a  new
+      file. (See * vedsetonscreen below for possible values.)
+
+In the new buffer, vedcurrent is set  to file (if that is a string),  or
+device_open_name(file) if  a device;  vedpathname and  veddirectory  are
+then  initialised  from  vedcurrent  (see  the  descriptions  of   those
+variables in  REF * VEDVARS). Also  at  this point,  vedsetfiletypes  is
+called on vedfiletypes to perform any variable initialisations based  on
+the extension of vedcurrent, etc.
+
+If a list  was present  in filearg, vedfileprops  is then  set from  its
+second element.  Otherwise, vedfileprops  defaults to  "workbuff"  for a
+pseudo-file, or false for a real file.
+
+If the filearg list has a third element, subsystem is initialised either
+to the  (" prefixed)  word  subsystem  or  to  the  valof  of  the  word
+subsystem_varname. Otherwise, subsystem defaults to "pop11".
+
+Following  these  initialisations,  the  defaults_p  argument  given  to
+vededit, vedopen and vedreadfile  (such as vedveddefaults, for  example)
+is called to set any other  user default values for the file  variables.
+vednamestring is then set.
+
+Finally, vedreadin or get_buffer_p is called to get vedbuffer. With  the
+new  file   completely  set   up,   vedreadfile  calls   the   procedure
+vedinitialise (with the vedreadfile new result as argument).
+
+For vededit  and vedopen,  only  the buffer  name (i.e.  the  vedcurrent
+value) is used when selecting an existing buffer. All other  information
+applies to a new buffer only.
+
+
+2.2  Creating/Selecting Buffers
+-------------------------------
+
+vededit(vedfilearg)                                          [procedure]
+vededit(vedfilearg, setfocus)
+vededit(vedfilearg, defaults_p)
+vededit(vedfilearg, defaults_p, setfocus)
+        The main entry point to Ved: selects an existing Ved buffer,  or
+        creates a new one, setting up Ved first if this has not  already
+        been done.  vedsetonscreen is  called  to display  the  selected
+        buffer, which assigns it to ved_current_file, and makes it first
+        in vedbufferlist.
+
+        The vedfilearg argument can be  either a Ved file structure  for
+        an  existing   buffer,  or   any  valid   filearg  argument   to
+        * vedreadfile as described in the section above (e.g. a filename
+        string).
+
+        The optional defaults_p is a procedure for setting defaults;  if
+        omitted,  the  procedure   in  vedveddefaults   is  used.   (See
+        REF * vedveddefaults and also HELP * vedveddefaults.)
+
+        setfocus is an optional boolean  argument. If true (the  default
+        when omitted), the file  selected is assigned to  vedinputfocus;
+        otherwise vedinputfocus  remains  unchanged  by  the  call.  (In
+        general, use vededit(vedfilearg, false)  for any file that  will
+        only be output  to; this  ensures that  the input  focus is  not
+        taken away from a file that should keep it.)
+
+        Setting Up
+        If Ved has not already been set up, vededit first calls vedsetup
+        (see * vedsetup below). Then, if vedinvedprocess is not  already
+        true, it gets inside a call of vedprocess by adding the closure
+
+            vededit(% vedfilearg, defaults_p, setfocus %)
+
+        to Ved's input stream  (ved_char_in_stream), sets up  vedprocess
+        as a process in vedprocessproc, and then runs it. Thus the first
+        action performed by vedprocess will be to call vededit again  to
+        get the file.
+
+        In non-XVed, the process will not exit until there are no  files
+        left (or vedexit is called); on exit, vededit resets the  screen
+        for normal use and sets  vedupperfile and vedlowerfile false  to
+        indicate there are no Ved windows on the screen.
+
+        In XVed, however, the process is suspended whenever there is  no
+        Ved input waiting  (see The Ved  Main Loop below).  vedupperfile
+        (which is always set to the current file when that has a window)
+        is not touched, because the window still exists.
+
+        Once Ved is Set Up
+        If vedfilearg is already a Ved file structure, then
+
+                vedsetonscreen(vedfilearg, false)
+
+        is called to display the file.
+
+        Otherwise, vedfilearg  must be  a filearg  as described  in  the
+        section above, and  the buffer  name (i.e.  vedcurrent part)  of
+        this is  extracted and  given to  vedpresent to  determine  if a
+        buffer of that  name already  exists. If  so, vedsetonscreen  is
+        called on the file structure returned by vedpresent.
+
+        If no buffer of the given name already exists,
+
+            vedreadfile(vedfilearg, defaults_p, true)
+                                        -> (new, vedfile_struct)
+
+        is called  to  construct  a  new  vedfile_struct  (as  described
+        above). The vedsetonscreen for this will have its initarg  (i.e.
+        second) argument chosen thus:
+
+          # if filearg contained an initarg  value (see above), that  is
+            used;
+
+          # if the new result from vedreadfile was true, then the string
+            'NEW FILE name' or 'NEW  BUFFER name' (depending on  whether
+            * veddirectory is false, qv);
+
+          # otherwise, false.
+
+
+vededitat(vedfilearg, defaults_p, int_or_string)             [procedure]
+        Same as
+
+                vededit(vedfilearg, defaults_p);
+
+        but  with  * vvedgotoplace   set  to   int_or_string,  so   that
+        vedsetonscreen will initially  position the buffer  at the  line
+        numbered int, or the first line containing string.
+
+
+edit(vedfilearg)                                             [procedure]
+        Same as vededit(vedfilearg),  i.e. vedveddefaults  will be  used
+        as the defaults procedure.
+
+
+vedobey(vedfilearg, p)                                       [procedure]
+        Runs the  procedure p  with vedfilearg  temporarily set  as  the
+        current Ved file, restoring the previous environment afterwards.
+
+        If the system is already inside vedprocess, vededit is called on
+        vedfilearg, p is executed, and vededit is called to restore  the
+        previous current file.
+
+        If  not  already  inside   vedprocess,  vededit  is  called   on
+        vedfilearg to get inside Ved, after adding to ved_char_in_stream
+        a procedure which will call p, restore any old file, and then do
+        vedexit(identfn) to return out of Ved.
+
+
+vedfileselect()                                              [procedure]
+        Prompts for a file to go to from vedbufferlist, by printing  out
+        a list  of  the  buffer  names (on  the  status  line  if  space
+        permits), with numbers  to choose the  one required.
+
+        If more  than 9  files  are being  edited  then some  files  are
+        referred to by  a number  and others  by a  letter. (There  is a
+        limit of 35  files that  can be  selected in  this way.)  Typing
+        anything but a  number or  letter corresponding to  a file  will
+        return to the last file (e.g. just typing <RETURN>).
+
+        If there  are too  many files  to display  on the  status  line,
+        vedfileselect will edit a temporary buffer to show the names  of
+        the files.
+
+        (Note that for most keyboards,  vedfileselect is set on the  key
+        sequence <ESC> e. If this setting is inconvenient, vedsetkey can
+        be used to change it. E.g. putting the line
+
+            vedsetkey('\e\^P', vedfileselect);
+
+        in your  'vedinit.p'  would  set the  sequence  <ESC> CTRL-P  to
+        activate vedfileselect.)
+
+
+vedopen(vedfilearg)                        -> vedfile_struct [procedure]
+vedopen(vedfilearg, defaults_p)            -> vedfile_struct
+vedopen(vedfilearg, addtolist)             -> vedfile_struct
+vedopen(vedfilearg, defaults_p, addtolist) -> vedfile_struct
+        This  procedure  is  like   vededit,  but  instead  of   calling
+        vedsetonscreen to  display  the  file,  it  merely  returns  the
+        vedfile_struct for the file. (It  also does not assign the  file
+        to ved_current_file, nor set up vedprocess, etc.)
+
+        The vedfilearg and defaults_p arguments  are as for vededit.  If
+        vedfilearg is already a Ved file structure, that is returned. If
+        vedfilearg is a filearg,  vedpresent is used to  look for it  in
+        vedbufferlist, and failing that,
+
+            vedreadfile(vedfilearg, defaults_p, false)
+                                        -> (, vedfile_struct)
+
+        is called to create a new file.
+
+        The optional boolean  addtolist argument says  whether the  file
+        should be added to vedbufferlist. If  true (and the file is  not
+        already there),  if  will  added at  the  END  of  vedbufferlist
+        (unlike vedsetonscreen, which always makes it first).
+
+
+2.3  Ved Initialisation Procedures
+----------------------------------
+These procedures are used to set up Ved initially.
+
+
+vedsetup()                                                   [procedure]
+        Called by vededit when  Ved is first used.  Does nothing if  the
+        variable vedsetupdone is true. Otherwise, it
+
+          # compiles   user    initialisation    files    (by    calling
+            * vedinitcomp);
+
+          # sets Ved up for  the type of  terminal currently being  used
+            by calling  * vedinitterm (note  that  the XVed  version  of
+            vedinitterm also calls * vedxvedinit);
+
+          # executes any Ved  "runtime actions" stored  in the  variable
+            * ved_runtime_actions;
+
+          # executes the user-definable procedure * vedinit.
+
+        Finally, it sets the variable vedsetupdone true, to prevent  the
+        initialisation process being  repeated for  subsequent calls  to
+        vededit.
+
+
+vedinitcomp()                                       [procedure variable]
+        Called by  vedsetup to  compile the  'vedinit.p'  initialisation
+        files. These files  may contain  any Pop-11  code for  tailoring
+        Ved. Both a site-wide  and a per-user  'vedinit.p' file will  be
+        compiled if found: the site-wide file is sought in the directory
+        $popsys; the  per-user file  is sought  first in  the  directory
+        $poplib, and  failing that,  in the  current directory.  Neither
+        file need exist. See HELP * INITIAL for more information.
+
+        Note that the way  to create a saved  image with your  vedinit.p
+        pre-compiled is to call vedinitcomp explicitly, and then  assign
+        identfn to it, i.e.
+
+            vedinitcomp();
+            identfn -> vedinitcomp;
+
+        This will stop Ved compiling it again on startup.
+
+
+ved_runtime_apply(p)                                         [procedure]
+        Used to defer Ved initialisations (e.g. key mappings) until  Ved
+        is  first  used.   Adds  the   procedure  p  to   the  list   of
+        initialisation    procedures     ved_runtime_actions,     unless
+        vedsetupdone is true, in which case p is executed immediately.
+
+        (The procedures in ved_runtime_actions are run immediately prior
+        to running the vedinit procedure.)
+
+
+ved_runtime_action                                              [syntax]
+        This `define form' provides  syntactic sugar for notating  calls
+        to ved_runtime_apply - the expression:
+
+            define :ved_runtime_action <name>;
+                <actions>
+            enddefine;
+
+        is precisely equivalent to
+
+            ved_runtime_apply(
+                procedure() with_props <name>;
+                    <actions>
+                endprocedure)
+
+        (Note that <name> is optional, in which case the pdprops of  the
+        procedure passed  to  ved_runtime_apply  are  false).  See  also
+        LIB * DEFINE_VED_RUNTIME_ACTION and HELP * DEFINE_FORM.
+
+
+vedinit()                                           [procedure variable]
+        User-definable procedure called by vedsetup after compiling  the
+        'vedinit.p' files  and setting  the terminal  type. Its  default
+        value is identfn  and so does  nothing; it can  be redefined  to
+        perform any user-specific tailoring.
+
+        See also HELP * INITIAL, REF * VEDTERMINALS and HELP * TERMINAL.
+
+
+
+2.4  Per-File Initialisation Procedures
+---------------------------------------
+These procedures are used  to assign global variables  every time a  new
+Ved buffer is created.
+
+
+vedsetfiletypes(list)                                        [procedure]
+        This  procedure  is  applied  to  the  user-definable  list   of
+        condition-action rules, vedfiletypes, (see  HELP * VEDFILETYPES)
+        whenever a  new Ved  buffer is  created (Cf  vedveddefaults  and
+        vedinitialise), to set the attribute variables according to  the
+        file extension of the current file. It is also run when ved_name
+        is used  to  rename a  Ved  file. vedsetfiletypes  can  also  be
+        invoked  explicitly  by  users,   e.g.  in  the   user-definable
+        procedure * vedveddefaults.
+
+
+vedsearchfiletypes(filename, varname) -> (found, value)      [procedure]
+        Searches vedfiletypes for a rule whose "condition" is  satisfied
+        by filename, and whose "actions" reference the variable varname.
+        If such a  rule is found,  vedsearchfiletypes returns the  value
+        associated with  varname,  and  true  (indicating  a  successful
+        search). Otherwise, false and false are returned.
+
+        An example:
+
+            vedsearchfiletypes('foo.lsp', "subsystem") =>
+            ** <true> lisp
+
+        Notes:
+
+            (1) vedfiletypes is searched in reverse order
+            (2) procedures in the "action" part of a rule are ignored
+
+
+vedveddefaults()                                    [procedure variable]
+        User assignable procedure run whenever a new Ved file is created
+        or read in (defaults to identfn).
+
+        This procedure is run after vedsetfiletypes, and BEFORE the file
+        is read in. (In  contrast to vedinitialise,  which is run  AFTER
+        the file is read in). See also HELP * VEDVEDDEFAULTS.
+
+
+vedinitialise(item)                                 [procedure variable]
+        User definable  procedure invoked  by  vedreadfile after  a  new
+        buffer has  been created,  or after  ved_name has  been used  to
+        change the name of the file.
+
+        It allows initialisation actions to be performed after the  text
+        buffer  exists,   unlike   vedvedefaults   and   the   call   of
+        vedsetfiletypes(vedfiletypes), which occur  before the text  has
+        been read in. The  argument item can take  one of the  following
+        values, with the interpretations specified:
+
+            true
+                invoked by  vedreadfile  when  it creates  a  new  empty
+                buffer because no file was found on disk.
+
+            false
+                invoked by vedreadfile  when it  has found  the file  on
+                disk and read it in.
+
+            "ved_name"
+                invoked by ved_name when used  to change the name of  an
+                existing file.
+
+        (XVed Note:  When vedinitialise  is run  inside vedreadfile,  no
+        window has yet been created for the new file, and wvedwindow  is
+        false  (the  window  is  not  created  until  vedsetonscreen  is
+        called). You can safely call vedputmessage during vedinitialise,
+        since this  will put  the  message out  on  the window  for  the
+        previous file (or on the basewindow), but you should not perform
+        any other window operations.)
+
+
+vedinitfile()                                       [procedure variable]
+        User definable procedure called whenever a file is set on screen
+        (defaults to identfn).
+
+        You should not normally need to use this procedure. For  setting
+        general  file  defaults,  use  the  vedfiletypes  mechanism   or
+        vedveddefaults, which  operate  BEFORE a  file  is read  in,  or
+        vedinitialise, which operates AFTER a file is read in.
+
+
+
+2.5  Quitting a File
+--------------------
+
+vedqget(edit_p)                                              [procedure]
+vedqget(edit_p, create_new_window)
+        Quits the current file (checking if it needs writing), then runs
+        the procedure edit_p to edit a new file.
+
+        The optional boolean argument create_new_window says whether the
+        new file should create  a new window in  XVed or use the  window
+        from the file being quit; if  true, a new window is created,  if
+        false (the default), the old window is used. (This argument  has
+        no effect in non-XVed.)
+
+        This procedure is used to define ved_qget, ved_qhelp,  ved_qref,
+        etc: these are all procedures  that quit the current file,  then
+        start up a new one (using the current window in XVed).
+
+        For example, ved_qved is defined thus:
+
+            define vars ved_qved();
+                ;;; quit current edit and start another
+                if vedargument = nullstring then chain(ved_q) endif;
+                vedqget(ved_ved);   ;;; reuse old window in XVed
+            enddefine;
+
+
+
+
+----------------------------
+3  Reading and Writing Files
+----------------------------
+
+The procedures below are used to get Ved files from disk, and write them
+back again.  The most  basic  procedures are  vedfile_line_repeater  and
+vedfile_line_consumer  (which   process   single   lines),   while   the
+higher-level  vedreadfile  and  vedwritefiles  deal  directly  with  Ved
+buffers.
+
+
+3.1  Ved File Representation
+----------------------------
+This section describes  how Ved buffer  characters are represented  when
+written to disk.
+
+...  Character Attributes
+-------------------------
+From Poplog Version 14.11, Ved is  able to represent attributes such  as
+'bold', 'underline',  and a  colour  number for  each character  in  the
+buffer. (These can be inserted, for example, with the command
+
+        <ENTER> chat
+
+See REF * ved_chat for a description of the available attributes.)
+
+When Ved  buffer lines  are  written to  a  file, characters  that  have
+attributes are translated into sequences containing control  characters.
+For  example,  the  word  'foo'  underlined  will  be  translated   to 3
+underscores followed by  3 backspace characters,  followed by the  word,
+i.e.
+
+         _ _ _ <BS> <BS> <BS> f o o
+
+Thus if  the file  is printed,  the  'foo' will  be overprinted  on  the
+underscores, making it appear underlined.  This is also how  alternative
+font (italic)  will appear  (although that  includes extra  non-printing
+control characters to distinguish it from underlining).
+
+Other attributes  are encoded  by  just inserting  non-printing  control
+characters, and  will therefore  not show  up at  all when  the file  is
+printed. Regardless  of this,  all  characters attributes  are  uniquely
+represented, and will be correctly restored  when the file is read  back
+into Ved.
+
+...  Special Characters
+-----------------------
+Ved graphics and special space characters are also represented in  files
+by special  control  sequences,  which  cause them  to  print  as  their
+ordinary substitute  characters.  See Ved  Special  Characters below.
+
+...  Embedded Strings & Words
+-----------------------------
+From Poplog Version 15+, any character  in a Ved buffer string can  have
+an arbitrary data item attached to it. This is called embedded data (and
+is   implemented   by   the   "vedstring"   procedures   described    in
+REF * STRINGS). However, only embedded strings, dstrings or words can be
+written to a  file, and  if any  character in  a buffer  has other  data
+attached to it, attempting to write the buffer will cause a mishap.
+
+An embedded string or word is written out as a sequence of  non-printing
+control characters, immediately preceding  the character it is  attached
+to. (In general,  embedded characters will  occupy 1.25 -  1.5 times  as
+many bytes on the output file.)
+
+
+
+3.2  Reading
+------------
+
+vedreadfile(filearg, defaults_p) -> (new, vedfile_struct)    [procedure]
+vedreadfile(filearg, defaults_p, setting_on_screen)
+                               -> (new, vedfile_struct)
+        This procedure  creates and  returns a  new Ved  file  structure
+        vedfile_struct,  given  an   input  specification  filearg and a
+        defaults   procedure    defaults_p.   The    optional    boolean
+        setting_on_screen says whether the  new file is being  displayed
+        or not.
+
+        The section filearg Argument to vededit, vedopen and vedreadfile
+        above gives full details of the possible values for the  filearg
+        argument.
+
+
+vedreadin(file)        -> (line1, ..., lineN, N)             [procedure]
+vedreadin(file, plain) -> (line1, ..., lineN, N)
+vedreadin(file)        -> false
+vedreadin(file, plain) -> false
+        Using vedfile_line_repeater, reads in all the lines from a  file
+        or device file, converts them to buffer strings, and leaves them
+        on the stack.
+
+        Both the file argument and  the optional plain argument are  the
+        same as for  vedfile_line_repeater (see below),  and are  passed
+        directly to that procedure.
+
+        The number of  lines read, N,  is returned as  the last  result.
+        However, if an error or interrupt occurs while reading the file,
+        false is returned instead (and no lines).
+
+
+vedfile_line_repeater(file)        -> line_repeater          [procedure]
+vedfile_line_repeater(file, plain) -> line_repeater
+        This is  the most  basic  Ved read  procedure,  and is  used  by
+        vedreadin, vedreadfile, vedselect, ved_r, etc.
+
+        It takes a file  name or input  device file (corresponding  to a
+        disc  file,  pipe  or  mailbox,  etc).  It  returns  a  repeater
+        procedure for Ved buffer lines, i.e. a procedure of the form
+
+                line_repeater() -> string_or_termin
+
+        Each time line_repeater is called,  it reads the next line  from
+        the file/device, converts it to a buffer string, and returns it.
+        termin is returned at end of file.
+
+        As described in Ved File Representation above, certain sequences
+        of control  characters appearing  in  lines are  interpreted  as
+        character attributes, Ved special characters, or embedded string
+        data. Where any character in  a line has attributes, the  result
+        of line_repeater will be a dstring rather than an ordinary  one;
+        if any character in a line has an embedded string attached,  the
+        string  will  have  an   entry  in  * vedstring_data_prop   (see
+        REF * STRINGS).
+
+        However, the  optional plain  argument may  be used  to  disable
+        these interpretations. If true, the  file is read 'as is',  with
+        no  control  characters  being  interpreted  (and  all   strings
+        returned will be ordinary ones).
+
+        If plain is  omitted, it defaults  to the current  value of  the
+        variable vedreadinplain (whose default value is false). Thus you
+        can   use   vedreadinplain    to   control    the   action    of
+        vedfile_line_repeater  when   called   indirectly   from   other
+        procedures (like vedreadin, vededit, etc).
+
+        Normally,  you   would  use   a  true   value  for   plain   (or
+        vedreadinplain) if you wanted to read in an ASCII file that  was
+        produced by a program  other than Ved,  and which also  contains
+        control characters that should not be interpreted as attributes,
+        etc.
+
+        However, certain operating-system utilities (such as nroff  used
+        by the  Unix  man  command)  produce  files  with  'underlining'
+        represented in a  similar way  to Ved's  underlining (i.e.  with
+        underscores and backspaces).  To specify  that such  underlining
+        (only) should be interpreted in terms of Ved attributes (but not
+        other   control    characters),   the    plain   argument    (or
+        vedreadinplain) may  also be  an integer  character,  containing
+        only attribute bits; 'underlined' characters will then be  given
+        those attributes.
+
+        For example, ved_man uses
+
+                vedreadin(pipe, `\[bi]`)
+
+        to read  lines  from  a  Unix  pipe,  with  the  plain  argument
+        specifying 'bold italic'. (See  REF * ITEMISE for a  description
+        of the  \[...]  form  for  specifying  character  attributes  in
+        character constants.)
+
+        The behaviour of vedfile_line_repeater  is also affected by  the
+        variables   vedindentstep,    vedreadintabs,    vednotabs    and
+        vedreadintrailspaces.   See   the    entries   for   these    in
+        REF * VEDVARS.
+
+
+3.3  Writing
+------------
+
+vedwritefiles()                                              [procedure]
+        Write all writeable  and changed files  in vedbufferlist;  calls
+        ved_write_current_file(false)  with  each   such  file  set   as
+        ved_current_file.
+
+
+ved_write_current_file(explicit)          [protected procedure variable]
+        Procedure called  by  ved_w1  and  vedwritefiles  to  write  the
+        current file ved_current_file.
+
+        explicit is true if the  file is being written explicitly,  i.e.
+        if called from ved_w1 (as opposed to being written implicitly by
+        vedwritefiles).
+
+        The standard value of this procedure does
+
+            vedwriterange(vedpathname, 1, vvedbuffersize);
+
+        to write the  buffer contents to  disk, providing vedchanged  is
+        true and veddirectory is not  false. (If veddirectory is  false,
+        the buffer does not  correspond to an actual  disk file, and  an
+        error will result if explicit  is true, otherwise the  procedure
+        does nothing.)
+
+        (N.B. This procedure  is locally redefined  for special  buffers
+        where 'writing'  the buffer  means something  other than  simply
+        writing the contents to disk.)
+
+
+vedwriterange(file, line1, line2)                            [procedure]
+vedwriterange(line1, line2, file)
+        Using  vedfile_line_consumer,  writes  text  lines  from  buffer
+        line1 to line2 inclusive to the filename or device file.
+
+        file may appear either as the first argument (first form) or the
+        last argument (second form) but the first form is preferred.
+
+        Note that if file is a  device, vedwriterange will not close  it
+        afterwards.
+
+
+vedappendrange(file, line1, line2)                           [procedure]
+        Similar to  vedwriterange, except  that the  lines of  text  are
+        appended to the existing contents of file.
+
+        If file is a device, then it should have been opened for reading
+        and writing -- i.e. with access  mode 2 -- to allow for  reading
+        to the end of file before updating. See REF * SYSIO.
+
+
+vedfile_line_consumer(file)        -> line_consumer          [procedure]
+vedfile_line_consumer(file, plain) -> line_consumer
+        This is  the most  basic Ved  write procedure,  and is  used  by
+        vedwriterange, etc.
+
+        It takes  a  filename  or  output  device  file,  and  returns a
+        consumer for Ved buffer lines, i.e. a procedure of the form
+
+                line_consumer(string_or_termin)
+
+        (If file is a  filename, a device is  first created for it  with
+        syscreate.)
+
+        Each time line_consumer is called  with a string as argument  it
+        writes the line to the device. If the given string is a  dstring
+        containing character attributes, and/or the string has  embedded
+        string data (i.e. an  entry in * vedstring_data_prop), then  the
+        appropriate encodings are  performed (as described  in Ved  File
+        Representation above). Ved special characters in the string  are
+        also translated.
+
+        Calling line_consumer(termin) will close the output device (i.e.
+        either the one supplied or the one created).
+
+        The optional argument plain can be used to prevent special  data
+        being encoded in the output, as follows:
+
+            Plain Value     Action
+            -----------     ------
+            0 (or false)    Character attributes, Ved special characters
+                            (graphics, etc),  and embedded  strings  are
+                            encoded in the output (the normal mode).
+
+            1               Character attributes  and  embedded  strings
+                            are ignored, but Ved special characters  are
+                            recognised and translated  to their  default
+                            substitute characters. (This  gives a  plain
+                            ASCII equivalent of the file.)
+
+            2               Character attributes  and  embedded  strings
+                            are ignored, and  no special characters  are
+                            interpreted  except   trailing   space   and
+                            trailing newline.
+
+            3 (or true)     Same  as  2,   without  trailing  space   or
+                            trailing newline being interpreted either.
+
+        If the plain  argument is  omitted, it defaults  to the  current
+        value of the variable  vedwriteoutplain (whose default value  is
+        false). Thus you can use vedwriteoutplain to control the  action
+        of  vedfile_line_consumer  when  called  indirectly  from  other
+        procedures (like vedwriterange, or ved_w, etc).
+
+        For example, the following procedure could be used to filter out
+        all special control characters  from a Ved  file (and write  the
+        result to the standard output):
+
+           define filter(file);
+               lvars file, procedure (repeater, consumer), string;
+               vedfile_line_repeater(file) -> repeater;
+               vedfile_line_consumer(popdevout, 1) -> consumer;
+               until (repeater() ->> string) == termin do
+                   consumer(string)
+               enduntil;
+           enddefine;
+
+
+
+
+-----------------------
+4  Ved Buffer Utilities
+-----------------------
+
+vedappfiles(p)                                               [procedure]
+        Apply the procedure p to every file structure in vedbufferlist.
+
+        ved_current_file is locally set to each file in turn, and p() is
+        called  (with  no   arguments).  (Note  that   for  each   file,
+        ved_on_status is locally set false before calling p.)
+
+
+vedbufferextend()                                            [procedure]
+        Ensure there  is enough  room  for at  least  one more  line  in
+        vedbuffer.
+
+
+vedbuffername(vedfile_struct)       -> string                [procedure]
+vedbuffername(vedfile_struct, true) -> string
+        Returns  the  name  of  the  vedfile_struct,  i.e.  the   string
+        corresponding to vedcurrent. If  the optional true is  included,
+        the full pathname, i.e. the string corresponding to  vedpathname
+        is returned. See REF * VEDVARS.
+
+
+vedpresent(vedfile) -> vedfile_struct_or_false               [procedure]
+        The argument is  either a  file name  or a  Ved file  structure.
+        Tests whether  there  is a  buffer  for the  file  currently  in
+        vedbufferlist and returns the vedfile_struct for that if  found,
+        otherwise false. See also REF * vedsearchlist.
+
+
+ved_save_file_globals()                                      [procedure]
+        Saves  the  values  of  the  global  Ved  variables  (the   file
+        attributes) in the file structure for the current Ved file (i.e.
+        ved_current_file). See REF * ved_current_file.
+
+
+is_vedfile_local(ident)                 -> bool              [procedure]
+is_vedfile_local(ident, vedfile_struct) -> bool
+bool -> is_vedfile_local(ident)
+bool -> is_vedfile_local(ident, vedfile_struct)
+        This procedure represents a mechanism  whereby the idval of  any
+        identifier ident  can be  localised  to the  Ved file  given  by
+        vedfile_struct.   If   omitted,   vedfile_struct   defaults   to
+        ved_current_file.
+
+        When localised, the file maintains its own private value for the
+        identifier -- that  is, whenever vedfile_struct  is assigned  to
+        ved_current_file, the  private  value is  set  as the  idval  of
+        ident, and when  vedfile_struct ceases to  be the current  file,
+        the current private value is saved and the public (or some other
+        file-private) value restored.
+
+        The  base  procedure   returns  true  if   ident  is  local   to
+        vedfile_struct,  false  otherwise.  This  applies  for  all  the
+        standard Ved file variables also, e.g.
+
+            is_vedfile_local(ident vednotabs) =>
+            ** <true>
+
+        For the updater,  if bool is  true then ident  is made local  to
+        vedfile_struct  (if   not   already).   If   vedfile_struct   is
+        ved_current_file, subsequent changes  to the identifier's  value
+        will be private to this file. For example,
+
+            true -> is_vedfile_local(ident current_directory);
+
+        would cause  any  subsequent  directory  changes  while  in  the
+        current file (e.g.  with <ENTER> cd)  to have no  effect on  the
+        current directory while in other files.
+
+        If bool is false, ident is de-localised from vedfile_struct  (if
+        it was local). If vedfile_struct is ved_current_file, the public
+        value of ident  (at the time  the file became  current) will  be
+        restored (or some other file-private value).
+
+        (Note that a mishap  will result if  you attempt to  de-localise
+        one of the standard Ved file variables from a file.)
+
+
+newvedfileprop() -> prop                                     [procedure]
+        Returns a  property  (see REF * PROPS)  which  is keyed  to  the
+        current Ved file, i.e. to ved_current_file.
+
+        That is, prop is procedure of the form
+
+            prop() -> item
+            item -> prop()
+
+        which will associate a  given item with  the current file.  E.g.
+        after
+
+            vars owner = newvedfileprop();
+
+        an assignment such as
+
+            "me" -> owner();
+
+        will cause "me" to be returned for the file which is current  at
+        the time of the assignment, i.e.
+
+            owner() =>
+            ** me
+
+        but not for any other file. Note that the default value of  prop
+        for any particular file is undef.
+
+
+isvedfileprop(item) -> bool                                  [procedure]
+        Returns  true   if   item   is   a   property   constructed   by
+        newvedfileprop, false otherwise.
+
+
+
+
+-----------------------------------------
+5  Refreshing All or Part of a Ved Window
+-----------------------------------------
+
+vedrefresh()                                                 [procedure]
+        Refresh current window.  Often mapped onto  a function key.  Use
+        vedrestorewindows   to   refresh   both   windows.   See   also:
+        vedrefreshline,         vedrefreshrange,         vedrefreshtail,
+        vedrefreshstatus.
+
+
+vedrefreshline(blank, wline, string, char_or_false)          [procedure]
+        Refresh the  window line  wline (line  1 =  status line),  using
+        characters from the string (starting from window column 2).
+
+        If the boolean  blank is  true then the  line is  assumed to  be
+        blank already, otherwise it is cleared first.
+
+        If char_or_false is an integer character (e.g.  -vedscreenmark),
+        then output that character in column 1, otherwise output a space
+        in column 1.
+
+        N.B. This procedure doesn't check that wline <= vedwindowlength.
+
+        See also * vedrefreshrange, * vedrefreshtail.
+
+
+vedrefreshpartline(bool, wline, wcol, n, num, string)        [procedure]
+        Refresh part  of a  line in  the current  window, starting  from
+        wline, wcol (in window co-ordinates, i.e. wline 1 = status line)
+        Use num characters from string, starting from n'th character  in
+        string. If num  = 0  use all the  characters in  the string.  If
+        there are not enough  characters in the  string leave the  extra
+        space blank. If bool  is true, assume that  the line is  already
+        blank, otherwise first blank the portion to be over-written.
+
+        NB doesn't check that wline <= vedwindowlength, or that wcol  <=
+        vedscreenwidth. See  also:  * vedrefreshtail,  * vedrefreshline,
+        * vedscreenblankpartline.
+
+
+vedrefreshtail(bool, wline, wcol, n, string)                 [procedure]
+        Refresh right hand part of line in current window, starting from
+        location wline,  wcol (in  window coordinates).  Use  characters
+        from string, starting from n'th character in string.
+
+        If bool  is  true,  assume  that  the  line  is  already  blank,
+        otherwise first blank it.
+
+        N.B. Doesn't check that wline  <= vedwindowlength, or that  wcol
+        <=     vedscreenwidth.      See      also      * vedrefreshline,
+        * vedrefreshpartline.
+
+
+vedscreenblankpartline(wline, wcol, num) -> bool             [procedure]
+        On window line wline, starting from window column wcol blank num
+        spaces, leaving Ved buffer unchanged.  Return true if only  part
+        of the tail of the line was blanked, false if it was all blanked
+        (using vedscreencleartail as a short cut).
+
+
+vedresize(n_lines, n_cols)                                   [procedure]
+vedresize(n_lines, n_cols, redraw)
+        Resizes the display to fit an output window of n_lines x n_cols.
+        Used for  screens  which  support  variable-sized  windows.  The
+        optional third  parameter redraw  is a  boolean flag  indicating
+        whether the resized display should be redrawn: if this is false,
+        the effect of the resize will not be visible until the next time
+        the display is refreshed. The default is true.
+
+
+vedrestorescreen()                                  [procedure variable]
+        If any printing  has been  done (vedprintingdone  is true)  then
+        print 'VED HERE' message, wait for user to press a key, and then
+        restore screen.
+
+
+vedrestorewindows()                                 [procedure variable]
+        Refreshes both ved windows. Useful if screen has been corrupted.
+
+
+vedsetscreen(string)                                         [procedure]
+        Refresh screen,  making  sure  current location  is  in  visible
+        portion, with string as message. Defined as
+
+            vedalignscreen();
+            vedputmessage(string);
+
+
+
+
+--------------------------------------
+6  Changing or Testing Cursor Location
+--------------------------------------
+
+This section deal with cursor movement, relative to the current position
+or file location, and through use of the cursor position stack. Note the
+last two entries, vedtrimline and vedsetlinesize which must be  executed
+whenever vedline (the  line number  of the current  cursor position)  is
+changed. Procedures that move the cursor  up or down alter the value  of
+vedline. Those that move it left or right alter the value of vedcolumn.
+
+
+vedatend() -> bool                                           [procedure]
+        True if at end of file (i.e. after last line of text in file).
+
+
+vedatstart() -> bool                                         [procedure]
+        True if at the beginning of the first line of the file.
+
+
+vedchardown()                                                [procedure]
+        Move down to next line. Increments vedline
+
+
+vedchardownleft()                                            [procedure]
+        Move down diagonally to the left. Changes vedline and vedcolumn
+
+
+vedchardownleftlots()                                        [procedure]
+        Move down diagonally to the left, several times.
+
+
+vedchardownlots()                                            [procedure]
+        Move down several lines.
+
+
+vedchardownright()                                           [procedure]
+        Move down diagonally to the right.
+
+
+vedchardownrightlots()                                       [procedure]
+        Move down diagonally to the right, several times.
+
+
+vedcharleft()                                                [procedure]
+        Move left one location (decrementing vedcolumn). If necessary go
+        to previous line.
+
+
+vedcharleftlots()                                            [procedure]
+        Move left several locations.
+
+
+vedcharmiddle()                                              [procedure]
+        Move to middle of text in current line.
+
+
+vedcharnext()                                                [procedure]
+        Move forward one location, incrementing vedcolumn. If  necessary
+        go to next line.
+
+
+vedcharright()                                               [procedure]
+        Move right one location, incrementing vedcolumn
+
+
+vedcharrightlots()                                           [procedure]
+        Move right several locations.
+
+
+vedcharup()                                                  [procedure]
+        Move up a line, decrementing vedline. Error if at top of file.
+
+
+vedcharupleft()                                              [procedure]
+        Move up diagonally to left.
+
+
+vedcharupleftlots()                                          [procedure]
+        Move up diagonally to left, several times.
+
+
+vedcharuplots()                                              [procedure]
+        Move up several lines.
+
+
+vedcharupright()                                             [procedure]
+        Move up diagonally to right.
+
+
+vedcharuprightlots()                                         [procedure]
+        Move up diagonally to right, several times.
+
+
+vedendfile()                                                 [procedure]
+        Go to end of the current file.
+
+
+vedendwordright()                                            [procedure]
+        Moves the cursor to  just after the end  of the current word  or
+        the next word if starting in a space. * vedatitemend is used  to
+        determine the end.
+
+
+vedinparagraph() -> item                            [procedure variable]
+        True if  the  current  line  can  be  considered  as  part  of a
+        paragraph. If item is of any  type other than boolean, then  the
+        current line is assumed to be the first line of a paragraph.
+
+        The default  definition returns  false  for empty  lines,  lines
+        starting with a `.`, and  lines starting with a format-space  or
+        standard graphics character;  it returns 1  for lines which  are
+        indented from vedleftmargin, and true otherwise.
+
+
+vedreturn()                                                  [procedure]
+        This ought,  logically,  to be  the  procedure mapped  onto  the
+        RETURN key  in  Ved. Instead  the  procedure is  called  veddocr
+        described above.
+
+
+vedstartwordleft()                                           [procedure]
+        Moves the cursor  to the beginning  of the current  word or  the
+        beginning of  the  next word  to  the  left if  already  at  the
+        beginning of a word or in  a space. * vedatitemstart is used  to
+        determine the start.
+
+
+vedexchangeposition()                                        [procedure]
+        Swap current  location  with  top of  ved  position  stack.  See
+        vedpositionpush.
+
+
+vedjumpto(line, col)                                         [procedure]
+vedjumpto(struct2)
+        Move cursor to  specified location  in Ved  buffer. The  integer
+        line and  col  arguments  may  also be  passed  in  a  structure
+        struct2, which can be a  vector {^line ^col}, a 2-element  list,
+        or any other indexable structure with at least 2 elements.
+
+
+vedmoveitem() -> item                                        [procedure]
+        Return next Pop-11 text item in file, move cursor past it. (This
+        procedure, unlike * vedwordright, uses * incharitem.)
+
+
+vednextline()                                                [procedure]
+        Places the cursor at the start of the next line in the file. See
+        also vedprevline.
+
+
+vednextpara()                                                [procedure]
+        Places the cursor at  the next start of  a paragraph within  the
+        current file. The extent of  a paragraph is determined by  calls
+        to vedinparagraph. See also vedprevpara.
+
+
+vednextparaend()                                             [procedure]
+        Places the cursor  at the  next end  of a  paragraph within  the
+        current file. The extent of  a paragraph is determined by  calls
+        to vedinparagraph. See also vedprevparaend.
+
+
+vednextscreen()                                              [procedure]
+        Displays the  next  screenful  of the  current  file.  See  also
+        vedprevscreen.
+
+
+vednextsent()                                                [procedure]
+        Places the cursor at the start of the next sentence in the file.
+        Sentences are assumed to finish with one of the characters ".?!"
+        (optionally followed  by one  of the  following characters  "]",
+        "}", ")", """, or '), followed by a capital letter. Either  this
+        or  be  separated   by  blank  lines.   See  also   vedprevsent,
+        vednextsentend, and vedprevsentend.
+
+
+vednextsentend()                                             [procedure]
+        Places the  cursor  at  the  next occurrence  of  the  end  of a
+        sentence in the  current file.  See vednextsent  for details  of
+        what is  considered  to be  the  end  of a  sentence.  See  also
+        vedprevsent and vedprevsentend.
+
+
+vedpositionpush()                                            [procedure]
+        Pushes  the  current  cursor  position  onto   vedpositionstack.
+
+
+vedpushkey()                                                 [procedure]
+        Push current  position  onto  vedpositionstack,  truncating  the
+        position stack if there are  more than 5 items. Also  displays a
+        message. (Usually assigned to a key.)
+
+
+vedpositionpop()                                             [procedure]
+        Restores  the   most  recently   saved  cursor   position   from
+        vedpositionstack. Only vedline and vedcolumn are restored.
+
+
+vedpopkey()                                                  [procedure]
+        Like   vedpositionpop,    except    that    vedlineoffset    and
+        vedcolumnoffset are also restored,  so that the window  contents
+        are the same as when the position was saved. (E.g. if you save a
+        position with the procedure starting  at the top of the  screen,
+        then when it  is popped the  procedure will again  start at  the
+        top.)
+
+        In addition, if the stack contains less than 5 saved  positions,
+        the restored position is moved to the back of the stack (instead
+        of being discarded).
+
+
+vedprevline()                                                [procedure]
+        Places the cursor at the start of the previous line in the file.
+        See also vednextline.
+
+
+vedprevpara()                                                [procedure]
+        Places the cursor at  the previous start  of a paragraph  within
+        the current file.  The extent  of a paragraph  is determined  by
+        calls to vedinparagraph. See also vednextpara.
+
+
+vedprevparaend();                                            [procedure]
+        Places the cursor at the previous end of a paragraph within  the
+        current file. The extent of  a paragraph is determined by  calls
+        to vedinparagraph. See also vednextparaend.
+
+
+vedprevscreen()                                              [procedure]
+        Displays the previous  screenful of the  current file. See  also
+        vednextscreen.
+
+
+vedprevsent()                                                [procedure]
+        Places the cursor at the previous start of a sentence within the
+        current file. See vednextsent for  what is considered to be  the
+        end of a sentence. Also see vednextsentend and vedprevsentend.
+
+
+vedprevsentend()                                             [procedure]
+        Places the  cursor  at  the  last occurrence  of  the  end  of a
+        sentence in the  current file.  See vednextsent  for details  of
+        what is  considered  to be  the  end  of a  sentence.  See  also
+        vedprevsent and vednextsentend.
+
+
+vedscreendown()                                              [procedure]
+        Move cursor to bottom of window  or down a window if already  at
+        bottom. Changes vedline.
+
+
+vedscreenleft()                                              [procedure]
+        Move cursor to beginning of line. Alters vedcolumn
+
+
+vedscreenmiddle()                                            [procedure]
+        Move  cursor  to  middle  of  screen  on  current  line.  Alters
+        vedcolumn
+
+
+vedscreenright()                                             [procedure]
+        Move cursor to right of window. Changes vedcolumn.
+
+
+vedscreenup()                                                [procedure]
+        Move cursor to top of window, or up a window if already at  top.
+        (i.e. changes vedline but not vedcolumn)
+
+
+vedsetcursor()                                               [procedure]
+        Put the screen cursor in right  place if current position is  in
+        visible window.
+
+
+vedtableft()                                                 [procedure]
+        Move cursor one tab stop left.
+
+
+vedtabright()                                                [procedure]
+        Move cursor one tab stop right.
+
+
+vedtextleft()                                                [procedure]
+        Move to beginning of text on current line.
+
+
+vedtextright()                                               [procedure]
+        Move to right of text on current line.
+
+
+vedtoperror()                                                [procedure]
+        Abort processing, and print 'TOP OF FILE' message.
+
+
+vedenderror()                                                [procedure]
+        Standard end of file error, like vedtoperror.
+
+
+vedtopfile()                                                 [procedure]
+        Move to top of file.
+
+
+vedwordleft()                                                [procedure]
+        Move word to left.  If the Ved cursor  is at the beginning  of a
+        line, or more than  one character beyond the  end of a line,  or
+        anywhere on an empty  line, this moves the  cursor back to  just
+        after the end  of the  last non-empty line.  Otherwise it  moves
+        left, using  * vedatitemstart to  determine when  it is  at  the
+        beginning of  a text  item. Thereafter  it traverses  any  space
+        characters on the  left, until it  is just to  the right of  the
+        next text item, or at the beginning of a line. If there are tabs
+        in the file each is treated as  a word, and the cursor stops  at
+        tab boundaries.  Like  * vedwordright,  the  behaviour  of  this
+        procedure can be controlled by redefining * vedchartype. (It  is
+        redefined for LISP, for example.)
+
+
+vedwordright()                                               [procedure]
+        Move word right.  This procedure  moves the  Ved cursor  right a
+        character at a time, using  * vedatitemend to determine when  it
+        has reached a text item boundary.  Unless it is at the end  of a
+        line it then traverses any spaces, to reach the beginning of the
+        next item. If  invoked at  the end  of a  line, it  goes to  the
+        beginning of the next non-empty line, or, if there isn't one, to
+        the beginning of the next line. Like * vedwordleft its behaviour
+        can be controlled by redefining * vedchartype. If there are  any
+        tabs they are treated  as separate words. I.e.  it stops at  tab
+        boundaries (unlike * vedmoveitem, which uses the Pop-11  lexical
+        analyser, * incharitem).
+
+
+vedsetlinesize()                                             [procedure]
+        Must  be  called   every  time  vedline   is  changed.   Updates
+        vvedlinesize.
+
+
+vedtrimline()                                                [procedure]
+        Use this before vedline is  altered, to remove any extra  spaces
+        from the right hand end.
+
+
+
+
+-----------------------
+7  Ved Input and Output
+-----------------------
+
+7.1  Low Level
+--------------
+
+From Poplog version 14.1 all input and output in Ved is handled by a set
+of redefinable  procedures which  are listed  below. All  Ved input  and
+output should operate via these procedures.
+
+The procedures are redefined according to the type of Ved being used: in
+XVed, for example,  they send  and receive  data from  the current  XVed
+window. (Any  assumptions  about  them  referring  to  poprawdevin   and
+poprawdevout, or rawcharin and rawcharout, are incorrect.)
+
+Note that in XVed, when called  from inside vedprocess (as they  usually
+are),   vedscr_read_input    and    vedscr_read_ascii    will    suspend
+vedprocessproc if no input is waiting.
+
+vedscr_read_input() -> char_or_p                    [procedure variable]
+        Read the  next  character  from  the  keyboard.  In  XVed,  this
+        procedure can also  return a  procedure to be  executed (e.g  to
+        switch files if input is not for the current window).
+
+
+vedscr_read_ascii() -> char                         [procedure variable]
+        Like vedscr_read_input, but is guaranteed to return a character.
+        In XVed, input from  windows other than  the current is  blocked
+        while waiting for a character.
+
+
+vedscr_input_waiting() -> int_or_false              [procedure variable]
+        Returns an integer count of the number of input items that  have
+        yet to be read into Ved from the input source, or false if there
+        are none.
+
+
+vedscr_clear_input()                                [procedure variable]
+        Clears the queue of items that have yet to be read from the  Ved
+        input source.
+
+
+vedscr_char_out(char_or_string)                     [procedure variable]
+        Writes the character or string to the current screen or window.
+
+
+vedscr_substring_out(string, n, len)                [procedure variable]
+        Writes len characters of string string to the current screen  or
+        window, starting at the n-th character.
+
+
+vedscr_flush_output()                               [procedure variable]
+        Writes any outstanding  characters in the  Ved output buffer  to
+        the screen.
+
+
+7.2  Higher Level
+-----------------
+The following section gives  higher level input/output procedures  which
+use the low-level variable procedures outlined in the previous section.
+
+They also use the  list * ved_char_in_stream to  buffer input; this  can
+contain characters, strings,  and procedures, and  provides a  mechanism
+for simulating Ved input, e.g. for defining macros, abbreviations,  etc.
+(Note that when read, a string appearing in ved_char_in_stream will have
+its  first   character  returned   and  the   remainder  put   back   on
+ved_char_in_stream.)
+
+The procedure  vedinput provides  a convenient  way of  adding items  to
+ved_char_in_stream.
+
+In XVed,  when called  from  inside vedprocess  (as they  usually  are),
+vedgetinput and vedinascii  will suspend vedprocessproc  if no input  is
+waiting.
+
+vedgetinput() -> char_or_p                                   [procedure]
+        Returns   the   next   input   character   or   procedure   from
+        ved_char_in_stream   if   that   is   non-empty,   or    reads a
+        character/procedure with vedscr_read_input otherwise.
+
+
+vedinascii() -> char                                         [procedure]
+        Like vedgetinput, but is guaranteed  to return a character.  Any
+        procedures buffered on ved_char_in_stream are discarded, and  if
+        ved_char_in_stream   contains   no   characters   or    strings,
+        vedscr_read_ascii is  called  to  get a  character  (instead  of
+        vedscr_read_input).
+
+        Calling vedscr_read_ascii means that in XVed, input from windows
+        other than the current is blocked while waiting for a character.
+
+
+vedinputwaiting() -> bool                                    [procedure]
+        Returns true  if  there  is unprocessed  Ved  input,  i.e.  when
+        vedscr_input_waiting    returns    a    non-false    value    or
+        ved_char_in_steam is a non-empty list.
+
+
+vedclearinput()                                              [procedure]
+        Writes any  outstanding characters  in  the Ved  output  buffer,
+        clears the input buffer and resets ved_char_in_stream to [].
+
+
+vedinput(item_or_list)                                       [procedure]
+        Adds item at  the front of  ved_char_in_stream, or  concatenates
+        list to the beginning of it. item (or each item in list) must be
+        be a character, string, or procedure.
+
+        (In XVed, this procedure also  calls XptSetXtWakeup, so that  if
+        used in an X callback context it will tell Poplog to return from
+        processing   X    events    and    allow    Ved    to    process
+        ved_char_in_stream.)
+
+
+vedinkeys(string)                                            [procedure]
+        Prints the string on the command  line as a prompt to the  user,
+        then reads  in  keys. The  codes  transmitted by  each  key  are
+        inserted into  the current  file in  a manner  suitable for  the
+        itemiser to build a string containing them. vedinkeys exits when
+        the user types three ESCs Used  by VED_DK and VED_DM to read  in
+        sequences of key strokes.
+
+
+vedreadinteger() -> (integer, char)                          [procedure]
+        Returns an  integer  (ie  sequence  of  digits)  read  from  the
+        keyboard, returns when a non-digit  is typed, the terminator  is
+        returned as char.
+
+
+vedrepeat()                                                  [procedure]
+        Reads an integer  (N) from the  keyboard (using  vedreadinteger)
+        then reads  a key  sequence  which maps  onto some  action.  The
+        action is repeated N times.
+
+
+vedscreenbell()                                     [procedure variable]
+        Ring terminal  bell. Sometimes  just flashes  the screen.  User-
+        definable.
+
+
+ved_get_reply(mess, answer_chars) -> char           [procedure variable]
+        Rings the  bell  and  displays  the  message  string  mess  with
+        vedputmessage, and  then  calls  vedinascii  to  read  a  single
+        character in response (which is always translated to lowercase).
+
+        Only  characters  contained  in  the  string  answer_chars   are
+        accepted; any other character typed is ignored (and the bell and
+        message are  repeated). When  an  acceptable character  char  is
+        typed, this is returned.
+
+
+
+7.3  Mapping Input Characters to Procedures
+-------------------------------------------
+Using the  Ved  character  input tables  (* vednormaltable  etc),  these
+procedures map sequences of input characters onto procedures.
+
+vedgetproctable(char_or_string_or_char_rep) -> p_or_undef    [procedure]
+        Returns the Ved action procedure p associated with
+
+            (1) a character char  (plus further  input characters  where
+                necesssary);
+
+            (2) the sequence of characters in a string string;
+
+            (3) the sequence  of  characters  supplied  by  a  character
+                repeater procedure char_rep.
+
+        The characters  are  used  to work  through  the  Ved  character
+        tables, starting  from  vednormaltable,  until  a  procedure  or
+        "undef" is found. (Each  character is assigned to  ved_last_char
+        as it is processed.)  In the char case,  if the tables  indicate
+        that  one  or  more  continuation  characters  are  required  to
+        interpret char, these are read using vedinascii.
+
+        If no procedure is associated  with the character sequence  then
+        the word "undef" is returned.
+
+        See also * vednormaltable, * vedescapetable, * vedquerytable.
+
+
+vedkeyproc(string) -> p                                      [procedure]
+        Returns the procedure associated with the key that transmits the
+        control codes given in string. Gives a vederror if no  procedure
+        is associated with the characters in string or if more than  one
+        procedure is  associated with  the  characters in  string.  Uses
+        vedgetproctable.
+
+
+vedsetkey(string, item)                                      [procedure]
+        Alter Ved's character  tables so that  the characters in  string
+        are mapped onto item. See HELP * VEDSETKEY for more details.  An
+        alternative mechanism that  uses a more  readable syntax and  is
+        probably more suitable for non-Pop-11 programmers is the  vedset
+        keys construct described in HELP * VEDSET.
+
+
+
+
+--------------------
+8  The Ved Main Loop
+--------------------
+
+These procedures  control  the  main  processing loop  of  Ved.  In  all
+versions of Ved, vedprocess  is run as  the process vedprocessproc;  for
+non-XVed, this is done  by vededit and the  process does not exit  until
+there are no files remaining (or vedexit is called).
+
+In XVed, however, the  process is suspended whenever  there is no  input
+waiting, and  resumed  (via  vedprocess_try_input)  whenever  Ved  input
+becomes available while Poplog is in a wait state, e.g. when waiting for
+input from an interactive device  (such as a terminal/pipe/mailbox),  or
+during a syshibernate.
+
+vedprocess()                                                 [procedure]
+        Repeatedly reads in  and processes input  characters and  action
+        procedures, using vedprocesschar. It calls vedprocesstrap before
+        reading each input item.
+
+        This procedure  constitutes  the  Ved top  level  loop,  and  is
+        constructed as a process in vedprocessproc. (It must not be  run
+        except as runproc(vedprocessproc).)
+
+        Inside vedprocess,  the  variable vedinvedprocess  is  set  true
+        (this is a protected variable and must not be assigned to).  The
+        variable vedediting is also set true on entry to vedprocess.
+
+
+vedprocesschar()                                             [procedure]
+        Repeatedly called by vedprocess. Each call reads a character  or
+        action  procedure   using  vedgetinput   (and  assigns   it   to
+        ved_last_char).
+
+        If  a  character  is  returned,  vedgetproctable  is  called  to
+        translate it to an action  procedure (which may involve  reading
+        further characters, see * vedgetproctable).
+
+        The action procedure returned by vedgetinput or  vedgetproctable
+        is then  executed. (Often,  this  will be  vedinsertvedchar,  to
+        insert the last character assigned to ved_last_char.)
+
+        In XVed, the call to vedgetinput etc will suspend vedprocessproc
+        if no input is waiting.
+
+
+vedprocess_try_input()                                       [procedure]
+        Except for XVed, this procedure does nothing.
+
+        In XVed, it tests whether vedinputwaiting is true and if so (and
+        vedinvedprocess is not already true), it runs vedprocessproc  to
+        re-activate the top-level  Ved loop  and deal  with the  waiting
+        input  (after  first  ensuring  that  vedprocessproc  is   live,
+        constructing a new process if not). If no Ved input is  waiting,
+        it just returns.
+
+
+vedexit(p)                                                   [procedure]
+        Exits from  vedprocess (and  in non-XVed,  the call  of  vededit
+        which invoked it), then chains to p.
+
+        It ensures that the global variables of all files are updated in
+        their file structures. Note  that the command procedure  ved_pop
+        is simply defined as
+
+            vedexit(identfn)
+
+        Since in XVed, vedprocessproc is being suspended and resumed all
+        the time, the  only effect  of calling  vedexit is  to kill  the
+        current vedprocessproc and force vededit or vedprocess_try_input
+        to create a new one next time.
+
+
+
+
+------------------------------
+9  Inserting and Deleting Text
+------------------------------
+
+9.1  Inserting
+--------------
+
+These routines are  used to  insert text  into the  file. This  normally
+causes the altered text to be displayed  on the screen. The text may  be
+either characters  read  from  the  keyboard,  or  strings  supplied  by
+commands or procedures. Procedures to  output information on the  status
+line are documented separately, in the section dealing with the  command
+line. Normally when  Ved is  in its top-level  loop (see  * vedprocess),
+ordinary printing  characters  read  in are  simply  inserted  into  the
+current Ved buffer (or the command line, if appropriate) at the  current
+cursor location. This uses * vedinsertvedchar.
+
+Additional text-insertion  procedures  are  the  "yank"  procedures  for
+undoing deletions, e.g. ved_y, ved_yankl, ved_yankw, ved_splice.
+
+
+vedcharinsert(char)                                          [procedure]
+        Inserts  the  character  char  at  the  current  location,   and
+        (providing vedstatic is  false), moves  the cursor  to the  next
+        column, i.e. adds 1 to vedcolumn.
+
+        char is a  24-bit integer representing  an ASCII character  with
+        attributes; note that any attributes (bits  16 - 23) set in  the
+        variable vedcharinsert_attr are or'ed into char before inserting
+        it. (This also applies to vedinsertstring and vedinsertvedchar.)
+
+        char may also be a pair of the form
+
+            conspair(integer-char, data)
+
+        representing a character with associated data item data. In this
+        case, as well as inserting the integer character, the item  data
+        will be attached to it in the current Ved buffer line.
+
+
+veddocr()                                           [procedure variable]
+        Normally mapped onto the <RETURN> key. It will normally insert a
+        line break (like vedcharinsert(`\n`)) unless either the file  is
+        an "immediate  mode" file,  or the  cursor is  currently on  the
+        status line.
+
+        If invoked with vedonstatus true  (i.e. currently on command  or
+        status line)  this is  equivalent to  vedredocommand  (described
+        below).
+
+        If the  current  file is  an  "immediate mode"  file,  then,  if
+        vedcrinteractive is false veddocr inserts a line break. If  true
+        it sends  the current  line to  the suspended  compiler  process
+        associated with the file.
+
+        For more  on  immediate  mode see  * vedsetpop,  and  HELP * IM,
+        * IMCSH (Unix), * IMSH (Unix), * IMDCL (VMS).
+
+
+vedinsertstring(string_or_word)                              [procedure]
+vedinsertstring(char1, ..., charN, N)
+        In the first form, inserts  the characters of string_or_word  at
+        the  current  location.  In  the  second  form,  inserts   the N
+        characters char1, ..., charN at the current location.
+
+
+vedinsertvedchar()                                           [procedure]
+        Takes   last   character   read   in   (using   vedinascii)   by
+        vedprocesschar  or  vedgetproctable  (stored  in  the   variable
+        ved_last_char) and  inserts  it into  the  current file  at  the
+        cursor position.
+
+
+vedlineabove()                                               [procedure]
+        Insert blank  line  above  current line.  Use  vedleftmargin  to
+        locate cursor.
+
+
+vedlinebelow()                                               [procedure]
+        Insert blank  line  below  current line.  Use  vedleftmargin  to
+        locate cursor.
+
+
+9.2  Deleting
+-------------
+
+Besides the procedures listed here see also procedures in REF * VEDCOMMS
+e.g. * ved_d and * ved_cut (delete text between two stacked  positions).
+Some of the delete  procedures store the last  item deleted in a  global
+variable and have corresponding "yank"  procedures to reinsert what  was
+last deleted, e.g * ved_y,  * ved_yankl, * ved_yankw, and  * ved_splice.
+See HELP * VEDBLOCKS for additional facilities, e.g. * ved_dtb, ved_ytb,
+and * vedcutblock (described below).
+
+
+vedchardelete()                                              [procedure]
+        Delete character to left of cursor.
+
+
+vedclearhead()                                               [procedure]
+        Delete current line to left of cursor. Undo with * ved_yankw
+
+
+vedcleartail()                                               [procedure]
+        Delete current line to right of cursor. Undo with * ved_yankw
+
+
+veddotdelete()                                               [procedure]
+        Deletes the character under the cursor.
+
+
+vedendwordrightdelete()                                      [procedure]
+        Deletes all the characters  up to the end  of the current  word,
+        using * vedendwordright to determine where to delete to.
+
+
+vedlinedelete()                                              [procedure]
+        Delete current line in buffer. Undo with * ved_yankl
+
+
+vedspandelete(col_1, col_2, item)                            [procedure]
+        Delete  some  text  from  the  current  line,  specifically  the
+        characters between col_1 and  col_2 (in buffer coordinates).  If
+        the item is not false, then  the text is saved in  vvedworddump,
+        which is returned.
+
+
+vedstartwordleftdelete()                                     [procedure]
+        Delete all the characters from the cursor, left to the beginning
+        of   the   current   word,   or   the   previous   word,   using
+        * vedstartwordleft to determine where to delete to.
+
+
+vedwordleftdelete()                                          [procedure]
+        This procedure uses * vedwordright to move the cursor, and  then
+        deletes text between the initial and final cursor locations. The
+        deleted text is saved in  * vvedworddump and can be  re-inserted
+        using * ved_yankw
+
+
+vedwordrightdelete()                                         [procedure]
+        Exactly like * vedwordleftdelete,  using * vedwordright  instead
+        of * vedwordleft to move the cursor. Undo with * ved_yankw
+
+
+
+
+---------------------------
+10  The Command/Status Line
+---------------------------
+
+These are the procedures  used to handle the  command line, and  command
+execution. They handle command line input and interpretation, writing to
+the command line, and switching from the command line to the body of the
+current file.
+
+veddebug(string)                                             [procedure]
+        For debugging Ved procedures. Displays the string on the command
+        line, wiggles cursor  at current  location, then  waits for  the
+        user to  type a  key. Pressing  <RETURN> causes  the program  to
+        continue. Any other key causes a popready break. On return  from
+        the  break   it  restores   the  screen.   See   LIB * VEDDEBUG,
+        HELP * POPREADY
+
+
+veddo(string)                                                [procedure]
+veddo(string, put_on_status)
+        Acts as if string had been typed on command line.  HELP * VEDDO.
+        If put_on_status is true and the  string is not the same as  the
+        current status line command, then vedputcommand is called to put
+        string on the command line.
+
+
+veddocommand()                                               [procedure]
+        Parses and obeys command line.
+
+
+vedenter()                                                   [procedure]
+        This prepares Ved for user commands to be typed in on the status
+        line.  Unless   ved_on_status   is  already   true,   it   calls
+        vedstatusswitch to  put Ved  into  status buffer  editing  mode,
+        setting ved_on_status true,  marking the left  hand edge of  the
+        cursor line  in  the current  Ved  buffer, and  switching  Ved's
+        global variables to refer to the status buffer.
+
+        It then does vedendfile() to get to  a blank line at the end  of
+        the  status  buffer,   leaving  previous  status-line   commands
+        accessible via vedcharup().  The cursor is  left visible on  the
+        empty command line.
+
+        When the veddocr key (normally  RETURN) is pressed, the  command
+        is analysed and obeyed, by veddocommand
+
+        See also vedstatusswitch (below) and HELP * VEDCOMMANDS.
+
+
+vederror(string)                                    [procedure variable]
+        Aborts processing, prints string on the status line and  bleeps.
+        This procedure is invoked by Ved  to handle errors for which  it
+        would be overkill to call mishap.
+
+        (See also REF * EXCEPTION, HELP * MISHAP.)
+
+
+vedputcommand(string)                                        [procedure]
+vedputcommand(string, at_end)
+        Puts string onto the command line (where it can later be  obeyed
+        by veddocommand  or  vedredocommand). If  the  optional  boolean
+        at_end is true (the default if omitted), a new line is added  at
+        the end of  the status line  buffer; otherwise, string  replaces
+        the current line.
+
+
+vedputmessage(string)                               [procedure variable]
+        Display message  string on  status  line, unless  vedediting  is
+        false. If  outside of  Ved  or there  is  no current  file,  the
+        message is printed on standard  output, regardless of the  value
+        of vedediting.
+
+
+vedredocommand()                                             [procedure]
+        Executes the command shown on the Ved status line. If  necessary
+        it calls vedstatusswitch to ensure that -ved_on_status is  true,
+        then it calls a system procedure  to tidy up the line, and  then
+        calls veddocommand.
+
+
+vedrefreshstatus()                                           [procedure]
+        Refresh the status line.
+
+
+vedsetstatus(string, paren, redraw)                          [procedure]
+        (For system use.)
+
+        Re-build the status  line with  string as message.  If paren  is
+        true, then put  the message  between parentheses.  If redraw  is
+        true then redraw  the status  line on  screen (but  if the  true
+        value  is  the  word  "undef",  don't  flush  the  output).  See
+        * vedputmessage.
+
+
+vedsetnormalmessage(flush)                          [procedure variable]
+        (For system use.)
+
+        Called at the end of every vedprocess loop, this procedure  uses
+        vedsetstatus to set the  normal message on  the status line  and
+        set the cursor where it should be. The message displayed will be
+        (a) empty when on the  status line, (b) vedmessage otherwise  if
+        it is not empty. If  vedmessage is empty, the message  displayed
+        is vednamestring.
+
+        If flush is true, vedscr_flush_output is called afterwards.
+
+
+vedstatusswitch()                                            [procedure]
+        Switch cursor  from status  line  to Ved  file, or  vice  versa,
+        erasing or leaving  a "mark"  at the  left edge  of the  current
+        cursor line. It is basically the same as
+
+                not(ved_on_status) -> ved_on_status
+
+        except that cursor line mark is drawn when going onto the status
+        line, or erased when coming off it.
+
+
+vedexpandchars(char) -> p                                     [property]
+        A property table associating characters with procedures. Used in
+        the expansion  of  command  line  abbreviations,  the  character
+        following the occurrence of vedexpandchar  is looked up in  this
+        table, and  the  associated  procedure  is  executed.  See  also
+        HELP * VEDEXPAND.
+
+
+
+
+-------------------------
+11  Text Editor Functions
+-------------------------
+
+This  suite  of  procedures  perform  additional  text  related   editor
+functions, e.g. case changing.
+
+vedcapword()                                                 [procedure]
+        Capitalises the initial letter of  the current word, then  moves
+        right to next word.
+
+
+vedchangecase()                                              [procedure]
+        Change chase of current character and move right one.
+
+
+vedchartype(char) -> char                           [procedure variable]
+        Returns a char which typifies  the class of characters of  which
+        the given char is  a member. Thus, if  given a-z returns a,  0-9
+        returns 0 etc.
+
+        This procedure controls the  behaviour of both  * vedatitemstart
+        and * vedatitemend, and can  be redefined to  suit the needs  of
+        different programming  languages.  The default  definition  (for
+        Pop-11 users) is (approximately):
+
+            define vars vedchartype(char) -> type;
+                lvars char, type;
+                checkinteger(char, 0, false);
+                if char == ` ` then ` `
+                elseif locchar(char, 1, '()[]{}",;%.') then `.`
+                elseif isalphacode(char) then `a`
+                elseif isnumbercode(char) then `0`
+                elseif locchar(char, 1, '+-><*=^!#$&~|\@:/?')
+                      then `+`
+                else    char    ;;; control character, `_`, `'`, ```
+                endif
+            enddefine;
+
+
+vedcurrentchar()    -> char                                  [procedure]
+char -> vedcurrentchar()
+vedcurrentdchar()   -> char                                  [procedure]
+char -> vedcurrentdchar()
+vedcurrentvedchar() -> char                                  [procedure]
+char -> vedcurrentvedchar()
+        These procedures return  or update the  character at the  cursor
+        position (without moving it).
+
+        The difference between  them is that  vedcurrentchar returns  or
+        updates only the character-code (ASCII) part of each  character,
+        vedcurrentdchar returns or updates the character and its display
+        attributes  (i.e.  a  24-bit  integer),  and   vedcurrentvedchar
+        returns or  updates  both the  full  integer character  and  any
+        associated data  item (see  Display  Strings and  Vedstrings  in
+        REF * STRINGS).
+
+        Thus vedcurrentchar returns an ASCII character,  vedcurrentdchar
+        an  ASCII  character  with  attributes,  and   vedcurrentvedchar
+        returns an integer character or  pair if there is an  associated
+        data item.
+
+        For any of  the updaters, char  may be an  integer character  or
+        pair (as for * vedcharinsert above), but only the relevant  part
+        is used.
+
+
+vedcurrentchartype() -> char                                 [procedure]
+        Returns a character  which typifies the  class of characters  of
+        which the character to the left of the cursor is a member.  Thus
+        any number returns `0`, any letter returns `a` etc.
+
+        N.B.  This  procedure  is  misnamed  --  it  should  be   called
+        vedlastchartype.
+
+
+veddecodetabs(string) -> string                              [procedure]
+        Remove the extra tabs put  into a string by  vedcharinsert(tab).
+        veddecodetabs is controlled by vedindentstep.
+
+
+vedencodetabs(string) -> string                              [procedure]
+        See veddecodetabs.
+
+
+vedlinestart(string)                                         [procedure]
+        True if  string occurs  at beginning  of current  line and  is a
+        separate text item (see HELP * issubitem).
+
+
+vedsetstatic()                                               [procedure]
+        Switch static mode on or off. Toggles vedstatic
+
+
+vedsetwindow()                                               [procedure]
+        Make current window fill whole screen, or return to half screen.
+        Usually mapped to <ESC> w.
+
+
+vedswapfiles()                                      [procedure variable]
+        Switch cursor  to other  file. Set  it on  screen if  necessary.
+        Usually mapped to <ESC> x.
+
+
+vedthisline() -> string                                      [procedure]
+string -> vedthisline()
+        Returns or updates the  (string or dstring) string  representing
+        the current line.
+
+
+vedthisstring() -> string                                    [procedure]
+        Equivalent to veddecodetabs(vedthisline()).
+
+
+vedwiggle(line, col)                                         [procedure]
+        Put cursor at the given (line, col) location in the buffer,  and
+        make it wiggle. The cursor can be made to wiggle on the  command
+        line by specifying  line = 0.  The length of  time for which  it
+        wiggles is  determined  by  the  variable  vedwiggletimes  which
+        defaults to 5, probably far too little for modern terminals  and
+        workstations. E.g.  try  35  on  a Sun3/60,  more  on  a  faster
+        machine.
+
+
+
+------------------------
+12  Searching Procedures
+------------------------
+
+See REF * VEDSEARCH for a comprehensive overview of the facilities for
+searching Ved buffers, and for details of the following procedures:
+
+    * ved_try_search    * ved_check_search
+    * ved_set_search    * ved_query_last_search
+    * ved_search_or_substitute
+    * ved_search        * ved_re_search
+    * ved_backsearch    * ved_re_backsearch
+
+
+
+----------------------------
+13  Program Editor Functions
+----------------------------
+
+These procedures handle functions of Ved related to program files.  I.e.
+compilation etc.
+
+
+vedargint(string) -> integer                                 [procedure]
+        Returns the  integer  represented  by  the  given  string  (like
+        strnumber), or the integer 1 if the string does not  represent a
+        valid number. If it represents a number but not an integer, then
+        unlike * vedargnum, this produces an error.
+
+
+vedargnum(string) -> number                                  [procedure]
+        Returns  the  number  represented  by  the  given  string  (like
+        strnumber), or the integer 1 if the string does not  represent a
+        valid number. Compare * vedargint
+
+
+vedatitemend(n, string, m)                                   [procedure]
+        True if location n is a legitimate text item boundary in string,
+        treating characters beyond location m as spaces. This is used by
+        * vedwordright, * vedendwordright, and * issubitem.
+
+        The behaviour of this  procedure, like * vedatitemstart, can  be
+        altered by redefining * vedchartype.
+
+
+vedatitemstart(n, string, m)                                 [procedure]
+        True if location  n is  a legitimate start  for a  text item  in
+        string treating characters beyond location m as spaces. This  is
+        used by * vedwordleft, * vedstartwordleft, and * issubitem.
+
+        The behaviour of this  procedure, like * vedatitemstart, can  be
+        altered by redefining * vedchartype (as is done for LISP).
+
+
+vedcompilefiles()                                            [procedure]
+        Compile all compilable and changed files.
+
+
+vedcompilevedargument()                                      [procedure]
+        Interprets vedargument  as a  fragment of  Pop-11 code.  Assumes
+        that the first  character of  vedargument is a  colon, which  it
+        removes.
+
+
+vedconvertword(test_p, conv_p, N_or_string, moveright)       [procedure]
+        Applies procedure test_p to each character of the N words to the
+        left or right of the cursor, characters for which test_p returns
+        true being converted with procedure conv_p.
+
+        N_or_string may  specify the  integer N  directly, or  may  be a
+        string such that the  result of applying  strnumber to it  gives
+        the integer N.
+
+        The direction  is  specified  by  the  boolean  moveright,  true
+        meaning right and false  left. (Note that  if the cursor  starts
+        off in the middle of a word, that whole word is the first one.)
+
+        test_p is a procedure of the form
+
+                test_p(CHAR) -> BOOL
+
+        All characters for which it  returns a true result are  replaced
+        by the  result of  applying  conv_p to  them, i.e.  conv_p  is a
+        procedure of the form
+
+                conv_p(CHAR) -> NEWCHAR
+
+
+vedconvertline(test_p, conv_p, N_or_string)                  [procedure]
+        Applies procedure  test_p  to  each character  of  the  N  lines
+        starting from  the current  line,  characters for  which  test_p
+        returns true being converted with procedure conv_p.
+
+        N_or_string may  specify the  integer N  directly, or  may  be a
+        string such that the  result of applying  strnumber to it  gives
+        the integer N.
+
+        test_p and conv_p are the same as for vedconvertword above.
+
+
+vedconvertrange(test_p, conv_p)                              [procedure]
+        Applies procedure test_p to each  character of all lines in  the
+        current marked range, characters  for which test_p returns  true
+        being converted with procedure conv_p.
+
+        test_p and conv_p are the same as for vedconvertword above.
+
+
+vedconvertseln(test_p, conv_p)                               [procedure]
+        Applies procedure conv_p to each  character in the current  Xved
+        selection that  satisfies  the  procedure test_p.  An  error  is
+        signalled if the current Ved window is not an Xved window, or if
+        it does not  contain a  selection. vedconvertseln  is called  by
+        ved_chat to implement the s option.
+
+
+veddointerrupt()                                             [procedure]
+        Abort current processing, flush input and output. Return to  Ved
+        top level. The default action when an interrupt occurs.
+
+
+vedfindpdheader(name, exact) -> line                [procedure variable]
+        Searches the  current  file for  the  definition of  the  Pop-11
+        procedure named name, which (if exact is true) is the exact name
+        of the procedure, or (if exact is false) is some initial part of
+        a procedure name. name should be a string or a word. Returns the
+        number of the line where  the matching procedure definition  was
+        found, or false if a matching definition could not be located.
+
+
+vedloadline()                                                [procedure]
+        Loads current line  without altering the  marked range.  Usually
+        mapped to <ESC> d.
+
+
+vednextitem() -> item                                        [procedure]
+        Returns the  next Pop-11  text  item in  the current  file,  but
+        leaving the current  cursor unchanged.  (It uses  * vedmoveitem,
+        then goes back to the original position.)
+
+
+vedout(file, returntofile, onscreen, initialise)             [procedure]
+                                            ->  char_cons
+        For printing into a file. See HELP * VEDOUT.
+
+
+vedpopexit()                                                 [procedure]
+        This procedure  is  run  on  exit from  Poplog,  i.e.  when  the
+        procedure * sysexit is called.  sysexit first runs the  variable
+        procedure * popexit (which defaults to identfn), and then  calls
+        vedpopexit.
+
+        vedpopexit checks if  there are  changed files left  in the  Ved
+        buffers, and if appropriate writes them to disk. You can make it
+        ask whether to write the files by assigning true to the variable
+        * vedalwaysask.
+
+
+ved_pr_exception(item1, ..., itemN, N,              [procedure variable]
+                        mess, idstring, severity)
+        Version of * pop_pr_exception used by Ved.
+
+
+vedrangerepeater(line1, line2) -> char_rep                   [procedure]
+        Returns a  character repeater  that  reads characters  from  the
+        current file between  line1 and line2  (in buffer  coordinates).
+        Compare * vedblockrepeater.
+
+
+vedrepeater()    -> char                                     [procedure]
+veddrepeater()   -> char                                     [procedure]
+vedvedrepeater() -> char                                     [procedure]
+        These procedures  return the  character  at the  current  cursor
+        position, and move the cursor one place forward.
+
+        The difference between them is that vedrepeater returns only the
+        character-code (ASCII)  part  of  each  character,  veddrepeater
+        returns the character and its display attributes (i.e. a  24-bit
+        integer), and  vedvedrepeater  returns  both  the  full  integer
+        character and any associated data item (i.e. a pair if there  is
+        an associated data item). See Display Strings and Vedstrings  in
+        REF * STRINGS.
+
+        N.B. These procedures  set poplastchar (to  the ASCII  character
+        only).
+
+
+vedlinerepeater() -> string                                  [procedure]
+        Returns the current line  of the current Ved  file (a string  or
+        dstring), and  moves the  cursor to  the beginning  of the  next
+        line.  Removes   unnecessary   tabs   from   the   line   (using
+        veddecodetabs). Similar to vedrepeater.
+
+
+
+
+---------------------
+14  Window Management
+---------------------
+
+These procedures are used to  display files in vedbufferlist on  screen,
+and to  control  the windows,  ensuring  that the  window  displays  the
+section of the file around the cursor.
+
+
+vedalignscreen()                                             [procedure]
+        Refresh screen,  making  sure  current location  is  in  visible
+        portion.
+
+
+vedcheck()                                                   [procedure]
+        Ensure current  window includes  cursor position.  If not  shift
+        window   and   refresh   screen.   Changes   vedlineoffset   and
+        vedcolumnoffset if necessary.
+
+
+vedchecksize(n_rows, n_cols) -> bool                         [procedure]
+        Returns  true   if  the   dimensions   of  the   usable   screen
+        (vedscreenlength x vedscreenwidth) are correctly set for a given
+        actual screen  size  of (n_rows  x  n_cols). If  this  procedure
+        returns  false  you   should  use  vedresize   to  correct   the
+        discrepancy.
+
+        This procedure takes account of  the fact that if  vedscreenwrap
+        is true, then vedscreenwidth  should be n_cols  - 1, to  prevent
+        problems with characters in the final column.
+
+
+vedcursorset() -> bool                                       [procedure]
+        True if  (vedline,  vedcolumn)  defines a  location  in  visible
+        window.
+
+
+vedmidwindow()                                               [procedure]
+        Repositions the current line as close as possible to the  middle
+        of the window. See also vedtopwindow.
+
+
+vedfileisonscreen(vedfile_struct_or_string) -> onscreen      [procedure]
+        Returns true if the given file structure, or the file  structure
+        referred to by the name string, is on screen.
+
+        For terminal  Ved  this  means  the  file  structure  is  either
+        vedupperfile or vedlowerfile. For  windowed Ved it merely  means
+        the file has an associated window (which note is not necessarily
+        open, i.e. could be iconic).
+
+        vedfileisonscreen can therefore  be used to  test whether  there
+        are window contents to be updated when changing a file buffer.
+
+
+vedsetonscreen(vedfile_struct, initarg)             [procedure variable]
+        Sets the file represented by vedfile_struct on the screen/window
+        (tidying up any previous window), makes it ved_current_file, and
+        sets it first in vedbufferlist.
+
+        If vvedgotoplace is an integer, the file is positioned with  the
+        cursor at that line  number; if vvedgotoplace  is a string,  the
+        cursor is positioned  at the first  line containing that  string
+        (note that this mechanism is intended to be used only when a new
+        buffer is first displayed).
+
+        After this, initarg is processed:  this may be false, a  message
+        string, or a procedure. If a procedure, it is called as
+
+            initarg(redisplay) -> (redisplay, initarg)
+
+        and is expected to return false  or a message string to  replace
+        itself. The  redisplay value  is a  boolean saying  whether  the
+        window contents are  new and need  redisplaying or not  (initarg
+        may change the return value for this if it wishes to.)
+
+        The  resulting  value  of  initarg  then  controls  the  message
+        displayed on the status line:
+
+            initarg             message displayed
+            -------             -----------------
+            non-empty string    initarg
+
+            empty string        empty
+            (redisplay false)
+
+            false               Message produced by vedsetnormalmessage
+            (redisplay false)
+
+            empty or false      vednamestring concatenated  with  'lines
+            (redisplay true)    LINES' where lines is vvedbuffersize
+
+        (Thus the  'vednamestring, lines  LINES' message  is shown  only
+        when redisplay  is  true  and  no  other  non-empty  message  is
+        supplied.)
+
+        Finally, vedfile_struct is  assigned to vedinputfocus  (although
+        note that when this  procedure is called  from vededit, a  false
+        setfocus argument to  the latter  causes this  assignment to  be
+        undone).
+
+
+ved_file_change_apply(arg1, ..., argN, changes_p,            [procedure]
+                                        vedfile_struct)
+        Enables a procedure  changes_p to call  Ved editing routines  to
+        change the buffer  of a  file vedfile_struct  without having  to
+        worry about  whether the  file has  a window  or not  (and  thus
+        whether the window contents needs updating).
+
+        In all cases, changes_p is applied (taking arguments arg1,  ...,
+        argN) with ved_current_file locally set to vedfile_struct  (thus
+        ved_current_file will be unchanged after the call).
+
+        If the condition
+
+            vedediting and vedfileisonscreen(vedfile_struct)
+
+        is true,  the file  is made  current by  calling  vedsetonscreen
+        (unless vedfile_struct is already the current file). Any changes
+        made be will then  be correctly reflected  in the window  (after
+        which vedsetonscreen is called  to restore the previous  current
+        file, if necessary).
+
+        Otherwise, if vedediting  is false  anyway, or the  file has  no
+        window, changes_p is applied with vedediting locally set  false.
+        Thus Ved  procedures  will  not attempt  to  update  any  window
+        contents.
+
+
+vedscreencooked()                                            [procedure]
+        System procedure called by vedscreenreset when Ved exits,  which
+        sets the terminal  to it's "normal"  state (with echoing  etc.),
+        including re-setting the  numerical keypad,  in preparation  for
+        normal printing. Compare vedscreenraw. (User definable)
+
+
+vedscreenraw()                                      [procedure variable]
+        System procedure used to set the terminal into "raw" mode, where
+        characters are not echoed, etc. Compare vedscreencooked
+
+
+vedscreenreset()                                    [procedure variable]
+        Prepare to produce  normal printout,  or read  in characters  at
+        bottom  of   screen,  in   non   raw  ("cooked")   mode.   Calls
+        vedscreencooked.
+
+        Set vedprintingdone true.
+
+
+vedscrollvert(nlines)                               [procedure variable]
+vedscrollup()                                                [procedure]
+vedscrolldown()                                              [procedure]
+        Given a  signed  integer nlines,  scroll  the text  up  or  down
+        abs(nlines), where positive means up (equivalently, window moves
+        down) and negative means  down (equivalently, window moves  up).
+        vedlineoffset is incremented by nlines.
+
+        vedscrollup is the same  as vedscrollvert(1), and  vedscrolldown
+        the same as vedscrollvert(-1).
+
+
+vedscrollhorz(ncols)                                [procedure variable]
+vedscrollleft()                                              [procedure]
+vedscrollright()                                             [procedure]
+        Given a  signed integer  ncols, scroll  the text  left or  right
+        abs(ncols), where  positive  means  left  (equivalently,  window
+        moves right),  and negative  means right  (equivalently,  window
+        moves left). vedcolumnoffset is incremented by ncols.
+
+        vedscrollleft   is   the    same   as   vedscrollhorz(1),    and
+        vedscrollright the same as vedscrollhorz(-1).
+
+
+vedscrollregion(wtop, wbottom, nlines, buffline)    [procedure variable]
+        Scrolls a region of  text on the  screen, without affecting  the
+        Ved buffer or any variables. (Typically used to alter the screen
+        after some  text has  been  deleted from  or inserted  into  the
+        buffer, e.g. using ved_d or ved_y).
+
+        wtop and wbottom  indicate which part  of the window  has to  be
+        scrolled, in  window line  numbers.  nlines indicates  how  many
+        lines to scroll down (positive) or up (negative).  (Confusingly,
+        this is the opposite signing from vedscrollvert.)
+
+        buffline is the number of the line in vedbuffer corresponding to
+        window line TOP.
+
+
+vedtopwindow()                                               [procedure]
+        Repositions the current line at the top of the window. See  also
+        vedmidwindow.
+
+
+vedvt52select()                                     [procedure variable]
+        Procedure which is  run to distinguish  between vt52  look-alike
+        terminals. The default for this is identfn (Ved can't tell).
+
+
+windows                                                        [library]
+        LIB * WINDOWS is a  facility for  using Ved with  more than  two
+        visible windows on the same VDU screen or Xterm window, etc.  It
+        is most convenient if  the screen displays  more than 30  lines.
+        For full details see HELP * WINDOWS
+
+
+
+
+---------------------
+15  Screen Management
+---------------------
+
+Procedures for outputting text to the screen, inserting or deleting text
+on the  screen  or moving  the  cursor on  the  screen. Users  will  not
+normally invoke  these procedures  directly  as they  are  automatically
+invoked when  the cursor  movement  procedures are  called, or  text  is
+inserted or deleted in  the current buffer. Note  that attempts to  move
+the screen cursor may be defeated by the fact that the top level loop of
+Ved  (* vedprocess)  always  moves  the  cursor  back  to  the  position
+corresponding to the current Ved location (* vedline, * vedcolumn).
+
+vedoutascii(char_or_string)                                  [procedure]
+        Uses vedscr_char_out  to  output  char  (or  the  characters  in
+        string) to  the screen. (Since  vedscr_char_out can  now  take a
+        string instead  of a  single character  there is  no longer  any
+        reason for using vedoutascii.)
+
+
+vedscreenchardown()                                 [procedure variable]
+        Move cursor down a line (on screen only).
+
+
+vedscreencharleft()                                 [procedure variable]
+        Move cursor left (on screen only).
+
+
+vedscreencharright()                                [procedure variable]
+        Move cursor right (on screen only).
+
+
+vedscreencharup()                                   [procedure variable]
+        Move cursor up (on screen only).
+
+
+vedscreenclear()                                    [procedure variable]
+        Clear the screen completely.
+
+
+vedscreencleartail()                                [procedure variable]
+        Delete line to right of cursor (on screen only).
+
+
+vedscreendeletechar()                               [procedure variable]
+        Delete current character (on screen only).
+
+
+vedscreendeleteline()                               [procedure variable]
+        Delete current line (on screen only).
+
+
+vedscreenescape(char_or_string_or_p)                         [procedure]
+        If the argument is a procedure then apply it, otherwise,  output
+        vedescape, followed by CHAR, or the characters of STRING.  (This
+        procedure is now mostly replaced by vedscreencontrol).
+
+
+vedscreenflush()                                             [procedure]
+        Synonym for vedscr_flush_output. To be withdrawn.
+
+
+vedscreeninsertchar(char)                           [procedure variable]
+        Insert char at the current cursor position (on screen only).
+
+
+vedscreeninsertline(n)                              [procedure variable]
+        Insert line (on screen only) below screen line n.
+
+
+vedscreenoutput(char)                                        [procedure]
+        Outputs the character char to the screen, where char is a 24-bit
+        integer in the form
+
+              23            16 15            8 7               0
+             ---------------------------------------------------
+             |   Attributes   |       0       | Character Code |
+             ---------------------------------------------------
+
+        The general action of vedscreenoutput is to
+
+            #   Strip off the attribute part  of char, and assign it  to
+                vedscreencharmode  to   set   the   display   attributes
+                appropriately;
+
+            #   Give the remaining  part of char  to vedscr_char_out  to
+                display it on the screen.
+
+        This general  behaviour is  modified  in the  following  special
+        cases:
+
+            #   If the character-code part  of char is  a tab (code  9),
+                replace it with a space.
+
+            #   If the character-code part of char is any other  control
+                character (i.e.  is  <  16:20),  then  replace  it  with
+                vedscreencontrolmark  (with  the  original   character's
+                attributes   or'ed   in   to   any   already   set    on
+                vedscreencontrolmark).
+
+            #   If the character-code part of char is a 'special  space'
+                character then  replace  it  with it  with  its  display
+                character  (with  the  original  character's  attributes
+                or'ed in to any already  set on the display  character).
+                See Special Spaces in this file.
+
+            #   If the character-code  part now lies  between 16:81  and
+                16:9D inclusive, then this is (or may be) a Ved standard
+                graphics character, and vedscreengraphtrans is called to
+                perform  an  appropriate  translation.  This   procedure
+                returns the translated  character and  a boolean  saying
+                whether to output it in graphics mode; if the latter  is
+                true, VEDCMODE_GRAPHIC  is set  in  the value  given  to
+                vedscreencharmode before sending the character out.
+
+            #   If (after any translations) the character-code part is a
+                space (code 32), any attributes that are not significant
+                on whitespace (e.g. bold or alternate font) are cleared.
+
+        In addition, vedscreencolumn is  incremented by 1 after  sending
+        out the character.
+
+        See INCLUDE * VEDSCREENDEFS  for  definitions of  the  character
+        attribute bits and VEDCMODE_GRAPHIC.
+
+        (Note that  char may  also be  a  character-with-associated-data
+        pair, as for vedcharinsert etc. The data part is ignored  unless
+        ved_on_status is true, in which case the data is embedded on the
+        character in vedstatusline.)
+
+
+vedscreenovermode()                                          [procedure]
+        Set the terminal into  "overwriting" mode (opposite of  "insert"
+        mode).
+
+
+vedscreenpulldown(n)                                [procedure variable]
+        Pull text down window  above window line  n. (Screen only,  i.e.
+        leave Ved buffer unchanged.)
+
+
+vedscreenpullup(n)                                  [procedure variable]
+        Pull text up window below window line n. (Screen only).
+
+
+vedscreenpushdown(n)                                [procedure variable]
+        Push text down window below window line n. (Screen only)
+
+
+vedscreenpushup(n)                                  [procedure variable]
+        Push text up window above window line n. (Screen only)
+
+
+vedscreenscrollregiondown(wline_1, wline_2)         [procedure variable]
+        Scroll text down between the (window) lines wline_1 and wline_2.
+        (Affects screen only)
+
+
+vedscreenscrollregionup(wline_1, wline_2)           [procedure variable]
+        Scroll text up between the  (window) lines wline_1 and  wline_2.
+        (Affects screen only)
+
+
+vedvt100screeninteger(int)                                   [procedure]
+        Outputs the given  integer in decimal  form (for sending  escape
+        sequences to a vt100).
+
+
+vedwindowpoint(wline, wcolumn)                               [procedure]
+        Move cursor (on  screen only)  to location  (wline, wcolumn)  in
+        window coordinates. Status line =  1. (Does not alter  * vedline
+        or * vedcolumn.
+
+
+
+
+--------------------------
+16  Ved Special Characters
+--------------------------
+
+16.1  Graphics Characters
+-------------------------
+From Poplog 14.11,  Ved defines  a standard  set of  codes to  represent
+various graphics  characters  that are  not  available in  the  ordinary
+character set.  In particular,  these include  a set  of characters  for
+drawing lines and line junctions.
+
+The Pop-11  itemiser  allows  'backslash'  sequences  to  specify  these
+characters in  strings  and character  constants,  as shown  below  (see
+REF * ITEMISE for more  details). You can  also insert these  characters
+directly into a file by
+
+        <ENTER> ic seq
+
+with the backslash omitted (see REF * ved_ic):
+
+        Seq     Name                             Default display
+        ---     ----                             ---------------
+        \Gle    left end of horizontal line            -
+        \Gre    right end of horizontal line           -
+        \Gte    top end of vertical line               |
+        \Gbe    bottom end of vertical line            |
+
+        \Gtl    top left corner junction               -
+        \Gtr    top right corner junction              -
+        \Gbl    bottom left corner junction            -
+        \Gbr    bottom right corner junction           -
+
+        \Glt    left T-junction                        |
+        \Grt    right T-junction                       |
+        \Gtt    top T-junction                         -
+        \Gbt    bottom T-junction                      -
+
+        \G-     full horizontal line                   -
+        \G|     full vertical line                     |
+        \G+     crossed full horiz/vert lines          +
+
+        \Go     degree sign                            o
+        \G#     diamond                                #
+        \G.     centred dot                            .
+
+These characters are translated  to an appropriate  form for the  screen
+being used by the terminal-dependent procedure vedscreengraphtrans  (see
+REF * VEDTERMINALS), which  is called  by vedscreenoutput  when  given a
+graphics character.
+
+Some (old)  terminals  and some  other  displays (e.g.  the  normal  Sun
+screen), do not support graphic characters at all, and some support  the
+line-drawing  characters  but  not  the  others.  Thus  each  of   these
+characters has an ordinary character defined as its default  replacement
+(the rightmost column in the table above).
+
+(However, note  that  those screens  which  do support  display  of  the
+line-drawing characters do  NOT support the  half-line 'end'  characters
+Gle, Gre,  Gte and  Gbe; these  are therefore  always displayed  as  the
+corresponding full-line characters G- or G|. The reason for representing
+the 'end' characters as separate codes is to make it easy for facilities
+like veddrawline (see below) to  produce the correct combined  character
+when 'overdrawing' one character on another.)
+
+The procedure vednographics assigns  to vedscreengraphtrans a  procedure
+which just displays all graphics characters as their default.
+
+This is also the way in which the characters will display in a Ved  file
+when printed  out. When  written  to a  file,  a graphics  character  is
+represented as a special control sequence whose only printing  character
+is the corresponding  default character (for  example, G- translates  to
+Ctrl-R followed by `-`).
+
+
+vednographics()                                     [procedure variable]
+        Replaces vedscreengraphtrans with  a procedure which  translates
+        the  Ved  standard  graphics  characters  to  ordinary  printing
+        characters when output to the screen (as described above).
+
+
+veddrawline(col1, line1, col2, line2)                        [procedure]
+veddrawline(point1, point2)
+        This procedure draws a line between the points (col1, line1) and
+        (col2,  line2)  in  the  current   Ved  buffer,  using  the   15
+        line-drawing graphics characters described above.
+
+        The 4 coordinates  may be specified  either as separate  integer
+        arguments (first form),  or as  2 two-element  lists point1  and
+        point2 (second form), where
+
+                point1 = [^col1 ^line1]
+                point2 = [^col2 ^line2]
+
+        The line can only be horizontal or vertical (which means it must
+        be that either line1 = line2 or col1 = col2).
+
+        The line  is  notionally  'drawn' between  the  centres  of  the
+        character  cells  specified  by  the  coordinates.  That   is, a
+        horizontal line is drawn as the graphics characters
+
+                 Gle G- ... G- Gre
+
+        etc, and a vertical line as
+
+                        Gte
+                        G|
+                        .
+                        .
+                        .
+                        G|
+                        Gbe
+
+        However, the line is also superimposed on any existing lines  in
+        the buffer, i.e.  the characters  of the new  line are  combined
+        with any existing line-graphics characters already in the buffer
+        to form the appropriate composite line or junction.
+
+        (Note  in  this  respect  that  the  15  line-drawing   graphics
+        characters are all built up by superimposing combinations of the
+        characters Gle, Gre, Gte and Gbe  (e.g. G- is Gre combined  with
+        Gle), and that the characters are encoded in such a way that the
+        superimposition  of  any  two  is  got  by  simply  taking   the
+        bitwise-or of their codes. E.g.
+
+            G-   = Gre || Gle
+            Gtl  = Gte || Gle
+            Gtt  = G-  || Gte
+
+        etc.)
+
+        Alternatively, if  the  variable rubout  is  true, the  line  is
+        erased instead of being drawn. Any existing graphics  characters
+        on the  track of  the  line are  replaced with  the  appropriate
+        characters representing the line removed.
+
+
+drawline(col1, line1, col2, line2)                  [procedure variable]
+drawline(point1, point2)
+        This  variable  procedure   is  used  by   facilities  such   as
+        LIB * SHOWTREE to draw lines.  Its default value is  veddrawline
+        to draw  lines in  the Ved  buffer, but  if required  it can  be
+        redefined to  produce line-drawing  output in  other forms.  The
+        arguments are the same as for veddrawline above.
+
+        (Note that drawline is not autoloadable, so
+
+            uses drawline;
+
+        is required).
+
+
+rubout -> bool                                                [variable]
+bool -> rubout
+        This boolean controls whether the drawline procedure should  rub
+        out  lines  (true)  as  opposed  to  drawing  them  (false).  It
+        therefore affects the behaviour of veddrawline.
+
+
+16.2  Special Spaces Etc
+------------------------
+In addition to the graphics characters described above, Ved also defines
+several kinds of special space character and a special newline.
+
+These codes (together  with the ISO  Latin 'no-break' space  character),
+can also be represented by  'backslash' sequences in Pop-11 strings  and
+character constants (and inserted into a file by
+
+        <ENTER> ic seq
+
+with the backslash omitted).
+
+To allow the special space characters in a file to be made visible  when
+required, each has  a corresponding variable  which contains the  actual
+character (possibly  plus  attributes)  that  the  character  should  be
+displayed as:
+
+        Seq     Name                         Displayed As
+        ---     ----                         ------------
+        \Ss     Ved no-break space           vedscreennobreakspacemark
+        \Sn     ISO Latin no-break space     vedscreennobreakspacemark
+        \Sf     format-control space         vedscreenformatspacemark
+        \Sp     prompt-marker space          vedscreenpromptspacemark
+        \St     trailing space               vedscreentrailspacemark
+        \Sh     Ved hair space               vedscreenhairspacemark
+        \Nt     trailing newline             vedscreentrailnewlinemark
+
+Except for  vedscreentrailspacemark and  vedscreentrailnewlinemark,  the
+above variables all default to an ordinary space. They may be set to any
+appropriate display  character (normally  done  with vedset  chars,  see
+HELP * VEDSET).
+
+(The Ved command <ENTER>  dssp causes all the  above to be displayed  as
+visible characters in the current file only. See REF * ved_dssp.)
+
+No-break Spaces
+    These characters can  be used  for inter-word  spacing to  prevent a
+    sequence of words being split  across lines when text is  justified,
+    etc.
+
+    Written to a file, the Ved character \Ss is represented by a special
+    control sequence whose only printing  character is a space (i.e.  it
+    will print as a space). \Sn, on the other hand, is the standard  ISO
+    Latin no-break space  code (16:A0) and  is written to  a file as  an
+    ordinary character (and  will therefore not  necessarily print  as a
+    space, although it may on some printers).
+
+Format-control Space
+    This character is used in  Poplog documentation files to mark  lines
+    that must not be reformatted  when run through the  manual-producing
+    program. It is written  to a file as  a control sequence whose  only
+    printing character is a space.
+
+Prompt-marker Space
+    The 'prompt-marker' space is the character in * vvedpromptchar  when
+    in immediate mode, used  to delineate the end  of the prompt. It  is
+    also used in place of  a format-control space on lines  representing
+    program code examples. It is written to a file as a control sequence
+    whose only printing character is a space.
+
+Trailing Space
+    A 'trailing space' character allows spaces  at the end of a line  to
+    be written  to,  or  read  from,  a  file.  Normally,  Ved  discards
+    end-of-line spaces while editing, or  when writing a file.  However,
+    inserting a 'trailing space'  as the last character  on a line  will
+    prevent this, because  (a) Ved editing  operations will preserve  it
+    intact, and  (b)  when  a  file is  written,  a  trailing  space  is
+    translated to an ordinary space character.
+
+    When a file is  read in with vedreadintrailspaces  true, a space  at
+    end of line is translated to  a trailing space. This preserves  both
+    that  character   and   any   other   spaces   preceding   it.   (If
+    vedreadintrailspaces is false -- the default -- trailing spaces  are
+    stripped from input lines.)
+
+    On output to the screen, a trailing space character is displayed  as
+    the character  in the  variable vedscreentrailspacemark  (normally a
+    bold `S` in inverse video).
+
+Ved hair space
+    In variable-width  mode in  XVed  this character  displays as  a  1-
+    pixel-wide space. Otherwise,  it displays  as the  character in  the
+    variable vedscreenhairspacemark  (normally  a bold  `H`  in  inverse
+    video).
+
+Trailing Newline
+    A 'trailing  newline'  character similarily  allows  trailing  blank
+    lines to be written or  read at end-of-file. Normally, Ved  discards
+    end-of-file blank  lines  while editing,  or  when writing  a  file.
+    However, making  the  last  such line  contain  a  single  'trailing
+    newline' will prevent  this, since (a)  Ved editing operations  will
+    preserve it  intact, and  (b) when  a file  is written,  a  trailing
+    newline is output as no character (the line it represents will  have
+    an ordinary newline added, like any other line).
+
+    When a file is read in with vedreadintrailspaces true, a blank  line
+    at end-of-file is translated  to a line  containing just a  trailing
+    newline. This preserves  both that  line and any  other blank  lines
+    preceding it. (If  vedreadintrailspaces is false  -- the default  --
+    trailing blank lines are stripped from input files.)
+
+    On output to the screen,  a trailing newline character is  displayed
+    as the character in the variable vedscreentrailnewlinemark (normally
+    a bold `N` in inverse video).
+
+
+
+
+-------------------------------------------
+17  Ved-Buffer Devices and "Immediate Mode"
+-------------------------------------------
+
+Ved-buffer devices are  pseudo (or 'user')  devices which enable  device
+input and output to  be performed on Ved  buffers. They are  constructed
+using consveddevice  for a  given  filename. As  with those  created  by
+sysopen etc, Ved devices may be  input only, output only, or both  input
+and output. The first time such a device is used, the corresponding  Ved
+buffer is set up if it doesn't already exist.
+
+Ved devices are the basis  of the "immediate mode" facilities  described
+in  HELP * IM.  These  work  by  calling  vedsetpop,  which  creates  an
+input/output Ved  device  and  assigns  it  to  the  standard  variables
+pop_charin_device,  pop_charout_device   and  pop_charerr_device.   Thus
+output to charout  and input from  charin are redirected  to/from a  Ved
+buffer.
+
+When output is sent to a Ved device, characters written to it are simply
+inserted into the buffer,  either at the current  position or at end  of
+file (this can be selected when the device is created).
+
+However, when input  is requested  from a  Ved device,  the sequence  of
+events is somewhat more complicated:
+
+The basic idea is that input  through Ved buffers should be  user-driven
+rather than program-driven. That is,  rather than have the whole  system
+hang up waiting for input when a program asks for it, the program should
+instead 'suspend', and control should return to the top-level Ved  loop.
+The user is then back in ordinary  editing mode, and can decide when  to
+supply input to the program.
+
+To effect this scheme, Ved devices use the Poplog process mechanism (see
+REF * PROCESS). When input is first requested from a device, the program
+asking for it  is turned into  a process using  consproc_to (where  'the
+program' in this context means all procedure calls inside the  top-level
+Ved loop). This  process is then  suspended, and added  to a  per-buffer
+list of processes waiting for input from that buffer.
+
+The per-buffer list of  processes is held  in the variable  vedprocwait.
+When this is  non-empty for  a buffer, it  causes the  behaviour of  two
+things to change:
+
+    (a)  typing <RETURN> in the  buffer (i.e. inserting a  newline  with
+         vedcharinsert, which causes veddocr to be called), and
+
+    (b)  loading a marked  range with ved_lmr.
+
+In both cases, the waiting process (that is, the first one on the  list)
+is removed from vedprocwait and run (with runproc).
+
+When run, input text  is passed to  the process, to  be returned as  the
+result of reading  the Ved device.  For (a)  this is the  line on  which
+<RETURN> was typed, while for (b) it  is the whole of the marked  range.
+(In both cases, the input text is  also copied to the end of the  buffer
+if it is not already there.)
+
+Subsequent reads  on the  device will  then return  any remaining  input
+text, and when this is exhausted, the process will suspend again and  be
+put back on vedprocwait. Each time the process suspends, it prompts  for
+input by writing a prompt string into the buffer. (The current value  of
+popprompt is  used  for  this,  but with  a  special  character,  a  Ved
+prompt-marker space,  added at  the  end to  enable Ved  to  distinguish
+prompts in  buffers  from other  text.  While a  file's  vedprocwait  is
+non-empty, the variable * vvedpromptchar is also set to this  character,
+causing various editing operations to treat the character specially.)
+
+In  addition,   the  buffer's   status  line   displays  the   character
+vedscreenstatusinputmark (normally `I`) to the  left of the line  number
+whenever there are processes waiting for input.
+
+The input  stream  for  a  process can  be  terminated  by  calling  the
+procedure ved_end_im. This can be done either as a Ved command  (<ENTER>
+end_im), or in the default Ved  key bindings by typing the sequence  ESC
+Ctrl-Z. It causes  the first waiting  process on vedprocwait  to be  run
+with 'end of file' as input.
+
+
+consveddevice(filename, access_mode, insert_at_eof) -> dev   [procedure]
+        Constructs a Ved-buffer device dev for a file named filename.
+
+        Permissible values for the integer  access_mode are the same  as
+        for sysopen, i.e.
+
+                0   Read only
+                1   Write only
+                2   Read and Write
+
+        insert_at_eof is  a  boolean that  says  whether output  to  the
+        device should be inserted at the end of the buffer (true) or  at
+        the current position in the buffer (false). For an input device,
+        this also affects where input prompts are put.
+
+        The behaviour of a Ved device when read or written is  described
+        in the introduction to this section.
+
+        Note that a  Ved device  is a type  of pseudo  or 'user'  device
+        produced using  consdevice. It  is classified  as a  'terminal',
+        i.e. systrmdev will return true for it; its device_full_name  is
+        the full pathname of the Ved file.
+
+
+isveddevice(item) -> bool                                    [procedure]
+        Returns true  if item  is a  device produced  by  consveddevice,
+        false otherwise.
+
+
+vedprocswaiting() -> bool                                    [procedure]
+        As described in the introduction  to this section, the  variable
+        vedprocwait contains a list  of suspended processes waiting  for
+        Ved-buffer device  input from  the  current buffer.  (Each  list
+        entry is a vector containing the actual process record and  some
+        associated data.)
+
+        However, vedprocwait  being non-empty  does not  guarantee  that
+        there are actually live processes waiting for input, since  some
+        of  them  may  have  died   (due  to  having  mishap'ed,   etc).
+        vedprocswaiting is therefore provided:  it returns true only  if
+        the vedprocwait  list contains  at least  one entry  for a  live
+        process.
+
+        Both   ved_lmr    and    veddocr   behave    differently    when
+        vedprocswaiting() is true: instead of their normal action,  they
+        both run the (first) waiting  process, supplying it with  input.
+        For ved_lmr, the input is  the whole marked range; for  veddocr,
+        it is the  current line.  (However, note that  for veddocr  this
+        behaviour is  dependent on  the boolean  vedcrinteractive  being
+        true -- otherwise, it behaves as normal.)
+
+
+vedsetpop()                                                  [procedure]
+        This procedure starts a compiler  process which will take  input
+        from, and send output to, the current Ved buffer.
+
+        It does  this  simply  by creating  an  input/output  Ved-buffer
+        device for the current file with consveddevice, and assigning it
+        locally  to  the   standard  I/O  variables   pop_charin_device,
+        pop_charout_device and pop_charerr_device.
+
+        It then calls pop_setpop_compiler to begin compilation with  the
+        compiler for  the  current  subsystem given  in  subsystem  (see
+        REF * pop_setpop_compiler).  As   described  above,   when   the
+        compiler tries  to read  input from  charin, the  Ved device  in
+        pop_charin_device  will  turn  all  procedure  calls  upto   and
+        including vedsetpop into a process, suspend it, and place it  on
+        vedprocwait.
+
+        Input can then be supplied to the process in the ways  described
+        above, i.e by typing <RETURN>  on a buffer line, or  'loading' a
+        marked range with ved_lmr.
+
+        Apart from  its  interaction  with  the  Ved  device  mechanism,
+        vedsetpop is intended to behave  like setpop (for more  details,
+        see REF * SYSTEM). In particular, any attempt to exit abnormally
+        through vedsetpop is trapped, and compilation is restarted. Thus
+        calling setpop inside vedsetpop only  resets to the latter.  (To
+        exit abnormally from inside a  vedsetpop you must call  sysexit;
+        this  works  because  vedsetpop  locally  redefines  popexit  to
+        perform a special untrapped exitfrom(vedsetpop).)
+
+        vedsetpop also sets  pop_charin_escapes locally to  [], so  that
+        the characters $, % and ! at the beginning of an input line will
+        not spawn operating-system child processes.
+
+
+ved_chario_file -> filename_or_false                   [active variable]
+filename_or_false -> ved_chario_file
+        This active  variable  enables  input from  and  output  to  the
+        standard devices
+
+            # pop_charin_device
+            # pop_charout_device
+            # pop_charerr_device
+
+        to be redirected to a Ved buffer while inside Ved.
+
+        Assigning a string filename to ved_chario_file will cause Ved to
+        create a  Ved-buffer  device  for filename  and  set  the  above
+        variables locally to that device inside vedprocess. If  filename
+        is false, input/output will be  restored to the devices as  they
+        are outside of vedprocess.
+
+        If ved_chario_file is assigned to  outside of Ved (i.e.  outside
+        of vedprocess),  it  will  have  no effect  until  Ved  is  next
+        (re)entered.
+
+        Note that inside  a vedsetpop,  the Ved device  created by  that
+        will  locally  override  the   ved_chario_file  one.  That   is,
+        assigning to ved_chario_file does not affect input and output in
+        "immediate mode"  files,  only that  performed  as a  result  of
+        executing Ved commands (although the  same file can be used  for
+        both purposes).
+
+
+vedimshell(ved_file_p)                                       [procedure]
+        This procedure  initiates  an  operating-system  immediate  mode
+        process, and is used by ved_imcsh, ved_imsh (Unix) and ved_imdcl
+        (VMS).
+
+        ved_file_p is a procedure to get an appropriate Ved file and set
+        the file's subsystem value  to the name  of the subsystem  whose
+        compiler  is  to  be  run.  (E.g.  ved_cshfile,  ved_shfile,  or
+        ved_dclfile, which respectively load
+
+            # LIB * CSH_SUBSYSTEM
+            # LIB * SH_SUBSYSTEM
+            # LIB * DCL_SUBSYSTEM
+
+        and set subsystem to "csh", "sh", or "dcl".)
+
+        ved_file_p  is  called  after  adding  to   ved_char_in_stream a
+        procedure which will begin the immediate mode process by calling
+        vedsetpop.
+
+        See Immediate Mode Commands in REF * VEDCOMMS.
+
+
+
+
+----------------
+18  Marked Range
+----------------
+
+The marked range is a facility to specify particular sections of a  file
+for manipulation by certain editor functions. These procedures are  used
+to set, display and remove the marked range.
+
+
+vedmarklo()                                                  [procedure]
+        Make current line start of marked range.
+
+
+vedmarkhi()                                                  [procedure]
+        Make current line end of marked range.
+
+
+vedmarkfind()                                                [procedure]
+        Move cursor to the beginning of the marked range.
+
+
+vedendrange()                                                [procedure]
+        Move cursor to the end of the marked range.
+
+
+vedmarked(line) -> char_or_false                             [procedure]
+        Returns false if line in the buffer is not in the marked  range.
+        If it  is,  returns  vedscreenmark  if  vvedmarkprops  is  true,
+        otherwise space character `\s`. See HELP * MARK.
+
+
+vedmarkpush()                                                [procedure]
+        Used for temporarily altering the position, or visibility of the
+        marked range.  Saves vvedmarkhi,  vvedmarklo, vvedmarkprops  and
+        vvedscreenmark on a stack of marked ranges.
+
+        This stack is local  to the current file,  i.e. is saved in  the
+        Ved file structure.  (The `status  line' file also  has its  own
+        stack.) Compare vedmarkpop.
+
+
+vedmarkpop()                                                 [procedure]
+        Pops the top  item off  the stack  of marked  ranges created  by
+        vedmarkpush, resetting the  marked range  and vvedmarkprops  and
+        remarking the screen if necessary.
+
+
+vedmarkset(line, char)                                       [procedure]
+        Displays the character char (on screen only) at the left of  the
+        line numbered line in the buffer. Used for marking ranges.  (See
+        HELP * MARK).
+
+
+vedrefreshrange(line_1, line_2, mark_flag)                   [procedure]
+        Redraw buffer lines line_1 to line_2 of the current file, if any
+        appear on the screen. If mark_flag is true, mark lines, if false
+        don't, if "undef" mark lines between vvedmarklo and vvedmarkhi.
+
+
+vedmarkparagraph()                                           [procedure]
+        Marks  the  paragraph  surrounding  the  current  line,  or  the
+        preceding paragraph  if  the  current  line  is  not  part  of a
+        paragraph. The extent of the paragraph is determined by calls to
+        vedinparagraph.
+
+
+ved_mark_named_range(range_name)                             [procedure]
+        Marks a named range in  the current file, where range_name  is a
+        word. range_name is  looked up  in vedmarkclasses,  which is  an
+        association list of alternating names and marking procedures, ie
+
+            [<name> <marking procedure> ... ]
+
+        If name  is  found  in vedmarkclasses,  then  the  corresponding
+        procedure is  run,  otherwise  the  error  'unknown  mark  name'
+        results.
+
+        By default, vedmarkclasses  contains procedures associated  with
+        the following range names:
+
+            Name            Procedure Action
+            ----            ----------------
+
+            "start"         Mark current line as start of range (just
+            "lo"            runs vedmarklo).
+
+            "end"           Mark current line as end of range (just runs
+            "hi"            vedmarkhi).
+
+            "line"          Mark the current line (runs vedmarklo
+                            followed by vedmarkhi).
+
+            "procedure"     Mark the current procedure (runs ved_mcp).
+
+            "paragraph"     Mark the current paragraph (uses
+                            vedmarkparagraph).
+
+            "tostartfile"   Mark from first line of file to current
+                            marked range end (runs ved_mbf).
+
+            "toendfile"     Mark from current marked range start to last
+                            line of file (runs ved_mef).
+
+            "window"        Mark all lines in the current window.
+
+            "file"          Mark whole file from first line to last
+                            (runs ved_mbe).
+
+        Note  that   the   command  '<ENTER>   mark   range_name'   runs
+        ved_mark_named_range on the given argument.
+
+
+
+
+-------------------------
+19  Embedded Text Actions
+-------------------------
+
+As described in the  section Ved Buffers above,  any character in a  Ved
+buffer may have an embedded data item associated with it. Together  with
+the 'active' character  attribute, this  facility is  used to  implement
+embedded text  actions,  i.e.  actions  that can  be  fired  off  by  an
+appropriate mouse  or keyboard  event such  as clicking  on text.  Among
+other things, text actions can be  used to implement hot links to  other
+documents.
+
+
+19.1  Constructing Text Actions
+-------------------------------
+Text actions  are built  as follows:  First, the  textual extent  of  an
+action is  delineated  as  an  active segment,  that  is,  a  contiguous
+sequence of characters in  a line all having  the active attribute  (any
+other attributes the characters  may have are  irrelevant). This can  be
+done (for example) with <ENTER> chat (see REF * ved_chat).
+
+The action to execute  is then attached to  the segment by embedding  an
+item on its first non-whitespace character:
+
+                      - active segment  -
+      ---------------------------------------------------
+      | | | | | | | | |A|A|A|A|A|A|A|A|A| | | | | | | | |
+      ---------------------------------------------------
+                         ^
+                         Action item attached to
+                         1st non-whitespace character
+
+Given a  line  and column  number  pointing anywhere  inside  an  active
+segment, this  construction  allows  the  associated  data  item  to  be
+retrieved (by the procedure ved_text_action_data, see below).
+
+A special feature (allowing  text actions to extend  over more than  one
+line), is  that  the  associated  item may  be  an  empty  string  (e.g.
+nullstring). This marks the segment as a continuation of a previous one,
+and causes  ved_text_action_data to  search  backwards through  the  Ved
+buffer for  a preceding  segment, providing  this is  separated only  by
+whitespace (spaces, tabs or newlines)  from the original. The  preceding
+segment may itself be a continuation of another one, and so on.
+
+(Note that various Ved editing functions deal automatically with  active
+continuation markers. E.g. if <ENTER> chat is applied to a marked  range
+or XVed selection that extends over  more than one line, and the  active
+attribute is being added, then nullstring continuation markers are added
+where necessary. Similarily, splitting an active segment by  inserting a
+line break will  add a continuation  marker, and deleting  a newline  to
+join two lines will remove  one where appropriate. The procedures  ved_j
+and ved_jj also maintain the integrity of text actions.)
+
+After creating an active segment, the command
+
+    <ENTER> tact
+
+can be used to attach an  action to it (see * ved_tact). Normally,  this
+will be a string command suitable for execution by  * ved_do_text_action
+(described in the next section).
+
+You can also create text  actions directly inside Pop-11 quoted  strings
+(see REF * ITEMISE). For  example, using the  'character input'  command
+supported by  ved_do_text_action,  quoted  strings  can  have  temporary
+character   input   'buttons'   in   messages   displayed   (e.g)   with
+vedputmessage or ved_get_reply. Thus
+
+    ved_get_reply(
+     '\{1A} \[+u'>y']yes \[]  \[+u'>n']no \[]  \[+u'>c']continue \[] ',
+     'ync');
+
+will display three inverse video buttons
+
+         yes   no   continue
+
+which can be  clicked on  in XVed  to supply  the appropriate  character
+response.
+
+(Another possibility is to  use * vedputcommand to  put a quoted  string
+containing active buttons on the status line, each with a different  Ved
+command attached.)
+
+
+
+19.2  Standard Text Actions
+---------------------------
+The procedure  ved_do_text_action  implements  a standard  set  of  text
+actions. When  called  outside  of  a text  action,  it  also  processes
+cross-references  in  Poplog  documentation   and  library  files   (see
+HELP * VEDGETSYSFILE).
+
+It is called in the following situations:
+
+      # To execute  an  action,  or get  a  documentation  file,  by
+        vedgetsysfile (usually mapped to <ESC> h);
+
+      # To execute an action,  or get a  documentation file from  an
+        active segment of text, by vedmouse__do_text_action in  XVed
+        (mapped to a mouse button click);
+
+      # To display an action in XVed when the mouse pointer is moved
+        into an active segment of text (any such display is  cleared
+        when the pointer is moved out of the segment).
+
+For ved_do_text_action, the item embedded in  a text action must be  one
+of the following:
+
+    (1) A (non-empty) string (representing  either a Ved command  or
+        character input);
+
+    (2) A procedure (or a pair conspair(procedure, string));
+
+    (3) A word, which dereferences with * recursive_valof to  either
+        (1) or (2).
+
+For (1), the string  consists of a command,  preceded by optional  flags
+and followed by an optional comment field:
+
+        [ (flags) ]  command  [ ;;;comment ]
+
+The command part is  any valid Ved command,  or the special  'command' >
+(greater than  sign).  The  latter  form  when  executed  adds  all  the
+characters following the  > as  input to  ved_char_in_stream (note  that
+there cannot be a comment field in this case).
+
+If present, flags is a parenthesised sequence of the following letters:
+
+        Letter  Meaning
+        -----   -------
+          S     Set the text cursor (i.e. vedline and vedcolumn) to  the
+          L     position of  the  text  action's  embedded  data  before
+                executing the command. For L, this is done only locally,
+                i.e. vedline and vedcolumn are restored after execution.
+                The default is to leave the text cursor alone.
+
+          M     XVed display mode optionally  displays a message on  the
+          N     status line (with  vedputmessage). The  default for  Ved
+                commands is to display  comment if present, and  command
+                otherwise; N means  no message. For  procedure/character
+                input, the default is no message: M can be used to force
+                a message (which for character  input will be the  whole
+                input string starting with >).
+
+          i     In XVed display  mode, highlight the  active segment  by
+          b     (i) inverting its foreground and background colours, (b)
+          p     drawing a  box around  it, and  (p) changing  the  mouse
+                pointer to pointer2shape. Any  combination of these  can
+                be used; when none are  specified, the default is p  for
+                Ved commands and i for procedure/character input.
+
+A procedure action  (case (2)) may  also supply the  optional flags  and
+comment fields via a pair whose front is the procedure and whose back is
+a string containing only  those fields. Note that  (as described in  Ved
+File Representation:  Embedded Strings  &  Words above),  only  embedded
+string/word data can actually be written to Ved files; hence case (2) is
+directly usable only  by programs  that create  temporary buffers  which
+will not be written to disk.
+
+
+ved_do_text_action(wline, wcol, select, mode)       [procedure variable]
+                                        -> result
+        This procedure processes standard text actions, as well as cross
+        references in Poplog documentation and library files.
+
+        The arguments  wline and  wcol specify  a text  position in  the
+        current Ved window where  (e.g) the mouse has  been moved to  or
+        clicked -- that is, a line and column in window coordinates (see
+        Note on Line/Column Coordinates above).  if wline = 1, the  text
+        in vedstatusline  is  examined  (not the  status  buffer  line),
+        otherwise the corresponding Ved buffer line.
+
+        The procedure  first  calls  ved_text_action_data  on  the  text
+        position to  see  if  it  is within  a  text  action  having  an
+        associated action  item;  failing  this, the  text  position  is
+        examined to see if it  lies in a Poplog documentation  reference
+        indicated by  a "*";  otherwise, the  default is  to provide  an
+        appropriate help file on the word at the text position.
+
+        However, the  select  argument is  an  integer mask  whose  bits
+        specify which  of  these  types of  action  should  actually  be
+        processed.   If   a   given   type   is   not   selected    for,
+        ved_do_text_action does nothing and returns false.
+
+        select may be or'ed together from any of the following,  defined
+        in INCLUDE * VED_DO_TEXT_ACTION:
+
+            VDTA_TYPE_CHARS     Allow a  character input  string  from a
+                                text action.
+
+            VDTA_TYPE_PDR       Allow a procedure from a text action.
+
+            VDTA_TYPE_COMM      Allow a Ved command  string from a  text
+                                action.
+
+            VDTA_TYPE_A_DOC_REF With    no    text    action,    allow a
+                                documentation reference  containing  "*"
+                                if the text has the active attribute.
+
+            VDTA_TYPE_DOC_REF   With    no    text    action,    allow a
+                                documentation reference  containing  "*"
+                                whether  the   text   has   the   active
+                                attribute or not.
+
+            VDTA_TYPE_ANY_HELP  With  no   text   action  or   "*"   doc
+                                reference, allow help on any word.
+
+            VDTA_TYPE_ANY       Allow anything.
+
+        The mode argument is an integer specifying how the action is  to
+        be  processed.  The  following   values  are  also  defined   in
+        INCLUDE * VED_DO_TEXT_ACTION:
+
+            VDTA_MODE_DISPLAY   Display only.
+
+            VDTA_MODE_EXECUTE   Execute immediately (same as INPUT for a
+                                character input string).
+
+            VDTA_MODE_INPUT     Put on ved_char_in_stream to execute  on
+                                the next top-level Ved loop cycle.
+
+        When mode  is EXECUTE  or  INPUT, the  procedure or  command  is
+        executed,   either   immediately   or    by   putting   it    on
+        ved_char_in_stream; before execution, vedline and vedcolumn  are
+        set to the position  of the text action's  embedded data if  the
+        action requested  it (see  above). The  result returned  is  the
+        VDTA_TYPE_ value for whatever was executed.
+
+        When mode is DISPLAY,  the only effect is  to display a  message
+        with vedputmessage if the command  requests it (see above),  and
+        return  result.  Depending  on  the  action  and  any  flags  it
+        contained (see above), result will  be or'ed from the  following
+        bits defined in INCLUDE * VED_DO_TEXT_ACTION:
+
+            VDTA_DISP_DID_MESS  A message was displayed.
+
+            VDTA_DISP_INVERT    Invert foreground/background colours  in
+                                the active segment.
+
+            VDTA_DISP_BOX       Draw a box around the active segment.
+
+            VDTA_DISP_POINTER   Change  the  mouse   pointer  shape   to
+                                pointer2shape.
+
+
+ved_text_action_data(line, col)                              [procedure]
+                -> (data_or_false, retn_line, retn_col)
+        Given a line and  a column number,  tests whether the  specified
+        column in the line is within a text action (as described above),
+        and returns any associated data item if so.
+
+        line may be  either (a) a  string, or (b)  a line number  within
+        vedbuffer. For (a), the search  is limited to the given  string,
+        whereas for (b) the specified buffer line and (where applicable)
+        previous lines are searched.
+
+        In both  cases, col  must be  the column/subscript  at which  to
+        begin the  search: if  line(col)  is not  a character  with  the
+        active attribute, false is returned for all three results.
+
+        Otherwise, the procedure searches back along line for the  first
+        character of the active segment of which col is a part, and then
+        forward again  to  find  the  first  active  character  with  an
+        embedded data  item.  If  no  data item  is  present,  false  is
+        returned for data, but with retn_line set to line, and  retn_col
+        set to the column of  the first non-whitespace character in  the
+        segment (or false if it was all space).
+
+        If data is present, and is not a nullstring continuation  marker
+        (i.e. data /= nullstring), data is returned, with retn_line  set
+        to line and  retn_col set  to the column  number containing  the
+        data.
+
+        On finding  a  continuation  marker,  the  procedure  will  skip
+        backwards  over  whitespace  characters  until  another   active
+        character is found. If non-active, non-whitespace characters are
+        encountered (or  the  beginning  of  the  string  or  buffer  is
+        reached), the search aborts, and the continuation marker  itself
+        is returned (as if it had not been recognised).
+
+        Otherwise,  the  whole  process   repeats,  starting  from   the
+        newly-found active character.
+
+
+
+
+---------------------------
+20  Miscellaneous Utilities
+---------------------------
+
+is_ved_output_file(filename)                                 [procedure]
+        Returns true if filename is  a Ved "output" file, as  determined
+        by inspection of vedlmr_print_in_file. This procedure is used in
+        the default value of vedfiletypes to set vedcompilable false for
+        "output" files.
+
+
+popvedcommand(comm_name)                                     [procedure]
+        This procedure is  used to implement  Pop-11 syntax versions  of
+        Ved commands. For example, the Pop-11 help command is defined as
+
+            define vars syntax help =
+                popvedcommand(% "ved_help" %)
+            enddefine;
+
+        The (word) argument  comm_name is  the name of  the Ved  command
+        procedure to  run  (e.g. "ved_help"):  the  valof this  word  is
+        executed after doing the assignment
+
+            readstringline() -> vedargument;
+
+        which will set vedargument to  the remainder of the line  coming
+        from the current proglist (see REF * readstringline).
+
+        (Note that before executing the command, vedputcommand is called
+        to put the equivalent <ENTER> command on the Ved status line.)
+
+
+vedissubitem(sub_string, n, string) -> m                     [procedure]
+        Similar to  issubstring except  that  (a) it  does not  work  on
+        words, and (b) the match succeeds only if the matching substring
+        is a distinct item in  the string string. 'Distinct item'  means
+        roughly that the substring sub_string  is not embedded in  other
+        characters in string; for example
+
+                vedissubitem('DEFINE', 1, 'ENDDEFINE')
+
+        returns false. It uses Ved's rules for deciding item  beginnings
+        and ends, not those of  the Pop-11 itemiser. The Ved  procedures
+        * vedatitemstart  and  * vedatitemend  are  used  to  test  item
+        boundaries.  The  behaviour  can  be  controlled  by  redefining
+        * vedchartype.
+
+
+vedwordcount_text(line_1, line_2)                            [procedure]
+        Prints (on  the command  line) a  count of  the words  in  lines
+        line_1 to  line_2  of the  current  file. Used  in  ved_wc.  See
+        HELP * WC.
+
+
+vedtrysetvalof(var_name, true_msg, false_msg)                [procedure]
+        This procedure is  used to  invert the truthvalue  of a  boolean
+        variable var_name (a word or string), and then print a  message,
+        using vedputmessage, depending on whether the new value is  true
+        or false. If  the new  value is  true, then  string true_msg  is
+        used, otherwise string false_msg.
+
+        If var_name is  not declared as  an identifier or  has an  undef
+        value, an error message is put out with vederror.
+
+        For examples  of  its use,  see  SHOWLIB * VED_SET,  * VED_TABS,
+        * VED_STATIC.
+
+
+vedusedsize(string_or_vector) -> int                         [procedure]
+        A system procedure which returns an indication of the number  of
+        characters (if  given  a  string), or  the  number  of  nonempty
+        strings (if given a vector) that are strictly part of the  given
+        structure.  i.e.  returns  this  size  of  the  structure  after
+        trimming has occurred (by vedtrimline etc).
+
+
+vedfilecomplete()                                            [procedure]
+        This library procedure is typically mapped onto a function  key.
+        When invoked  it completes  the file  name to  the left  of  the
+        cursor, or displays  the possible completions  in the form  of a
+        menu, either on the status line  or in a separate temporary  Ved
+        buffer. For full information see HELP * VEDFILECOMPLETE.
+
+
+emacs                                                          [library]
+        Inferior pre-cursor to * vedemacs, described below.
+
+
+vedemacs                                                       [library]
+        LIB * VEDEMACS modifies  both  the  terminal  setting  (on  Unix
+        systems) and  Ved's  key mapping  to  make Ved  respond  to  key
+        presses in a way that is similar  to a subset of the UNIX  EMACS
+        editor. Full details are given below. Some, but not all, of  the
+        facilities, will also work on VMS.
+
+
+20.1  Bracket Matching
+----------------------
+
+vedfindbracket(char_1, char_2, end_test_p, move_p)           [procedure]
+        Searches for char_1 using procedure  move_p to move the  cursor.
+        Signals an error  if end_test_p  ever returns  true. Skips  over
+        intervening  matched  pairs  of   char_1  and  char_2.   Ignores
+        instances of char_1  and char_2 that  are located between  quote
+        characters  (see   vedfindbracket_quotes).  Used   by   ved_gbl,
+        ved_gel, ved_mp.
+
+
+vedfindbracket_quotes(ssname) -> string                      [procedure]
+        Given a subsystem name ssname, returns a string containing those
+        characters that are  considered to be  `quotes' by the  compiler
+        for that subsystem. This user-assignable property is defined  in
+        LIB * VEDFINDBRACKET and used  by the procedure  vedfindbracket,
+        which  ignores  bracket  characters  that  occur  between  quote
+        characters.
+
+
+vedsetwiggle(closing_bracket_char, filetype)                 [procedure]
+        Modifies the effect  of typing closing_bracket_char  (in a  file
+        whose name ends with the  string filetype) such that the  cursor
+        is wiggled over the opening  bracket character that matches  the
+        closing_bracket_char just typed.
+
+        If vedsetwiggle  is  called a  second  time with  the  same  two
+        arguments, then wiggling is disabled for closing_bracket_char in
+        files of type filetype.
+
+        vedsetwiggle is used by * ved_wiggle (i.e. <ENTER> wiggle).
+
+
+vedclosebrackets(closing_bracket_char);                      [procedure]
+        Moves  the  cursor  to  the  end  of  the  current  line  (using
+        vedtextright),  and   then  inserts   sufficient  instances   of
+        closing_bracket_char to  balance  matching  outstanding  opening
+        bracket characters. Uses ved_wmp.
+
+
+
+-----------------------------
+21  User-Definable Procedures
+-----------------------------
+
+These procedures are assessed at  various stages of Ved's execution,  so
+it is  possible  for  individual  users  to  tailor  Ved  to  their  own
+requirements.
+
+vedcommandtrap()                                    [procedure variable]
+        User-assignable  procedure-typed  variable.  The  procedure   is
+        executed just  before every  command (i.e.  <ENTER> command)  is
+        processed. The default value is identfn.
+
+
+vedenterkey()                                       [procedure variable]
+        User re-definable  procedure  invoked  by  <ENTER>.  Default  is
+        vedenter.
+
+
+vedhelpkey()                                        [procedure variable]
+        User re-definable procedure  invoked by the  <HELP> key  (should
+        the terminal possess one). The default value is ved_hkeys.
+
+
+vedinterrupt()                                      [procedure variable]
+        A  user-assignable  procedure-typed  variable  which  is  called
+        whenever an  interrupt occurs  in Ved  (eg when  user types  the
+        interrupt character). The default value is veddointerrupt.
+
+
+vedpopready()                                       [procedure variable]
+        User-assignable procedure, called by interrupt when compiling in
+        Ved (e.g. ved_lmr, ved_c etc). Its default value is setpop.
+
+        You can  trap  interrupts  in Ved  by  assigning  * popready  to
+        vedpopready. This aids the debugging  of programs since you  can
+        inspect the value local variables had when the error handler was
+        called.
+
+        Note that  vedpopready  is  not  called  when  compiling  in  an
+        'immediate mode' file; to trap  interrupts in this case,  assign
+        popready directly to interrupt.
+
+
+vedprocesstrap()                                    [procedure variable]
+        User-assignable   procedure-typed   variable   (default    value
+        identfn), called once each time  around the Ved top level  loop,
+        just before the call of vedprocesschar in vedprocess, i.e.  once
+        per key  or escape  sequence. It  can be  used, for  example  to
+        examine  ved_last_char   the   last   character   read   in   by
+        vedprocesschar.
+
+
+vedredokey()                                        [procedure variable]
+        User assignable  procedure  variable  associated  with  the  Ved
+        <REDO> key. Default value is vedredocommand.
+
+
+vedvedquitfile()                                    [procedure variable]
+        User assignable procedure run whenever a file is quit.  Defaults
+        to identfn.
+
+
+vededitortrap()                                     [procedure variable]
+vededitorexit()                                     [procedure variable]
+        These user-definable procedures are  called whenever vededit  is
+        entered  or  re-entered  (vededitortrap),  or  when  Ved   exits
+        normally or  abnormally (vededitorexit).  Both have  identfn  as
+        their default value.
+
+        However, these procedure are NOT  called in XVed, since in  that
+        case the notion of 'being in Ved'  or 'being out of Ved' is  not
+        applicable: vedprocess is  being suspended and  resumed all  the
+        time.
+
+
+
+--------------------
+22  Other Facilities
+--------------------
+
+22.1  Procedures for Acting on Rectangular Blocks of Text
+---------------------------------------------------------
+The following procedures are used by LIB * VEDBLOCKS, fully described in
+HELP * VEDBLOCKS.  They  underpin  the  procedures  ved_dtb,   ved_sdtb,
+ved_mtb,  ved_smtb,  ved_ttb,  ved_stb,  ved_ytb,  ved_sytb,   ved_yotb,
+ved_itb, ved_sitb.
+
+vedblockrepeater(vector_of_strings) -> procedure             [procedure]
+        Given a vector of strings all of the same length, such as  might
+        be produced by * vedcutblock, this returns a procedure that is a
+        character repeater for those strings. Compare * vedrangerepeater
+
+        See HELP * VEDBLOCKREPEATER for an example of use.
+
+
+vedblocks                                                      [library]
+        LIB * VEDBLOCKS,  together  with  associated  libraries,   makes
+        available  a   collection   of   procedures   for   manipulating
+        rectangular blocks of text in Ved, several of them described  in
+        the rest of this section of  REF VEDPROCS. For full details  see
+        HELP * VEDBLOCKS
+
+
+vedcutblock(line_1, col_1, line_2, col_2, delete) -> vec     [procedure]
+        Copies rectangular block of text from Ved buffer between corners
+        line_1,  col_1,  and  line_2,  col_2  (in  buffer  coordinates).
+        Returns a VECTOR of strings.  If delete is non-false, then  also
+        deletes the block from the Ved buffer.
+
+        See            HELP * VEDCUTBLOCK,             HELP * VEDBLOCKS,
+        HELP * VEDBLOCKREPEATER * VEDYANKBLOCK * VEDOVERLAYBLOCK
+
+
+vedfillblock(line_1, col_1, line_2, col_2, char)             [procedure]
+        Insert a rectangle filled with character char in the Ved buffer.
+        Move everything to  the right if  VEDSTATIC is false,  otherwise
+        overwrite text. Uses  * vedrefreshblock to  redisplay text.  See
+        HELP * VEDFILLBLOCK, * VEDBLOCKS
+
+
+vedoverlayblock(vector_of_strings)                           [procedure]
+        "Yank" a vector of strings,  such as produced by  * vedcutblock,
+        into the  Ved buffer  as  a rectangular  block starting  at  the
+        current cursor location,  ignoring spaces in  the strings.  I.e.
+        where there are spaces the  original contents of the Ved  buffer
+        are left to 'show through'. Compare * vedyankblock.
+
+
+vedrefreshblock(line_1, col_1, line_2, col_2, bool)          [procedure]
+        Refresh  the  portion  of  the  screen  showing  the  text-block
+        specified. If bool is true then  everything to the right of  the
+        text-block  is  refreshed   also.  See   HELP * VEDREFRESHBLOCK,
+        * VEDBLOCKS.
+
+
+vedyankblock(vector_of_strings)                              [procedure]
+        Inserts a vector of strings, VEC, into Ved, of the kind produced
+        by vedcutblock. Compare * vedoverlayblock.
+
+        See HELP * VEDYANKBLOCK, * VEDBLOCKS
+
+
+
+
+22.2  Reading Output from a Shell Command into a Ved Buffer (Unix Only)
+-----------------------------------------------------------------------
+HELP * PIPEUTILS describes LIB * PIPEIN and LIB * PIPEOUT, which allow a
+Poplog program to spawn  a sub program connected  via a pipe. There  are
+several utilities that use * pipein to run a program and read any output
+into a Ved buffer,  also described in the  help file, including  ved_sh,
+ved_csh, ved_rsh,  ved_remsh,  ved_rved,  and  several  of  the  "dired"
+utilities described in  HELP * DIRED. The "system"  procedures on  which
+these libraries are built are described below.
+
+diredpipein(string, file)                                    [procedure]
+        Run  the  shell  command,   string,  with  file  replacing   any
+        occurrence of  %  in the command and read any output into either
+        the current  Ved buffer  or a  temporary Ved  file depending  on
+        whether use_dired_current_file  is true  or false.  (Default  is
+        true). This is used in * ved_dired. (UNIX only)
+
+
+vedgenshell(string1_or_false, string2_or_false)              [procedure]
+        (UNIX only) Run a shell command (using vedpipein) and store  the
+        output in a Ved file. This can be used to define a collection of
+        Ved commands that run shell commands and print their output into
+        a new Ved buffer, e.g. ved_sh, ved_csh, ved_rsh, ved_rved.
+
+        string1  is  the  pathname  of   a  shell,  e.g.  '/bin/sh'   or
+        '/bin/csh'. If  the  first  argument is  false  then  the  shell
+        defaults to the result of systranslate('SHELL').
+
+        string2 is inserted  as a header  in the output  file (false  is
+        ignored).
+
+        vedargument is used to define the  arguments to be given to  the
+        shell, e.g. a command to be run.
+
+        If the output  fits on  one line,  then instead  of a  temporary
+        file, vedgenshell and  its derivates  will print  the output  on
+        Ved's status line, unless the variable show_output_on_status  is
+        false.   (The   default   is   true.)   See    HELP * PIPEUTILS,
+        LIB * VEDGENSHELL, * VED_CSH.
+
+
+vedpipein(command, args, file, defaults_p, display, header)  [procedure]
+        UNIX only. command is a Unix  command path name and args a  list
+        of argument strings, as required for sysexecute and pipein.  The
+        command is run and  any output received is  put into a Ved  file
+        defined by file (which can be either  a file name or a Ved  file
+        structure). defaults_p  is a  procedure to  be executed  in  the
+        environment of file as soon as it is opened, to set defaults.
+
+        If display is true the output from the command is displayed as a
+        Ved window  on the  screen, or,  if there  is enough  space  and
+        show_output_on_status is true, on the status line. If display is
+        set to 1, the value of show_output_on_status is ignored.
+
+        If header is  a string then  if an output  file is created,  the
+        string is inserted as a header line.
+
+        If file  is false  then instead  of going  into a  new file  the
+        output  from  the  command  is   read  into  the  current   file
+        immediately after the current line.
+
+        This procedure is used by vedgenshell, and related utilities.
+
+
+show_output_on_status                                         [variable]
+        Variable used by vedpipein, q.v.
+
+
+
+--- C.all/ref/vedprocs
+--- Copyright University of Sussex 1995. All rights reserved.

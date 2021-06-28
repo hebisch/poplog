@@ -1,0 +1,2504 @@
+REF EXTERNAL                             John Gibson, Jon Meyer Aug 1992
+                                            Revised John Gibson Dec 1996
+
+        COPYRIGHT University of Sussex 1996. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<  LOADING EXTERNAL DATA AND  >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<< CALLING EXTERNAL FUNCTIONS  >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+This file, along with REF * EXTERNAL_DATA and REF * DEFSTRUCT, describes
+a basic, integrated set of facilities for loading external functions and
+data, for calling  functions, and  for accessing data.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+
+  2   Lib External
+
+  3   Overview of External Loading with exload
+
+  4   Syntax of exload
+      4.1   Input File Arguments
+            ... Unix Systems with Static Linking
+            ... Unix Systems with Dynamic Linking
+            ... VAX VMS
+            ... Alpha VMS
+      4.2   Identifier Specifications
+            ... First Form
+            ... Second Form
+            ... The = Form is a Runtime Action
+            ... External Names
+            ... Note On Variables, Structures and Arrays in VMS
+      4.3   Attribute Lists
+            ... prefix Attribute
+            ... language Attribute
+            ... type Attribute
+            ... reloading Attribute
+            ... batching Attribute
+      4.4   Characters in External Names
+
+  5   Calling External Functions
+      5.1   External Function Argument Processing
+      5.2   Floating-Point Arguments
+      5.3   Full Fields in Argument Structures
+      5.4   Arguments Passed `By Reference'
+      5.5   Example: Passing Arrays
+      5.6   Other Types of Arguments
+      5.7   VMS: Arguments Passed by Descriptor
+      5.8   External Function Results
+
+  6   Re-compiling and Unloading an exload
+      6.1   Alpha VMS Note
+
+  7   Saving and Restoring Images
+      7.1   Unix
+      7.2   VMS
+            ... VAX Note On message Utility
+
+  8   Utility Procedures for External Loading
+
+  9   Raw External Loading
+
+ 10   External Callback
+      10.1  C Interface
+            ... Synopsis
+            ... Description
+      10.2  Callback and Fixed-Address Structures
+      10.3  External Function Closures
+      10.4  Callback and Abnormal Exit
+      10.5  Restrictions on Operations Inside Callback
+            ... Processes
+            ... Prolog
+
+ 11   General Warning
+
+
+
+
+---------------
+1  Introduction
+---------------
+
+In  Poplog,  external  data  and  functions  are  data  structures   and
+function/procedure code associated  with non-Poplog  languages (e.g.  C,
+FORTRAN, PASCAL,  etc),  and  which  can  be  dynamically  loaded  (from
+operating system object  files) into memory  alongside a running  Poplog
+system. External  functions  can  then  be  called,  and  external  data
+accessed (or updated), from a Poplog program.
+
+Reasons for wanting  to do this  include the possibility  of doing  some
+things more efficiently  than they  can be  done in  Poplog (e.g.  heavy
+numerical computation),  or gaining  access to  facilities not  provided
+directly by Poplog.
+
+Note that  while these  facilities have  been considerably  expanded  in
+Poplog Version  14, and  are  now much  more  powerful, they  are  still
+somewhat clumsy  in  respect  of calling  functions  and  procedures  in
+languages such as  FORTRAN and PASCAL  (the reason concerns  the way  in
+which arguments  are  passed  in  those  languages).  Calling  functions
+written in C, on the other hand, is much more straightforward (since its
+argument passing mechanism is simpler, and more compatible with Pop-11).
+
+However, the LIB * EXTERNAL facilities, described in HELP * EXTERNAL and
+HELP * NEWEXTERNAL, provide  a  higher-level, more  language  orientated
+approach to external  loading and calling.  While this too  concentrates
+mainly on C, it  also supports a FORTRAN  interface which eases some  of
+the problems with calling that  language. (Unfortunately, it still  does
+not (as yet) provide any similar support for PASCAL.)
+
+
+
+---------------
+2  Lib External
+---------------
+
+The  identifiers  in  this  section  are  used  by  the   LIB * EXTERNAL
+facilities.
+
+
+external                                                        [syntax]
+        The  main   syntax  construct   in  LIB * EXTERNAL   facilities,
+        described  in  HELP * EXTERNAL.   LIB * NEWEXTERNAL  is  a   new
+        improved version of this, see HELP * NEWEXTERNAL.
+
+
+c_dec()                                                      [procedure]
+        Used  by   LIB * EXTERNAL  and   LIB * NEWEXTERNAL  to   parse C
+        declarations. See also HELP * NEWC_DEC.
+
+
+fortran_dec()                                                [procedure]
+        Used by LIB * EXTERNAL to parse Fortran declarations.
+
+
+
+-------------------------------------------
+3  Overview of External Loading with exload
+-------------------------------------------
+
+Object files containing external functions  and data may be loaded  with
+the syntax form  exload. To understand  and use this,  you will need  to
+have read the following:
+
+    REF * EXTERNAL_DATA
+        (at least the  section Representation  of External  Data
+        which describes external pointers), and
+
+    REF * DEFSTRUCT
+        (which describes type_spec  syntax for external  pointer
+        type specifications, as  well as the  exacc syntax  form
+        used for calling functions and accessing data).
+
+exload operates by running the operating  system linker to link in  with
+the Poplog system user object files produced by language compilers,  and
+then provides access to the named external functions and data defined in
+those files.
+
+This is an 'additive'  incremental process in the  sense that a  running
+list of all external names brought  in by previous loads is  maintained,
+and everything accumulated  is accessible  at each new  load. The  input
+files specified to a  new exload (plus  any operating system  libraries,
+etc) must provide  definitions for  all names that  have not  previously
+been loaded (linker error messages will  result if any are undefined  or
+multiply defined).
+
+The exload syntax form will  be briefly summarised before describing  it
+in detail in the following sections  of this file. It consists of  three
+parts, bracketed by  the opening  exload and the  closing endexload,  as
+follows:
+
+            exload
+                mark_item
+                input_file_list
+                identifier_specs
+            endexload;
+
+The mark_item part is just an item to identify this particular  external
+load,  and  may   be  anything   (word,  string,   integer,  etc).   The
+input_file_list part  names the  object  files, etc  to be  loaded,  and
+consists of a list of strings or words in square brackets, e.g.
+
+            [foo baz grum]
+
+Finally, the  identifier_specs  part  specifies  declarations  for,  and
+values to be assigned to, a  set of Pop-11 identifiers (i.e.  variables,
+constants, etc).  Each  identifier will  have  assigned to  it  a  value
+derived from  an external  name (such  as a  function name),  where  the
+external name either defaults to the  same as the identifier, or can  be
+specified separately if different.
+
+The value to be assigned  in each case is  specified by a type_spec.  In
+the most general form, this can be used to access any value through  the
+external name, but an abbreviated form  allows for the most common  case
+of loading a simple external pointer.
+
+With a suitable type_spec for an external pointer, exload will also make
+an automatic typename  declaration for  the identifier  name (i.e.  with
+p_typespec or l_typespec), which allows it  to be used in an exacc  form
+without further type declarations.
+
+
+
+-------------------
+4  Syntax of exload
+-------------------
+
+exload                                                          [syntax]
+        This construct has the form
+
+                exload
+                    mark_item
+                    input_file_list
+                    identifier_specs
+                endexload;
+
+        where the parts are as follow:
+
+        mark_item
+            An item that  identifies this particular  exload. It may  be
+            any Poplog item (usually a  number, word, string, etc),  but
+            must   be   different   from    the   mark_item   for    any
+            previously-compiled exload (that is, different according  to
+            the Pop-11 "=" operator, not "==").
+
+            This item will come into  play if you re-compile an  exload.
+            See Re-compiling  and Unloading  an  exload below  for  more
+            details.
+
+        input_file_list
+            A square  bracket enclosed  list  of object-file  names  and
+            other file specifications (strings or words) required to  be
+            loaded. The exact contents of this list are operating system
+            dependent; see Input File Arguments below.
+
+            Note that this  argument is optional  (if omitted, then  all
+            external names  being loaded  must  be either  present  from
+            previous loads, or in default libraries, etc).
+
+            Note also  that this  list  is read  as  a normal  Pop  list
+            construct (that is, it may contain 'evaluate' keywords  such
+            as %, ^, ^^, etc).
+
+        identifier_specs
+            Overall, this part  is like a  sequence of Pop-11  constant,
+            vars, lconstant or lvars statements, each ending with a  ";"
+            (which is optional for  the last one);  however, to get  the
+            current default  constant  or  vars declaration  in  use  by
+            define, the declarator keyword may be omitted.
+
+            That is, identifier_specs basically  consists of any  number
+            of repetitions of
+
+                declarator
+                    identifier_spec,
+                    identifier_spec,
+                        ...
+                    ;
+
+            where declarator is either empty, or one of
+
+                constant  vars  lconstant  lvars
+
+            Each identifier_spec can take one of two forms. The meanings
+            of these  are  described  below in  the  section  Identifier
+            Specifications for exload:
+
+                identifier_name     type_spec  from_name
+                identifier_name  =  type_spec  from_name
+
+            type_spec is optional  in the first  form, but mandatory  in
+            the second;  from_name is  optional in  both cases,  and  if
+            present consists of  <- (read 'comes  from') followed by  an
+            external name, i.e.
+
+                <-  external_name
+
+            Whereas identifier_name  must be  a word,  if  present  then
+            external_name  may  be either a word or a quoted  string. If
+            external_name is not  present, it  defaults to  the same  as
+            identifier_name.
+
+            A bracketed comma  separated list of  attributes may  appear
+            anywhere  between  statements  beginning  with   declarator.
+            Attributes  specified   in   this   way   apply   to   every
+            identifier_spec that follows upto  endexload, or until  that
+            attribute is redefined in another attribute list. Attributes
+            are used to  control identifier  prefixes and  if, how,  and
+            when  identifiers  are  loaded.  Attribute  lists  have  the
+            syntax:
+
+                ( attribute, attribute, ... )
+
+            Each attribute is one of:
+
+                # prefix prefix
+                # no prefix
+                # batching
+                # no batching
+                # reloading
+                # no reloading
+                # language name
+
+            Where both prefix  and name  may be either  a string  or
+            word. A typical attribute list would therefore be:
+
+                (no reloading, language C)
+
+            The following default attributes:
+
+                (no prefix, batching, reloading, language C)
+
+            are used by exload.
+
+
+Before completing the description of  exload in the following  sections,
+the example below gives an idea of what an exload statement looks like:
+
+            exload 'example'
+
+            (language C)
+                malloc(nbytes) :exptr,
+                atan2(x, y) :dfloat,
+                c_exit(status) :void        <- exit,
+                c_printf(string, ...) :int  <- printf,
+                errno :int
+
+            endexload;
+
+
+This uses no object  files, but loads the  standard C library  functions
+malloc, atan2,  exit, printf  and  the variable  errno, where  exit  and
+printf are loaded under the names  c_exit and c_printf (note the  latter
+renaming would be essential, since  printf is already a standard  Pop-11
+procedure).  In  each  case,  the  identifiers  have  external  pointers
+assigned to them (and typename declarations made for them).
+
+Alternatively, using the prefix attribute, all the above could be loaded
+as the Pop identifiers c_name (i.e. c_malloc, ..., c_errno):
+
+            exload 'example'
+
+            (language C, prefix c_)
+                malloc(nbytes) :exptr,
+                atan2(x, y) :dfloat,
+                exit(status),
+                printf(string, ...) :int,
+                errno :int
+
+            endexload;
+
+
+
+4.1  Input File Arguments
+-------------------------
+The input_file_list argument to exload  may contain strings or words  to
+specify object files,  etc to be  loaded; the exact  contents and  their
+interpretation differs between Unix and VMS Poplog, as described below.
+
+On all systems, an argument beginning  with == is assumed to specify  an
+environment variable/logical  name,  and  is replaced  by  the  list  of
+strings (i.e.  the  exlibs result)  returned  by  * sys_translate_exlibs
+applied to it.
+
+(Note however, that  this translation  is not done  when compiling  with
+Popc. The input_file_list is  merely written to  the output w-file,  and
+the corresponding translation of  environment variables is performed  at
+link time by Poplink.)
+
+input_file_list may also contain  identifiers whose idvals are  strings,
+words or  lists; these  are dereferenced  to their  values, lists  being
+processed recursively.
+
+
+...  Unix Systems with Static Linking
+-------------------------------------
+This currently includes  older versions  of SunOS  (4.1.X and  earlier),
+Ultrix, versions of  Irix prior  to 5.0  and systems  based on  System V
+Release 3.
+
+On Unix  system where  static linking  is employed,  exload invokes  the
+operating system linker ld to link in relocatable object files and  code
+extracted from static archives. Since the  input file list is passed  to
+ld, it may contain any valid  arguments for that utility (see  ld(1)). A
+word argument (not  beginning with "-")  is taken to  be an object  file
+name without an extension, and the  standard extension '.o' is added  to
+it. String arguments may  specify library files  (or -L directories)  as
+appropriate;      both      the       Poplog      external       library
+'$popexternlib/libpop.olb'. and the  C default library  '-lc' are  added
+automatically to the end of the list.
+
+
+...  Unix Systems with Dynamic Linking
+--------------------------------------
+This currently includes  OSF1, AIX,  HP-UX (post version  8.0) and  Unix
+systems based on System V Release  4 (SVR4), including Sun Solaris  2.X,
+Silicon Graphics IRIX 5.X and ICL's implementation of SVR4.
+
+On these systems, exload uses the system call interface to the operating
+system dynamic linker to  attach a shared object  to the Poplog  process
+and make  the functions  and data  defined in  the shared  object/shared
+library available to Poplog. The input file list determines which shared
+objects will be  opened and  where they  are to  be found.  The list  is
+processed by Poplog and may contain a subset of the options supported by
+ld: namely, shared object  files, library specifications (-l  arguments)
+and additional library search paths (-L arguments). A word argument (not
+beginning with "-") is taken to be a shared object file name without  an
+extension, and either of the  standard extensions '.so' (SVR4, OSF1  and
+AIX) or  '.sl' (HP-UX)  is added  to it.  String arguments  may  specify
+library  files  as  appropriate;   both  the  Poplog  external   library
+'$popexternlib/libpop.olb'. and the  C default library  '-lc' are  added
+automatically to the end of the list.
+
+The  creation  of  a  shared  object/shared  library  as  opposed   to a
+relocatable object  file  is quite  trivial.  It has  two  requirements.
+Firstly, that the source file  is compiled to position independent  code
+(PIC): this  is  accomplished by  an  option to  the  external  language
+compiler. Secondly. it requires a call to the operating system linker ld
+to create a shared object from  the relocatable object file produced  by
+the external language compiler.
+
+Solaris
+On Solaris systems,  these two steps  may be combined.  For example,  to
+produce a shared  object 'test.so'  corresponding to the  C source  file
+'test.c':
+
+        % cc -o test.so -G -K pic test.c
+
+Silicon Graphics
+Silicon  Graphics  compilers   generate  position-independent  code   by
+default, but building a shared object has to be done in a separate  link
+step; so to get the same effect under IRIX 5:
+
+        % cc -c test.c
+        % ld -o test.so -shared test.o
+
+OSF1
+Similar to  Silicon  Graphics, but  any  C libraries  required  must  be
+specified to the link command. In addition, if any of the object modules
+use Poplog callback procedures (see External Callback below), these will
+result in undefined symbol warnings unless the -expect_unresolved option
+is specified for symbols beginning with pop_ :
+
+        % cc -c test.c
+        % ld -o test.so -shared -expect_unresolved pop_\* test.o -lc
+
+HP-UX
+To produce a shared library 'test.sl' corresponding to the C source file
+'test.c' on HP-UX:
+
+        % cc -c +z test.c
+        % ld -o test.sl -b test.o
+
+AIX
+To produce a shared object 'test.so' corresponding to the C source  file
+'test.c' on AIX:
+
+        % cc -c test.c
+        % ld -o test.so -G -bexpall -bnoentry test.o -lc
+
+(In AIX, shared objects may also  be modules in archives created by  the
+ar utility, i.e. files whose extensions  are '.a'. For -l arguments,  .a
+archives are searched for first  before .so files, and  if a .a file  is
+found, the module name is assumed to be 'shr.o'.)
+
+
+For  further  details  see  the  appropriate  operating  system/language
+processor manual.
+
+Note that  there is  a subtle  restriction on  SVR4 systems:  given  two
+shared objects A and B where B depends on A (e.g. a function defined  in
+B calls a function  defined in A), you  can load A on  its own, but  you
+can't load B on its own, regardless of whether you've loaded A before or
+not. You must explicitly specify the dependency in the exload; e.g.
+
+    exload 'example' ['-lB' '-lA'] ... endexload; ;;; B depends on A
+
+It is actually possible to make  the dependency explicit when you  build
+the library. E.g.
+
+    cc -o B.so -G -K pic B.c -lA
+
+Then  you  can  exload  B  on  its  own:  the  linker  will  bring  in A
+automatically if it's needed.  However, there may  be a problem  arising
+from where the  run-time linker looks  for library A.  A solution is  to
+specify a list of library search  directories using the -R option  which
+will be passed to the run-time linker. See the manual page for ld(1) for
+details.
+
+Note also that it is quite in  order to exload a shared object  multiple
+times: exloads  subsequent to  the first  return a  handle to  the  same
+instance of the shared object: there is  thus no added cost in space  or
+time. This also applies to HP-UX shared libraries.
+
+
+...  VAX VMS
+------------
+On VAX VMS, exload invokes the  operating system linker link to link  in
+object files. Apart from  linker command qualifiers  (which may also  be
+included), the list goes into a VMS linker options file, with one string
+per line, and so may  contain any lines valid for  such a file (see  the
+VMS Linker Reference Manual). Words are treated the same as strings, and
+no default extensions are added to  object file names (since for a  name
+with no extension, '.obj' is assumed by the linker anyway). The list may
+also contain the names of shareable images to be loaded (see below),  as
+well as libraries, etc; the Poplog external library
+
+    popexternlib:libpop.olb/library
+
+is included automatically.
+
+    Linker Command Qualifiers
+        Strings beginning with a  `/` character are  taken to be  linker
+        command qualifiers, and are extracted from the list and added to
+        the link command.  However, you  should not attempt  to use  any
+        qualifiers in this context  other than '/nosyslib',  '/nosysshr'
+        and '/nouserlib' (and their abbreviations).
+
+    Shareable Images
+        A shareable image (specified with 'filename/share' etc), may  be
+        either a system image  in sys$share:, or  a private image  file.
+        For example,
+
+          'vaxcrtl/share'   ;;; system image "vaxcrtl"
+          'myshare/share'   ;;; where "myshare" is a
+                            ;;; logical name for a file myshare.exe
+
+        Although filename may include components such as disk, directory
+        or extension, only the  actual file name  part is relevant  (and
+        the other parts may be omitted).  The VMS linker uses only  this
+        part, and looks to see  if it is defined  as a logical name;  if
+        not, it assumes the image is  in sys$share. If the logical  name
+        is defined, it must translate to the full filename of a  private
+        shareable image.
+
+        In other  words,  you  cannot load  a  private  shareable  image
+        without  first  having  defined  a  logical  name  for  it,  and
+        moreover, the logical name must be the same as the file name.
+
+        Also, each  shareable image  must appear  in a  separate  string
+        (i.e. do not  use commas  to separate  two or  more images  in a
+        single string, even though this would normally be allowed by the
+        linker).
+
+    Linker Special Options
+        Of  these,   only  'symbol=',   'psect_attr=',  'collect='   and
+        'cluster=' are safe to use (but on no account must 'cluster=' be
+        used to specify a base address).
+
+
+...  Alpha VMS
+--------------
+The behaviour  of exload  on VAX  VMS systems  is not  supported on  the
+Alpha. Instead, you  are restricted  to loading  external symbol  values
+from shareable images only  (this is similar in  spirit to Unix  systems
+with  dynamic   loading).  exload   uses  the   VMS  library   procedure
+lib$find_image_symbol to effect the loading.
+
+Each input_file_list  item  must be  a  word or  a  string  specifying a
+shareable image, in the form
+
+        name/share
+
+where the /share qualifier is optional. The name part may be either
+
+    (1) A logical name (optionally ending with ':') which translates  to
+        the full filename of a shareable image, e.g.
+
+            'myshare/share'
+
+        where "myshare"  is  defined  as  a  logical  name  for  a  file
+        disk:[dir]myshare.exe, etc.
+
+    (2) A filename containing only a  file name part (i.e. no  directory
+        or extension), which names a shareable image in sys$share, e.g.
+
+            'sys$ssishr/share'
+
+        refers to sys$share:sys$ssishr.exe.
+
+    (3) A filename containing a directory and/or extension, which  names
+        a file in the usual way, e.g.
+
+            'myshare.exe/share'
+
+        means myshare.exe in the current directory.
+
+    (However, note that in standalone  programs compiled with Popc,  the
+    /share qualifier is mandatory, and (3) is disallowed. With Popc, the
+    shareable image  spec is  processed through  the VMS  linker  (which
+    requires /share),  and  the  resulting  executable  would  require a
+    logical name to activate any image not in sys$share.)
+
+Unlike the VAX system, input files do not accumulate from one exload  to
+the next;  the  input_file_list to  each  exload must  specify  all  the
+shareable images required to define the external symbols for that  load.
+(Also unlike the VAX system, you  cannot implicitly refer to symbols  in
+other shareable images that are used by the ones specified; every symbol
+must be a universal of one of the images given.)
+
+Creating Shareable Images
+In order to  load object files  into Alpha Poplog,  you must first  turn
+them into shareable image(s). The VMS Linker Reference Manual  describes
+how to  do  this  in  general; however,  Poplog  provides  a  simplified
+approach with the command file
+
+        popcom:linkshare.com
+
+whose main feature is to relieve you of the burden of having to  declare
+as "universal" the global symbols you require to access. It simply links
+an image in which all global symbols are declared universal.
+
+The format of the command is as follows:
+
+        @popcom:linkshare image-name file1 file2 ... file7
+
+where image-name is the name of the shareable image to link, followed by
+upto 7 file arguments. Each file argument may be
+
+      # An object file spec (wildcards allowed, e.g. *.obj);
+
+      # A shareable image name with /share appended;
+
+      # A library name with /library or /include (etc) appended;
+
+      # A linker options  file with  /options appended:  any such  files
+        will be  placed last  in  the link.  (If  you have  more  than 7
+        arguments, you  can  put  the  remainder  in  an  options  file.
+        However, since these are processed by the linker, wildcards will
+        not be accepted in object file names.)
+
+      # If required, a  "gsmatch=" option  (note that  this defaults  to
+        "gsmatch=lequal,1,1000" if not specified).
+
+All global symbols defined in the object files/object libraries used are
+made universal in the output image (and thus accessible with exload).
+
+For example,
+
+        $ @popcom:linkshare myshare.exe mycode.obj
+
+will  turn  the  object  file   'mycode.obj'  into  a  shareable   image
+'myshare.exe'.
+
+Callback Shareable Image Library
+Note that linking a shareable  image for external loading which  employs
+Poplog external  callback (see  External  Callback below)  requires  the
+Poplog external library
+
+        popexternlib:libpop.olb/library
+
+in   the   link   command    (this   is   supplied   automatically    by
+popcom:linkshare).  libpop.olb  is  a  shareable  image  library   which
+(currently) contains only one image, namely
+
+        popexternlib:pop$c_callback.exe
+
+(given by the logical name "pop$c_callback").
+
+
+
+4.2  Identifier Specifications
+------------------------------
+As described above, each identifier_spec in an exload statement controls
+the value which will be assigned to one Pop-11 identifier. Ignoring  for
+a moment the optional from_name part, this can have two forms:
+
+          identifier_name     type_spec     (type_spec optional)
+          identifier_name  =  type_spec     (     "     required)
+
+(In all cases, the actual Pop-11 identifier involved is  identifier_name
+with any current  prefix added  -- in  the descriptions  below, this  is
+simply referred to as identifier_name.)
+
+
+...  First Form
+---------------
+This is  the most  common case,  and is  used when  the 'value'  of  the
+external name being loaded is the address of something in memory  (where
+this includes functions, data  structures, arrays, variables, etc);  the
+Pop-11 identifier  is  assigned an  external  pointer pointing  to  that
+object in memory.
+
+If in addition  type_spec is  supplied, then  it specifies  the type  of
+object pointed to, and  the identifier name is  declared as a  typename.
+That is, a declaration
+
+            x_typespec identifier_name type_spec;
+
+is made (using p_typespec for a permanent identifier, and l_typespec for
+a lexical one). This allows the identifier to be used with exacc without
+having to specify a type cast.
+
+For example, in the identifier_spec
+
+            atan2(x, y):dfloat
+
+identifier_name  is  "atan2",  while  '(x,y):dfloat'  is  the  value  of
+type_spec. This  specifies a  pointer to  a function  with 2  arguments,
+returning a double float  result (produced as  a Poplog ddecimal).  This
+could be called directly with exacc as follows:
+
+            exacc atan2(x, y) -> ddecimal;
+
+(See External Function Results below for more on function results.)
+
+Alternatively,
+
+            errno :int
+
+loads into errno a pointer to the  C "int" variable of that name,  whose
+value could then be accessed or updated with
+
+            exacc errno -> error_code;
+            0 -> exacc errno;
+
+etc.
+
+
+...  Second Form
+----------------
+Instead of just loading  an external pointer as  in the first form,  the
+second form of identifier_spec  using = allows an  actual access on  the
+pointer to be performed. It can be used when
+
+    # The value  of the  external name  is not  an address,  but  an
+      integer in  its  own right.  Examples  of this  are  the  many
+      symbolic status  return codes  used in  VMS (e.g.  SS$_NORMAL,
+      whose value is 1). In Unix systems, this kind of external name
+      is hardly ever used, because such integer codes are  #define'd
+      as macros  in  C header  files  (and the  integer  values  are
+      substituted for the names at compile-time).
+
+    # The external name  is the address  of an object,  but what  is
+      required in the  Pop-11 identifier  is not a  pointer to  that
+      object, but something derived from it, or accessed through it,
+      etc.
+
+As for the first  form, the value  of the external name  is put into  an
+external pointer record, but then instead  of assigning that to the  Pop
+identifier, exacc  is  applied  to  it with  the  given  type_spec;  the
+identifier then receives whatever results from that exacc. That is,  the
+identifier is assigned the result of
+
+            exacc type_spec temp
+
+where temp contains the external pointer.
+
+Thus for example, whereas
+
+            errno :int
+
+would set errno to a pointer to an integer,
+
+            errno = :int
+
+would actually access the integer (and assign that to errno). Note  that
+type_spec can consist of access and/or conversion procedures only, e.g.
+
+            baz = #convert
+
+is valid.
+
+Where the value of the external  name itself is required as an  integer,
+this can be got with a `pointer value' access using "^", e.g.
+
+            foo = ^uint
+
+would set identifier foo to the value  of the external name "foo" as  an
+unsigned integer.
+
+    In general, since type_spec can include implicit access  procedures,
+conversion procedures, etc, etc, the item resulting from the exacc  (and
+put in  the identifier)  may turn  out as  anything. However,  so as  to
+provide the same automatic typename  declarations as in the first  form,
+if the result  of the type_spec  access is a  `typed' external  pointer,
+e.g.
+
+        identifier_name = :exptr.{pointer_type}
+
+then as before, x_typespec  is used to  declare identifier_name as  type
+pointer_type.
+
+
+...  The = Form is a Runtime Action
+-----------------------------------
+An important aspect of the = form not so far mentioned is the following:
+the evaluation of
+
+            exacc type_spec temp
+
+(and the assignment of the result  to the identifier) has to be  delayed
+by the system until `run-time'.
+
+That is, instead of directly evaluating the exacc at load-time, it,  and
+the  assignment  of  the  result   to  the  identifier,  are  done   via
+sys_runtime_apply  as  a  runtime   action.  (See  Runtime  Actions   in
+REF * SYSTEM.)
+
+There are two reasons for this. The first is that although Poplog  saved
+images  can  correctly  save  and  restore  external  name  values  from
+operating system  shareable  libraries when  they  are confined  to  the
+`original' external pointers, they cannot  guarantee to do the same  for
+anything accessed through those pointers (or indeed deal with any  other
+external pointer class  structures into which  the external name  values
+may get copied). The second  reason is that Popc compilation  similarily
+cannot deal  with  anything but  the  original external  pointers.  (The
+`original' external pointers  are actually constructed  and returned  by
+external_do_load.)
+
+The principal consequence of this delayed action is that, if the current
+image has been run with %nort in order to build a saved image, then  any
+code that attempts to use the  value of an identifier at load-time  will
+fail (since the assignment will not have been done). On the other  hand,
+when building a saved image, the current  image MUST be run in this  way
+(because if the actions ARE done at compile-time, the saved inage cannot
+guarantee to save and restore the results correctly).
+
+Thus compile-time executed  "top level" code should  not attempt to  use
+the values from identifiers declared with the = form. Moreover, so as to
+allow their assignments to be done at run-time, all such identifiers are
+coerced to variables (i.e. lvars or vars as appropriate).
+
+(Note that this issue does not  concern the first form of exload,  since
+that only assigns the original external pointers to identifiers.)
+
+
+...  External Names
+-------------------
+The optional from_name part at the end of an identifier_spec allows  the
+name of  the  Pop-11  identifier  being  declared  and  assigned  to  be
+completely different from the external name being loaded (as opposed  to
+just having a simple prefix added). When present, it consists of
+
+            <-  external_name
+
+where external_name is generally a word  (but may also be a string,  see
+below). E.g.
+
+          the_c_printf_function(string,...):int  <- printf
+
+(N.B. If there is a current prefix specified with the prefix  attribute,
+then this  will still  be added  to the  Pop identifier  name even  when
+from-name is present.)
+
+You can  use  from_name  if  you simply  want  to  call  the  identifier
+something different  from  the external  name,  or  when it  has  to  be
+different because  the external  name clashes  with an  existing  Pop-11
+identifier (e.g. a built-in  system one). There  are also other  reasons
+for using from_name, but before describing these something must be  said
+about external symbols as opposed to external names.
+
+By external  symbol is  meant the  name by  which the  operating  system
+linker (and other utilities) actually know a given external  definition.
+The point here  is that  compilers in  many Unix  systems generally  add
+characters to names used in programs,  so that the symbols appearing  in
+object files are not quite the same as those used in the original source
+code. (The standard 'mappings' in this respect are for the C compiler to
+prepend an underscore (so  that name "foo"  becomes symbol '_foo'),  and
+for the FORTRAN compiler  to both prepend and  append one (so that  name
+"foo" becomes symbol `_foo_`).)
+
+Note that the above does not apply in VMS, where the external symbol  is
+always the  same as  the  original name.  The  situation is  similar  in
+SVID-compatible Unix systems using COFF format object files, except that
+FORTRAN compilers will usually append an underscore (so that name  "foo"
+becomes symbol `foo_`).
+
+In any  case,  when  given an  external  name  as a  word,  exload  will
+automatically perform any necessary mapping from name to symbol; this is
+the normal case where either from_name  is omitted, or is supplied  with
+external_name as a word. Supplying external_name as a string says  "this
+is the actual external symbol", and bypasses any translation.
+
+
+...  Note On Variables, Structures and Arrays in VMS
+----------------------------------------------------
+The treatment of non-procedures such as variables, structures and arrays
+in some  VMS compilers  is a  little strange:  unlike procedures,  their
+names are not by default declared  as ordinary external symbols, but  as
+psects (program sections).
+
+Since Poplog cannot  handle such  declarations, you  must declare  these
+structures globaldef in order to  load them. Structures not so  declared
+will result in undefined symbol messages.
+
+The problem applies particularly to the C language on the VAX (note, not
+Alpha), where the default behaviour is wholly inappropriate (having more
+to do with FORTRAN  common blocks than  C). For example,  if you try  to
+load my_structure and my_variable from the following
+
+        struct {
+            int a;
+            char b;
+            long c;
+        } my_structure;
+
+        int my_variable;
+
+you will get both undefined. They must be redeclared as
+
+        globaldef struct {
+            int a;
+            char b;
+            long c;
+        } my_structure;
+
+        globaldef int my_variable;
+
+(and declared globalref in other external files that reference them).
+
+This problem  is  cured  in  the  Alpha  VMS  C  compiler:  by  default,
+variables,  structures  and  arrays  are  declared  as  ordinary  global
+symbols. (Indeed, the  default mode  of compilation  will issue  warning
+messages for globaldef/globalref.)
+
+See VMS language manuals for further details.
+
+
+
+4.3  Attribute Lists
+--------------------
+As well as controlling the current Pop identifier name prefix, attribute
+lists in exload  are used  to control  mappings from  external names  to
+symbols  (the  language  attribute),   reloading  of  identifiers   (the
+reloading attribute),  and  when  loading  is  actually  performed  (the
+batching attribute).
+
+All  attributes  apply  to  each  identifier_spec  which  follows,  upto
+endexload, or until  that attribute  is redefined  in another  attribute
+list. The initial attributes used by exload are:
+
+        (no prefix, no type, batching, reloading, language C)
+
+
+...  prefix Attribute
+---------------------
+The current prefix added to all  Pop identifier names can be  controlled
+with
+
+            ( prefix prefix )
+
+where prefix can be a word or string (it makes no difference which).
+
+
+...  language Attribute
+-----------------------
+In order to  allow exload  to perform  language-dependent mappings  from
+external names to symbols, the attribute
+
+            ( language name )
+
+can be used, where  name can be  a word or  string (makes no  difference
+which).
+
+You can always supply  a language attribute if  you wish, but  currently
+there is only one  case in which exload  actually takes any notice  of a
+specific language name.  This is "FORTRAN"  in (non-COFF) Unix  systems,
+where (as noted  above), the mapping  from name to  symbol is  different
+from the C mapping (the C one being the default for such systems).
+
+
+...  type Attribute
+-------------------
+The operating system linker may need to be told whether a given external
+symbol is a code symbol or  a data symbol (currently, this applies  only
+to HP-UX on  HPPA machines,  and then only  when compiling  a file  with
+Popc). The attribute
+
+            ( type type )
+
+can be used for this purpose, where type is "code" or "data".
+
+However, you need only use  this attribute for identifier_specs that  do
+not supply a type_spec. With  the default (no type), an  identifier_spec
+having a function type_spec will  assume "code", and an  identifier_spec
+having any other type_spec will assume "data".
+
+For identifier_specs that do  not supply a  type_spec, the default  with
+(no type) is "code".
+
+
+...  reloading Attribute
+------------------------
+The reloading attribute controls whether an identifier which already has
+a value in Poplog should be loaded again. If you enable reloading, using
+the attribute list  (reloading), then exload  will load every  specified
+identifier regardless of whether that  identifier already has a  defined
+value in Poplog.  Previous values  of the  identifier are  lost. If  you
+disable reloading, using  the (no  reloading) attribute  list, then  any
+identifier_spec which refers  to an existing  identifier in Poplog  will
+effectively be ignored. This allows you to "demand load" symbols from an
+external object file or library.
+
+
+...  batching Attribute
+-----------------------
+The batching attribute  is used  to collect  identifier-spec lists  from
+multiple exload  commands  together,  and  load them  in  a  single  raw
+external_do_load call.  This  "deferred loading"  is  desirable  because
+invoking the operating system linker is time consuming.
+
+The batching  attribute is  used in  conjunction with  the  exload_batch
+command.
+
+
+exload_batch                                                    [syntax]
+        This construct has the form:
+
+            exload_batch
+                statement_sequence
+            endexload_batch;
+
+        Where statement_sequence contains any statements which are valid
+        Pop-11,  and   may   include  multiple  exload  or  exload_batch
+        commands.
+
+        Within the context of an  exload_batch command, exload will  add
+        each identifier_spec for which batching  is enabled to a  buffer
+        which  is  flushed  when  endexload_batch  is  reached.   Nested
+        exload_batch commands  can  occur;  the  batch  buffer  is  only
+        flushed  when  the  outermost  endexload_batch  is  reached.  If
+        batching is disabled by  specifying the (no batching)  attribute
+        to  exload,  or  outside  an  exload_batch  ...  endexload_batch
+        statement, exload  will add  each  identifier_spec to  a  buffer
+        which is loaded as soon as the closing endexload is reached.
+
+
+To   manually   flush    the   batch   buffer,    use   the    procedure
+exload_do_batch_load, which takes no arguments:
+
+
+exload_do_batch_load()                                       [procedure]
+        This  calls  external_do_load  to   load  any  symbols  in   the
+        exload_batch buffer.
+
+
+Within an exload_batch, the default is to batch unless (no batching)  is
+specified on a particular exload.
+
+The following example shows  how exload_batch can be  used to group  two
+exload commands into a single external_do_load:
+
+        exload_batch
+
+        exload 'test1'
+            c_printf <- printf;
+        endexload;
+
+        exload 'test2'
+            c_exit <- exit;
+        endexload;
+
+        endexload_batch;
+
+exload_batch does not  expect there to  be any particularly  complicated
+dependencies between different object file specifications in the various
+input_file_lists, and  merges these  lists  from the  different  exloads
+using an algorithm which (usually) ensures the correct result.
+
+If this causes a problem  for a particular exload,  you can use the  (no
+batching) attribute to resolve  it. (This will  not, however, work  with
+Popc batch-compilation, since  Poplink use the  same algorithm to  merge
+the input_file_lists from all input files).
+
+
+
+4.4  Characters in External Names
+---------------------------------
+A problem  that arises  in VMS  (but  not generally  in Unix),  is  that
+external names can contain 'sign'  characters that make them invalid  as
+normal Pop-11 words when read as input in a program; the main culprit in
+this respect is the character $, which occurs frequently in VMS names.
+
+One  way  to  solve  this  problem   in  VMS  is  to  use  a   different
+identifier_name with external_name specified as  a string (in which  a $
+doesn't matter). Another  (and probably  the best)  way is  to make  the
+character \ an alphabeticiser with
+
+        12 -> item_chartype(`\\`);
+
+(which is  best  done in  your  'init.p' file),  after  which $  can  be
+escaped, e.g.
+
+        SS\$_NORMAL = ^uint
+
+Note that in VMS all external symbols are case-blind, that is
+
+        ss\$_normal = ^uint
+
+gives the  same external  symbol as  the  above (but  not the  same  Pop
+identifier).
+
+(Note also that there is a limit of 31 characters on VMS external symbol
+names; exload will automatically truncate any names over this limit.)
+
+
+
+
+-----------------------------
+5  Calling External Functions
+-----------------------------
+
+The basic way  to call an  external function pointed  to by an  external
+pointer (or  external pointer  class  record) is  with the  syntax  form
+exacc. (It can  also be done  with an 'apply'  procedure defined by  the
+syntax form defexacc.)  Both exacc  and defexacc are  not restricted  to
+calling external  functions,  but  can also  be  used  to  access/update
+external data; their general forms are described in REF * DEFSTRUCT.
+
+However, an exacc to  call a function is  quite simple, e.g. an  example
+already given above:
+
+            exacc atan2(x, y) -> ddecimal;
+
+This particular example depends on the identifier atan2 already having a
+typename declaration for  it as  type '(x,y):dfloat' (if  this were  not
+already declared, it would have  to be given as  a type cast before  the
+name, i.e.
+
+            exacc (x,y):dfloat atan2(x, y) -> ddecimal;
+
+etc). Note that the  type_spec declaration for a  function allows it  to
+have a variable number of arguments, e.g. the C function "printf" loaded
+as c_printf
+
+            c_printf(string, ...):int  <- printf
+
+where the "..." specifies an indeterminate number of further  arguments.
+In this case, the  actual number of  arguments to a  given call must  be
+supplied as an additional last argument. (A convenient way to do this is
+with the Pop-11 construct #|, which  counts the number of things put  on
+the stack between #| and |#, e.g.
+
+            exacc c_printf(#| string_arg, x, y, z, ... |#)
+
+would supply the appropriate last argument.)
+
+    While the actual call of  a function is straightforward, passing  it
+the correct arguments may  be less so.  The following sections  describe
+how arguments are converted  when passed, and what  should be passed  to
+ensure a function receives the intended data.
+
+
+
+5.1  External Function Argument Processing
+------------------------------------------
+Not surprisingly,  the way  in which  arguments are  passed to  external
+functions is conditioned by the way in which they are passed in  Pop-11.
+This means (as  noted in Introduction)  that it is  rather more work  to
+call languages whose argument passing conventions are not the simple one
+used by Pop,  and whereas  the C language  does (roughly)  use the  same
+convention, languages like  FORTRAN and PASCAL  do not. The  description
+below is therefore of the basic  argument passing mechanism, and how  it
+relates to function arguments in C; the following sections consider  the
+requirements of other languages.
+
+Although the result of an  external function is `statically typed',  its
+arguments are `dynamically typed'. That is, the actual values passed  to
+a function depend solely on the run-time arguments you supply to it, and
+(with the  exception  of (d)decimals),  any  particular kind  of  Poplog
+object is always passed  in the same way.
+
+Any Poplog item may be passed  an a argument; the actual value  received
+by the function depends on its processing, as follows:
+
+    Simple integers or bigintegers
+        These are converted from Poplog encoded representation to normal
+        machine representation, and passed as for a long or int argument
+        in C (or a short or char, etc since these are passed as ints).
+
+        A biginteger  exceeding the  size  of an  machine word  has  its
+        high-order part truncated (i.e.  is passed modulo 2**N,  where N
+        bits is  the machine  wordsize  (64 bits  on  Alpha, 32  on  all
+        other current machines)).
+
+    Decimals or ddecimals (floating-point)
+        For a  given argument,  both  of these  are passed  as  either a
+        machine  single  float,  or  as  a  machine  double  float.  See
+        Floating-Point Arguments below.
+
+    Booleans (false and true)
+        These are passed  as integer arguments,  0 for false  and 1  for
+        true. (They are  in fact  external deref  class, with  word-size
+        fields containing 0 and 1 at their structure pointers.)
+
+    External pointer class records
+        (I.e. record classes with the attribute "external_ptr".)
+
+        These are  replaced by  their "exptr"  fields at  the  structure
+        pointer (see REF * EXTERNAL_DATA), which is then passed as for a
+        pointer type in C.
+
+    External deref class records
+        (I.e. record classes with the attribute "external_deref".)
+
+        These are replaced  by their word-size  fields at the  structure
+        pointer (see * conskey), which is then passed as for an  integer
+        in C.
+
+    All other kinds of data structure (records, vectors, etc)
+        These are passed  (unchanged)  as  their structure pointers, (in
+        the same way as a pointer type in C.
+
+        For a vector class (e.g.  strings, intvecs), the pointer  points
+        to the first element of the vector; for a record class it points
+        to whatever field is at the pointer position (the section Format
+        of Poplog Data Structures in REF * DATA explains this further).
+
+        All Poplog byte  vectors such  as strings are  guaranteed to  be
+        null-terminated, so  you can  pass these  directly as  C  string
+        arguments.
+
+        Note that if you pass a Poplog array to be processed externally,
+        the actual data  is contained  in its arrayvector,  so you  must
+        pass this rather than the array procedure itself.
+
+        NOTE ALSO  that when  passing any  Poplog data  structure to  an
+        external function which will store the structure pointer in some
+        external location for use  in a LATER  external call, a  garbage
+        collection while  back  in  Poplog between  the  two  calls  may
+        invalidate the pointer in the external location. This problem is
+        dealt with  in detail  by  Fixed-Address Poplog  Structures  for
+        External Use in REF * EXTERNAL_DATA.
+
+
+
+5.2  Floating-Point Arguments
+-----------------------------
+As mentioned above, Poplog decimals or ddecimals may be passed as either
+machine single floats, or machine double floats. The default is to  pass
+them as double, but you can  select single by appending  the  flag  <SF>
+to any argument in the type_spec declaration for the function. E.g. with
+the type_spec
+
+        (x, y<SF>, z) :void
+
+a (d)decimal would be passed as  single for the second argument, but  as
+double for the first and third. Where a function is variadic, e.g.
+
+        (x, y<SF>, z, ...<SF>) :void
+
+the ...<SF> means pass (d)decimals as singles for any arguments from the
+fourth onwards.
+
+In C, one  place you will  need to use  <SF> is for  float arguments  to
+functions which are declared in the new ANSI form
+
+        foobaz(int x, float y, int z)
+
+as opposed to the old pre-ANSI style
+
+        foobaz(x, y, z)
+        float y;
+
+etc. Although  declared  as  float rather  than  double,  the  old-style
+declaration has  always  in fact  expected  a double  as  argument  (and
+continues  to,  even  with  an   ANSI  compiler).  Only  the   new-style
+declaration actually requires a single.
+
+Another place to  use <SF> is  where floats are  being passed under  the
+guise of general int-size values, e.g.  in a C procedure using  varargs,
+or taking some argument which represents an anonymous data value and  is
+just declared as int or void * etc.
+
+Note that <SF> has  no effect if  any value other  than a (d)decimal  is
+supplied: if you give  an <SF>-flagged argument  an integer, an  integer
+will be passed.
+
+
+
+5.3  Full Fields in Argument Structures
+---------------------------------------
+An important point to bear in  mind when passing Poplog data  structures
+to external functions (i.e, the last case in External Function  Argument
+Processing above)  is  that most  structures  used by  a  normal  Poplog
+program hold their data in "full" record fields or vector elements.
+
+As can be seen from the way  in which arguments are converted (and  also
+Representation of  Data  in  Poplog in  REF * DATA),  the  main  problem
+concerns  integer  and   floating-point  values,  which   are  held   in
+Poplog-encoded form. Whereas these are converted to normal machine  form
+when  passed  as  direct  argument  values,  when  passed  inside   data
+structures they  are  (of course)  not  converted. This  means  that  an
+external function trying to access integer or floating-point data from a
+"full" field will not get the correct value.
+
+The upshot  is that  integer/floating-point data  intended for  external
+processing must  not be  in "full" fields, but  in packed  (i.e.  normal
+machine) form, in record  fields or vector elements  with types such  as
+:int, :sfloat, :dfloat, etc. For example, if you wish to pass an integer
+array to be processed  externally, you cannot  use one constructed  with
+newarray, because its arrayvector  is a full  vector; instead, you  must
+use one whose  arrayvector is an  intvec (or some  other packed  integer
+type).
+
+
+
+5.4  Arguments Passed `By Reference'
+------------------------------------
+One of  the  principal  problems  with  calling  FORTRAN  functions  and
+subroutines is the fact that in that language, single integer, real  and
+double arguments are passed `by reference' rather than `by value'.  This
+means that  a POINTER  to the  data is  expected, rather  than the  data
+itself; thus e.g.  for an  integer, what  has to  be passed  is not  the
+integer value,  but  a  pointer  to a  memory  location  containing  the
+integer.
+
+In the C language, int, float and double arguments are passed by  value;
+passing an argument `by reference'  corresponds to passing a pointer  to
+the value. Thus the C equivalent of the FORTRAN function
+
+        double precision function square(x)
+        double precision x
+        square = x * x
+        end
+
+is not (as might be expected)
+
+        double square(x)
+        double x;
+        { return(x * x); }
+
+but
+
+        double square(x_ptr)
+        double *x_ptr;
+        { double x = *x_ptr; return(x * x); }
+
+etc.
+
+Pop-11 too has its version of this, namely passing an identifier  rather
+than its value; the Pop equivalent would be
+
+        define square(x_id);
+            lvars x_id, x = idval(x_id);
+            x * x
+        enddefine;
+
+where square could be called using the ident syntax word, e.g.
+
+        square(ident x)
+
+Now, ident COULD  be used with  an external function,  and would  indeed
+supply a pointer to the value;  unfortunately, idval is a "full"  field,
+meaning that  its  use  is  ruled out  by  the  Poplog-encoding  problem
+discussed in the last section.
+
+So for this type of  argument, what has to be  passed instead is a  data
+structure containing  a single  `packed'  element, for  which  purpose a
+one-element vector is the usually  the most convenient. In FORTRAN,  the
+element type will be :int, :sfloat or :dfloat (corresponding to integer,
+real and double respectively). The :int type is provided already by  the
+built-in intvec vector class, defined as
+
+        defclass intvec :int;
+
+and suitable floating-point ones can be defined by, e.g.
+
+        defclass sfltvec :sfloat;
+        defclass dfltvec :dfloat;
+
+Thus, if either  the FORTRAN or  C version of  the function square  were
+loaded as
+
+        square(xptr) :dfloat
+
+then passing it a value, say from the variable x, requires that value to
+be put into a 1-element dfltvec first:
+
+        lconstant argvec = initdfltvec(1);
+        x -> argvec(1);
+        exacc square(argvec) -> result;
+
+(declaring argvec as an lconstant here means a single vector is  created
+at compile-time and used for every call, which avoids creating a new one
+every time).
+
+    Note that  one  of  the  main advantages  of  passing  arguments  by
+reference as opposed to by  value is that a  called function can (if  it
+wishes) modify the value pointed to by  an argument, and thus use it  to
+return data to  the caller (in  the Poplog  case with a  vector as  used
+above, the vector element would then have a new value after the external
+call).
+
+
+
+5.5  Example: Passing Arrays
+----------------------------
+As with C, array  arguments in FORTRAN are  expected as pointers to  the
+array data. Note that  this too is passing  `by reference', but in  this
+case the data in Poplog will already be in a suitable vector (unlike the
+case of a single FORTRAN integer,  etc, for which in effect a  1-element
+`array' has to be constructed). If (as normal) your array processing  in
+Poplog is done with Poplog array procedures (see REF * ARRAYS), then the
+vector containing the  data will  be the  arrayvector of  one of  those;
+alternatively (e.g.  for  1-dimensional  arrays),  you  might  just  use
+vectors on their own.
+
+Note that as mentioned above,  Poplog full vectors (or array  procedures
+using them) are not suitable for passing to external functions requiring
+integer/floating-point data,  since  they hold  data  in  Poplog-encoded
+form.
+
+The following example shows how to define a Pop-11 procedure that  calls
+a FORTRAN subroutine to `threshold' a 2-dimensional integer array  (i.e.
+replace all elements less than a given limit with zero):
+
+      c
+      c This subroutine thresholds an integer array IMAGE of
+      c dimension XSIZE by YSIZE with the threshold LIMIT.
+      c
+          subroutine threshold(image, xsize, ysize, limit)
+          integer limit, xsize, ysize
+          integer image(xsize, ysize)
+
+          do 10 j=1,ysize
+          do 10 i=1,xsize
+      10      if (image(i,j) .lt. limit) image(i,j) = 0
+          end
+
+After compiling the  above subroutine  to an  object file  'threshold.?'
+(where the extension ? is operating system dependent), it can be  loaded
+with
+
+        exload 'array-example'
+            [threshold]     ;;; object file threshold.?
+
+        (language FORTRAN)
+            threshold(image,xsize,ysize,limit)
+            ;
+
+        endexload;
+
+A Pop procedure to call the subroutine is shown below. A suitable Poplog
+array for this would be one constructed on an intvec or equivalent, e.g.
+
+        newanyarray([1 10 1 10], intvec_key) -> array;
+
+Note that  a 1-element  intvec is  required to  pass each  of the  three
+integer arguments  to  the  subroutine;  the  size  arguments  for  each
+dimension are computed using the * boundslist of the given array:
+
+        define threshold_array(array, lim);
+            lvars
+                array, lim, bounds = boundslist(array);
+            lconstant
+                xsize   = initintvec(1),
+                ysize   = initintvec(1),
+                limit   = initintvec(1);
+
+            bounds(2)-bounds(1)+1 -> xsize(1);
+            bounds(4)-bounds(3)+1 -> ysize(1);
+            lim -> limit(1);
+            exacc threshold(arrayvector(array), xsize, ysize, limit)
+        enddefine;
+
+For comparison, a C function to do the same job might look as follows:
+
+        void threshold(image, xsize, ysize, limit)
+        int limit, xsize, ysize;
+        int image[];
+        { int i, j, r, t = xsize*ysize;
+          for (j=0; j < t; j = r)
+            { r = j+xsize;
+              for (i=j; i < r; i++)
+                if (image[i] < limit) image[i] = 0;
+            }
+        }
+
+This is simpler  to call from  Pop, because the  int arguments are  just
+passed by value and no extra vectors are required:
+
+        define threshold_array(array, lim);
+            lvars array, lim, bounds = boundslist(array);
+
+            exacc threshold( arrayvector(array),
+                             bounds(2)-bounds(1)+1,
+                             bounds(4)-bounds(3)+1,
+                             lim)
+        enddefine;
+
+For an additional example in C see REF * INTVEC.
+
+
+
+5.6  Other Types of Arguments
+-----------------------------
+In C,  character strings  are null-terminated.  From Version  14.1,  all
+Poplog strings are  guaranteed to  have a  0 byte  following their  last
+byte, which means you can pass them directly to C. (The same applies  to
+any byte vectorclass.)
+
+The way  in  which FORTRAN  character  string arguments  are  passed  is
+generally host system dependent; you may  be able to ascertain this  and
+other details for a particular system  by consulting a manual on how  to
+call FORTRAN from C -- if one exists. (For example, on Sun systems,  see
+Sun FORTRAN Programmers Guide, section 4.5 Interprocedure Interface.  In
+VMS FORTRAN, all character strings are passed by descriptor, see below.)
+
+
+
+5.7  VMS: Arguments Passed by Descriptor
+----------------------------------------
+Many VMS  functions and  procedures,  including library  procedures  and
+system services,  make  use of  another  kind of  argument  passing:  by
+descriptor.  There  are  actually  lots  of  different  descriptors  for
+different kinds of data, but currently the only one explicitly supported
+by Poplog is a simple string descriptor:
+
+
+consdescriptor(string) -> desc                               [procedure]
+        Returns a  VMS  simple string  descriptor  record desc  for  the
+        string string.
+
+
+VMS  FORTRAN   character   string   arguments  can   be   passed   using
+consdescriptor: the following example illustrates its use in calling the
+VMS system service sys$trnlog to  translates a logical name  (sys$trnlog
+is actually now superseded by the more complicated sys$trnlnm).
+
+In this example, the input and output strings are passed by  descriptor,
+and the argument for the result string length is passed by reference (so
+a value can  be passed  back in  it). Note  that a  system service  call
+requires all its arguments, so the last 3 unused ones default to zero:
+
+        include sysdefs.ph;         ;;; needed for #_IF DEF ALPHA
+
+        exload 'vms-example'
+
+        ;;; no input files needed on VAX, but ALPHA requires the
+        ;;; shareable image sys$share:sys$ssishr.exe
+        #_IF DEF ALPHA
+            ['sys$ssishr/share']
+        #_ENDIF
+
+        (language VMS)
+            sys\$trnlog(lognam,rsllen,rslbuf,table,acmode,dsbmsk) :uint,
+            ;
+
+        endexload;
+
+
+        define trans_logical(string);
+            lvars
+                string, status;
+            lconstant
+                result_len      = initintvec(1),
+                result_string   = inits(128),
+                result_desc     = consdescriptor(result_string),
+                SS\$_NORMAL     = 1,        ;;; return status code
+                SS\$_NOTRAN     = 1577,     ;;;   "       "     "
+            ;
+
+            exacc sys\$trnlog(
+                    consdescriptor(string),
+                    result_len,
+                    result_desc,
+                    0, 0, 0 ) -> status;
+
+            if status == SS\$_NORMAL or status == SS\$_NOTRAN then
+                ;;; extract result using length returned in result_len(1)
+                substring(1, result_len(1), result_string)
+            else
+                ;;; no translation
+                false
+            endif
+        enddefine;
+
+
+
+5.8  External Function Results
+------------------------------
+Direct  results   from  external   functions   can  only   be   integer,
+floating-point, or  pointer  values.  For  example,  you  cannot  call C
+functions which return  structures by-value (nor  indeed can you  call C
+routines that take by-value structure arguments).
+
+One   result   type   requiring   special   mention   is   single-length
+floating-point. In  some pre-ANSI  C compilers  (e.g. Suns,  but not  HP
+Bobcat or VAX VMS),  a C function declared  as returning a float  result
+actually returns a double-float (as if it were declared double); on  the
+other hand, this is not so for a real*4 FORTRAN function on any  system.
+To allow for  this, the result  type float is  provided: this  assumes a
+C-style result as  appropriate to  the host  system, as  opposed to  the
+standard sfloat  type  which  always  assumes a  single  (in  all  other
+contexts, float and sfloat are identical as types).
+
+Thus the exload declaration
+
+        foo(x) :sfloat
+
+is appropriate for FORTRAN, but not for  C (at least, not on all  Poplog
+hosts); for C, always use
+
+        foo(x) :float
+
+In the case of double-float results,
+
+        foo(x) :dfloat
+
+is appropriate for all languages.
+
+
+
+---------------------------------------
+6  Re-compiling and Unloading an exload
+---------------------------------------
+
+The purpose  of the  mark_item argument  to exload  is to  specify  that
+particular load uniquely. If you  re-compile an exload that has  already
+been compiled one  (or more)  times, the system  uses the  mark item  to
+detect that  happening,  and  undoes  the  existing  load  first  before
+re-doing it  (without  which, duplication  of  object files  etc,  would
+occur).
+
+However, because external loading is an `additive' incremental  process,
+to undo a given load requires that all later loads are undone also. Thus
+if loads with mark items  'A', 'B', 'C' and  'D' have been compiled  (in
+that order), then re-compiling 'B' forces the system to unload not  only
+'B' itself, but 'C' and 'D' as well (but 'A' remains untouched).
+
+This means that to re-compile one of a sequence of loads, you must  also
+re-compile any that came after it.
+
+You can also explicitly unload back  to a given load with the  procedure
+external_unload, and  the  current  state of  external  loading  can  be
+displayed with  the  procedure external_show  (for  both of  these,  see
+Utility Procedures for External Loading below).
+
+6.1  Alpha VMS Note
+-------------------
+When a shareable  image is  first loaded, exload  remembers the  version
+number of the file.  Additional loads using that  image will always  use
+the same version number.
+
+Thus if you recompile and relink a  shareable image, to pick up the  new
+version you must recompile your Pop code back to the load mark where the
+image was first loaded. (You cannot invoke a new version of a  shareable
+image that is already used in the system, or in a saved image.)
+
+(Because VMS  in fact  provides no  support for  unloading or  reloading
+shareable images,  each time  exload has  to load  a new  version of  an
+existing image it does so by loading a temporary copy of the image under
+another name. Although the memory occupied by the first load of an image
+cannot be reused (since it may contain other shareable images invoked by
+the outer one), the memory  occupied by subsequent 'temporary' loads  is
+recycled. This may cause problems if you try to make too drastic changes
+to an image,  i.e. making it  use new  shareable images it  did not  use
+previously. In addition, every 'temporary' reload of a new version  will
+add a further entry  to VMS's internal database  of images, which  could
+eventually overflow.)
+
+None of the above applies when simply reloading from the same version of
+an existing image.
+
+
+
+
+------------------------------
+7  Saving and Restoring Images
+------------------------------
+
+A saved image created with  either syssave or sys_lock_system will  save
+the state of external loading, and sysrestore on the image will  restore
+that state. The saving and restoring is done in such a way that  further
+incremental loading can  continue normally after  the restore.  However,
+all loads done before the saved  image was created are locked, that  is,
+cannot be unloaded (a mishap will result if you try to re-load a  locked
+load).
+
+It is important to note that the Poplog saved image mechanism saves only
+external functions  and  the  initial  (load-time)  state  of  any  data
+associated with them.  It does not  save their run-time  data, i.e.  you
+cannot save and restore the  results of actually running external  code.
+(In particular, areas of dynamic memory allocated by the library  memory
+allocators malloc (Unix) and lib$get_vm (VMS) are not saved.)
+
+In other words, saved  images are not  intended as a  way of saving  the
+running state of external functions, but only for saving external  loads
+after compilation. While  Poplog does  not prevent  you from  creating a
+saved image after  external code has  been run, this  will, in  general,
+lead  to  unpredictable  external  code  behaviour  when  the  image  is
+restored.
+
+
+7.1  Unix
+---------
+On Unix  systems with  dynamic  linking, no  external  code or  data  is
+actually saved  in an  image;  instead, a  record  of files  loaded  and
+symbols accessed during all  external loads is kept.  When the image  is
+restored, all the external loads are redone in one go.
+
+A consequence of  this is that  any shared objects  recorded in a  saved
+image must be accessible in their  original locations when the image  is
+restored. This is  not quite as  restrictive as it  might seem,  since a
+shared object file may  be referenced using a  path name which  includes
+one or more  environment variables.  These will be  translated when  the
+saved image  is restored,  thereby allowing  saved objects  to be  moved
+(providing the relevant environment variables are changed accordingly).
+
+
+7.2  VMS
+--------
+In VMS, all shareable images used by external functions are  remembered,
+and reactivated when the saved image is restored.
+
+On the VAX,  activation of a  private shareable image  (i.e. one not  in
+sys$share:) requires the definition  of a logical  name for that  image.
+Logical names for all  such images reactivated by  a Poplog saved  image
+must therefore be defined when the saved image is restored.
+
+On Alpha systems, this only applies if you actually loaded the shareable
+image via a logical name. For an image loaded via a filename, e.g.
+
+            'somedir:myshare.exe/share'
+
+the exact filename  given at  load time  will be  reactivated (i.e.  any
+logical name in the device part  will use the run-time translation,  not
+the load-time translation).
+
+Note that, owing to possible expansion of system shareable images in new
+versions of  VMS, a  Poplog saved  image may  fail to  work in  a  later
+version of VMS than  the one it was  built in -- see  Note on VMS  Saved
+Images in REF * SYSTEM for more on this point.
+
+...  VAX Note On message Utility
+--------------------------------
+A problem exists  on VAX  systems concerning the  interaction of  Poplog
+saved images and  object files  containing messages created  by the  VMS
+message utility. While a program that loads such object files will  work
+correctly when run directly after loading,  it will fail to work if  run
+from a saved  image. (What  happens is  that although  the messages  are
+mapped into  memory, they  do  not get  registered with  the  sys$getmsg
+facility).
+
+However, this  problem applies  only  to object  files  per se,  not  to
+shareable images:  a simple  workaround is  therefore to  make any  such
+message  files  into   a  shareable   image.  A   message  object   file
+'messages.obj' is easily turned into one with the DCL command
+
+        $ link/shareable messages.obj
+
+This  produces  the  shareable  image  'messages.exe';  after   defining
+'messages' as a logical name pointing to the image,
+
+        $ define messages [mydir]messages.exe
+
+you can  then include  'messages/share' in  an exload  in place  of  the
+original object  file. A  saved  image created  after this  will  behave
+correctly (remembering that, as mentioned  above, the logical name  must
+also be defined when the saved image is restored).
+
+(This problem does not apply on  Alpha systems, since you can only  load
+shareable images anyway.)
+
+
+
+
+------------------------------------------
+8  Utility Procedures for External Loading
+------------------------------------------
+
+
+external_show()                                              [procedure]
+        Produces a listing of all current external loads.
+
+
+external_load_count() -> N                                   [procedure]
+        Returns the current number of external loads.
+
+
+external_load_mark(N) -> item                                [procedure]
+        Returns the mark item  for the N-th  external load, where  loads
+        are numbered from 1 (the most recent).
+
+
+external_unload(mark_item)                                   [procedure]
+        This can be used with  a given mark to  undo the effects of  all
+        loads back to (and including) the one indicated. Because loading
+        is an  'additive'  incremental process,  to  undo a  given  load
+        requires that all later loads are undone also. Thus if  external
+        loads 'A', 'B', 'C' and 'D' have been done (in that order), then
+
+                external_unload('B')
+
+        will unload back to mark 'B',  i.e. will unload all of 'B',  'C'
+        and 'D' (and only 'A' will remain loaded).
+
+
+
+
+-----------------------
+9  Raw External Loading
+-----------------------
+
+The  `raw'  procedure  for  loading  object  files  containing  external
+functions and data is external_do_load, described below; this is used by
+the syntax  construct  exload. (You  do  not  need to  know  about  this
+procedure  unless  you   want  to  construct   other  external   loading
+interfaces.)
+
+The input  files (or  default libraries,  etc) for  each new  load  must
+provide definitions  for  all  symbols  in  symbol_list  that  have  not
+previously been loaded (linker or  Poplog error messages will result  if
+any are undefined or multiply defined).
+
+Systems with Static Linking
+On Unix  systems  with  static linking, and  VAX  VMS,  external_do_load
+operates by running  the operating system  linker (ld in  Unix, link  in
+VMS) in a sub-process,  to link the given  files with a special  `symbol
+table' object file. This  symbol table file contains  a running list  of
+symbols defined either in the base Poplog system or in previous external
+loads; symbols accumulate  from one  external_do_load to  the next,  and
+each one generates a new symbol table file.
+
+On VAX VMS, external_do_load also maintains a running list of  shareable
+images that have been loaded  (including those extracted from  shareable
+image libraries),  all  of  which are  automatically  included  in  each
+subsequent load: thus if you have specified 'foo/share' in one load, you
+need not specify it in a later one (if you do, it will be ignored).
+
+The base `symbol table' object file contains those external symbols that
+are  used   already   in   the  standard   Poplog   system.   In   Unix,
+external_do_load assumes this file  is given by  the translation of  the
+environment   variable   "popexlinkbase"   (which   will   normally   be
+'$popsys/basepop11.stb').  In  VAX  VMS,  the   file  is  taken  to   be
+'image.stb' where image is the name of the Poplog image being run (again
+normally   'popsys:basepop11.stb',   since   the   image   is   normally
+'popsys:basepop11.exe').
+
+Systems with Dynamic Linking
+On Unix systems with dynamic  linking, external_do_load uses the  system
+call interface to the operating system dynamic linker to attach a shared
+object to the Poplog process and to access symbols defined therein.
+
+In Alpha VMS, external_do_load uses lib$find_image_symbol to dynamically
+load symbols from shareable images.
+
+In neither case is there any  need for accumulating symbol table  files.
+The base `symbol table' object file will be merely an empty dummy.
+
+
+external_do_load(mark_item, input_file_list, symbol_list)    [procedure]
+        Loads object files containing  external functions and data,  and
+        provides for the values of external symbols from those files  to
+        be accessed.
+
+        The arguments are as follows:
+
+        mark_item
+            An item that  identifies this particular  external load.  It
+            may  be  any  Poplog  item  (number,  string,  word,   etc),
+            providing it is different from any previously used mark item
+            (N.B. different according to the = operation, not ==).
+
+            If mark_item  specifies  an  existing  load,  then  that  is
+            unloaded first, i.e. external_unload(mark_item) is called.
+
+        input_file_list
+            Same as  the  input_file_list  to  exload.  See  Input  File
+            Arguments above.
+
+        symbol_list
+            Specifies the external symbols to  be loaded, and is a  list
+            of 5-element full vectors, one  vector for each symbol.  The
+            elements in each vector are used for either input or output,
+            as follows:
+
+                1.  (Input/Output) The name of the symbol, as a word  or
+                    string. If a  string, the  name is  taken as  given;
+                    otherwise, a word is  transformed to an actual  name
+                    string  according  to  the  host  operating  system,
+                    taking into account the language name in  element 2,
+                    and  the result  is assigned back into element 1.
+
+                    In VMS the only translation performed is to truncate
+                    all  symbols  to  31  characters  (by  chopping  off
+                    trailing characters).  Otherwise,  for  a  word  the
+                    result string is the same as the word.
+
+                    In Unix  systems  without COFF  or  ELF  object-file
+                    format,  the   basic  translation   (as  for   the C
+                    compiler) is to prefix the name with an  underscore,
+                    i.e. "foo"  becomes  '_foo';  if  in  addition,  the
+                    language  name  in   (2)  is   'FORTRAN',  then   an
+                    underscore is also postfixed to the name, i.e. "foo"
+                    becomes `_foo_`.
+
+                    In Unix systems with COFF/ELF object-file format, no
+                    translation is performed  (like VMS)  except in  the
+                    case where the  language name in  (2) is  'FORTRAN',
+                    when an underscore is postfixed  to the name in  the
+                    same way as other Unix systems.
+
+                2.  (Input) A language name  string, ignored except  for
+                    'FORTRAN' in Unix systems as above.
+
+                    This element may also be  a pair whose front is  the
+                    language name string  and whose back  is a type  for
+                    the symbol. If supplied, the type must be the string
+                    'code'  or  'data',  and  defaults  to  'code'  when
+                    omitted.
+
+                3.  (Input/Output) Return  value;  after the  call  this
+                    will be an  external pointer  record, whose  pointer
+                    value is  the value  of the  external linker  symbol
+                    given by (1). The external_ptr_props of this  record
+                    is set to the name of the symbol from (1).
+
+                    In all systems except  VAX/VMS, you can also  supply
+                    as input in  this field  a pre-constructed  external
+                    pointer record  to use  for  the output  value.  The
+                    procedure * external_load_consptr will return a  new
+                    external  pointer  if   this  allowable,  or   false
+                    otherwise. Thus if  you wish to  pass in a  pointer,
+                    always use the result from external_load_consptr.
+
+                4.  (Output) Set  to  a "tmpval"  property  entry  whose
+                    fast_prop_entry_arg is the external symbol  string
+                    from 1.   This  is  stored on  the system's  history
+                    list     of     external     loads,     and      its
+                    fast_prop_entry_value is printed out for the  symbol
+                    'value'  by  external_show;  thus  you  can   assign
+                    whatever is required to show  as the value into  the
+                    fast_prop_entry_value of this.
+
+                    In addition,  if  the  entry  value  is  set  to  an
+                    external   pointer    class    record,    then    an
+                    external_unload for  mark_item will  assign null  to
+                    the pointer value of that record.
+
+                    If no value  is assigned,  or the  value is  garbage
+                    collected, then  external_show  will not  print  the
+                    symbol at all.
+
+                5.  (Ignored) May contain any user data associated  with
+                    the symbol.
+
+        NOTE:
+            There are  certain  restrictions on  the  way in  which  the
+            external pointers  returned  in  element (3)  can  be  used:
+            basically,  they   must  be   treated  as   `opaque'   until
+            `run-time'.
+
+            In practice this means the following: data accessed  through
+            the pointers,  or other  external pointer  class  structures
+            into which the  pointer values have  been copied, cannot  be
+            handled either (a) by  the saved image  mechanism or (b)  by
+            Popc compilation.
+
+            The reason for (a) is  that saved images can correctly  save
+            and restore  external symbol  values from  operating  system
+            shareable libraries only  when they reside  in the  original
+            external pointer records returned by external_do_load;  they
+            cannot,  however,  guarantee  to  deal  correctly  with  any
+            shareable-library  data  or  code  accessed  through   those
+            pointers, or deal  with the  external name  values when  put
+            into other  external pointer  class structures.  (Note,  for
+            example, that  when loading  in Alpha  VMS with  pop_runtime
+            false (i.e. system started  with %nort), the pointer  values
+            are not even  assigned, since the  shareable images are  not
+            actually activated.)
+
+            The reason for (b)  is the Popc  compiler can only  generate
+            object code for external pointers where the external name is
+            given by the external_ptr_props of the pointer.
+
+            Thus accesses through the  pointers, or copying the  pointer
+            values into other external pointer structures, must be  done
+            at run-time.  Any such  operation which  would nominally  be
+            done   at   compile-time   must   be   deferred   by   using
+            * sys_runtime_apply (see Runtime Actions in REF * SYSTEM).
+
+
+external_load_consptr() -> exptr_or_false                    [procedure]
+        If external_do_load can take  input external pointer records  in
+        element (3) of symbol vectors  (see above), then this  procedure
+        returns a  new external  pointer; otherwise,  it returns  false.
+        (Currently, the  only  system  in  which  it  returns  false  is
+        VAX/VMS.)
+
+
+
+
+---------------------
+10  External Callback
+---------------------
+
+From Version 14  of Poplog,  external functions called  from within  the
+system may  call  back  to  Poplog procedures.  The  interface  to  this
+consists of a  set of  callback functions,  described below;  currently,
+there are only  C versions  of these, and  no direct  support for  other
+languages is provided (although of course, if a particular language  can
+call C, then that provides an interface).
+
+
+10.1  C Interface
+-----------------
+These functions are in the  Poplog external library 'libpop.olb' in  the
+directory given by the environment variable/logical name  "popexternlib"
+(this library is automatically included for external loading).
+
+Declarations for the functions are in the C header file 'callback.h'  in
+the same directory. To use this with  #include in Unix you will need  to
+give the  host  C  compiler  a  -I  argument  for  the  directory  (i.e.
+-I$popexternlib). In VMS you can either  give the C compiler a  /include
+argument (i.e. /include=popexternlib:), or specify
+
+    #include "popexternlib:callback.h"
+
+directly in the source file.
+
+
+...  Synopsis
+-------------
+
+    #include "callback.h"
+
+    int pop_mishap(char *message);
+
+    int pop_call(POPOBJ obj, void *argptr);
+
+    POPOBJ pop_get_ident(char *idname);
+
+    int pop_free_fixed_hold(POPOBJ obj);
+
+    int pop_check_interrupt();
+
+    POPOBJ *pop_exfunc_closure_arg;
+
+    unsigned *pop_external_flags;
+
+
+...  Description
+----------------
+
+    int pop_mishap(char *message);
+
+        Re-enters Poplog  and  then  generates  a  mishap  with  message
+        message (i.e. calls mishap(0, message_string) ).
+
+        The  result  value  is  1  for   a  normal  return,  0  for   an
+        abnormal-exit return (see  below). Since it  generates a  Poplog
+        mishap (which should cause an abnormal exit, usually a  setpop),
+        this function should always return 0 (if it returns at all).
+
+
+    int pop_call(POPOBJ obj, void *argptr);
+
+        Re-enters Poplog and then calls the procedure specified by  obj,
+        giving it as argument an external pointer whose pointer value is
+        argptr.
+
+        obj must  be  a  Poplog  structure  pointer  which  supplys  the
+        procedure P to be called: it  can be the procedure directly,  an
+        identifier whose idval  is the procedure,  or a reference  whose
+        cont is either of those. (A Poplog mishap will result if obj  is
+        not valid.)
+
+        P is  called as  P(exptr), where  exptr is  an external  pointer
+        pointing to  whatever  data  structure  argptr  points  to.  The
+        content of this  data structure is  entirely between the  caller
+        and P, and it is up to P to access its components through  exptr
+        (with exacc,  etc) to  extract input  arguments, and  to  update
+        components through exptr to return output values (P itself  must
+        not return any result on the Poplog userstack).
+
+        The  result  value  is  1  for   a  normal  return,  0  for   an
+        abnormal-exit return (see below).
+
+
+    POPOBJ pop_get_ident(char *idname);
+
+        Gets the  permanent identifier  with  pathname idname  from  the
+        Poplog dictionary. (For  an identifier  containing a  procedure,
+        the result of this  function could be  supplied directly as  the
+        obj argument to pop_call.)
+
+        idname may  be  any  valid pathname,  including  sections  where
+        necessary, and may  be either  absolute (beginning  with $-)  or
+        relative (not  beginning with  $-); if  relative, it  refers  to
+        whatever * current_section is at the time of the call.
+
+        The normal  return value  is a  (held) fixed-address  reference,
+        whose cont is either the permanent identifier record  associated
+        with idname, or its idval for an assigned constant (i.e, one for
+        which isconstant returns true). That is,
+
+                cons_fixed(id_or_idval, ref_key, true)
+
+        where id_or_idval is either the identifier or its idval.
+
+        Note that  if  idname  is not  declared,  the  usual  'DECLARING
+        VARIABLE' message will result inside  Poplog; thus for a  normal
+        return this function  will always return  an identifier. For  an
+        abnormal-exit return the result is 0 (see below).
+
+
+    int pop_free_fixed_hold(POPOBJ obj);
+
+        Re-enters Poplog and calls the procedure free_fixed_hold on obj.
+        (For example,  this  could  be  used  to  free  a  fixed-address
+        reference returned by pop_get_ident.)
+
+        The  result  value  is  1  for   a  normal  return,  0  for   an
+        abnormal-exit return (see below).
+
+
+    int pop_check_interrupt();
+
+        Checks to see  if there  are any asynchronous  traps or  signals
+        pending inside Poplog (i.e. queued but not processed), and if so
+        (and  asynchronous  trap  and  signal  processing  is  currently
+        enabled),  re-enters  the   system  and   services  them.   (See
+        REF * ASYNC.)
+
+        The  result  value  is  1  for   a  normal  return,  0  for   an
+        abnormal-exit return (see below).
+
+
+    POPOBJ *pop_exfunc_closure_arg;
+
+        A pointer to a POPOBJ variable that receives the argument  value
+        from an external function closure ("exfunc_closure") as  created
+        by make_exfunc_closure. See External Function Closures below.
+
+
+    unsigned *pop_external_flags;
+
+        A pointer to an integer  variable that holds status and  control
+        flags, all  defined in  callback.h (note  that these  flags  are
+        local to  each  block  of  external  calls).  See  Callback  and
+        Abnormal Exit below.
+
+        The  first  is  a  status  flag  for  testing  only  (i.e.   `if
+        (*pop_external_flags&FLAG) ...' etc):
+
+            PEF_DOING_ABEXIT    Set if  the  current block  of  external
+                                calls will continue an abnormal exit  on
+                                return to Poplog.
+
+        The following flags can be  set for control over abnormal  exits
+        (*pop_external_flags|=FLAG):
+
+            PEF_RETURN_ABEXIT_NEXT
+                                Return  from  abnormal   exit  on   next
+                                callback only (cleared after  callback).
+                                An    abnormal    return    will     set
+                                PEF_DOING_ABEXIT.
+
+            PEF_RETURN_ABEXIT_ANY
+                                Return  from   abnormal  exit   on   any
+                                callback  (in  this  block  of  external
+                                calls).  An  abnormal  return  will  set
+                                PEF_DOING_ABEXIT.
+
+            PEF_CATCH_ABEXIT_NEXT
+                                Catch and return  from abnormal exit  on
+                                next  callback   only   (cleared   after
+                                callback).
+
+            PEF_CATCH_ABEXIT_ANY
+                                Catch and return  from abnormal exit  on
+                                any callback (in this block of  external
+                                calls).
+
+        These flags  can  be  set  for  user  control  over  asychronous
+        callback:
+
+            PEF_ASYNC_CALLBACK
+                                If  set,  then  asynchronous  traps  and
+                                signals  that  interrupt  user  external
+                                code will  call  pop_check_interrupt  to
+                                service   the   interrupt    (otherwise,
+                                servicing waits  until return  from  the
+                                current block  of external  calls).  You
+                                should not  set  this flag  unless  your
+                                program is  `garbage-collection  proof',
+                                i.e.   makes   proper   allowance    for
+                                fixed-address structures etc. See below.
+
+            PEF_ASYNC_RETURN_ABEXIT
+                                If  this  is  set  in  combination  with
+                                PEF_ASYNC_CALLBACK,      causes       an
+                                asynchronous     callback     to     set
+                                PEF_RETURN_ABEXIT_NEXT before making the
+                                callback.
+
+            PEF_ASYNC_CATCH_ABEXIT
+                                If  this  is  set  in  combination  with
+                                PEF_ASYNC_CALLBACK,      causes       an
+                                asynchronous     callback     to     set
+                                PEF_CATCH_ABEXIT_NEXT before making  the
+                                callback.
+
+        Note: Pop-11 macros for all these flags are  also  available  in
+        INCLUDE * EXTERNAL_FLAGS.
+
+
+
+10.2  Callback and Fixed-Address Structures
+-------------------------------------------
+pop_call is the basic callback function: to use this successfully, it is
+essential to read  Fixed-Address Poplog Structures  for External Use  in
+REF * EXTERNAL_DATA.
+
+The obj argument to  pop_call (supplying the procedure  to call) can  be
+passed down through an external function, either as a direct argument or
+in a "full" field of  some data structure (an  external one or a  Poplog
+one). In all cases, ordinary Poplog structure pointers stored externally
+may become  invalid after  a return  to Poplog  which causes  a  garbage
+collection.
+
+Thus it is almost always essential to use fixed-address structures  in a
+callback context, either by creating structures as fixed-address in  the
+first place, by making fixed copies, or by putting ordinary  relocatable
+structures inside fixed  ones. For  a procedure argument  like obj,  the
+simplest way  is  to  pass  a  fixed-address  reference  containing  the
+procedure, etc (which is why  pop_call allows a reference as  argument).
+This is  the method  used by  pop_get_ident when  returning a  permanent
+identifier or its value.
+
+It is also essential to  make provision for `holding' any  fixed-address
+structure which has  no other  pointers to  it inside  Poplog. Thus  the
+references returned by pop_get_ident  are kept on  the fixed hold  list,
+and can only become garbage if freed with pop_free_fixed_hold.
+
+
+
+10.3  External Function Closures
+--------------------------------
+One of the main  potential uses of the  Poplog callback mechanism is  to
+allow externally-defined callbacks to be extended to Poplog. That is, in
+the situation where  an external  function, F say,  requires a  variable
+callback function CF as argument, we wish (in effect) to allow CF to  be
+a variable Poplog procedure.
+
+While it is straightforward to write a function CF which packages up its
+arguments in  a temporary  struct  to pass  as  the second  argument  to
+pop_call, the problem arises as to how to to pass the Poplog  procedure.
+A well-designed function F will take an additional argument P, which can
+be any user data to be passed on as one of the arguments to CF, and this
+can be used to pass the  procedure (either directly or inside some  data
+structure, etc).
+
+However, F may not be so designed; in this case, the only alternative is
+to create a new external function, which is essentially CF but with  a P
+argument frozen in -- that is, a closure of CF. Poplog provides for this
+with make_exfunc_closure, which allows the creation of external function
+closures. These are records containing a small piece of executable code,
+together with a pointer  to an external function  (the CF) and a  frozen
+argument value  (the  P), and  which  can be  called  from C  just  like
+ordinary external functions. When executed,  such a closure assigns  its
+frozen argument value P to the standard location *pop_exfunc_closure_arg
+and then calls  its base  function CF  (which can  then pick  up P  from
+*pop_exfunc_closure_arg). In C, this might look something like
+
+        CF(arg1, ..., argN)
+        type1 arg1; ... typeN argN;
+          {
+            struct { type1 arg1; ... typeN argN; } args;
+            args.arg1 = arg1;
+                ...
+            args.argN = argN;
+            pop_call(*pop_exfunc_closure_arg, &args);
+          }
+
+etc. After  externally loading  CF, a  closure for  a  given   procedure
+P could be created with
+
+        make_exfunc_closure(CF, P, true)
+
+and passed as argument to the F function.
+
+    A disadvantage (from the Poplog  programmer's point of view) of  the
+example just given  is that it  requires a C  'stub' procedure CF  which
+knows what arguments F is going to pass to its callback procedure. Every
+different callback  context  is  likely to  require  a  different  stub,
+written in C and  externally loaded into Poplog.  To avoid this  problem
+Poplog provides a 'generic' stub procedure which simply calls back on P,
+passing a pointer to any arguments  it has been passed. This allows  the
+argument decoding to be carried out  within a Poplog procedure which  is
+then 'exported'  as the  closure  argument for  the generic  stub.  This
+generic C stub looks something like
+
+        CG(va_alist)
+        va_dcl
+        {
+            va_list argp;
+
+            va_start(argp);
+            pop_call(*pop_exfunc_closure_arg,argp);
+            va_end(argp);
+        }
+
+(note the use of the C 'varargs' mechanism for passing the args  through
+to pop_call). The Poplog  procedure provided as  *pop_exfunc_closure_arg
+receives a single external pointer argument, pointing to an array of the
+args. So to achieve the equivalent of  CF above, one might use a  Poplog
+procedure such as:
+
+        define pop_CF(exptr);
+            lvars exptr, arg1, ..., argN;
+            l_typespec exdata
+                { type1 arg1; ... typeN argN; }
+
+            exacc :exdata exptr.arg1 -> arg1;
+            ...
+            exacc :exdata exptr.argN -> argN;
+
+            P(arg1, ..., argN);
+        enddefine;
+
+(assuming the types type1, ...  typeN had been previously declared).  To
+export  this   procedure   using   the   generic   callback   stub   use
+exfunc_export:
+
+        exfunc_export(pop_CF, 0, false)
+
+which will return an external function closure that can be used directly
+as a callback argument. (The  additional arguments to exfunc_export  are
+discussed in External Function Closures in REF * EXTERNAL_DATA.)
+
+    In practice, one would not want to rewrite pop_CF for each procedure
+P used as a callback, but Poplog's ordinary procedure closure  mechanism
+can be used to avoid this:
+
+        define pop_CF(exptr, p);
+            lvars exptr, procedure p, arg1, ..., argN;
+            l_typespec exdata
+                { type1 arg1; ... typeN argN; }
+
+            exacc :exdata exptr.arg1 -> arg1;
+            ...
+            exacc :exdata exptr.argN -> argN;
+
+            p(arg1, ..., argN);
+        enddefine;
+
+        exfunc_export(pop_CF(% P %), 0, false)
+
+Examples of this  closure technique in  the X Toolkit  interface can  be
+found in LIB * fast_xt_callback and LIB * fast_xt_action.
+
+    Note that exfunc closures are automatically fixed-address  (although
+the issue of `holding'  them still has to  be considered). On the  other
+hand, since an exfunc closure is an ordinary Poplog record in which  the
+P value is  held in a  "full" field,  so there is  no requirement  for P
+itself  to  be   fixed-address.  See  External   Function  Closures   in
+REF * EXTERNAL_DATA for more details.
+
+
+
+10.4  Callback and Abnormal Exit
+--------------------------------
+Any callback to Poplog can potentially result in an abnormal exit,  that
+is, procedures like setpop, exitto, chainto, etc being called to  unwind
+the callstack to a point prior to the current block of external calls.
+
+The default action  of all  the callback  functions in  this respect  is
+simply to allow the abnormal exit to erase the current block of external
+calls altogether, and to carry on exiting from the Poplog call (i.e. the
+exacc that initiated it) -- thus the callback function never returns.
+
+However, this default  behaviour may be  altered by setting  one of  the
+flags
+
+        PEF_RETURN_ABEXIT_NEXT
+        PEF_RETURN_ABEXIT_ANY
+        PEF_CATCH_ABEXIT_NEXT
+        PEF_CATCH_ABEXIT_ANY
+
+in *pop_external_flags. In general, setting any of these will cause  any
+of the callback  functions to handle  an abnormal exit  by returning  an
+error value of 0. A "NEXT" flag is cleared after the callback -- and  so
+affects only the next  callback function called --  while an "ANY"  flag
+remains set  (and  so affects  any  callback  in the  current  block  of
+external calls).
+
+The difference between the "RETURN" and "CATCH" versions in each case is
+what happens when the current block of external calls returns back  into
+Poplog: In the "RETURN"  case, the abnormal  exit is simply  `suspended'
+while back  in  the  external  calls,  but  takes  control  again  after
+returning to Poplog; the "CATCH" versions, on the other hand, catch  the
+abnormal exit altogther, i.e. abort it (whence return from the  external
+calls will be as normal).
+
+If both  "CATCH" and  "RETURN"  are set,  then  the "CATCH"  flag  takes
+precedence. However,  once  an  abnormal  exit  has  been  handled  with
+"RETURN", the `suspension' of  that exit is  irreversible, i.e. it  will
+continue on returning to Poplog (regardless of whether further exits are
+aborted with  "CATCH").  To indicate  this  state, an  exit  handled  on
+"RETURN" sets  the flag  PEF_DOING_ABEXIT in  *pop_external_flags;  once
+this is set, the external calls cannot return normally.
+
+
+
+10.5  Restrictions on Operations Inside Callback
+------------------------------------------------
+Certain operations  cannot be  performed  inside external  callback:  in
+particular, there  are problems  with Poplog  processes and  the  Prolog
+subsystem, as noted below.
+
+In general,  doing any  significant  amount of  work  in a  callback  is
+deprecated, and  should be  avoided if  possible. To  aid in  this,  the
+procedure external_defer_apply  allows  you to  specify  actions  from a
+callback which  are executed  only  when the  callback has  returned  to
+top-level Poplog:
+
+external_defer_apply(p)                                      [procedure]
+external_defer_apply(p, arg1, arg2, ..., argN, N)
+        This  procedure  is  intended  to  be  called  within   external
+        callbacks; it permits  operations that  are not  allowed or  are
+        inadvisable within  a  callback to  be  safely executed  by  the
+        procedure p.
+
+        It  raises   p   as   an  asynchronous   trap   procedure   with
+        * sys_raise_ast,  but  specifying  that  p  be  blocked   inside
+        external calls. Thus  when inside  external calls,  p is  merely
+        queued, and  will  not  actually  be  executed  until  the  next
+        interrupt checkpoint encountered on returning from the outermost
+        external call.
+
+        (Note for X Toolkit users:  When inside a Toolkit callback,  the
+        queueing of p  also causes  an implicit  * XptSetXtWakeup to  be
+        performed.)
+
+        If external_defer_apply  is  called  when  not  inside  external
+        calls,  p   will  be   executed  immediately   (i.e.   providing
+        asynchronous traps are not blocked because * pop_asts_enabled is
+        false   --   otherwise,   p   will   be   executed   only   when
+        pop_asts_enabled reverts to true).
+
+        In the second  form of  the call,  the procedure  p is  supplied
+        together with N items arg1, ..., argN that should be passed to p
+        as arguments (this form is the same as * consclosure, and causes
+        external_defer_apply to  call consclosure  to create  a  closure
+        which will be garbaged after execution).
+
+
+...  Processes
+--------------
+The operation  of Poplog  processes  (see REF * PROCESS)  is  restricted
+inside callback, as follows: Although processes can be run and suspended
+as normal inside callback, you cannot suspend a process across  callback
+(that is, so as to include external calls in the process's context).  On
+re-entering  Poplog  from  external  callback,  pop_current_process   is
+locally set  false;  this prevents  any  attempt to  suspend  a  process
+running outside the original external function call.
+
+(N.B. One consequence of the above  is that a procedure inside  callback
+which reads input from charin will not work inside Ved "immediate  mode"
+-- since that relies  on suspending the immediate  mode process to  wait
+for input to  be entered. It  is therefore inadvisable  to use  callback
+procedures that read interactive input.)
+
+
+...  Prolog
+-----------
+The Prolog  subsystem  in  Poplog  uses  an  area  of  memory  to  store
+continuations and the  trail of instantiated  variables (see The  Prolog
+Memory  Area   in  REF * PROLOG).   This  area   is  normally   expanded
+automatically as  required, or  its  size set  explicitly with  the  Pop
+variable pop_prolog_size (or the Prolog predicate prolog_area_size).
+
+However, in all current implementations  of the system, the Prolog  area
+is stored in the same region as the callstack, which means that changing
+its size  requires  moving  all  the callstack  frames  to  make  space.
+Although Poplog procedure stack frames  are designed to be  relocatable,
+external function stack frames are  not, and hence the callstack  cannot
+be moved while external frames are active.
+
+Thus the  size of  the Prolog  area cannot  be changed  during  external
+callback. Attempting to do so will result in the mishap
+
+    'CAN'T CHANGE PROLOG AREA SIZE DURING EXTERNAL CALLBACK'
+
+While this limitation may be overcome in a future version of the system,
+for now if  you use Prolog  procedures during callback  you must  ensure
+that the prolog  area is large  enough for your  program's needs  BEFORE
+starting it (by  assigning an  appropriate value  to pop_prolog_size  or
+prolog_area_size).
+
+
+
+
+-------------------
+11  General Warning
+-------------------
+
+External functions should not access data outside of the data structures
+they themselves  define, or  that are  passed to  them from  Poplog;  in
+particular they  must  not write  into  memory areas  outside  of  these
+structures. If this happens, it will more than likely corrupt the Poplog
+system.
+
+
+
+--- C.all/ref/external
+--- Copyright University of Sussex 1996. All rights reserved.

@@ -1,0 +1,892 @@
+REF FLAVOURS                                   Mark Rubinstein  May 1986
+                                             Revised A.Schoter June 1991
+
+        COPYRIGHT University of Sussex 1986.  All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<    THE FLAVOURS PACKAGE     >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+This document  provides details  of the  current implementation  of  the
+flavours library package  and describes the  procedures and  identifiers
+that are part of it. For an  introduction to the package and details  on
+how to use  it see TEACH * FLAVOURS.  It is assumed  that the reader  is
+familiar with the  details of the  package provided by  the teach  file.
+Some notes on the implementation are given at the end of this file.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Flavour Objects
+      1.1   Methods and Method Records
+      1.2   Instances
+      1.3   Flavours
+      1.4   Flavour Records
+
+  2   Flavour Definition
+      2.1   Flavours and Sections
+      2.2   SYSFLAVOUR
+
+  3   Instance Creation
+
+  4   Message sending
+
+  5   Procedures and identifiers used by the FLAVOURS system
+
+  6   Some implementation details
+      6.1   Dynamic instance variables
+      6.2   Lexical Instance Variables
+
+  7   Precedence Ordering
+      7.1   Messages
+      7.2   Message Reception
+      7.3   Method Selection
+      7.4   Delayed Compilation
+
+  8   Bugs and Omissions
+
+
+
+------------------
+1  Flavour Objects
+------------------
+
+There are four kinds of objects  of note in the flavours package.  These
+are instances, flavour records, methods and method records.
+
+
+
+1.1  Methods and Method Records
+-------------------------------
+Methods are always procedures and a method record is a two field  record
+for holding the procedure  and its name. Users  can make method  records
+using  consmethodrecord   (q.v.)  and   access  parts   of  them   using
+m_methodname and m_methodpdr (q.v.).
+
+
+
+1.2  Instances
+--------------
+Instances  are  records  which  have  a  pointer  to  a  flavour  record
+(instances can only have one flavour at a time) and a vector holding the
+values for  the instance  variables. Instances  in fact  have two  value
+vectors, one for the value of lexical instance variables and one for the
+value of dynamic instance variables. Applying an instance to a word  has
+the affect of sending the word as  a message to the instance, since  the
+class_apply  (see  HELP * CLASSES)   of  instances   is  the   procedure
+syssendmessage (q.v.).
+
+
+
+1.3  Flavours
+-------------
+Flavours are  instances  of  the  flavour  metaflavour  or  one  of  its
+subclasses. The metaflavour (see HELP * METAFLAVOURS) of all flavours is
+the flavour "metaflavour". This is the user interface to classes --  the
+instances of  metaflavours  are  constructed by  sysflavour  (q.v.)  and
+cannot be created  by make_instance  or the  message "new".  One of  the
+instance variables  of  all flavours  is  the "flavour_record"  -  which
+should always be the value of the internal record which has the  details
+of the class.  It should always  be possible to  get the  flavour_record
+from a flavour  by applying ivalof  (q.v.) to the  flavour and the  word
+"flavour_record". You could declare a procedure for getting the record:
+
+    vars flavour_record_of = ivalof(%"flavour_record"%);
+
+so that you can do
+
+    flavour_record_of(metaflavour_flavour) =>
+    ** <flavour_record metaflavour>
+
+
+
+1.4  Flavour Records
+--------------------
+Flavour records  are the  internal records  that hold  the details  of a
+class. They cannot be constructed or altered by users, and for the  most
+part people programming in FLAVOURS using the syntax provided need never
+see or know  about flavour_records. However  if you wish  to bypass  the
+syntax then it is necessary to be able to access the flavour records  to
+pass as parameters to some  of the procedures. The procedure  sysflavour
+(q.v.) returns a flavour record as a result. You can also access flavour
+records by accessing the instance variable "flavour_record" of a flavour
+(as shown above).
+
+
+
+
+---------------------
+2  Flavour Definition
+---------------------
+
+The definition of flavours is slightly different from that of most other
+structures in POPLOG (with the possible exception of * SECTIONS) in that
+when you define a flavour the dictionary is first searched to find  if a
+flavour by the same name has already been defined. If one is found  then
+that flavour is altered instead of a new one being created.
+
+Using the flavour  definition routines  you can  define and  add to  the
+definition of a flavour. The system will support full dynamic alteration
+to flavours  -  the  adding  and removing  of  components  and  instance
+variables and the adding  removing and changing  of methods, however  at
+the moment the flavour definition procedure (sysflavour) and the  syntax
+form (flavour..endflavour) will only add components, instance  variables
+and methods, and change methods. If you  wish to remove any part of  the
+definition then you must do so  by communicating with the flavour.  This
+is    described     below     and     in     HELP * METAFLAVOURS     and
+REF * METAFLAVOUR_FLAVOUR.
+
+
+
+2.1  Flavours and Sections
+--------------------------
+Whenever a new  flavour is  created (because  no previous  one has  been
+found) a dictionary  entry (a word  constructed of <name>_flavour  where
+<name> is the name of the flavour)  is created and is given the  flavour
+as its * valof. The only way that users can ensure that an entirely  new
+flavour is created is to * cancel the word from the dictionary. The  use
+of valof on  the constructed  word ensures  that the  flavour system  is
+sensitive to sections. At present a flavour is always made * global so a
+flavour is shared by the section it is defined in and all sections below
+it. If the word <name>_flavour is exported from a section then the whole
+flavour is effectively exported and made available to the section  above
+the current one and all sections below the section to which the word  is
+exported.
+
+
+
+2.2  SYSFLAVOUR
+---------------
+Flavours are defined using the procedure sysflavour the use of which  is
+described more fully below. The procedure decides whether to build a new
+flavour or alter an existing one on the basis of the name (as  described
+above).  Since   many   details   of  flavours   and   their   inherited
+characteristics are  "cached" in  the  flavour record  sysflavour  looks
+after re-caching the characteristics for both the flavour being  changed
+and any sub-classes that rely on it.
+
+
+
+
+--------------------
+3  Instance Creation
+--------------------
+
+Instances are created by  sending the message  "new" to the  appropriate
+metaflavour (e.g. to create an instance of person:
+
+    person_flavour <- new
+
+will return the instance).
+
+The procedure make_instance  described below provides  a good  interface
+for creating and initialising instances.
+
+
+
+
+------------------
+4  Message sending
+------------------
+
+Messages can be sent  to an object  using the syntax  forms "<-" or  "^"
+described below. The procedure for sending a message is "syssendmessage"
+and the  details  of how  messages  are  received is  described  in  the
+implementation section at the end of the file.
+
+
+
+
+---------------------------------------------------------
+5  Procedures and identifiers used by the FLAVOURS system
+---------------------------------------------------------
+
+<-                                                  [procedure syntax 4]
+        Syntax for sending a message to an object. The format is
+
+            object <- message(arg1, arg2, ... argn);
+
+        For a message with no arguments you can do
+
+            object <- message;
+
+        For an update message the form is
+
+            new-value -> object <- message(arg1, .. argn);
+
+        This syntax uses syssendmessage.
+
+
+^                                                   [procedure syntax 4]
+        Syntax for sending a message to "self". It can be thought of  as
+        a macro  where  "^" replaces  "self  <-" which  is  functionally
+        equivalent, but  using  ^  can  be  more  efficient  as  dynamic
+        instance variables do not need to be set and saved.
+
+
+consmethodrecord(procedure, word)                            [procedure]
+        Returns a  method record  (as required  by sysflavour  q.v.)  in
+        which procedure is  the method  to be executed  for the  message
+        word. If  the procedure  wants to  refer to  a lexical  instance
+        variable then it should refer to them by doing
+
+            ivalof(self, <instance-variable-name>)
+
+        (This also  works  for dynamic  instance  variables but  is  not
+        necessary within a method.)
+
+        To construct  a method  to  be used  as  an updater  you  should
+        construct a method record in which the procedure slot is  itself
+        a method record and its name slot is the word "updater". E.g.
+
+            consmethodrecord(consmethodrecord(PDR, NAME), "updater")
+
+
+default_method                                                  [syntax]
+        A special, optional modifier for defmethod (see REF * DEFMETHOD)
+        which allows  methods to  be defined  for handling  cases  where
+        there is no specific method for the given message. The  standard
+        default method provided by vanilla_flavour prints a message (see
+        Method Selection below), but it is possible for the user to  add
+        default  methods   specific   to  their   own   flavours.   (See
+        HELP * DEFAULT_METHOD)
+
+
+defmethod method_name (args)                                    [syntax]
+defmethod type method_name (args)
+defmethod updaterof method_name (args)
+defmethod type updaterof method_name (args)
+        Syntax form for defining a method -- can only be used within the
+        flavour..endflavour syntax form. It is used just like the syntax
+        define..enddefine.
+
+        The type  argument is  option  and must  be either  "before"  or
+        "after", indicating  that the  method  is to  be a  daemon.  The
+        keyword "updaterof"  is  also option  and  is used  to  define a
+        method to respond to an updater. (Using a combination of the two
+        indicates a daemon  to be  activated on an  update messsage  see
+        example 3)  method_name is the name of the method being defined,
+        and args are the option arguments to the method.
+
+        Examples:
+
+            1.  A simple method:
+
+               defmethod birthday;
+                  age + 1 -> age;
+               enddefmethod;
+
+            2.  A method with an output:
+
+               defmethod distance_from(x, y) -> dist;
+                    lvars x y dist;
+                    sqrt(((my_x - x) ** 2) + ((m_y - y) ** 2)) -> dist;
+               enddefmethod
+
+            3.  A complex method definition:
+
+               defmethod before updaterof location;
+                   location <- player_leaves(self)
+               enddefmethod
+
+        See TEACH * FLAVOURS for  full details of  the flavour  package,
+        including details  of  usage.  See  also  HELP * DEFAULT_METHOD,
+        REF * DEFAULT_METHOD.
+
+
+divars word1 word2 ... wordn;                         [syntax procedure]
+        Syntax word for declaring  dynamic instance variables. Can  only
+        be used within the flavour..endflavour form. Its use is  similar
+        to that of vars or lvars, e.g.
+
+            divars name age occupation;
+
+        You can also specify a default  value using the "=" syntax.  The
+        value will be evaluated at compile  time and not at the time  of
+        assigning the default values e.g.  the first but not the  second
+        form will work.
+
+            divars my_x = 10, my_y = 20;
+            divars my_x = 10, my_y = my_x * 2; ;;; THIS WILL NOT WORK
+
+
+enddefmethod                                                    [syntax]
+        The syntax word enddefmethod  is used to  indicate the end  of a
+        method definition. See also REF * DEFMETHOD
+
+
+endflavour                                                      [syntax]
+        The syntax  word endflavour  is used  to indicate  the end  of a
+        flavour definition. See also REF * FLAVOUR
+
+
+flavour name                                          [syntax procedure]
+flavour name a metaflavour
+flavour name novanilla
+flavour name a metaflavour novanilla
+flavour name isa component_1 ...
+flavour name a metaflavour isa component_1
+flavour name novanilla isa component_1
+flavour name a metaflavour novanilla isa component_1
+        flavour is  a syntax  word  used for  defining or  altering  the
+        definition of a flavour object, while using the FLAVOUR library.
+        The heading has the key word  flavour  followed  by the name  of
+        the flavour to be  defined or altered.  You can then  optionally
+        specify its metaflavour (e.g. a  mixin), the default is for  the
+        metaflavour to be  flavour. There  is then  an optional  keyword
+        "novanilla" meaning  do  not include  the  vanilla_flavour  as a
+        component flavour optionally followed by the key word "isa"  and
+        a list of names  of flavour which are  to be components of  this
+        flavour. The body of the flavour can contain method  definitions
+        (see REF * DEFMETHOD), procedures  and declarations of  instance
+        variables.
+
+        For example:
+
+            flavour person novanilla;
+            ivars name age sex;
+                defmethod birthday;
+                    age + 1 -> age;
+                    [happy birthday to ^name] =>
+                enddefmethod;
+                defmethod printself;
+                    pr('an object called '); pr(name);
+                enddefmethod;
+            endflavour;
+
+        Or you might want to have a flavour called student that is a sub
+        class of person;
+
+            flavour student isa person;
+            ivars subject tutor;
+                defmethod graduate;
+                    [congratulations] =>
+                enddefmethod;
+                defmethod crawl:
+                    [^subject is fascinating] =>
+                enddefmethod;
+            endflavour;
+
+        See TEACH * FLAVOURS, and REF * DEFMETHOD,
+
+
+flavour_flavour -> metaflavour                     [variable -- flavour]
+metaflavour -> flavour_flavour
+        The default system metaflavour (see HELP * METAFLAVOURS).
+
+
+flavour_of(word) -> flavour;                                 [procedure]
+        Returns the flavour associated with the word (its name). Returns
+        false if it cannot find one in the current section. Does not try
+        to autoload.
+
+
+isinstance(object, flavour) -> boolean;                      [procedure]
+        Returns false iff  object is not  an instance of  flavour or  an
+        instance of a flavour that inherits from flavour. In other words
+        checks if object has the properties associated with flavour.  If
+        flavour is false then returns true iff object is an instance.
+
+
+ismethodrecord(methodrecord) -> boolean;                     [procedure]
+        Returns true iff methodrecord is a method record.
+
+
+ivalof(instance, word) -> value;                             [procedure]
+value -> ivalof(instance, word);
+        Access or updates the instance  variable slot named word of  the
+        object instance. An error  occurs if there  is no such  instance
+        variable.
+
+
+ivars word1 word2 ... wordn;                          [syntax procedure]
+        Syntax word for declaring  lexical instance variables. Can  only
+        be used within the flavour..endflavour form. Its use is the same
+        as for divars (see above).
+
+
+m_methodname(method-record) -> word;                         [procedure]
+word -> m_methodname(method-record);
+        Accesses or updates the word that  is the name part of a  method
+        record.
+
+
+m_methodpdr(method-record) -> procedure;                     [procedure]
+procedure -> m_methodpdr(method-record);
+        Accesses or updates the procedure  that is the method part  of a
+        method record.
+
+
+make_instance(list) -> instance;                             [procedure]
+        Makes an instance of the flavour  named by the head of the  list
+        by  sending  the  message  "new"  to  the  flavour_of  the  word
+        (make_instance  will  try  autoloading  if  necessary).  If  the
+        instance will  respond to  the  message "initialise"  (which  is
+        defined in  vanilla_flavour) then  the message  "initialise"  is
+        sent with the tail of list as argument.
+
+        The method "initialise" defined  in the flavour vanilla  expects
+        the list to be of the form:
+
+            [attribute1 value1 attribute2 value2 ... attributeN valueN]
+
+        and will iterate over pairs of items in the list doing
+
+            value -> self <- attribute;
+
+        with each pair or items.
+
+        See also HELP * FLAVOUR_LIBRARY /Protocol for vanilla_flavour
+
+
+message -> word                                               [variable]
+word -> message
+        During message sending this is bound to the message being sent.
+
+
+mixin_flavour -> metaflavour                       [variable -- flavour]
+metaflavour -> mixin_flavour
+        Metaflavour for  mixins, supplied  with the  system. Mixins  are
+        like flavours except that they cannot be instantiated.
+
+
+myflavour -> metaflavour                            [protected variable]
+        During message  sending  time  this variable  is  bound  to  the
+        metaflavour of the receiving object.
+
+
+quitmessage                                           [syntax procedure]
+        This is a syntax word  in the same way  as * QUITLOOP is. It  is
+        used for jumping out of a message cleanly and can be called from
+        within a primary method or a daemon. Any changes already made to
+        instance variables will be saved. Any further computation either
+        in daemons or primary methods will not be executed. It is a  bit
+        like:
+
+            exitfrom(syssendmessage)
+
+        but it  is much  safer  as it  ensures  the saving  of  instance
+        variables.
+
+
+self -> object                                      [protected variable]
+        During  message  sending  time  this  is  bound  to  the  object
+        receiving the message.
+
+
+sysflavour(name,                                             [procedure]
+    component-list,
+    lexical-ivar-vector,
+    dynamic-ivar-vector,
+    method-list,
+    before-daemon-list,
+    after-daemon-list,
+    metaflavour,
+    default-values-list) -> flavour_record;
+        This procedure which takes nine arguments is responsible for the
+        definition  of  (construction  and  alteration)  of  the   class
+        structures. It  returns the  flavour record  of the  class.  The
+        arguments are:
+
+        name
+            a word which is the name of the flavour to be constructed
+            or changed.
+
+        component-list
+            a list of components (flavour records) that are the  direct
+            superclasses of this flavour. The order is significant with
+            the first element having the most precedence.
+
+        lexical-ivar-vector
+            a vector  of  names of  lexical  instance variables. It is
+            not necessary, but does  not harm, to  include those
+            variable that will be inherited from components.
+
+        dynamic-ivar-vector
+            a vector of names of dynamic instance variables, as above.
+
+        method-list
+            a  list  of  method  records  as  constructed  by
+            consmethodrecord to be used as primary methods. See the
+            note  on constructing updater methods under
+            consmethodrecord above.
+
+        before-daemon-list
+            a list  of method  records to  be used  as before daemons.
+            As above.
+
+        after-daemon-list
+            A list of method records to be used as after daemons. As
+            above.
+
+        metaflavour
+            flavour  record of  the  appropriate  metaflavour (usually
+            the flavour record of flavour_flavour). If an  existing
+            flavour is being  changed this  argument is ignored and can
+            be false.
+
+        default-values-pair
+            a  list  of  pairs  associating  instance variables with
+            default values. The  pairs should be of the  form
+            [value|variable-name]. If  no  default  value  is  provided
+            the precedence list is searched for a  value. If none is
+            found then undef is the initial value.
+
+        When sysflavour creates a  new flavour it  sends it the  message
+        "initialise" (with an empty list as argument) to the flavour  if
+        it will  respond  to the  message.  When sysflavour  changes  an
+        existing flavour it sends the message "flavour_changed" (with no
+        argument) to the flavour if it will respond to the message.
+
+
+syssendmessage(message, instance);                           [procedure]
+value -> syssendmessage(message, instance);
+        Sends the  message  message (which  should  be a  word)  to  the
+        instance instance. Any arguments required for the processing  of
+        the message should be  on the * STACK. The  updater is used  for
+        sending an update message. The steps taken in the processing  of
+        a message is described below. The class apply of an instance  is
+        syssendmessage so the above are equivalent to
+
+            instance(message)
+            value -> instance(message)
+
+
+vanilla_flavour -> mixin_flavour                   [variable -- flavour]
+mixin_flavour -> vanilla_flavour
+        The system root flavour (a mixin). All flavours inherit from it.
+
+
+ved_lcf                                                    [ved command]
+        VED command to Load Current Flavour.
+
+
+ved_mcf                                                    [ved command]
+        VED command to Mark Current Flavour.
+
+
+
+
+------------------------------
+6  Some implementation details
+------------------------------
+
+When using  the flavour..endflavour  syntax  a method  can refer  to  an
+instance variable  by simply  using  its name.  In  some systems  it  is
+necessary to tell  the compiler that  you are referring  to an  instance
+variable either  by  sending  "self"  a  message  or  by  prefacing  the
+reference by a special symbol.
+
+Two kinds of instance variables  are supported by the flavours  system -
+dynamic instance variables and lexical instance variables. In the  first
+version only dynamic  instance variables were  provided, later  versions
+only supported lexical instance  variables which at  the time I  thought
+were more efficient. I am no longer so sure.
+
+
+
+6.1  Dynamic instance variables
+-------------------------------
+Dynamic instance variables are like normal dynamic variables (*VARS)  in
+their scope. They  can be accessed  in methods and  also any  procedures
+that a method calls (the procedure need not be a method and need not  be
+defined within the scope of the "flavour .. endflavour" syntax form).
+
+When a message is sent to an instance all the dynamic instance variables
+associated with its class are set to have the appropriate value for that
+instance. After the  message has  been dealt  with the  values of  those
+dynamic instance variables are saved as being the value associated  with
+the instance. This means that if  a class has 30 dynamic variables  then
+there has to be  30 settings before  the message is  run and 30  savings
+after the  message  is  run. Every  class  has  a  set-dynamic-variables
+procedure and a save-dynamic-variables procedure associated with it.
+
+In fact it is a little more complex since if a method sends a message to
+another object  then  the dynamic  instance  variables for  the  current
+instance have to be saved before the  message is sent to the object  and
+then restored after the message has been sent. For example if we have an
+object Andrew and an object Sarah each of which have a dynamic  instance
+variable "spouse" associated with it and we have a method marry which is
+defined as:
+
+    defmethod marry(person);
+        unless person == spouse do  ;;; unless we already married to p
+            person -> spouse;       ;;; update the instance variable
+            spouse <- marry(self);  ;;; pass on the message
+        endunless;
+    enddefmethod;
+
+then what we should  be able to  do is send the  message marry with  the
+argument Sarah to Andrew. Andrew should  set his value for spouse to  be
+Sarah and send the  message on to  Sarah. Sarah will  set her value  for
+spouse to be  Andrew and then  pass the  message on to  Andrew. At  this
+point Andrew should find that his spouse slot is already filled by Sarah
+and so the marrying rally should end. For this to work we are relying on
+the fact  that when  andrew gets  the second  marry message  his  actual
+internally set value for "spouse" has  been altered. This means that  we
+must do a "save" before  the marry method sends  a message to an  object
+and a "set" after  the message has  finished. (The only  time it is  not
+necessary to do this  additional save and set  is when the object  being
+sent the message is the object that is sending it i.e you send a message
+to "self").
+
+
+
+6.2  Lexical Instance Variables
+-------------------------------
+The scope of lexical instance variables is different from that of POPLOG
+*LVARS. A lexical ivar can be accessed  or referred to, by name, in  any
+method defined in a flavour which declares (or has previously  declared)
+the instance variable,  or has  inherited the  instance variable  from a
+component. In  the example  below the  reference to  "a" in  the  method
+"printa" will  refer to  the  instance variable  since it  is  inherited
+through the flavour b from the flavour a.
+
+    flavour a;
+    ivars a;
+    endflavour
+
+    flavour b isa a;
+    endflavour;
+
+    flavour c isa b;
+        defmethod printa;
+            a =>
+        enddefmethod;
+    endflavour;
+
+References  to  lexical  instance   variables  in  methods  (using   the
+defmethod..enddefmethod form) are trapped  and instead of being  planted
+as a normal PUSH or POP they are treated as if you had typed:
+
+        ivalof(self, ivarname)
+
+except that the code is slightly more efficient. In fact instead of  one
+virtual machine instruction (see REF * VM) (a PUSH, POP, CALL, or UCALL)
+seven will  be planted.  This means  that methods  are bulkier  and  the
+reference to an instance variable inevitably involves more work.
+
+If you have a method which is only going to refer to a instance variable
+once and has many  dynamic instance variables then  you will suffer  the
+cost of all the setting and  saving for the instance variables that  are
+not referred to. If  the processing of a  message requires referring  to
+several instance variables  and you are  going to refer  to most of  the
+instance variables then it  is probably better  to use dynamic  instance
+variables. I have not  done any investigation into  at what point it  is
+more efficient to use one kind of instance variable in place of another.
+
+It is important to note that efficiency is not the only consideration in
+choosing the kind  of instance variable.  You may want  the security  of
+knowing that if a procedure that a method calls happens to use a dynamic
+variable (*VARS) with the same name  as an instance variable then  there
+will not be a clash. You may  also want the flexibility of knowing  that
+the procedure will access the instance variable.
+
+
+
+
+----------------------
+7  Precedence Ordering
+----------------------
+
+For every  flavour  the  system  keeps  a  list  of  all  the  inherited
+components of the flavour  including those implicitly inherited  through
+explicit component  specifications.  This  list  is  kept  in  order  of
+precedence and no component should occur  twice in the list. The  system
+has a default way of constructing  this "precedence list" but users  can
+define their  own methods  for doing  so by  including a  method  called
+"precedence_list"  in  the  metaflavour  (HELP * METAFLAVOURS   provides
+details on how this can be done).
+
+The default  ordering  algorithm  is  that  used  by  LOOPS.  The  basic
+principle is that you follow the left most path of the components  (when
+a flavour is declared  the order in which  the flavours are declared  is
+significant - the first mentioned (left-most) is considered to have  the
+highest precedence) until one  of the other paths  joins at which  point
+you include the  flavours in  that path  up to  the join.  This is  best
+explained by means of  a diagram. Below is  part of an inheritance  tree
+for classes of gauge and instrument objects. All the lines represent  an
+"isa" or component relationship where the class above "isa" component of
+the class below:
+
+                                  |
+                            ------------
+                            |instrument|
+                            ------------
+                        -----------
+                        |bar-gauge|
+                        -----------
+            |----------------| |-------------|
+    --------|---------       | |          ---|--------------
+    |scaled-bar-gauge|  ------ -------    |moving-bar-gauge|
+    ------------------  |            |    ------------------
+        |  -------------|---  -------|--------  |
+        | | horiz-bar-gauge| | vert-bar-gauge | |
+        |  -----------------  ----------------  |
+        |             |          |---------------
+        ----   ------------------|-----
+           |   |moving-horiz-bar-gauge|
+           |   ------------------------
+       -------------------------------
+       |scaled-moving-horiz-bar-gauge|
+       -------------------------------
+
+The precedence list for the scaled-moving-horiz-bar-gauge class would be
+
+    1.  scaled-moving-horiz-bar-gauge - precedence lists include
+        themselves first
+
+    2.  scaled-bar-gauge (left most line)
+
+    3.  moving-horiz-bar-gauge (merge at a join)
+
+    4.  horiz-bar-gauge
+
+    5.  moving-bar-gauge
+
+    6.  bar-gauge
+
+    7.  instrument
+
+    8.  ...
+
+
+Most objects will include  vanilla (the root object)  at the end of  the
+precedence list.
+
+
+
+7.1  Messages
+-------------
+A message is considered to consist of a selector which should be a  word
+and optionally  some (or  none) arguments  which might  be any  kind  of
+object. The selector  is used  to determine  how the  message should  be
+received, in most cases a procedure (a method) is applied. The arguments
+are left on the stack for the method to deal with as appropriate.
+
+The procedure syssendmessage first checks the protected variable  "self"
+to see if the message sender is an instance. If it is then the  instance
+is "saved" (its  store for  its dynamic instance  variables are  updated
+from the  value of  the  variables). Then  normal message  reception  is
+begun.
+
+
+
+7.2  Message Reception
+----------------------
+The dynamic instance variables of the message receiver are set. Then any
+before daemons called  "any_message" found  in the  precedence list  are
+fired in the order in which they are found in the precedence list.  Then
+all before daemons appropriate to the message are fired (iff there  is a
+primary method for the message or the message is the name of an instance
+variable), they  are fired  in the  order of  the precedence  list -  by
+default most specific first - then one, and only one, primary method  is
+selected from the precedence list -- or an instance variable is accessed
+(updated if the message is sent in update mode). Then the after  daemons
+are executed in  the reverse order  of the before  daemons. Finally  all
+after daemons called "any_message" are fired in the reverse order of the
+precedence list  and  the  dynamic instance  variables  of  the  message
+receiver  are  saved  and  then  if  the  message-sender  is  an  object
+(syssendmessage found that self was an instance when it began) then  its
+dynamic instance-variables are reset.
+
+Currently it  is  not easy  to  change the  way  in which  messages  are
+received. You  can  alter they  way  in  which the  precedence  list  is
+constructed but you  cannot for example  stop the firing  of daemons  or
+allow more than one primary method to be activated.
+
+A distinction is  made between messages  sent in normal  mode and  those
+sent in * UPDATER mode. In update mode the primary method must have been
+declared as  an  updater  (unless  the message  refers  to  an  instance
+variable) and  only  daemons  defined as  updaters,  using  the  keyword
+"updaterof", are fired. This applies  to both "any_message" daemons  and
+those specific to particular messages.
+
+
+
+7.3  Method Selection
+---------------------
+When a message is sent a method has  to be found to respond to it.  This
+task involves looking at each of  the components in the precedence  list
+to see if there is a method with the appropriate name. If none is  found
+all the instance variable names are checked to see if any of their names
+match the message. If  no method can be  found and no instance  variable
+matches then the system tries to send the message "default_method"  with
+the original method  as argument.  If no default_method  can be  found a
+mishap occurs. (The flavour vanilla provides a default method which will
+try and autoload a file called '<message>_message.p' and if it  succeeds
+re-sends the original message  to itself. If it  cannot autoload a  file
+successfully then it will call mishap).
+
+In order to speed up the  time spent in choosing the appropriate  method
+the FLAVOURS uses  a 'caching' facility.  At flavour  definition/compile
+time it is  possible to know  all the possible  messages an instance  of
+that flavour can respond to and  what methods and daemons will be  fired
+for each of the messages. This means that it is possible to  construct a
+procedure for each of  the classes that will  handle a message  destined
+for an instance of that class. The procedure might be defined as:
+
+    define run_message_for_person(instance, message);
+        if message == "marry" then
+            /* before daemons, primary method, after daemons */
+        elseif message == "birthday" then
+            /* before daemons, primary method, after daemons */
+        elseif
+            .
+            .
+        elseif message == "age" then
+            /* before daemons, instance-variable value, after daemons */
+        elseif
+            .
+            .
+        else
+            /* default_method daemons and primary method */
+        endif;
+    enddefine;
+    define updaterof run_message_for_person(instance, message);
+        .
+        .
+    enddefine;
+
+NOTE: At some later date it may  be feasible to change the way in  which
+these class specific procedures are defined to do something like jump on
+the basis of the first character of the method in order to ensure a more
+even and perhaps faster method selection.
+
+
+
+7.4  Delayed Compilation
+------------------------
+The only problem with  using this kind of  caching is that every  time a
+flavour is  changed not  only its  class specific  procedure has  to  be
+rebuilt but also the procedures of all the classes inherit from it. This
+could make the package very slow and bulky. For this reason the flavours
+system notes that the  procedure of a class  needs to be  reconstructed,
+but does not  actually construct it  until it is  required -- the  first
+time a message  is sent to  one of  its instances. This  means that  the
+first time a message is  sent to an instance of  a class which has  been
+redefined, or one of its components has been redefined, the reception of
+the message will take slightly longer than for subsequent messages sent.
+
+Since most object oriented programmes include several 'mixin' classes --
+classes which serve  as a place  holder in the  inheritance lattice  but
+which are not going to  be instantiated this delayed compilation  serves
+to limit the amount of extra work that is done and space that is used.
+
+
+
+
+---------------------
+8  Bugs and Omissions
+---------------------
+
+The flavours  package  could  be  enhanced by  the  provision  of  class
+variables, a syntax for sending a message iff it is handled and a method
+by which users can easily specify how a message should be handled.
+
+
+
+
+--- C.all/ref/flavours
+--- Copyright University of Sussex 1990. All rights reserved.

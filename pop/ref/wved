@@ -1,0 +1,199 @@
+REF WVED                                            John Gibson Dec 1992
+
+     COPYRIGHT University of Sussex 1992. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<       WINDOWED VED          >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<        PROCEDURES           >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Overview
+
+  2   Variables for Windowed Ved
+
+  3   Manipulating Windows
+
+  4   Window Parameters
+
+
+
+-----------
+1  Overview
+-----------
+
+This file describes variables and procedures used in windowed Ved,  i.e.
+XVed. The procedures are redefined to behave appropriately when  using a
+windowing system.
+
+In the procedures below, a window argument currently stands for an  XVed
+window structure.
+
+
+
+
+-----------------------------
+2  Variables for Windowed Ved
+-----------------------------
+
+These variables control the behaviour of windowed Ved (i.e. XVed).
+
+vedusewindows -> word_or_false                         [active variable]
+word_or_false -> vedusewindows
+        This variable  controls whether  Ved uses  windows or  not;  the
+        value of this cannot be  changed when there are files  currently
+        being edited. Allowable values are
+
+        false
+            Don't use windows. You can assign  this at any time in  XVed
+            (and there are no current files).
+
+        "x"
+            With XVed  loaded,  will  make  Ved  use  X  windows.  Calls
+            xvedsetup if this  has not  already been  done.
+
+
+vedwarpcontext -> list_or_bool                                [variable]
+list_or_bool -> vedwarpcontext
+        Controls the  contexts  in which  the  pointer and  input  focus
+        should be  warped to  a file  window being  selected. Note  that
+        warping  is   not  done   immediately;  rather,   the   variable
+        wvedwindowchanged is  set true,  which causes  the  * vedprocess
+        main loop to do the actual warping when control returns to it.
+
+        vedwarpcontext can take the following values:
+
+        false
+            No automatic  input warping.  Assigning this  globally  will
+            produce counter-intuitive results, especially in  connection
+            with  ved_rb,   vedswapfiles   (ESC  X   by   default)   and
+            vedfileselect (ESC  e by  default).  false can  be  assigned
+            locally in  procedures that  want to  decide for  themselves
+            whether to  warp  the  pointer  or not.  If  they  do,  such
+            procedures can assign true to wvedwindowchanged.
+
+        true
+            Warp pointer and focus to current window whenever Ved  moves
+            to a new window.
+
+        A non-empty list of words
+            The words  are taken  to be  procedure names  or event  type
+            names, which if present, allow warping in the context of the
+            relevant procedures. The allowable names are:
+
+          "vedfileselect"
+              Warp to window selected from vedfileselect full menu  (and
+              do it immediately: don't wait for vedprocess).
+          "vedswapfiles"
+              If this  is in  the  list then  the  input focus  will  be
+              redirected to  the  "other" window  when  vedswapfiles  is
+              invoked.
+          "ved_pop"
+              Warp to base window when ved_pop is called or when exiting
+              from vededit (e.g. via ved_pop, ved_q (if no files  left),
+              or vedexit.
+          "ved_q"
+              If this is in the list then  when a Ved file is quit,  the
+              input  focus  will  be  moved   to  the  next  window   in
+              vedbufferlist.
+          "ved_rb"
+              Warp to next window whenever ved_rb runs.
+          "ved"
+              Warp to Ved window when  entering or re-entering Ved  from
+              the base window.
+
+        NOTE: User-defined procedures  that manipulate  Ved buffers  may
+        check whether other  words are  in the  list vedwarpcontext  and
+        decide   on   that   basis    whether   to   assign   true    to
+        wvedwindowchanged. For programs that may be running at the  same
+        time as the user is working on some other window (e.g. ved_diff)
+        it is best locally to assign false to vedwarpcontext to  prevent
+        the mouse pointer suddenly being moved and input redirected.
+
+
+wvedwindowchanged -> bool                                     [variable]
+bool -> wvedwindowchanged
+        Setting this variable true will  cause the vedprocess main  loop
+        (the next time control  returns to it) to  warp the pointer  and
+        the input focus to  wvedwindow, i.e. the  window of the  current
+        file. This will also open the window if it is iconic.
+
+
+wved_should_warp_mouse(keyword) -> bool             [procedure variable]
+        This is the procedure that  uses the value of vedwarpcontext  to
+        decide whether the mouse pointer should be warped when moving to
+        a new  window.  keyword  is as  described  under  vedwarpcontext
+        above.
+
+
+wvedalwaysraise -> bool                                       [variable]
+bool -> wvedalwaysraise
+        If the value of  this variable is true,  Ved will try to  ensure
+        that the window you are editing in is always fully visible.
+
+
+wvedbreaktofit -> bool                                        [variable]
+bool -> wvedbreaktofit
+        If this variable is true, Ved will adjust vedlinemax so that the
+        point at which lines  are broken is close  to the right edge  of
+        the window you are editing in, whenever the window is resized.
+
+
+
+
+-----------------------
+3  Manipulating Windows
+-----------------------
+
+wved_open_window(window)                            [procedure variable]
+        Opens (i.e. de-iconifies), the window specified by window.
+
+
+wved_close_window(window)                           [procedure variable]
+        Closes (i.e. iconifies) the window.
+
+
+wved_raise_window(window)                           [procedure variable]
+        Bring window specified by window to front of screen.
+
+
+wved_set_input_focus(window)                        [procedure variable]
+        Open and fully expose the window specified by window.
+
+
+
+
+--------------------
+4  Window Parameters
+--------------------
+
+wved_is_live_window(window) -> bool                 [procedure variable]
+        Will return  true  if  the window  window  is  currently  alive,
+        otherwise false.
+
+
+wved_window_size(window) -> (width, height)         [procedure variable]
+        Returns the width and  height of window.  For XVed windows  both
+        values are in character cell  units (i.e. number of columns  and
+        number of rows).
+
+
+wved_window_label(window) -> string                 [procedure variable]
+string -> wved_windowlabel(window)
+        Examine or replace the label (in string) in the title stripe  of
+        the window specified by window.
+
+
+wved_icon_label(window) -> string                   [procedure variable]
+string -> wved_icon_label(window)
+        Examine or replace the label (in string) displayed in a window's
+        icon.
+
+
+
+
+--- C.all/ref/wved
+--- Copyright University of Sussex 1992. All rights reserved.

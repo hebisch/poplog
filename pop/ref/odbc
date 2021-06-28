@@ -1,0 +1,2140 @@
+REF ODBC                                            John Gibson Aug 1996
+
+        COPYRIGHT University of Sussex 1996. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                              >>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<     POPLOG INTERFACE TO      >>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<  OPEN DATABASE CONNECTIVITY  >>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                              >>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+
+  2   Differences from the C Interface
+      2.1   Procedures
+      2.2   INCLUDE ODBC
+      2.3   SQL Data Types
+      2.4   Pop Data Types
+      2.5   Environment, Connection & Statement Handles
+
+  3   Data Input/Output Modes
+      3.1   false (Pop Value Mode)
+      3.2   3-Element Vector (Byte Buffer Mode)
+            ... Input
+            ... Output
+      3.3   Procedure (Byte Stream Mode)
+            ... Input
+            ... Output
+      3.4   Special Data Values
+            ... NULL Values
+            ... Default Parameters in SQL Procedure Calls
+      3.5   Extended Fetch and Update
+            ... Pop Value mode
+            ... Byte Buffer mode
+            ... Byte Stream mode
+            ... Unfetched Rows
+
+  4   Connecting to a Data Source
+
+  5   Driver/Data Source Information
+
+  6   Driver Options
+
+  7   Preparing SQL Requests
+
+  8   Submitting Requests
+
+  9   Retrieving Results & Result Information
+
+ 10   Data Source System Table Information
+
+ 11   Terminating Statements & Connections
+
+ 12   Asynchronous Statement Processing
+
+ 13   Examples
+      13.1  Static SQL
+      13.2  Ad Hoc Query
+            ... Using sql_app_result_set
+
+
+
+---------------
+1  Introduction
+---------------
+
+LIB * ODBC is  a Pop-11  interface to  Microsoft's ODBC  (Open  DataBase
+Connectivity), a  C language  API which  allows applications  to  access
+database management systems using Structured Query Language (SQL).
+
+Before using any procedures, the library must be loaded with
+
+    uses odbc;
+
+The  include   file  INCLUDE * ODBC defines  various   integer constants
+and macros for use with these procedures:
+
+    include odbc.ph;
+
+LIB ODBC  assumes Extension  Level 1  conformance from  all drivers.  It
+implements all Core and Level  1 functions, and (currently) all  Level 2
+functions except the following:
+
+    SQLParamOptions
+    SQLMoreResults
+    SQLProcedures
+    SQLProcedureColumns
+
+This file describes only the Pop interface to ODBC, and does not attempt
+to provide a tutorial  on ODBC in general.  The description of LIB  ODBC
+procedures  should   therefore  be   read  in   conjunction  with   ODBC
+documentation for the C interface.
+
+In all cases, the  descriptions of the  Pop procedures indicate  which C
+functions they call.  Where a Pop  procedure is dependent  on a  Level 2
+function, * sql_connect_functions  can  be  used  to  test  whether  the
+particular driver supports that function or not.
+
+
+
+
+-----------------------------------
+2  Differences from the C Interface
+-----------------------------------
+
+2.1  Procedures
+---------------
+LIB ODBC is  a Pop-paradigm  implementation of the  C interface,  rather
+than a literal one. Thus while the Pop procedures are roughly comparable
+to the C ones, they are by no means identical.
+
+For this reason,  the Pop procedures  have all-lowercase names  starting
+with sql_, e.g.  sql_bind_parameter rather  than SQLBindParameter.  (The
+Pop names are also generally  cleaner and more explicit. In  particular,
+the names of all  procedures that return data  by creating a result  set
+begin with sql_select_.)
+
+Unlike the C  functions they  call, LIB  ODBC procedures  do not  return
+status codes: they either return nothing, or (where appropriate)  return
+data values directly.
+
+Instead, when a LIB ODBC procedure  calls a C function which returns  an
+error (return code  SQL_ERROR), the  Pop procedure will  raise a  mishap
+with sys_raise_exception. If  a function returns  SQL_SUCCESS_WITH_INFO,
+the Pop procedure will raise a warning and continue. In both cases,  the
+exception message text is obtained from SQLError, and the exception  has
+an id-string of the form
+
+        odbc-funcname:exsys-odbc-sqlstate
+
+where funcname is the name of  the C function being called and  sqlstate
+is the SQLSTATE returned by SQLError.
+
+All other C  return codes are  handled automatically by  LIB ODBC.  (The
+only  procedure  which  effectively  hands  on  a  C  status  result  is
+sql_fetch,     whose      true/false     result      corresponds      to
+SQL_SUCCESS/SQL_NO_DATA_FOUND from SQLFetch.)
+
+The following table summarises  the LIB ODBC  equivalent of each  ODBC C
+function:
+
+    C Interface             LIB ODBC
+    -----------             --------
+    SQLAllocConnect         Called automatically by * sql_connect.
+
+    SQLAllocEnv             * sql_environment if  required,  but  called
+                            automatically by * sql_connect.
+
+    SQLAllocStmt            * sql_alloc_statement.
+
+    SQLBindCol              * sql_bind_column.
+
+    SQLBindParameter        * sql_bind_parameter.
+
+    SQLBrowseConnect        * sql_connect.
+
+    SQLCancel               Assigning false to * sql_statement_busy  for
+                            a statement.
+
+    SQLColAttributes        * sql_column_attribute.
+
+    SQLColumnPrivileges     * sql_select_column_privileges.
+
+    SQLColumns              * sql_select_columns.
+
+    SQLConnect              * sql_connect.
+
+    SQLDataSources          * sql_data_source_repeater.
+
+    SQLDescribeCol          * sql_describe_column.
+
+    SQLDescribeParam        * sql_describe_parameter.
+
+    SQLDisconnect           * sql_disconnect (or GC destroy action).
+
+    SQLDriverConnect        * sql_connect.
+
+    SQLDrivers              * sql_driver_repeater.
+
+    SQLError                Called  automatically  for  message  strings
+                            when an exception is raised.
+
+    SQLExecDirect           * sql_execute with optional SQL string.
+
+    SQLExecute              * sql_execute.
+
+    SQLExtendedFetch        * sql_extended_fetch.
+
+    SQLFetch                * sql_fetch.
+
+    SQLForeignKeys          * sql_select_foreign_keys.
+
+    SQLFreeConnect          * sql_disconnect (or GC destroy action).
+
+    SQLFreeEnv              GC destroy action.
+
+    SQLFreeStmt             * sql_free_statement (or GC destroy action).
+
+    SQLGetConnectOption     * sql_connect_option.
+
+    SQLGetCursorName        * sql_cursor_name.
+
+    SQLGetData              Called  automatically  by  * sql_fetch   and
+                            * sql_extended_fetch.
+
+    SQLGetFunctions         * sql_connect_functions.
+
+    SQLGetInfo              * sql_connect_attribute.
+
+    SQLGetStmtOption        * sql_statement_option.
+
+    SQLGetTypeInfo          * sql_select_types.
+
+    SQLNativeSql            * sql_native_sql.
+
+    SQLNumParams            * sql_num_parameters.
+
+    SQLNumResultCols        * sql_num_result_columns.
+
+    SQLParamData            Called automatically  by  * sql_execute  and
+                            * sql_set_position when necessary.
+
+    SQLPrepare              * sql_prepare.
+
+    SQLPrimaryKeys          * sql_select_primary_keys.
+
+    SQLPutData              Called automatically  by  * sql_execute  and
+                            * sql_set_position when necessary.
+
+    SQLRowCount             * sql_row_count.
+
+    SQLSetConnectOption     * sql_connect_option updater.
+
+    SQLSetCursorName        * sql_cursor_name updater.
+
+    SQLSetStmtOption        * sql_statement_option updater.
+
+    SQLSetPos               * sql_set_position.
+
+    SQLSpecialColumns       * sql_select_special_columns.
+
+    SQLStatistics           * sql_select_statistics.
+
+    SQLTablePrivileges      * sql_select_table_privileges.
+
+    SQLTables               * sql_select_tables.
+
+    SQLTransact             * sql_transact.
+
+
+
+
+2.2  INCLUDE ODBC
+-----------------
+The file  INCLUDE * ODBC defines  a similar  set of  macros for  integer
+constants as the corresponding C header file 'sql.h'.
+
+However, whereas in C all these  macros have names beginning with  SQL_,
+in LIB ODBC  some begin with  Sql_. In  all cases, Sql_  values are  the
+corresponding SQL_ values shifted left  16 bits, with extra  information
+encoded in the bottom part.
+
+(If required, the inline macro SQL(Sql_value) can be applied to an  Sql_
+value to get the SQL_ value, e.g.
+
+        SQL(Sql_INTEGER)
+
+is SQL_INTEGER. Note that  in general, INCLUDE  ODBC defines either  the
+Sql_ or the SQL_ value, but not both.)
+
+Most  of  the  Sql_  values  are  input  arguments  to  the   procedures
+sql_connect_attribute,  sql_connect_option,   sql_statement_option   and
+sql_column_attribute, where  they  specify  a  particular  attribute  or
+option (and  where  the bottom  16  bits encode  the  data type  of  the
+corresponding attribute/option value).
+
+
+2.3  SQL Data Types
+-------------------
+ODBC SQL data types describe the represention of data by the driver.  In
+LIB ODBC, they are Sql_  values in which the  bottom 16 bits encode  the
+precision and  the  scale  of  the type,  and  additionally,  a  bit  to
+differentiate between signed and unsigned for integer types.
+
+The LIB ODBC SQL types are listed below, together with the corresponding
+default Pop type for each (see next section).
+
+For types whose precision and scale are variable, the Sql_ definition is
+not a  single  value,  but  an  inline  macro  that  takes  one  or  two
+parameters. These are
+
+        SQL Type                            Default Pop Type
+        --------                            ----------------
+        Sql_CHAR(nbytes)                    Sql_P_string
+        Sql_VARCHAR(max_nbytes)             Sql_P_string
+        Sql_BINARY(nbytes)                  Sql_P_binary
+        Sql_VARBINARY(max_nbytes)           Sql_P_binary
+        Sql_NUMERIC(precision, scale)       Sql_P_string
+        Sql_DECIMAL(precision, scale)       Sql_P_string
+
+The non-parameterised types are
+
+        SQL Type                            Default Pop Type
+        --------                            ----------------
+        Sql_BIT                             Sql_P_boolean
+        Sql_TINYINT                         Sql_P_sbyte
+        Sql_SMALLINT                        Sql_P_short
+        Sql_INTEGER                         Sql_P_int
+        Sql_BIGINT                          Sql_P_longlong
+        Sql_REAL                            Sql_P_sfloat
+        Sql_FLOAT                           Sql_P_dfloat
+        Sql_DOUBLE                          Sql_P_dfloat
+        Sql_DATE                            Sql_P_date
+        Sql_TIME                            Sql_P_time
+        Sql_TIMESTAMP                       Sql_P_timestamp
+        Sql_LONGVARBINARY                   Sql_P_binary
+        Sql_LONGVARCHAR                     Sql_P_string
+
+The types Sql_TINYINT, Sql_SMALLINT, Sql_INTEGER and Sql_BIGINT indicate
+signed integers, and each has a corresponding unsigned version:
+
+        SQL Type                            Default Pop Type
+        --------                            ----------------
+        Sql_UTINYINT                        Sql_P_byte
+        Sql_USMALLINT                       Sql_P_ushort
+        Sql_UINTEGER                        Sql_P_uint
+        Sql_UBIGINT                         Sql_P_ulonglong
+
+The   above   SQL   type   encoding   simplifies   the   arguments    to
+sql_bind_parameter,  by   condensing   three   of   the   arguments   to
+SQLBindParameter into one (also three SQLDescribeColumn results into one
+sql_describe_column result, etc).
+
+The signed/unsigned distinction for  integer types makes it  unnecessary
+to specify an  explicit Pop  type to sql_bind_parameter  merely for  the
+purpose of indicating signed or unsigned.
+
+Note that  the  parameters  to  types like  Sql_CHAR  are  evaluated  at
+compile-time,  and  cannot  be   run-time  expressions.  The   following
+procedures may be used to manipulate SQL type descriptors at run-time:
+
+
+sql_cons_sql_type(stype, precision, scale, unsigned)         [procedure]
+                                            -> sql_type
+        Constructs a LIB ODBC SQL type descriptor sql_type (an integer).
+
+        stype is the basic  ODBC SQL type; precision  and scale are  the
+        precision and scale of the type. precision must range from 0  to
+        255, and scale must range from 0 to precision.
+
+        unsigned is a boolean  which if true  indicates that an  integer
+        type (i.e.  stype =  SQL_TINYINT, SQL_SMALLINT,  SQL_INTEGER  or
+        SQL_BIGINT) should be  considered unsigned  rather than  signed.
+        (unsigned is ignored for other types.)
+
+        Note that an sql_type descriptor  for a long data type  (stype =
+        SQL_LONGVARCHAR or  SQL_LONGVARBINARY)  does not  represent  the
+        maximum number  of bytes  allowed for  the type  (since this  is
+        likely to be  a large  number such  as 2**31-1).  Hence in  this
+        case, precision is ignored and set to 0 (and scale must be 0).
+
+
+sql_dest_sql_type(sql_type)                                  [procedure]
+                    -> (stype, precision, scale, unsigned)
+        Given a  LIB  ODBC SQL  type  descriptor sql_type,  returns  the
+        four component fields of the type.
+
+
+The following  code fragment  illustrates the  use of  sql_dest_sql_type
+(and the SQL inline  macro) to perform  a go_on on  the basic type  of a
+given sql_type descriptor:
+
+    sql_dest_sql_type(sql_type) -> (stype, precision, scale, unsigned);
+
+    go_on stype to SType:
+        SType SQL(Sql_CHAR(1)):
+        SType SQL(Sql_VARCHAR(1)):
+        SType SQL(Sql_BINARY(1)):
+        SType SQL(Sql_VARBINARY(1)):
+            <some code>
+            goto SType end;
+
+        SType SQL(Sql_TINYINT):
+        SType SQL(Sql_SMALLINT):
+        SType SQL(Sql_INTEGER):
+        SType SQL(Sql_BIGINT):
+            <some code>
+            goto SType end;
+
+        SType SQL(Sql_REAL):
+        SType SQL(Sql_FLOAT):
+        SType SQL(Sql_DOUBLE):
+        SType SQL(Sql_DECIMAL(1,0)):
+        SType SQL(Sql_NUMERIC(1,0)):
+            <some code>
+    endgo_on;
+
+(Note that for the above, the parameterised Sql_ types can use any legal
+parameter values, since the basic stype is not affected.)
+
+
+2.4  Pop Data Types
+-------------------
+In the C interface, the ODBC C data types specify the representation  of
+data required in the application program; when data is transferred,  the
+driver converts  data  between  this representation  and  the  SQL  type
+representation. Each SQL type has a corresponding default C type.
+
+In LIB ODBC, the role played by  ODBC C data types is played instead  by
+Sql_P_ Pop data types (the  SQL() values of which  are the C types  they
+correspond to). Each SQL type has a corresponding default Pop type  (see
+previous section).
+
+Unlike the C interface, LIB ODBC provides three different mechanisms for
+actually accessing data -- see Data Input/Output Modes below.
+
+The Pop data types are
+
+        Sql_P_boolean
+        Sql_P_bit
+
+        Sql_P_sbyte
+        Sql_P_byte
+        Sql_P_short
+        Sql_P_ushort
+        Sql_P_int
+        Sql_P_uint
+        Sql_P_longlong
+        Sql_P_ulonglong
+        Sql_P_sfloat
+        Sql_P_dfloat
+
+        Sql_P_bookmark
+
+        Sql_P_date
+        Sql_P_time
+        Sql_P_timestamp
+
+        Sql_P_string
+        Sql_P_binary
+
+The types Sql_P_sbyte through  Sql_P_dfloat represent storage  locations
+as for  a  Pop  record  field  of  the  corresponding  type  (see  Field
+Specifiers for Poplog Data in REF * KEYS).
+
+The type  Sql_P_bit is  the same  as Sql_P_byte,  except that  only  the
+bottom bit  is  significant; Sql_P_boolean  is  the same  as  Sql_P_bit,
+except that the bit  value is converted to/from  a boolean in Pop  value
+mode (see Data Input/Output Modes below).
+
+Sql_P_bookmark is the same as Sql_P_uint (note that this is the  default
+Pop type for * sql_bind_column on column number 0).
+
+Sql_P_date, Sql_P_time and  Sql_P_timestamp represent storage  locations
+for the  i_typespec  structures  sql_date,  sql_time  and  sql_timestamp
+defined in INCLUDE * ODBC.
+
+The types Sql_P_string and Sql_P_binary both represent storage locations
+for data as a sequence  of bytes. (In the  C interface, these two  types
+must be distinguished, because of  null-termination for strings. In  the
+Pop interface this does not apply, and the only difference between  them
+is that for input to non-LONG parameters (i.e. excluding Sql_LONGVARCHAR
+or Sql_LONGVARBINARY parameters), Sql_P_string implies a maximum  length
+of 254 bytes rather than 255 for Sql_P_binary.)
+
+
+2.5  Environment, Connection & Statement Handles
+------------------------------------------------
+In LIB ODBC,  the C-interface handles  for the environment,  connections
+and statements  are packaged  as external-pointer  class records  (whose
+contents are otherwise opaque to the user).
+
+Each record is given a garbage  collector destroy action, which will  be
+called when the record becomes garbage.
+
+Since there is  only one  environment handle, this  is never  explicitly
+required as an argument to any procedure. It is created automatically by
+* sql_connect if necessary, but may be explicitly created by referencing
+the active variable * sql_environment.
+
+
+
+
+--------------------------
+3  Data Input/Output Modes
+--------------------------
+
+The DATA_BUFF argument  to sql_bind_parameter specifies  how data  for a
+parameter is input when  sql_execute is called.  (It also specifies  how
+data is output for an output parameter in an SQL procedure call, i.e. an
+SQL call statement that calls a  named executable object defined by  the
+data source.)
+
+Similarily, the  DATA_BUFF  argument to  sql_bind_column  specifies  how
+data for a column is output when sql_fetch is called.
+
+In both  cases,  DATA_BUFF represents  either  one or  two  arguments: a
+single identifier record main_id, optionally  followed by a second  item
+mode.
+
+The mode item controls the mode in which data is transferred, and may be
+
+    # false (the default if omitted);
+    # a 3-element vector;
+    # a procedure.
+
+Alternatively, mode may be another  identifier whose idval will  contain
+one of those  three at  the time of  the sql_execute  or sql_fetch.  (In
+other words, mode may be supplied as a bind-time constant, or through an
+identifier    whose    value    can    change    between    calls     to
+sql_execute/sql_fetch.)
+
+The different modes (in order of increasing complexity) are as follows:
+
+
+3.1  false (Pop Value Mode)
+---------------------------
+When mode  is false  (or omitted),  the data  value is  simply a  Poplog
+object input from, or output to, the idval of main_id.
+
+The Pop types Sql_P_sbyte through Sql_P_dfloat accept as input any  item
+that can be assigned into a Pop  record field of that type, and  produce
+as output the result of accessing such a field.
+
+An input  value for  Sql_P_bit must  be either  0 or  1, with  the  same
+produced on output; for Sql_P_boolean,  the truthvalue of an input  item
+is converted to 0 or  1 (0 for false, 1  for anything else), and  output
+produces false or true.
+
+The types Sql_P_string and Sql_P_binary both accept or produce a string.
+
+The  Pop  value   corresponding  to  the   Sql_P_date,  Sql_P_time   and
+Sql_P_timestamp types is a full vector  whose first element is the  word
+"sql_date", "sql_time" or "sql_timestamp", and whose remaining  elements
+are integers:
+
+        Type                Vector
+        ----                ------
+        Sql_P_date          {sql_date year month day}
+        Sql_P_time          {sql_time hour minute second}
+        Sql_P_timestamp     {sql_timestamp year month day
+                                           hour minute second fraction}
+
+
+3.2  3-Element Vector (Byte Buffer Mode)
+----------------------------------------
+When mode is a 3-element vector, it specifies a byte buffer in the form
+
+        {start_bsub bytestruct max_nbytes}
+
+where bytestruct is  any structure suitable  for use with  * move_bytes.
+The buffer area starts at  byte subscript start_bsub within  bytestruct,
+and has a maximum length of max_nbytes bytes.
+
+...  Input
+----------
+For input parameter  data, you  must set  main_id to  the actual  number
+nbytes of data bytes to be transferred before each call to  sql_execute.
+The data is then taken from the buffer with
+
+        move_bytes(start_bsub, bytestruct, ..., nbytes);
+
+For all Pop types except Sql_P_string or Sql_P_binary, it is an error if
+nbytes is  not the  exact number  of bytes  required for  the type.  For
+Sql_P_string/Sql_P_binary, nbytes must be less than or equal to  254/255
+unless  the   SQL  type   of  the   parameter  is   Sql_LONGVARCHAR   or
+Sql_LONGVARBINARY.
+
+...  Output
+-----------
+For output column data, each call of sql_fetch will transfer data to the
+buffer with
+
+        move_bytes(..., start_bsub, bytestruct, nbytes);
+
+and set main_id  to the number  nbytes of bytes  transferred. (It is  an
+error if the buffer is not large enough, i.e. if max_nbytes is less than
+nbytes.) Similarily for output parameters from sql_execute.
+
+
+3.3  Procedure (Byte Stream Mode)
+---------------------------------
+If mode  is a  procedure, mode  or  its updater  will be  called  inside
+sql_execute or sql_fetch to transfer the data.
+
+...  Input
+----------
+For input parameters, you must set main_id to the total number nbytes of
+data bytes to be  transferred before each call  to sql_execute. (If  the
+total is not known  in advance you  can set it  false; however, this  is
+only allowable if the * sql_connect_attribute Sql_NEED_LONG_DATA_LEN  is
+false.)
+
+The updater of mode will then  be called inside sql_execute with  nbytes
+and a procedure write_p as arguments:
+
+        -> mode(nbytes, write_p)
+
+The updater of mode must then call the procedure write_p to write chunks
+of data as input, i.e.
+
+        write_p(start_bsub, bytestruct, nb)
+
+meaning take  nb  bytes  from  bytestruct  starting  at  byte  subscript
+start_bsub (where bytestruct is any structure allowed by  * move_bytes).
+The updater of mode may call write_p as many times as necessary to  pass
+all the data for the parameter.
+
+...  Output
+-----------
+For output column data, sql_fetch will  set main_id to the total  number
+nbytes of data bytes  (or false if  this is not  known in advance),  and
+then call the base procedure of mode with main_id and a procedure read_p
+as arguments:
+
+        mode(main_id, read_p)
+
+mode must then  call the procedure  read_p to receive  chunks of  output
+data, i.e.
+
+        read_p(start_bsub, bytestruct, max_nb) -> nb
+
+meaning read  at most  max_nb  bytes into  bytestruct starting  at  byte
+subscript start_bsub (returning the actual  number of bytes read).  mode
+must repeatedly call read_p to fetch all the data for the column; read_p
+will return less than max_nb only at end-of-stream, and 0 when the  data
+is exhausted.
+
+(Note that mode  being called with  main_id as argument  gives mode  the
+option of creating a structure for  the output data and assigning it  to
+main_id. This is potentially useful with * sql_app_result_set, where the
+main_id   identifiers   are   created   internally   and    dereferenced
+automatically after calling sql_fetch.)
+
+The situation is identical for  sql_execute output parameters, i.e.  the
+base procedure of mode is called to read the data. (For parameters  that
+are both input and output, the updater is called first to handle  input,
+then the base procedure to handle output.)
+
+
+3.4  Special Data Values
+------------------------
+
+...  NULL Values
+----------------
+NULL data values are represented in  the Pop interface by undef  records
+(e.g. pop_undef).
+
+To specify  that  the  value  of an  input  parameter  is  NULL,  assign
+pop_undef to the value of main_id. The mode argument is then ignored.
+
+When an  output column  or  parameter value  is  NULL, the  system  sets
+main_id to pop_undef, and ignores mode.
+
+
+...  Default Parameters in SQL Procedure Calls
+----------------------------------------------
+To specify that an SQL procedure  call should use the default value  for
+an input parameter, set the value of main_id to the word "default". mode
+is then ignored for input.
+
+
+
+3.5  Extended Fetch and Update
+------------------------------
+The Level  2 procedure  sql_extended_fetch allows  multiple rows  to  be
+fetched from a result set.  The number of rows  to be fetched is  called
+the  rowset  size  (and  is  determined  by  the  * sql_statement_option
+Sql_ROWSET_SIZE).
+
+In  addition,  following  a  call  to  sql_extended_fetch,  the  Level 2
+procedure sql_set_position may be  called (with operation =  SQL_UPDATE)
+to update one or all of the fetched rows. (It may also be called to  add
+new rows.)
+
+To cope with multiple rows in  each column, the first DATA_BUFF item  to
+sql_bind_column must be a full vector main_vec rather than an identifier
+main_id. The R-th element  of main_vec is then  used instead of  main_id
+for the R-th row of the rowset.  The length of the vector bound to  each
+column must be  at least as  large as the  rowset size (identifiers  may
+only be used with sql_extended_fetch if the rowset size is 1).
+
+When main_vec is specified, the mode argument is similar, except that it
+now applies to any row in the rowset instead of just one:
+
+...  Pop Value mode
+-------------------
+The value item for  the R-th row  of the column is  assigned to (or  for
+updating, taken from) main_vec(R).
+
+...  Byte Buffer mode
+---------------------
+When mode  is a  3-element  vector {start_bsub  bytestruct  max_nbytes},
+max_nbytes specifies the size of each  row part within the column.  Thus
+the data area for the R-th row is assumed to start at
+
+        start_bsub + (R-1)*max_nbytes
+
+The actual number of bytes  nbytes for the R-th  row is assigned to  (or
+for updating, taken from) main_vec(R).
+
+...  Byte Stream mode
+---------------------
+When mode is a procedure, the base procedure is called once for each row
+R within the column, with the  total number of bytes nbytes assigned  to
+main_vec(R). mode is called with the row number R as an additional first
+argument:
+
+        mode(R, main_vec, read_p)
+
+For updating, main_vec(R) must be set to the total number nbytes of data
+bytes  to   be   transferred  for   each   row  before   the   call   to
+sql_set_position. The updater of mode is  then called once for each  row
+within the column with the row number R as an additional first argument:
+
+        -> mode(R, nbytes, write_p)
+
+...  Unfetched Rows
+-------------------
+When the actual  number of  rows fetched is  less than  the rowset  size
+(e.g. at the end of the result  set), main_vec(R) is set to termin  (and
+mode ignored) for any rows not  fetched. This also happens for any  rows
+for  which   an   error   occurred,   or   which   were   deleted   (see
+sql_extended_fetch).
+
+For updating, any row for which main_vec(R) is termin will be ignored.
+
+
+
+
+------------------------------
+4  Connecting to a Data Source
+------------------------------
+
+sql_environment -> henv                                [active variable]
+        This active variable returns  the current environment handle  if
+        one  exists,  or  calls  SQLAllocEnv  to  allocate  a  new   one
+        otherwise.
+
+        Once created, sql_environment holds  on to the environment  only
+        weakly via  a  temporary  property  entry,  which  means  that a
+        garbage collection will reclaim it (and call SQLFreeEnv)  unless
+        other references to it remain.
+
+        Since the environment is not required as an argument by any  LIB
+        ODBC procedure calls, there are  only two reasons for  accessing
+        this variable explicitly, viz
+
+          # To force the environment to be created at a particular  time
+            (e.g. on program startup -- note that SQLAllocEnv reads  the
+            file 'odbc.ini');
+
+          # To save the environment in  your own variable to prevent  it
+            being garbaged (you should always do this if you access it).
+
+        Note that  all  connection  and  statement  handles  maintain a
+        pointer to the environment, so  merely saving one of these  will
+        also prevent the environment being garbaged.
+
+
+sql_connect(conn_str, changes_p, retries, conn_mode) -> hdbc [procedure]
+        Establishes  a  connection  to  a  data  source  and   returns a
+        connection handle hdbc.
+
+        This procedure provides  an interface  to both  SQLDriverConnect
+        and SQLBrowseConnect (as well as the equivalent of  SQLConnect).
+        It  performs   SQLAllocConnect   automatically   (and   accesses
+        * sql_environment for the environment handle).
+
+        Any of the  changes_p, retries  and conn_mode  arguments may  be
+        omitted;  only  the  conn_str  argument  is  mandatory.   Unless
+        conn_mode is  supplied  and  is a  reference  (see  below),  the
+        connection is made using SQLDriverConnect.
+
+        conn_str
+            This is  the only  required argument,  and may  be a  single
+            string, or a 0- to 3-element list of strings:
+
+                [ ]
+                [ data_source_name ]
+                [ data_source_name user_name ]
+                [ data_source_name user_name password ]
+
+            The list elements  are converted  to a  string suitable  for
+            SQLDriverConnect/SQLBrowseConnect, i.e.
+
+                ''
+                'DSN=data_source_name;'
+                'DSN=data_source_name; UID=user_name;'
+                'DSN=data_source_name; UID=user_name; PWD=password;'
+
+            If conn_str  is  a single  string,  it is  interpreted  as a
+            data_source_name (i.e.  equivalent  to  a  1-element  list),
+            unless it contains a semicolon: in this case, it is  assumed
+            to be a valid connection string for SQLDriverConnect, and is
+            used unchanged.
+
+        changes_p
+            An   optional   procedure   argument   which   enables   any
+            pre-connection setting of options with * sql_connect_option.
+            If supplied, it is called on the newly-allocated  connection
+            handle hdbc before making the actual connection, i.e.
+
+                    changes_p(hdbc)
+
+            (Note that this is only time user code is given access to an
+            unconnected connection handle.)
+
+        retries
+            An optional  integer  retry count  for  connection  attempts
+            (defaults to 5  if omitted). Connection  attempts that  fail
+            because of communication-link  errors will  be retried  this
+            many times.
+
+        conn_mode
+            This  optional  argument  is   either  a  pair   (specifying
+            additional arguments for  SQLDriverConnect), or a  reference
+            containing a  procedure  (specifying  that  SQLBrowseConnect
+            should be used instead of SQLDriverConnect).
+
+            If conn_mode  is a  pair,  the front  must contain  an  item
+            suitable for the window handle argument to SQLDriverConnect,
+            and the back  an integer  for the  'driver completion  flag'
+            argument.   The    latter    is    one    of    the    codes
+            SQL_DRIVER_NOPROMPT, SQL_DRIVER_COMPLETE,  SQL_DRIVER_PROMPT
+            or SQL_DRIVER_COMPLETE_REQUIRED (defined in INCLUDE * ODBC),
+            and defaults to SQL_DRIVER_NOPROMPT if conn_mode is omitted.
+
+            To specify that SQLBrowseConnect  should be used,  conn_mode
+            must be reference containing a procedure, i.e.
+
+                    consref(browse_p)
+
+            where browse_p is a procedure of the form
+
+                browse_p(result_string, sqlstate_or_false)
+                                            -> next_conn_string
+
+            SQLBrowseConnect is  then called  repeatedly (starting  with
+            the initial  conn_str  argument)  until  the  connection  is
+            established. Each time it returns SQL_NEED_DATA  (indicating
+            that more connection information  is required), browse_p  is
+            called to supply the additional information.
+
+            The two arguments  passed to  browse_p each  time depend  on
+            whether the previous SQLBrowseConnect call had a recoverable
+            error or not. If there was an error, the second argument  is
+            the SQLSTATE string for the error, and result_string is  the
+            associated error message obtained from SQLError.  Otherwise,
+            the second  argument  is  false, and  result_string  is  the
+            browse result connection string.
+
+            In  either  case,  browse_p   must  return  an   appropriate
+            next_conn_string  as   argument  for   the  next   call   to
+            SQLBrowseConnect.
+
+
+
+
+---------------------------------
+5  Driver/Data Source Information
+---------------------------------
+
+sql_data_source_repeater() -> ds_rep                         [procedure]
+        Returns  a   repeater   procedure   ds_rep   for   data   source
+        specifications from the 'odbc.ini' file or registry.
+
+        Each time ds_rep is called, it uses SQLDataSources to fetch  the
+        next data source specification  as a pair  of strings, the  data
+        source name and its associated driver description. That is,
+
+            ds_rep() -> pair_or_termin
+
+        where each pair has the form
+
+            conspair(data_source_name, driver_description)
+
+        ds_rep returns termin at end of stream.
+
+
+sql_driver_repeater() -> dr_rep                              [procedure]
+        Returns a repeater  procedure dr_rep  for driver  specifications
+        from the odbc.ini file.
+
+        Each time dr_rep is called, it uses SQLDrivers to fetch the next
+        driver specification as a list of strings. The first element  of
+        the list is the driver  description, and any remaining  elements
+        are attributes in the form 'keyword=value'. That is,
+
+            dr_rep() -> list_or_termin
+
+        where each list has the form
+
+            [ driver_description attribute1 attribute2 ... ]
+
+        dr_rep returns termin at end of stream.
+
+
+sql_connect_attribute(hdbc, conn_attr) -> value              [procedure]
+        Calls SQLGetInfo to return the value of a specified attribute of
+        the driver/data source associated with the connection hdbc.
+
+        conn_attr specifies the attribute, and  must be one of the  Sql_
+        descriptors listed below (defined in INCLUDE * ODBC).
+
+        The table below indicates  the data type  of the value  returned
+        for each attribute. Note that
+
+          # type code means one of  a mutually exclusive set of  integer
+            values defined  as  SQL_  constants by  INCLUDE  ODBC  (e.g.
+            Sql_IDENTIFIER_CASE    returns    one    of    SQL_IC_UPPER,
+            SQL_IC_LOWER, SQL_IC_SENSITIVE or SQL_IC_MIXED);
+
+          # type bitmask means an  integer OR'ed from  a set of  bitmask
+            values defined  as  SQL_  constants by  INCLUDE  ODBC  (e.g.
+            Sql_ALTER_TABLE   has   zero   or    more   of   the    bits
+            SQL_AT_ADD_COLUMN, SQL_AT_DROP_COLUMN set).
+
+          # attributes for  which SQLGetInfo  returns a  Y/N string  are
+            returned as booleans (true/false);
+
+        See SQLGetInfo for a description of each attribute.
+
+            conn_attr                           Type
+            ---------                           ----
+            Sql_ACCESSIBLE_PROCEDURES           boolean
+            Sql_ACCESSIBLE_TABLES               boolean
+            Sql_ACTIVE_CONNECTIONS              integer
+            Sql_ACTIVE_STATEMENTS               integer
+            Sql_ALTER_TABLE                     bitmask
+            Sql_BOOKMARK_PERSISTENCE            bitmask
+            Sql_COLUMN_ALIAS                    boolean
+            Sql_CONCAT_NULL_BEHAVIOR            code
+            Sql_CONVERT_BIGINT                  bitmask
+            Sql_CONVERT_BINARY                  bitmask
+            Sql_CONVERT_BIT                     bitmask
+            Sql_CONVERT_CHAR                    bitmask
+            Sql_CONVERT_DATE                    bitmask
+            Sql_CONVERT_DECIMAL                 bitmask
+            Sql_CONVERT_DOUBLE                  bitmask
+            Sql_CONVERT_FLOAT                   bitmask
+            Sql_CONVERT_FUNCTIONS               bitmask
+            Sql_CONVERT_INTEGER                 bitmask
+            Sql_CONVERT_LONGVARBINARY           bitmask
+            Sql_CONVERT_LONGVARCHAR             bitmask
+            Sql_CONVERT_NUMERIC                 bitmask
+            Sql_CONVERT_REAL                    bitmask
+            Sql_CONVERT_SMALLINT                bitmask
+            Sql_CONVERT_TIME                    bitmask
+            Sql_CONVERT_TIMESTAMP               bitmask
+            Sql_CONVERT_TINYINT                 bitmask
+            Sql_CONVERT_VARBINARY               bitmask
+            Sql_CONVERT_VARCHAR                 bitmask
+            Sql_CORRELATION_NAME                code
+            Sql_CURSOR_COMMIT_BEHAVIOR          code
+            Sql_CURSOR_ROLLBACK_BEHAVIOR        code
+            Sql_DATA_SOURCE_NAME                string
+            Sql_DATA_SOURCE_READ_ONLY           boolean
+            Sql_DBMS_NAME                       string
+            Sql_DBMS_VER                        string
+            Sql_DEFAULT_TXN_ISOLATION           code
+            Sql_DRIVER_NAME                     string
+            Sql_DRIVER_ODBC_VER                 string
+            Sql_DRIVER_VER                      string
+            Sql_EXPRESSIONS_IN_ORDERBY          boolean
+            Sql_FETCH_DIRECTION                 bitmask
+            Sql_FILE_USAGE                      code
+            Sql_GETDATA_EXTENSIONS              bitmask
+            Sql_GROUP_BY                        code
+            Sql_IDENTIFIER_CASE                 code
+            Sql_IDENTIFIER_QUOTE_CHAR           string
+            Sql_KEYWORDS                        string
+            Sql_LIKE_ESCAPE_CLAUSE              boolean
+            Sql_LOCK_TYPES                      bitmask
+            Sql_MAX_BINARY_LITERAL_LEN          integer
+            Sql_MAX_CHAR_LITERAL_LEN            integer
+            Sql_MAX_COLUMNS_IN_GROUP_BY         integer
+            Sql_MAX_COLUMNS_IN_INDEX            integer
+            Sql_MAX_COLUMNS_IN_ORDER_BY         integer
+            Sql_MAX_COLUMNS_IN_SELECT           integer
+            Sql_MAX_COLUMNS_IN_TABLE            integer
+            Sql_MAX_COLUMN_NAME_LEN             integer
+            Sql_MAX_CURSOR_NAME_LEN             integer
+            Sql_MAX_INDEX_SIZE                  integer
+            Sql_MAX_OWNER_NAME_LEN              integer
+            Sql_MAX_PROCEDURE_NAME_LEN          integer
+            Sql_MAX_QUALIFIER_NAME_LEN          integer
+            Sql_MAX_ROW_SIZE                    integer
+            Sql_MAX_ROW_SIZE_INCLUDES_LONG      boolean
+            Sql_MAX_STATEMENT_LEN               integer
+            Sql_MAX_TABLES_IN_SELECT            integer
+            Sql_MAX_TABLE_NAME_LEN              integer
+            Sql_MAX_USER_NAME_LEN               integer
+            Sql_MULTIPLE_ACTIVE_TXN             boolean
+            Sql_MULT_RESULT_SETS                boolean
+            Sql_NEED_LONG_DATA_LEN              boolean
+            Sql_NON_NULLABLE_COLUMNS            boolean
+            Sql_NULL_COLLATION                  code
+            Sql_NUMERIC_FUNCTIONS               bitmask
+            Sql_ODBC_API_CONFORMANCE            code
+            Sql_ODBC_SAG_CLI_CONFORMANCE        code
+            Sql_ODBC_SQL_CONFORMANCE            code
+            Sql_ODBC_SQL_OPT_IEF                boolean
+            Sql_ODBC_VER                        string
+            Sql_OJ_CAPABILITIES                 bitmask
+            Sql_ORDER_BY_COLUMNS_IN_SELECT      boolean
+            Sql_OUTER_JOINS                     boolean
+            Sql_OWNER_TERM                      string
+            Sql_OWNER_USAGE                     bitmask
+            Sql_POSITIONED_STATEMENTS           bitmask
+            Sql_POS_OPERATIONS                  bitmask
+            Sql_PROCEDURES                      boolean
+            Sql_PROCEDURE_TERM                  string
+            Sql_QUALIFIER_LOCATION              code
+            Sql_QUALIFIER_NAME_SEPARATOR        string
+            Sql_QUALIFIER_TERM                  string
+            Sql_QUALIFIER_USAGE                 bitmask
+            Sql_QUOTED_IDENTIFIER_CASE          code
+            Sql_ROW_UPDATES                     boolean
+            Sql_SCROLL_CONCURRENCY              bitmask
+            Sql_SCROLL_OPTIONS                  bitmask
+            Sql_SEARCH_PATTERN_ESCAPE           string
+            Sql_SERVER_NAME                     string
+            Sql_SPECIAL_CHARACTERS              string
+            Sql_STATIC_SENSITIVITY              bitmask
+            Sql_STRING_FUNCTIONS                bitmask
+            Sql_SUBQUERIES                      bitmask
+            Sql_SYSTEM_FUNCTIONS                bitmask
+            Sql_TABLE_TERM                      string
+            Sql_TIMEDATE_ADD_INTERVALS          bitmask
+            Sql_TIMEDATE_DIFF_INTERVALS         bitmask
+            Sql_TIMEDATE_FUNCTIONS              bitmask
+            Sql_TXN_CAPABLE                     code
+            Sql_TXN_ISOLATION_OPTION            bitmask
+            Sql_UNION                           bitmask
+            Sql_USER_NAME                       string
+
+
+sql_connect_functions(hdbc) -> bitmask                       [procedure]
+sql_connect_functions(hdbc, func_number) -> bool
+        Calls  SQLGetFunctions  to  return  information  on  which  ODBC
+        functions are supported by the driver on the connection hdbc.
+
+        Each function is identified by a number from 1 to 100; constants
+        for these numbers have  names of the form  SQL_API_functionname.
+        Note that INCLUDE * ODBC defines these names only for  Extension
+        Level 2 functions, since LIB ODBC assumes Level 1  functionality
+        is always present.
+
+        In the first  form, sql_connect_functions calls  SQLGetFunctions
+        to get information  about all functions,  and returns this  as a
+        biginteger bitmask in which bit N is set if the driver  supports
+        function number N. bitmask can therefore be used with
+
+            testbit(bitmask, func_number)
+
+        to test for  an individual func_number.  (Note that the  bitmask
+        result is  cached  inside  hdbc  so  that  subsequent  calls  to
+        sql_connect_functions do not have to reconstruct it.)
+
+        In the second form, sql_connect_functions returns a boolean bool
+        pertaining to the individual function given by func_number.
+
+
+sql_select_types(hstmt)                                      [procedure]
+sql_select_types(hstmt, sql_type)
+        Calls SQLGetTypeInfo to create a result set describing the  data
+        types supported by a  data source. hstmt  is a statement  handle
+        for the result set.
+
+        If sql_type  is  supplied,  it  must be  a  LIB  ODBC  SQL  type
+        descriptor (see SQL Data Types above); in this case, the  result
+        set has rows only for  those data source types which  correspond
+        to sql_type. If sql_type is omitted, all possible data types are
+        enumerated.
+
+        See SQLGetTypeInfo for details of the columns in each row of the
+        result set.
+
+
+
+
+-----------------
+6  Driver Options
+-----------------
+
+sql_connect_option(hdbc, conn_option) -> value               [procedure]
+value -> sql_connect_option(hdbc, conn_option)
+        Calls  SQLGetConnectOption/SQLSetConnectOption   to  access   or
+        update  the  value  of  a  specified  option  setting  for   the
+        connection hdbc.
+
+        conn_option specifies the option,  and must be  one of the  Sql_
+        descriptors listed below  (and defined  in INCLUDE * ODBC).  For
+        the updater only, conn_option  may also be  any valid option  to
+        sql_statement_option (i.e.  to set  a statement  option for  all
+        subsequently-created statements on hdbc).
+
+        The table below indicates  the data type  of the value  returned
+        for each option.  Note that type  code means one  of a  mutually
+        exclusive set of  integer values  defined as  SQL_ constants  by
+        INCLUDE   ODBC    (e.g.   Sql_ACCESS_MODE    returns   one    of
+        SQL_MODE_READ_WRITE or SQL_MODE_READ_ONLY).
+
+        Certain options  also have  a default  value defined  for  them:
+        these are shown in the table. For any option whose value has not
+        previously been set, sql_connect_option will return the  default
+        if the option has one,  or pop_undef otherwise. In addition,  an
+        option with  a default  value  may be  set  to that  default  by
+        assigning the word "default" to the updater.
+
+        See SQLSetConnectOption for a description of each option.
+
+            conn_option             Type        Default
+            -----------             ----        -------
+            Sql_ACCESS_MODE         code        SQL_MODE_READ_WRITE
+            Sql_AUTOCOMMIT          boolean     true
+            Sql_CURRENT_QUALIFIER   string
+            Sql_LOGIN_TIMEOUT       integer     15
+            Sql_ODBC_CURSORS        code        SQL_CUR_USE_DRIVER
+            Sql_OPT_TRACE           boolean     false
+            Sql_OPT_TRACEFILE       string
+            Sql_PACKET_SIZE         integer
+            Sql_TRANSLATE_DLL       string
+            Sql_TRANSLATE_OPTION    integer
+            Sql_TXN_ISOLATION       code
+
+
+sql_statement_option(hstmt, stmt_option) -> value            [procedure]
+value -> sql_statement_option(hstmt, stmt_option)
+        Calls SQLGetStmtOption/SQLSetStmtOption to access or update  the
+        value of a specified option setting for the statement hstmt.
+
+        stmt_option specifies the option,  and must be  one of the  Sql_
+        descriptors listed below (and defined in INCLUDE * ODBC).
+
+        The table below indicates  the data type  of the value  returned
+        for each option.  Note that type  code means one  of a  mutually
+        exclusive set of  integer values  defined as  SQL_ constants  by
+        INCLUDE   ODBC    (e.g.   Sql_ACCESS_MODE    returns   one    of
+        SQL_MODE_READ_WRITE or SQL_MODE_READ_ONLY).
+
+        Certain options  also have  a default  value defined  for  them:
+        these are shown in the table. For any option whose value has not
+        previously  been  set,  sql_statement_option  will  return   the
+        default if  the  option  has one,  or  pop_undef  otherwise.  In
+        addition, an option  with a  default value  may be  set to  that
+        default by assigning the word "default" to the updater.
+
+        Note that the Sql_ASYNC_ENABLE option is special insofar as  its
+        value is  false  or  a  procedure.  See  Asynchronous  Statement
+        Processing below.
+
+        See SQLSetStmtOption for a description of each option.
+
+            stmt_option             Type        Default
+            -----------             ----        -------
+            Sql_ASYNC_ENABLE        boolean     false
+            Sql_CONCURRENCY         code        SQL_CONCUR_READ_ONLY
+            Sql_CURSOR_TYPE         code        SQL_CURSOR_FORWARD_ONLY
+            Sql_KEYSET_SIZE         integer     0
+            Sql_MAX_LENGTH          integer     0
+            Sql_MAX_ROWS            integer     0
+            Sql_NOSCAN              boolean     false
+            Sql_QUERY_TIMEOUT       integer     0
+            Sql_RETRIEVE_DATA       boolean     true
+            Sql_ROWSET_SIZE         integer     1
+            Sql_SIMULATE_CURSOR     code
+            Sql_USE_BOOKMARKS       boolean     false
+
+        The following options  are read-only (i.e.  may be accessed  but
+        not set, see SQLGetStmtOption):
+
+            Sql_GET_BOOKMARK        integer
+            Sql_ROW_NUMBER          integer
+
+        There is also the following option, which is special to LIB ODBC
+        (and is  used by  * sql_extended_fetch when  Sql_ROWSET_SIZE  is
+        greater than 1):
+
+            Sql_LONG_DATA_MAX       integer     2047
+
+
+
+
+-------------------------
+7  Preparing SQL Requests
+-------------------------
+
+sql_alloc_statement(hdbc) -> hstmt                           [procedure]
+        Calls SQLAllocStmt to allocate a  new statement handle hstmt  on
+        the connection hdbc.
+
+
+sql_prepare(hstmt, sql_string)                               [procedure]
+        Calls SQLPrepare  to  prepare  the  SQL  string  sql_string  for
+        execution on the statement hstmt. All parameters and columns  on
+        hstmt are unbound first.
+
+
+sql_num_parameters(hstmt) -> num_parameters                  [procedure]
+        (Extension Level  2) Returns  the number  of parameters  in  the
+        prepared statement hstmt (by calling SQLNumParams).
+
+
+sql_describe_parameter(hstmt, N) -> (sql_type, nullable)     [procedure]
+sql_describe_parameter(hstmt, N, unsigned)
+                                 -> (sql_type, nullable)
+        (Extension Level 2) Returns  the LIB ODBC SQL  type of the  N-th
+        parameter  in   the  prepared   statement  hstmt   (by   calling
+        SQLDescribeParam).
+
+        The  nullable  result  is   one  of  the  values   SQL_NO_NULLS,
+        SQL_NULLABLE     or     SQL_NULLABLE_UNKNOWN     (defined     in
+        INCLUDE * ODBC).
+
+        Because SQLDescribeParam  does  not provide  any  indication  of
+        whether whether  an  integer type  is  signed or  unsigned,  the
+        optional boolean  argument unsigned  may  be supplied:  this  is
+        passed as  the last  argument  to * sql_cons_sql_type  when  the
+        sql_type result is constructed (and defaults to false).
+
+
+
+sql_bind_parameter(hstmt, N, DATA_BUFF, sql_type)            [procedure]
+sql_bind_parameter(hstmt, N, DATA_BUFF, sql_type, pop_type)
+sql_bind_parameter(hstmt, N, DATA_BUFF, sql_type, pop_type,
+                                                param_type)
+        Binds a  buffer for  the N-th  parameter marker  in a  statement
+        hstmt (where N >= 1). This procedure calls SQLBindParameter.
+
+        DATA_BUFF specifies the buffer mechanism, and represents  either
+        one or two arguments. These  are described fully in the  section
+        Data Input/Output Modes above.
+
+        sql_type specifies the LIB ODBC  SQL type of the parameter,  and
+        must be one of the Sql_ types listed under SQL Data Types above.
+
+        pop_type is  an optional  Pop data  type for  the parameter;  if
+        supplied, it must be  one of the Sql_P_  types listed under  Pop
+        Data Types above.  If pop_type  is omitted, it  defaults to  the
+        default Pop type for sql_type (see SQL Data Types).
+
+        param_type is an optional parameter type, and must be one of the
+        constants     SQL_PARAM_INPUT,     SQL_PARAM_INPUT_OUTPUT     or
+        SQL_PARAM_OUTPUT  defined  in  INCLUDE * ODBC.  If  omitted,  it
+        defaults  to  SQL_PARAM_INPUT.  (Note  that  if  param_type   is
+        supplied, pop_type is mandatory; however, in this case  pop_type
+        may be false to mean use the default Pop type for sql_type.)
+
+        The form
+
+                sql_bind_parameter(hstmt, "*", false);
+
+        may also be used to unbind all parameters on hstmt (there is  no
+        mechanism for unbinding a single parameter).
+
+
+sql_cursor_name(hstmt) -> string_or_false                    [procedure]
+string_or_false -> sql_cursor_name(hstmt)
+        Returns or updates the  name of the  cursor associated with  the
+        statement hstmt.
+
+        The base procedure  call SQLGetCursorName to  access the  cursor
+        name. false is returned if there is no open cursor on hstmt (and
+        the updater has not been called to set an explicit name).
+
+        If the updater is given  a string, it calls SQLSetCursorName  to
+        associate a cursor name with hstmt (this may only be done before
+        the cursor is opened, i.e. before the statement is executed).
+
+        If the updater  is given  false, it calls  SQLFreeStmt with  the
+        SQL_CLOSE option to close the cursor. (However, note that if  an
+        explicit cursor name has been set, this remains associated  with
+        hstmt even  though  there is  no  open cursor;  hence  the  base
+        procedure will continue to return that name rather than false.)
+
+
+
+
+----------------------
+8  Submitting Requests
+----------------------
+
+sql_execute(hstmt)                                           [procedure]
+sql_execute(hstmt, sql_string)
+        In the first form, calls SQLExecute to execute an SQL  statement
+        hstmt already prepared with  * sql_prepare. In the second  form,
+        calls SQLExecDirect to execute the SQL statement sql_string.
+
+        In both cases, the current  values of any parameters bound  with
+        * sql_bind_parameter are  used for  the corresponding  parameter
+        markers in the statement.
+
+
+sql_native_sql(hdbc, sql_string) -> native_sql_string        [procedure]
+        (Extension  Level  2)  Given  a  connection  hdbc,  returns  the
+        driver's translation of the SQL statement string sql_string.
+
+
+
+
+------------------------------------------
+9  Retrieving Results & Result Information
+------------------------------------------
+
+sql_row_count(hstmt) -> row_count                            [procedure]
+        Calls SQLRowCount to return  the number of  rows affected by  an
+        UPDATE, INSERT or DELETE statement previously executed on  hstmt
+        (or alternatively,  by  an SQL_UPDATE,  SQL_ADD,  or  SQL_DELETE
+        operation with * sql_set_position).
+
+
+sql_num_result_columns(hstmt) -> num_columns                 [procedure]
+        Calls SQLNumResultCols to  return the number  of columns in  the
+        result set associated with the (prepared or executed)  statement
+        hstmt.
+
+        0 is returned  if hstmt  is a  statement that  did not  create a
+        result set.
+
+
+sql_describe_column(hstmt, N) -> (name, sql_type, nullable)  [procedure]
+        Returns the column name and LIB ODBC SQL type of the N-th column
+        in  the  result   set  on  the   statement  hstmt  (by   calling
+        SQLDescribeCol).
+
+        The  nullable  result  is   one  of  the  values   SQL_NO_NULLS,
+        SQL_NULLABLE     or     SQL_NULLABLE_UNKNOWN     (defined     in
+        INCLUDE * ODBC).
+
+        For integer types,  this procedure calls  * sql_column_attribute
+        to determine the  Sql_COLUMN_UNSIGNED attribute  of the  column,
+        which is then included in the sql_type result.
+
+
+sql_column_attribute(hstmt, N, col_attr) -> value            [procedure]
+        Calls SQLColAttributes  to  return  the  value  of  a  specified
+        attribute of the N-th column in a result set.
+
+        col_attr specifies the attribute,  and must be  one of the  Sql_
+        descriptors listed below (and defined in INCLUDE * ODBC).
+
+        The table below indicates  the data type  of the value  returned
+        for each attribute. Note that type code means one of a  mutually
+        exclusive set of  integer values  defined as  SQL_ constants  by
+        INCLUDE  ODBC   (e.g.   Sql_COLUMN_NULLABLE   returns   one   of
+        SQL_NO_NULLS, SQL_NULLABLE or SQL_NULLABLE_UNKNOWN).
+
+        See SQLColAttributes for a description of each attribute.
+
+            col_attr                        Type
+            --------                        ----
+            Sql_COLUMN_AUTO_INCREMENT       boolean
+            Sql_COLUMN_CASE_SENSITIVE       boolean
+            Sql_COLUMN_COUNT                integer
+            Sql_COLUMN_DISPLAY_SIZE         integer
+            Sql_COLUMN_LABEL                string
+            Sql_COLUMN_LENGTH               integer
+            Sql_COLUMN_MONEY                boolean
+            Sql_COLUMN_NAME                 string
+            Sql_COLUMN_NULLABLE             code
+            Sql_COLUMN_OWNER_NAME           string
+            Sql_COLUMN_PRECISION            integer
+            Sql_COLUMN_QUALIFIER_NAME       string
+            Sql_COLUMN_SCALE                integer
+            Sql_COLUMN_SEARCHABLE           code
+            Sql_COLUMN_TABLE_NAME           string
+            Sql_COLUMN_TYPE                 integer
+            Sql_COLUMN_TYPE_NAME            string
+            Sql_COLUMN_UNSIGNED             boolean
+            Sql_COLUMN_UPDATABLE            code
+
+
+sql_bind_column(hstmt, N, DATA_BUFF)                         [procedure]
+sql_bind_column(hstmt, N, DATA_BUFF, pop_type)
+        Binds a buffer  for the  N-th column of  the result  set on  the
+        statement hstmt (where N >= 0).
+
+        DATA_BUFF specifies the buffer mechanism, and represents  either
+        one or two arguments. These  are described fully in the  section
+        Data Input/Output Modes above.
+
+        pop_type is  an  optional  Pop  data type  for  the  column;  if
+        supplied, it must be  one of the Sql_P_  types listed under  Pop
+        Data Types above.  If pop_type  is omitted, it  defaults to  the
+        default Pop type for  the SQL type of  the column (see SQL  Data
+        Types). For N = 0  (i.e. binding the bookmark column),  pop_type
+        defaults to Sql_P_bookmark.
+
+        The forms
+
+                sql_bind_column(hstmt, N, false);
+                sql_bind_column(hstmt, "*", false);
+
+        can also be used to unbind either a single column or all columns
+        on hstmt.
+
+        (N.B.  In  general,  sql_bind_column  does  not  actually   call
+        SQLBindCol -- this is because sql_fetch uses SQLGetData to fetch
+        the data  for  all  columns.  Hence any  errors  that  might  be
+        expected from SQLBindCol  will instead  occur during  sql_fetch.
+        The same is true for * sql_extended_fetch with a rowset size  of
+        1; however, sql_extended_fetch with a rowset size greater than 1
+        does call SQLBindCol.)
+
+
+sql_fetch(hstmt) -> data_found                               [procedure]
+        Calls SQLFetch to fetch the next row of data from the result set
+        on the statement hstmt.
+
+        If a row was fetched,  any columns bound with  * sql_bind_column
+        have data transferred to their buffers (by calls to SQLGetData),
+        and true is returned.
+
+        false is returned when there are no rows left.
+
+
+sql_app_result_set(hstmt, col_select, app_p)                 [procedure]
+sql_app_result_set(hstmt, col_select, init_p, app_p)
+        A convenience procedure that enables processing of a result  set
+        without explicit  use  of  sql_bind_column  and  sql_fetch.  The
+        procedure app_p is applied to every row of the result set on the
+        statement hstmt.
+
+        The  col_select  argument  selects  the  column  numbers  to  be
+        processed,     which     can     range     between     1     and
+        sql_num_result_columns(hstmt) inclusive. col_select is a list of
+        column specifiers,
+
+                [ col_spec1 col_spec2 ... col_specM ]
+
+        where each  col_spec  is  either  a  col_num_spec  or  a  2-  or
+        3-element full vector whose first element is a col_num_spec:
+
+                { col_num_spec 1_or_2_bind_args }
+
+        A col_num_spec is either
+
+              # a single column number;
+
+              # a 2-element list  [first_col last_col], meaning  columns
+                first_col to last_col inclusive;
+
+              # the word "*", meaning all remaining columns.
+
+        (Note   that   column   numbers   outside   the   range   1   to
+        sql_num_result_columns(hstmt) are ignored.)
+
+        Every column  selected is  bound with  sql_bind_column. In  each
+        case, the main_id  identifier for  the first  DATA_BUFF item  to
+        sql_bind_column is generated automatically; if the col_spec that
+        selected a column is a vector, the remaining one or two elements
+        of  col_spec  are   passed  as  additional   arguments  to   the
+        sql_bind_column  call  for  that  column.  These  elements  thus
+        represent  the  mode  part  of  DATA_BUFF  and/or  the  pop_type
+        arguments to sql_bind_column.
+
+        For example, the col_select list
+
+                [ 1 [3 5] {[7 10] ^Sql_P_int} {* ^Sql_P_string} ]
+
+        selects columns 1,  3-5, 7-10  with pop_type  Sql_P_int, and  11
+        onwards with pop_type Sql_P_string. (With all columns  returning
+        data in Pop value mode.)
+
+        sql_fetch is then called  to fetch each row  of the result  set.
+        For each row,  app_p is  applied to the  set of  values for  the
+        selected columns, together with the number of columns  selected.
+        That is, if column numbers c1, ..., cN are selected, then  app_p
+        is called as
+
+            app_p(c1_val, c2_val, ..., cN_val, N);
+
+        where each cI_val  is the  idval of the  main_id identifier  for
+        that column.
+
+        init_p Argument
+        The optional  procedure  argument  init_p  allows  some  initial
+        processing to be  done for  each selected  column. If  supplied,
+        then before fetching any  rows, init_p is  called once for  each
+        column c1,  ..., cN,  with hstmt  and the  column number  cI  as
+        arguments:
+
+                init_p(hstmt, cI) -> cI_results
+
+        Any results returned by init_p for  column cI will be saved  and
+        added as additional  (constant) arguments  following the  cI_val
+        argument to every call of app_p.  That is, app_p will be  called
+        as
+
+            app_p(c1_val, c1_results, c2_val, c2_results, ...,
+                                        cN_val, cN_results, nargs);
+
+        where nargs is the total number of arguments.
+
+        In addition, init_p is called an extra (N+1)-th time with  false
+        for the column number (which call must not return any  results).
+        This allows any final processing  to take place before  fetching
+        the row data.
+
+
+sql_extended_fetch(hstmt, fetch_type, row_num,               [procedure]
+                        row_status_vec)  -> nrows_or_false
+        (Extension Level 2)  Calls SQLExtendedFetch  to fetch  specified
+        row(s) from the result set on the statement hstmt.
+
+        The number of rows to be fetched is called the rowset size,  and
+        is determined by the * sql_statement_option Sql_ROWSET_SIZE.
+
+        Binding Buffers
+        For each row fetched,  any columns bound with  * sql_bind_column
+        have data transferred to  their buffers. If  the rowset size  is
+        greater than 1, the DATA_BUFF arguments to sql_bind_column  must
+        have supplied  full vectors  of appropriate  length rather  than
+        identifiers -- see Extended Fetch and Update above.
+
+        With a  rowset  size  of 1,  sql_extended_fetch  uses  the  same
+        mechanism as  sql_fetch  for fetching  data  (i.e.  SQLGetData).
+        However, with a rowset  size greater than  1, this mechanism  is
+        problematical  and   so   (currently),   the   first   call   of
+        sql_extended_fetch on an hstmt will cause all columns to  become
+        bound  with   SQLBindCol   instead.  The   latter   necessitates
+        allocating an internal buffer of sufficient size to hold all the
+        data for each column, and forces sql_extended_fetch to  impose a
+        limit on columns with LONG data types (i.e. Sql_LONGVARCHAR  and
+        Sql_LONGVARBINARY). This  limit  is  specified  by  the  special
+        * sql_statement_option  Sql_LONG_DATA_MAX,  and  represents  the
+        maximum number of bytes that should be allowed for a LONG column
+        of data  in a  single row.  Sql_LONG_DATA_MAX defaults  to  2047
+        bytes.
+
+        (Note: The row-wise binding facility of SQLExtendedFetch is  not
+        supported by sql_extended_fetch.)
+
+        fetch_type and row_num Arguments
+        The position  of the  rowset fetched  within the  result set  is
+        determined by  the  fetch_type  argument, either  alone,  or  in
+        conjunction with  the current  cursor  position or  the  row_num
+        argument, as shown below. (After a rowset is fetched, the cursor
+        is positioned on the first row of the rowset.)
+
+            fetch_type              Action
+            ----------              ------
+            SQL_FETCH_NEXT          Fetches  the  next  rowset.  If  the
+                                    cursor  is  positioned  before   the
+                                    start  of   the   result   set   (as
+                                    initially),  this  is  the  same  as
+                                    SQL_FETCH_FIRST.
+
+            SQL_FETCH_PRIOR         Fetches the previous rowset. If  the
+                                    cursor is positioned  after the  end
+                                    of the result set, this is the  same
+                                    as SQL_FETCH_LAST.
+
+            SQL_FETCH_RELATIVE      Fetches the rowset row_num rows from
+                                    the start of the current rowset;  if
+                                    row_num is 0, the current rowset  is
+                                    re-fetched.   If   the   cursor   is
+                                    positioned before the  start of  the
+                                    result set  and row_num  is  greater
+                                    than  0,   or  if   the  cursor   is
+                                    positioned  after  the  end  of  the
+                                    result set and row_num is less  than
+                                    0,   this    is    the    same    as
+                                    SQL_FETCH_ABSOLUTE.
+
+            SQL_FETCH_FIRST         Fetches  the  first  rowset  in  the
+                                    result set.
+
+            SQL_FETCH_LAST          Fetches the last complete rowset  in
+                                    the result set.
+
+            SQL_FETCH_ABSOLUTE      If  row_num  is   greater  than   0,
+                                    fetches the rowset  starting at  row
+                                    row_num; if row_num equals 0,  false
+                                    is  returned  (and  the  cursor   is
+                                    positioned before the  start of  the
+                                    result set); if row_num is less than
+                                    0, fetches  the rowset  starting  at
+                                    row L+row_num+1, where L is the last
+                                    row in the result set.
+
+            SQL_FETCH_BOOKMARK      Fetches the rowset starting with the
+                                    row whose bookmark is row_num.
+
+        The row_num argument is ignored  for those values of  fetch_type
+        that do  not require  it, and  may be  omitted in  these  cases;
+        fetch_type itself may  be omitted (together  with row_num)  when
+        the fetch type required is SQL_FETCH_NEXT.
+
+        row_status_vec Argument
+        The row_status_vec argument is optional; if supplied, it must be
+        a full vector  of length  greater than  or equal  to the  rowset
+        size. The elements  of this vector  are then set  to one of  the
+        following integer status values for each row fetched:
+
+                SQL_ROW_SUCCESS
+                SQL_ROW_DELETED
+                SQL_ROW_UPDATED
+                SQL_ROW_ADDED
+                SQL_ROW_ERROR
+
+        Any remaining elements of row_status_vec for unfetched rows  (up
+        to the rowset size) are  set to SQL_ROW_NOROW. (As mentioned  in
+        Extended Fetch and Update above, rows with status SQL_ROW_NOROW,
+        SQL_ROW_DELETED or  SQL_ROW_ERROR  have  their  main_id/main_vec
+        column buffer entries set to termin.)
+
+        Note that  row_status_vec  is saved  inside  hstmt so  that  its
+        elements   may   be   modified   by   a   subsequent   call   to
+        * sql_set_position.
+
+        Result
+        sql_extended_fetch returns the actual number of rows fetched, or
+        false at end-of-stream in either direction.
+
+
+sql_set_position(hstmt, row_num, operation, lock)            [procedure]
+        (Extension Level 2) Following a call to * sql_extended_fetch  to
+        fetch a rowset from  the statement hstmt, sql_set_position  sets
+        the cursor position within the rowset, and allows an application
+        to refresh,  update, delete  or add  data to  the rowset.  (This
+        procedure calls SQLSetPos.)
+
+        The row_num argument specifies the row number within the  rowset
+        on which to  perform the  operation, or  is 0  if the  operation
+        should be performed on  all rows in the  rowset (0 is not  valid
+        for operation = SQL_POSITION).  Except for operation =  SQL_ADD,
+        row_num must be less than or equal to the rowset size.
+
+        The operation argument specifies the operation to be  performed,
+        as follows:
+
+            operation       Action
+            ---------       ------
+            SQL_POSITION    Sets the cursor on row number row_num.
+
+            SQL_REFRESH     If row_num is  nonzero, sets  the cursor  on
+                            row number row_num, and re-fetches the  data
+                            for that row;  if row_num  is 0,  re-fetches
+                            the data  for all  rows in  the rowset  (and
+                            leaves the cursor position unchanged).
+
+            SQL_UPDATE      If row_num is  nonzero, sets  the cursor  on
+                            row number row_num, and then updates the row
+                            from the column  buffers; if  row_num is  0,
+                            updates all rows in  the rowset (and  leaves
+                            the cursor  position unchanged).  Note  that
+                            columns   whose   main_id/main_vec    buffer
+                            entries for  the updated  row(s) are  termin
+                            will be  ignored  (see  Extended  Fetch  and
+                            Update above).
+
+            SQL_DELETE      If row_num is  nonzero, sets  the cursor  on
+                            row number  row_num,  and then  deletes  the
+                            underlying row; if row_num is 0, deletes all
+                            rows in the  rowset (and  leaves the  cursor
+                            position unchanged).
+
+            SQL_ADD         If row_num  is nonzero,  adds a  new row  of
+                            data to the  data source,  using the  column
+                            buffer entries  for  row_num (which  may  be
+                            greater than the rowset size, providing  all
+                            main_vec  buffers   have   a   corresponding
+                            element). If row_num is 0, adds  rowset-size
+                            new  rows.  Unbound   columns  (or   columns
+                            containing  termin  for  a  row)  will   use
+                            default or NULL values in the new row(s).
+
+        The operation argument may be omitted provided the lock argument
+        is also; in this case,  operation defaults to SQL_POSITION  (and
+        lock to SQL_LOCK_NO_CHANGE).
+
+        Note that if a row_status_vec was supplied to the preceding call
+        of sql_extended_fetch,  all operations  except SQL_POSITION  may
+        modify the elements of row_status_vec to reflect the new  status
+        of row(s) affected by the operation.
+
+        The lock argument is  optional; if supplied, it  must be one  of
+        SQL_LOCK_NO_CHANGE   (the   default),   SQL_LOCK_EXCLUSIVE    or
+        SQL_LOCK_UNLOCK. See SQLSetPos for more details.
+
+
+
+
+----------------------------------------
+10  Data Source System Table Information
+----------------------------------------
+
+sql_select_columns(hstmt, tab_qual, tab_owner, tab_name,     [procedure]
+                                                col_name)
+        Calls SQLColumns to create a  result set on the statement  hstmt
+        describing the columns in specified tables on the data source.
+
+        tab_qual, tab_owner, tab_name and col_name are respectively  the
+        table qualifier name, table owner  name, table name, and  column
+        name arguments to SQLColumns, and may each be a string or  false
+        (the latter meaning pass a NULL pointer for the argument).
+
+        See SQLColumns for more details.
+
+
+sql_select_special_columns(hstmt, col_type, tab_qual,        [procedure]
+                    tab_owner, tab_name, scope, nullable)
+        Calls SQLSpecialColumns to create a result set on the  statement
+        hstmt describing special columns in specified tables on the data
+        source.
+
+        col_type must be either SQL_BEST_ROWID or SQL_ROWVER.
+
+        tab_qual, tab_owner  and  tab_name are  respectively  the  table
+        qualifier name, table  owner name, and  table name arguments  to
+        SQLSpecialColumns, and may each be a string or false (the latter
+        meaning pass a NULL pointer for the argument).
+
+        scope  is  one  of  SQL_SCOPE_CURROW,  SQL_SCOPE_TRANSACTION  or
+        SQL_SCOPE_SESSION;   nullable   is   either   SQL_NO_NULLS    or
+        SQL_NULLABLE.
+
+        See SQLSpecialColumns for more details.
+
+
+sql_select_statistics(hstmt, tab_qual, tab_owner, tab_name,  [procedure]
+                                        unique, accuracy)
+        Calls SQLStatistics  to create  a result  set on  the  statement
+        hstmt describing statistics  and indexes for  a single table  on
+        the data source.
+
+        tab_qual, tab_owner,  and tab_name  are respectively  the  table
+        qualifier name, table  owner name, and  table name arguments  to
+        SQLStatistics. tab_qual and tab_owner may  be a string or  false
+        (the latter  meaning  pass a  NULL  pointer for  the  argument);
+        tab_name must be string.
+
+        unique is either SQL_INDEX_UNIQUE or SQL_INDEX_ALL; accuracy  is
+        either SQL_ENSURE or SQL_QUICK.
+
+        See SQLStatistics for more details.
+
+
+sql_select_tables(hstmt, tab_qual, tab_owner, tab_name,      [procedure]
+                                                tab_type)
+        Calls SQLTables to create  a result set  on the statement  hstmt
+        listing the tables available on the data source.
+
+        tab_qual, tab_owner, tab_name and tab_type are respectively  the
+        table qualifier name,  table owner name,  table name, and  table
+        type arguments to SQLTables, and may  each be a string or  false
+        (the latter meaning pass a NULL pointer for the argument).
+
+        See SQLTables for more details.
+
+
+sql_select_column_privileges(hstmt, tab_qual, tab_owner,    [procedure]
+                                    tab_name, col_name)
+        (Extension Level 2) Calls SQLColumnPrivileges to create a result
+        set on the statement hstmt describing the associated  privileges
+        of columns in specified tables on the data source.
+
+        tab_qual, tab_owner, tab_name and col_name are respectively  the
+        table qualifier name, table owner  name, table name, and  column
+        name arguments to SQLColumnPrivileges, and may each be a  string
+        or false  (the  latter  meaning  pass a  NULL  pointer  for  the
+        argument).
+
+        See SQLColumnPrivileges for more details.
+
+
+sql_select_table_privileges(hstmt, tab_qual, tab_owner,      [procedure]
+                                                tab_name)
+        (Extension Level 2) Calls SQLTablePrivileges to create a  result
+        set on  the  statement hstmt  describing  privilege  information
+        about tables on the data source.
+
+        tab_qual, tab_owner  and  tab_name are  respectively  the  table
+        qualifier name, table  owner name  and table  name arguments  to
+        SQLTablePrivileges, and  may  each be  a  string or  false  (the
+        latter meaning pass a NULL pointer for the argument).
+
+        See SQLTablePrivileges for more details.
+
+
+sql_select_primary_keys(hstmt, tab_qual, tab_owner,          [procedure]
+                                                tab_name)
+        (Extension Level 2) Calls SQLPrimaryKeys to create a result  set
+        on the statement  hstmt listing the  column names that  comprise
+        the primary key for a specified table.
+
+        tab_qual, tab_owner,  and tab_name  are respectively  the  table
+        qualifier name, table  owner name, and  table name arguments  to
+        SQLPrimaryKeys . tab_qual and tab_owner may be a string or false
+        (the latter  meaning  pass a  NULL  pointer for  the  argument);
+        tab_name must be string.
+
+        See SQLPrimaryKeys for more details.
+
+
+sql_select_foreign_keys(hstmt,                               [procedure]
+                        pktab_qual, pktab_owner, pktab_name,
+                        fktab_qual, fktab_owner, fktab_name)
+        (Extension Level 2) Calls SQLForeignKeys to create a result  set
+        on the  statement  hstmt listing  foreign  keys in  a  specified
+        table.
+
+        pktab_qual, pktab_owner  and  pktab_name  are  respectively  the
+        primary key table  qualifier name,  table owner  name and  table
+        name arguments  to SQLForeignKeys;  fktab_qual, fktab_owner  and
+        fktab_name are  respectively  the foreign  key  table  qualifier
+        name,  table   owner   name   and  table   name   arguments   to
+        SQLForeignKeys.
+
+        All these arguments may be a string or false (the latter meaning
+        pass a  NULL  pointer  for the  argument),  except  that  either
+        pktab_name or fktab_name (or both) must be a string.
+
+        See SQLForeignKeys for more details.
+
+
+
+
+----------------------------------------
+11  Terminating Statements & Connections
+----------------------------------------
+
+sql_transact(hdbc)                                           [procedure]
+sql_transact(hdbc, commit)
+        Calls SQLTransact to commit or rollback all active operations on
+        all statements associated with the connection hdbc.
+
+        The optional boolean argument commit  is true for commit,  false
+        for rollback, and defaults to true if omitted.
+
+        The form
+
+                sql_transact(false, commit);
+
+        may also be used to  perform a commit/rollback operation on  all
+        current connections.
+
+        Note that  the * sql_connect_option  SQL_AUTOCOMMIT is  true  by
+        default on any  connection, and  causes all  transactions to  be
+        committed automatically. See SQLTransact for further details.
+
+
+sql_free_statement(hstmt)                                    [procedure]
+        Calls  SQLFreeStmt  (with  operation   SQL_DROP)  to  free   the
+        statement hstmt  and  release all  associated  resources.  (This
+        procedure is the * sys_process_destroy_action of every hstmt.)
+
+
+sql_disconnect(hdbc)                                         [procedure]
+        Calls SQLDisconnect to close the connection hdbc and release all
+        associated     resources.     (This     procedure     is     the
+        * sys_process_destroy_action of every hdbc.)
+
+
+
+
+-------------------------------------
+12  Asynchronous Statement Processing
+-------------------------------------
+
+Providing a given  driver supports  it, the  Sql_ASYNC_ENABLE option  to
+* sql_statement_option enables  processing  on  a  statement  to  happen
+asynchronously.
+
+In this mode, calls to certain ODBC C functions (such as SQLExecute  and
+SQLFetch) initiate  an operation  on  a statement  and then  return  the
+status code  SQL_STILL_EXECUTING.  The  function  must  then  be  called
+repeatedly to  determine whether  processing  has finished  (i.e.  until
+something other than SQL_STILL_EXECUTING is returned).
+
+The corresponding LIB ODBC procedures handle this by repeatedly  calling
+the underlying  C function  in a  loop, with  a 'wait'  procedure  being
+called each time the function returns SQL_STILL_EXECUTING.
+
+The wait procedure used is the value of the Sql_ASYNC_ENABLE option  for
+the hstmt.  If true  is  assigned to  the  option value,  the  procedure
+defaults to syssleep(%1%), but any suitable procedure can be used.
+
+In particular,  either  an individual  LIB  ODBC procedure  or  a  whole
+application can be  run as a  process (see REF * PROCESS),  with a  wait
+procedure that suspends the process. A timer can then resume the process
+at appropriate intervals, or (more efficiently), use  sql_statement_busy
+to test  if the  statement has  finished executing  before resuming  the
+process.
+
+
+sql_statement_busy(hstmt) -> busy                            [procedure]
+false -> sql_statement_busy(hstmt)
+        The base procedure returns true if the statement hstmt is  busy,
+        i.e. has an asynchronous operation  still in progress. false  is
+        returned otherwise.
+
+        The  updater  is  an  interface  to  SQLCancel,  and  allows  an
+        asynchronous operation  on hstmt  to be  cancelled by  assigning
+        false (any other value is ignored).
+
+
+The LIB ODBC procedures that can  call a wait procedure if  asynchronous
+processing has been enabled on their hstmt argument are listed below.
+
+    * sql_app_result_set
+    * sql_column_attribute
+    * sql_describe_column
+    * sql_describe_parameter
+    * sql_execute
+    * sql_extended_fetch
+    * sql_fetch
+    * sql_num_parameters
+    * sql_num_result_columns
+    * sql_prepare
+    * sql_select_column_privileges
+    * sql_select_columns
+    * sql_select_foreign_keys
+    * sql_select_primary_keys
+    * sql_select_special_columns
+    * sql_select_statistics
+    * sql_select_table_privileges
+    * sql_select_tables
+    * sql_select_types
+    * sql_set_position
+
+
+
+
+------------
+13  Examples
+------------
+
+The following two examples are Pop-11 translations of the the C examples
+given in Chapter 10 of ODBC SDK Programmer's Reference.
+
+
+13.1  Static SQL
+----------------
+
+include odbc.ph;
+
+define example1(conn_str);
+    lvars   ID, Name, hdbc, hstmt;
+
+    ;;; Connect to conn_str (which may be a string in DriverConnect
+    ;;; format, or a list [^server ^user ^password] etc).
+
+    sql_connect(conn_str) -> hdbc;
+
+    ;;; allocate a statement handle
+
+    sql_alloc_statement(hdbc) -> hstmt;
+
+    ;;; EXEC SQL CREATE TABLE NAMEID (ID integer, NAME varchar(50));
+    ;;; Execute the SQL statement
+
+    sql_execute(hstmt,
+                  'CREATE TABLE NAMEID (ID INTEGER, NAME VARCHAR(50))');
+
+    ;;; EXEC SQL COMMIT WORK;
+    ;;; Commit the table creation.
+    ;;; (Note that the default transaction mode is auto-commit
+    ;;; and sql_transact has no effect.)
+
+    sql_transact(hdbc);
+
+    ;;; EXEC SQL INSERT INTO NAMEID VALUES (:id, :name);
+    ;;; Show the use of the sql_prepare/sql_execute method:
+    ;;; Prepare the insertion and bind parameters;
+    ;;; Assign parameter values;
+
+    sql_prepare(hstmt, 'INSERT INTO NAMEID VALUES (?, ?)');
+    sql_bind_parameter(hstmt, 1, ident ID,   Sql_INTEGER);
+    sql_bind_parameter(hstmt, 2, ident Name, Sql_VARCHAR(50));
+
+    ;;; Execute the insertions.
+
+    (500, 'Babbage') -> (ID, Name);
+    sql_execute(hstmt);
+    (600, 'Turing') -> (ID, Name);
+    sql_execute(hstmt);
+
+    ;;; EXEC SQL COMMIT WORK;
+    ;;; Commit the insertions
+
+    sql_transact(hdbc);
+
+    ;;; EXEC SQL DECLARE c1 CURSOR FOR SELECT ID, NAME FROM NAMEID;
+    ;;; EXEC SQL OPEN c1;
+    ;;; Show the use of the sql_execute direct method.
+    ;;; Execute the selection.
+    ;;; (Note that the application does not declare a cursor name.)
+
+    sql_execute(hstmt, 'SELECT ID, NAME FROM NAMEID');
+
+    ;;; EXEC SQL FETCH c1 INTO :id, :name;
+    ;;; Bind the columns of the result set with sql_bind_column.
+    ;;; Fetch and print all rows.
+
+    sql_bind_column(hstmt, 1, ident ID);
+    sql_bind_column(hstmt, 2, ident Name);
+
+    while sql_fetch(hstmt) do
+        [ID ^ID Name ^Name] ==>
+    endwhile;
+
+    sql_transact(hdbc);
+    sql_disconnect(hdbc);
+enddefine;
+
+
+13.2  Ad Hoc Query
+------------------
+
+include odbc.ph;
+
+define example2(conn_str, sql_string);
+    lvars   nresultcols, rowcount, N, id, name, dsize, col_list, col,
+            hdbc, hstmt;
+
+    sql_connect(conn_str) -> hdbc;
+    sql_alloc_statement(hdbc) -> hstmt;
+
+    ;;; Execute the given SQL statement
+
+    sql_execute(hstmt, sql_string);
+
+    ;;; See what kind of statement it was. If there are no result
+    ;;; columns, the statement is not a SELECT. If the number of
+    ;;; affected rows is greater than 0, the statement was probably an
+    ;;; UPDATE, INSERT or DELETE, so print the number of affected rows.
+    ;;; If the  number of affected rows is 0, print that the operation
+    ;;; was successful and commit it.
+
+    sql_num_result_columns(hstmt) -> nresultcols;
+
+    if nresultcols == 0 then
+        sql_row_count(hstmt) -> rowcount;
+        if rowcount == 0 then
+            printf('%p rows affected.\n', [^rowcount])
+        else
+            printf('Operation successful.\n')
+        endif;
+
+    ;;; Otherwise, use sql_column_attribute to get and display the
+    ;;; column names of the result set, and also to find the display
+    ;;; size needed for each column. Then bind each column (specifying
+    ;;; that all data should be converted to string format), and make a
+    ;;; list of columns in which each element contains the id and the
+    ;;; display size for that column. Finally, fetch and print each row.
+
+    else
+        [%  for N to nresultcols do
+                sql_column_attribute(hstmt, N, Sql_COLUMN_NAME) -> name;
+                sql_column_attribute(hstmt, N, Sql_COLUMN_DISPLAY_SIZE)
+                                                    -> dsize;
+                max(dsize, datalength(name)) + 1 -> dsize;
+                pr_field(name, dsize, false, `\s`);
+                consident(0, 0, "lex") -> id;
+                sql_bind_column(hstmt, N, id, Sql_P_string);
+                [^id ^dsize]
+            endfor
+        %] -> col_list;
+        cucharout(`\n`);
+
+        while sql_fetch(hstmt) do
+            for col in col_list do
+                dl(col) -> (id, dsize);
+                pr_field(idval(id), dsize, false, `\s`);
+            endfor;
+            cucharout(`\n`)
+        endwhile
+    endif;
+
+    sql_transact(hdbc);
+    sql_disconnect(hdbc)
+enddefine;
+
+
+...  Using sql_app_result_set
+-----------------------------
+Another version of example2, but using * sql_app_result_set.
+
+
+define example2(conn_str, sql_string);
+    lvars   nresultcols, rowcount, hdbc, hstmt;
+
+    sql_connect(conn_str) -> hdbc;
+    sql_alloc_statement(hdbc) -> hstmt;
+    sql_execute(hstmt, sql_string);
+    sql_num_result_columns(hstmt) -> nresultcols;
+
+    if nresultcols == 0 then
+        sql_row_count(hstmt) -> rowcount;
+        if rowcount == 0 then
+            printf('%p rows affected.\n', [^rowcount])
+        else
+            printf('Operation successful.\n')
+        endif;
+
+    else
+        define init_col(hstmt, N);
+            lvars name, dsize;
+            if N then
+                sql_column_attribute(hstmt, N, Sql_COLUMN_NAME) -> name;
+                sql_column_attribute(hstmt, N, Sql_COLUMN_DISPLAY_SIZE)
+                                                -> dsize;
+                max(dsize, datalength(name)) + 1 -> dsize;
+                pr_field(name, dsize, false, `\s`);
+                dsize;      ;;; return dsize
+            else
+                cucharout(`\n`)
+            endif
+        enddefine;
+
+        ;;; For each row, this procedure will be given nresultcols * 2
+        ;;; arguments, the column value and dsize for each column
+        define pr_col(nargs);
+            lvars i;
+            for i from nargs by -2 to 2 do
+                pr_field(subscr_stack(i), subscr_stack(i), false, `\s`)
+            endfor;
+            erasenum(nargs);
+            cucharout(`\n`)
+        enddefine;
+
+        sql_app_result_set(hstmt, [{* ^Sql_P_string}], init_col,
+                                                            pr_col);
+    endif;
+
+    sql_transact(hdbc);
+    sql_disconnect(hdbc)
+enddefine;
+
+
+
+
+--- C.all/ref/odbc
+--- Copyright University of Sussex 1996. All rights reserved.

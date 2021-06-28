@@ -1,0 +1,696 @@
+REF PROGLIST                                        John Gibson Oct 1992
+
+       COPYRIGHT University of Sussex 1993. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<    THE PROGLIST VARIABLE    >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+Poplog provides the global  permanent variable proglist  for use as  the
+input item stream by many system modules, including the Pop-11 compiler.
+This  file  describes  the  procedures  and  variables  associated  with
+proglist.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+
+  2   Reading Items from Proglist
+
+  3   Reading Items with Macro Expansion
+
+  4   Proglist-Related Permanent Macros
+
+  5   Including a File in the Current Compilation Stream
+
+  6   Proglist State Variables
+
+
+
+---------------
+1  Introduction
+---------------
+
+A standard requirement for  compilers and other  utilities in Poplog  is
+the ability to read source text in itemised (or 'tokenised') form,  that
+is, to have  an input  character stream lexically  analysed into  words,
+numbers, strings, etc. This  process can be  performed, for example,  by
+the item repeater procedures constructed by * incharitem from  character
+repeaters (see REF * CHARIO and REF * ITEMISE).
+
+    For programs which wish to process such an input item stream, it  is
+particularly convenient to do so via a dynamic list constructed from the
+item repeater (see REF * LISTS for  a description of dynamic lists).  An
+item can then be  obtained simply by  taking the head  of the list,  and
+saved there until the next item is required (at which point the list can
+be tailed). Another advantage of this method is that extra items can  be
+inserted into the stream when necessary, by concatenation onto the front
+of the list (e.g. for macro expansion, see below).
+
+    Because many parts of programs may require access to the item stream
+currently in use, it is also useful to define a standard location  where
+the input list can be found; for this reason, Poplog provides the global
+permanent variable proglist.  The list  (dynamic or  otherwise) in  this
+variable is  used as  the  input item  stream  by many  system  modules,
+including the Pop-11 compiler (see REF * POPCOMPILE).
+
+    Although proglist can be processed directly, it is conventional (and
+usually  more  convenient)  to  take  input  items  from  it  using  the
+item-reading procedures described below.  Of these procedures,  itemread
+and nextitem also provide a macro expansion facility.
+
+
+
+
+------------------------------
+2  Reading Items from Proglist
+------------------------------
+
+poplastitem -> item                                           [variable]
+item -> poplastitem
+        Contains the  last  item read  from  proglist with  readitem  or
+        itemread.
+
+
+readitem() -> item                                           [procedure]
+        Removes the next item from proglist and returns it. If  proglist
+        is null, then <termin> is  returned. The item returned is  saved
+        in poplastitem.
+
+
+nextreaditem() -> item                                       [procedure]
+        Returns the next item from proglist, but without removing it (so
+        that another  call of  nextreaditem will  return the  same  item
+        again). <termin> is returned if proglist is null.
+
+
+readtill(end_item) -> (item_1, item_2, ..., end_item)        [procedure]
+readtill(end_list) -> (item_1, item_2, ..., end_item)
+        Reads items with readitem until an item either equal to end_item
+        (first  form)  or  a  member   of  end_list  (second  form)   is
+        encountered. All items read, including the last, are returned.
+
+
+readline() -> list                                  [procedure variable]
+        The  standard  procedure  in  this  variable  reads  items  from
+        proglist (using readitem) until a newline is encountered.  (This
+        is done by setting popnewline true, so that newline is  returned
+        as a word.) The result is a list containing all the items  read,
+        excluding the newline.
+
+
+pop_readline_prompt -> string                                 [variable]
+string -> pop_readline_prompt
+        The item in this variable (default '?\s') is locally assigned to
+        popprompt during readline. See  REF * SYSIO for possible  values
+        of popprompt.
+
+
+requestline(prompt) -> list                                  [procedure]
+        Same as readline,  but with pop_readline_prompt  locally set  to
+        prompt.
+
+
+rdstringto(end_item) -> string                               [procedure]
+rdstringto(end_list) -> string
+        Reads items with readitem until an item either equal to end_item
+        (first  form)  or  a  member   of  end_list  (second  form)   is
+        encountered.
+
+        The result is  the string formed  by concatenating together  the
+        printed representations  of all  the items  read, EXCLUDING  the
+        last (the items are concatenated with sys_><, see REF * PRINT).
+
+
+readstringline() -> string                                   [procedure]
+        Reads a string of characters string up to (but not  including) a
+        newline or <termin>, in the following way:
+
+        If   proglist   is    an   unexpanded    dynamic   list,    then
+        nextchar(readitem) is used to  get the characters until  newline
+        or <termin> is encountered  (see REF * ITEMISE). Leading  spaces
+        are ignored; a  backslash \  character may be  used to  escape a
+        following newline, backslash, or leading  space when this is  to
+        be included in the string. Trailing spaces are also ignored.
+
+        Otherwise, if proglist actually contains some items already, the
+        result is
+
+                rdstringto([^newline ^termin])
+
+        (with popnewline set true).
+
+
+yesno(item) -> bool                                          [procedure]
+        Prints item (using  =>) then  uses readline  to read  a line  of
+        input; if the input is [yes] or [y] it returns true, if [no]  or
+        [n] it returns false, otherwise it prompts for input again.
+
+
+proglist_read_by(read_p) -> list                             [procedure]
+        Given any  procedure read_p  which  reads items  from  proglist,
+        executes read_p and returns a separate list of the items it read
+        (which are removed from proglist).
+
+        pop_syntax_only is locally set  true while read_p is  executing.
+        Thus if read_p is a procedure that compiles (e.g.) Pop-11  code,
+        the only effect  will be to  return the list  of items it  read,
+        without actually planting any Poplog VM code.
+
+
+exprread() -> list                                           [procedure]
+        Returns a list of Pop-11 items constituting an expression,  read
+        from proglist, for use  with LIB * FORM. See HELP * FORM.  (This
+        procedure is just proglist_read_by(%pop11_comp_expr%).)
+
+
+impread() -> list                                            [procedure]
+        Returns a  list  of  Pop-11  items  constituting  an  imperative
+        sequence separated by commas, read  from proglist, for use  with
+        the form macro. See HELP * FORMS.
+
+
+impseqread() -> list                                         [procedure]
+        Returns a  list  of Pop-11  items  constituting an  sequence  of
+        imperatives, separated  by  ",",";","=>", or  "==>",  read  from
+        proglist, for use with the form macro. See HELP * FORMS.
+
+
+listread() -> item                                           [procedure]
+        Reads either  a  single  item from  proglist,  or  a  bracketted
+        sequence of them. The outer (and nested) brackets may be  either
+        [ ... ] or { ... }. (Note that this is not the same as a  Pop-11
+        list or vector  constructor expression, in  that the  'evaluate'
+        keywords %, ^, and ^^ are not recognised.) See HELP * LISTREAD.
+
+
+numberread() -> number                                       [procedure]
+        Reads and returns the next  item from proglist, which must  be a
+        number.
+
+
+readimp(bool) -> list                                        [procedure]
+        Returns a list  of Pop-11 items  constituting an imperative  (if
+        bool is true), or a sequence of imperatives (if bool is  false),
+        read from proglist.
+
+
+varread() -> word                                            [procedure]
+        Returns a word read from proglist, for use with LIB * FORMS.
+
+
+
+
+-------------------------------------
+3  Reading Items with Macro Expansion
+-------------------------------------
+
+A macro is a word which is currently declared as a lexical or  permanent
+identifier with identprops "macro" (see REF * WORDS, * IDENT). When such
+a word is read from proglist using the procedures itemread and nextitem,
+it undergoes macro expansion, that is, the word is replaced in  proglist
+by a sequence  of items derived  from the value  of the identifier.  The
+item actually returned by the call  of itemread or nextitem is then  the
+first of these (unless  this is again a  macro, in which case  expansion
+proceeds recursively until the first item is not a macro). Thus a  macro
+can substitute itself in the input stream with any desired items.
+
+    The sequence of items into which a macro is expanded depends on  its
+identifier value, which may be either a procedure, a list, or any  other
+item (except an undef record):
+
+    # For a procedure, the expansion is  all the items left on the  user
+      stack by calling  it (i.e. the  topmost item on  the stack is  the
+      last in the  sequence). The  procedure is called  with the  next N
+      items from proglist (read with itemread) as its arguments, where N
+      is its * pdnargs.
+
+    # For a  list,  the  expansion  is all  the  elements  of  the  list
+      (possibly none).
+
+    # For any other  item, the  expansion is  that item.  A mishap  will
+      result if the item is an undef record (on the assumption that this
+      means the macro's value is undefined).
+
+Expansion is actually performed by collecting the items in a list  list,
+and then adding them to proglist with
+
+        list <> proglist -> proglist;
+
+after removal of  the macro  word itself  and any  arguments. (Thus  the
+original list pairs constituting proglist are not updated, which can  be
+important in some contexts -- see proglist_macro_pair below.)
+
+    Note that before checking  for a macro,  nextitem and itemread  will
+attempt to  autoload any  word which  is not  currently declared  as  an
+identifier (by  calling  * sys_autoload). This  permits  autoloading  of
+(permanent) macros, and is also the mechanism by which autoloading takes
+place in  Pop-11. (When  unwanted, this  can be  turned off  by  locally
+assigning false to * pop_autoload.)
+
+    If a macro word is required  to be read from proglist without  macro
+expansion, it must be preceded by the word "nonmac" (see below).
+
+
+itemread() -> item                                           [procedure]
+        After  expanding  macros  (and  possibly  autoloading  undefined
+        words),  returns  and  removes  the  next  non-macro  item  from
+        proglist. <termin> is  returned if  proglist is  null. The  item
+        returned is saved in poplastitem.
+
+
+nextitem() -> item                                           [procedure]
+        As for  itemread, but  does not  remove the  returned item  from
+        proglist (so that another call of nextitem will return the  same
+        item again).
+
+
+proglist_macro_pair -> list                                   [variable]
+list -> proglist_macro_pair
+        As described  above, macro  expansion  always creates  new  list
+        pairs to add to proglist, and does not update the original ones.
+        This variable provides a means for macro procedures to  actually
+        update the original proglist if they wish to.
+
+        When a macro procedure is applied, proglist_macro_pair holds the
+        list pair on proglist that actually contained the macro word (if
+        the macro has no  arguments, the next pair  on proglist will  be
+        the tl  of this  one).  Thus for  example, a  macro  producing a
+        single item  can, as  well as  returning it  as a  result,  also
+        assign it directly to
+
+            hd(proglist_macro_pair)
+
+        (alternatively,  it   can  do   the  latter   and  then   assign
+        proglist_macro_pair to proglist, returning no result).
+
+        Of particularly relevance in this  context are macros that  read
+        characters from  the input  stream using  * nextchar, which  can
+        fail to work properly with certain compilers (e.g. Pop-11)  that
+        expect to be able to read  sections of proglist more than  once.
+        The reason for this  is that on a  second or subsequent  reading
+        the original  proglist still  contains the  macro word,  but  no
+        longer has available the characters required by the macro (since
+        it has been itemised ahead of  that point). Macros of this  type
+        should therefore use  proglist_macro_pair to replace  themselves
+        directly, so that  re-reading of the  item stream will  function
+        correctly.
+
+
+
+
+------------------------------------
+4  Proglist-Related Permanent Macros
+------------------------------------
+
+nonmac                                                           [macro]
+        Escapes the next word on proglist as a macro, so that when  read
+        with nextitem or itemread the word will not be expanded. E.g. if
+        proglist is
+
+                    [nonmac foo ...]
+
+        where "foo" is a macro, then itemread() will produce "foo".  (On
+        the other hand, note that readitem() would produce "nonmac".)
+
+
+#_<                                                              [macro]
+>_#                                                              [macro]
+        #_< implements on-the-fly macros by allowing the evaluation of a
+        sequence of Pop-11 statements in the input stream. Its usage is
+
+                    #_< statement-sequence >_#
+
+        The statement sequence up to >_# is compiled and evaluated,  and
+        any items left on  the stack in so  doing are spliced back  onto
+        proglist in  place  of  the whole  construct.  For  example,  if
+        proglist is
+
+                    [ #_< 3 + 4 * 5 >_# ...]
+
+        then itemread() will return 23. Note that >_# is simply a  macro
+        that produces <termin>,  so that #_<  can compile the  statement
+        sequence to <termin>; in fact, this macro is just defined as
+
+           pop11_exec_compile(termin, pop11_comp_stmnt_seq_to, true) ->
+
+
+#_IF                                                             [macro]
+#_ELSEIF                                                         [macro]
+#_ELSE                                                           [macro]
+#_ELSE_ERROR                                                     [macro]
+#_ENDIF                                                          [macro]
+        These macros enable the conditional reading or skipping of items
+        in proglist. Their usage is
+
+                #_IF expression
+                    item-sequence
+                #_ELSEIF expression
+                    item-sequence
+                #_ELSEIF expression
+                    item-sequence
+                    ...
+                #_ELSE (or #_ELSE_ERROR)
+                    item-sequence
+                #_ENDIF
+
+        where the #_ELSEIF  and #_ELSE clauses  are optional, and  where
+        each Pop-11  expression  is  terminated  by  a  newline  as  for
+        readline (qv). The item-sequence may be empty.
+
+        Starting from the #_IF, each  expression occurring after a  #_IF
+        or #_ELSEIF is evaluated until one is found that returns a  true
+        result, item sequences  following a false  result being  skipped
+        without macro expansion. The sequence following the true result,
+        or that following a #_ELSE  if no expression evaluated to  true,
+        is then 'allowed through' in the sense that the current call  of
+        itemread etc and  subsequent calls will  return these items  (if
+        there is no true clause or #_ELSE then whatever item follows the
+        #_ENDIF will result).
+
+        #_ELSE_ERROR may be used instead of  a #_ELSE: in this case,  if
+        no expression  in the  corresponding  #_IF or  #_ELSEIF  clauses
+        evaluates to  true, the  mishap
+
+            NO CLAUSE SATISFIED IN #_IF
+
+        results.
+
+        These macros may be  nested to any depth,  i.e. any of the  item
+        sequences can contain further #_IF constructs.
+
+
+#_TERMIN_IF                                                      [macro]
+        This macro is followed by an expression like #_IF, i.e.
+
+                #_TERMIN_IF expression
+
+        If expression evaluates to true,  [] is assigned to proglist  to
+        terminate the current item stream.
+
+        It also clears  the internal stack  associated with #_IF,  which
+        means that  no  #_IF-associated  errors  will  result  from  the
+        premature end-of-file (but note  that this is NOT so for  Pop-11
+        closing brackets, e.g.
+
+            section;
+            #_TERMIN_IF true
+            endsection;
+
+        would produce an error).
+
+
+DEF                                                              [macro]
+DEFV                                                             [macro]
+        These macros enable  the status  of an identifier  to be  tested
+        with (for example) #_IF.
+
+        DEF takes an  identifier name  (either as  a word  or a  section
+        pathname) and  returns  true  if  the  identifier  is  currently
+        declared and has a non-false value. Otherwise it returns  false.
+        E.g.
+
+            #_IF DEF UNIX
+
+        will satisfy the #_IF if UNIX  is declared as an identifier  and
+        has  a  non-false  value.  The  test  for  being  declared  uses
+        * sys_current_ident, and so works for both lexical and permanent
+        identifiers.
+
+        DEFV is similar,  but combines the  test for declaration  with a
+        comparison of the identifier's value against a given number.  It
+        takes three  arguments:  the first  is  an identifier  name  (as
+        before), the second is one of the comparison operator names
+
+                =   /=   <   <=   >   >=
+
+        and the third is a (non-complex) number. It returns true if  the
+        same conditions as for  DEF hold, and in  addition the value  of
+        the identifier (which must be numeric) satisfies the  comparison
+        with the number. E.g.
+
+            #_IF DEFV VMS >= 5.3
+
+        will satisfy the #_IF if VMS is declared and has a numeric value
+        >= 5.3.
+
+        (Note, however, that before doing the comparison both values are
+        multiplied by 1000  and then rounded  to integers. This  enables
+        floating-point values -- which may  not be quite accurate --  to
+        be compared  sensibly. The  principal use  of this  macro is  in
+        comparing floating-point version numbers.)
+
+        INCLUDE * SYSDEFS defines a set of system-specific macros  (such
+        as UNIX, VMS, etc) which can be used in conjunction with DEF and
+        DEFV    for    controlling    conditional    compilation.    See
+        HELP * SYSDEFS.
+
+
+
+
+-----------------------------------------------------
+5  Including a File in the Current Compilation Stream
+-----------------------------------------------------
+
+#_INCLUDE                                                        [macro]
+        This macro enables the stream of  items from a given file to  be
+        spliced into proglist at its current point.
+
+        It takes  one  argument,  a  string  or  a  word  representing a
+        filename, which is passed to discin to open a character repeater
+        CHAR_REP for the file, e.g.
+
+            #_INCLUDE 'foo.ph'
+            #_INCLUDE baz
+
+        Note that discin  appends pop_default_type to  a word  argument;
+        #_INCLUDE locally adds an 'h' to  its current value, so that  if
+        e.g. pop_default_type  is  '.p', then  the  default for  a  word
+        argument to #_INCLUDE will be '.ph'.
+
+        The  current  values  of  proglist,  cucharin,  popfilename  and
+        poplinenum are then saved on a stack (-pop_#_include_stack-, see
+        below), and the latter 3  variables are set to have  appropriate
+        values for the new character repeater CHAR_REP. proglist is then
+        set with
+
+            pdtolist(incharitem(CHAR_REP)) -> proglist
+
+        so that the  item returned  by the itemread,  etc which  invoked
+        this macro  will  be the  first  item  of the  file.  When  this
+        proglist is  exhausted, the  previously  saved values  of  the 4
+        variables are unstacked  and restored,  and the  next item  read
+        will be the item following the #_INCLUDE argument.
+
+        Note that if isincharitem(itemread)  is true before proglist  is
+        set, i.e.  the existing  proglist was  producing items  from  an
+        incharitem repeater (see REF * ITEMISE), then the item  repeater
+        constructed from CHAR_REP is  given the same itemiser  character
+        types as the existing  one. Moreover, any  local changes to  the
+        character types of the new one are copied back when the original
+        proglist is restored. This makes #_INCLUDEing files  transparent
+        to local character type changes.
+
+        The macro include allows a search list of directories to be used
+        in connection with #_INCLUDE. See HELP * INCLUDE.
+
+
+include                                                          [macro]
+        This macro takes one argument, i.e.
+
+            include FILENAME
+
+        It searches through the directories named in popincludelist  for
+        an occurrence of a file with the given name, after appending, if
+        necessary, an appropriate file-type  such as '.ph' as  explained
+        in connection with * #_INCLUDE. include compiles the first  such
+        file found, as part  of the current  compilation stream so  that
+        top level lexically  scoped declarations are  accessible in  the
+        file containing the include  command. This makes it  unnecessary
+        to specify the full  path name of the  file to be included.  See
+        HELP * INCLUDE and REF * LIBRARY for further detail.
+
+
+popincludelist -> list                                        [variable]
+list -> popincludelist
+        This user-assignable variable is used  by the macro include.  It
+        holds a list  of directories  in which to  search for  "include"
+        files. See * #_INCLUDE, * include, LIB * INCLUDE.
+
+
+loadinclude                                                      [macro]
+        This macro behaves  exactly as  include, except  that the  given
+        file is compiled in  a separate compilation  stream (as if  with
+        compile), rather than being included in the current one.
+
+
+
+
+---------------------------
+6  Proglist State Variables
+---------------------------
+
+proglist has a number of associated global variables, some of which  are
+accessible to the user, some of which are not. The complete state of the
+input stream represented by proglist is returned by the active  variable
+proglist_state.  A  complete  state  for  a  new  input  source  can  be
+constructed with the procedure proglist_new_state, and then assigned  to
+proglist_state.
+
+
+proglist -> list                                              [variable]
+list -> proglist
+        The input list  of items  (possibly dynamic)  used by  readitem,
+        nextread, itemread and nextitem, etc.
+
+
+cucharin() -> char                                  [procedure variable]
+        Contains the character  repeater procedure currently  associated
+        with proglist. That is, if proglist  is a dynamic list which  is
+        producing items from a character repeater, then cucharin is that
+        repeater. When  proglist  is  not dynamic,  cucharin  will  be a
+        procedure that just returns <termin> when called.
+
+        Compilers set up  this variable when  setting up proglist  for a
+        new input  stream,  e.g. with  proglist_new_state  (see  below).
+        Changing this variable afterwards generally has no effect, since
+        compiler procedures do not reference it again.
+
+
+popfilename -> false_or_string                                [variable]
+        If cucharin is a  character repeater taking  input from a  named
+        file or  device,  then  this variable  contains  the  associated
+        filename. Otherwise, it contains false.
+
+        Compilers set up  this variable when  setting up proglist  for a
+        new input stream, e.g. with proglist_new_state (see below).
+
+        It is  used  in particular  by  sysprmessage, which  assumes  it
+        contains the name of the file currently being compiled, and  (if
+        not false), includes the line
+
+                FILE: popfilename LINE NUMBER: poplinenum
+
+        in mishap messages.
+
+
+poplinenum -> int                                             [variable]
+        If cucharin is a character repeater taking input from a file  or
+        device, then  this variable  contains  the current  line  number
+        within the file. It is incremented by discin character repeaters
+        and charin each time a newline is read (see REF * CHARIO).
+
+        Compilers set  this  variable  to 1  (or  as  appropriate)  when
+        setting  up  proglist  for  a   new  input  stream,  e.g.   with
+        proglist_new_state (see below).
+
+        Assumed by sysprmessage  to contain the  line number within  the
+        current file being compiled (cf popfilename above).
+
+
+pop_#_include_stack -> stack                        [protected variable]
+        This variable holds  the stack used  by #_INCLUDE, as  described
+        above.
+
+        false represents an  empty stack;  when the  stack is  non-empty
+        (i.e. when the current proglist  comes from a #_INCLUDEd  file),
+        its value  is  a  vector  containing the  saved  values  of  the
+        proglist-related global variables, i.e.
+
+            { ^proglist_state }
+
+        (which includes the stack variable itself).
+
+        Compiler startup procedures locally  set this variable to  false
+        by assigning  a  proglist_new_state  for an  input  source  to a
+        localised proglist_state, i.e.
+
+            dlocal proglist_state = proglist_new_state(source);
+
+        The  test  for  pop_#_include_stack  having  a  true  value  can
+        therefore be used to determine whether the current file is being
+        #_INCLUDEd or directly compiled.
+
+
+proglist_state -> (item1, ..., itemN)                  [active variable]
+(item1, ..., itemN) -> proglist_state
+        This active variable produces all the variables associated  with
+        proglist,  including  proglist  itself,  cucharin,  popfilename,
+        poplinenum, pop_#_include_stack, as well  as the internal  stack
+        associated with #_IF.
+
+        NOTE that the number and  disposition of the values produced  by
+        this variable are intended  to be opaque to  the user (i.e.  you
+        should not assume there  are any particular  number of them,  or
+        anything about  what the  values are).  The number,  meaning  or
+        ordering of  the values  may change  in future  versions of  the
+        system.
+
+        proglist_state is intended to be used only in two ways,  neither
+        of which conflicts with  the above: (1) to  save the state  in a
+        vector, as in
+
+                { ^proglist_state } -> save;
+
+        (after which
+
+                explode(save) -> proglist_state;
+
+        will restore the state), or (2) locally to a procedure, with  or
+        without an assignment from proglist_new_state, e.g.
+
+            dlocal proglist_state = proglist_new_state(list);
+
+        The above  is  the correct  way  to  locally assign  a  list  to
+        proglist; just localising and assigning proglist itself, i.e.
+
+                dlocal proglist = list;
+
+        MAY work  some  of  the  time, but  will  not  necessarily  work
+        correctly in  all  contexts (e.g  where  the #_INCLUDE  or  #_IF
+        stacks are non-empty).
+
+
+proglist_new_state(source) -> (item1, ..., itemN)            [procedure]
+        For a new  input source source,  returns a set  of values to  be
+        assigned to proglist_state.
+
+        In this set, pop_#_include_stack is false and the internal stack
+        associated with #_IF  is empty. The  state values for  proglist,
+        cucharin, popfilename and poplinenum are derived from the source
+        argument, as follows:
+
+        If source is a list (i.e. of items), then proglist is that list.
+        In this  case,  cucharin  is  a  procedure  that  just  produces
+        <termin> when called, and popfilename and poplinenum have  their
+        current values.
+
+        Otherwise, source may be  either a character repeater  procedure
+        directly, or an argument to be  given to discin to produce  one.
+        (I.e.  filename   string,  word,   or  device   record  --   see
+        REF * discin. Note that  when given a  word, discin will  append
+        pop_default_type to it for the resultant filename.)
+
+        In either  case, the  character repeater  char_rep is  then  the
+        value for cucharin, and the proglist value is the dynamic list
+
+                pdtolist(incharitem(char_rep))
+
+        The values for popfilename and  poplinenum are derived from  the
+        pdprops of  char_rep as  follows: if  the props  are a  filename
+        string (as will be the case  for a discin result), then this  is
+        popfilename and poplinenum is 1; if  the props are a pair,  then
+        the front is taken  as popfilename and  the back as  poplinenum;
+        otherwise, popfilename is false and poplinenum is 0.
+
+        As with proglist_state, the actual number and disposition of the
+        values produced by this  procedure are opaque  to the user.  The
+        state produced  should only  be assigned  to proglist_state  (or
+        saved in a vector, etc).
+
+
+
+--- C.all/ref/proglist
+--- Copyright University of Sussex 1993. All rights reserved.

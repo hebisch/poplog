@@ -1,0 +1,791 @@
+REF VEDSEARCH                                  Jonathan Meyer, Sept 1993
+
+      COPYRIGHT University of Sussex 1993. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<    VED SEARCH FACILITIES    >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+This file describes the Ved  regular expression search and  substitution
+facilities.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+
+  2   Search and Replace in Ved
+
+  3   Search Pattern Elements
+
+  4   Substitution Pattern Elements
+
+  5   Search Commands
+
+  6   Search and Substitute Commands
+
+  7   Creating New Search Commands
+
+  8   Information About the Last Search
+
+  9   Procedural Interface
+
+ 10   Search Variables
+
+ 10   Definition of "embedded"
+
+
+
+---------------
+1  Introduction
+---------------
+
+This document  describes  the  regular  expression  search  and  replace
+facilities found in Ved.
+
+If you are an experienced  Ved user wanting to  learn about the new  Ved
+search mechanism, read the section 'Notes for experienced Ved users'  in
+TEACH * VEDSEARCH.
+
+If you are an  experienced VI or  ED user, you  should read the  section
+'Notes for VI, ED, GREP and AWK users' in TEACH * VEDSEARCH.
+
+
+NOTE TO XVed USERS: Under XVed you can choose to have Ved  automatically
+select the matching text for a search. Either do:
+
+    <ENTER> xved SearchDoesSelect true
+
+or add the following to your .Xdefaults:
+
+    XVed*SearchDoesSelect: true
+
+See REF * XVED/SearchDoesSelect.
+
+
+
+
+----------------------------
+2  Search and Replace in Ved
+----------------------------
+
+In Ved  you  can  search  forward  or  backwards  looking  for  'regular
+expression' search patterns in files, ranges, procedures, lines, or even
+words. You can turn on and off case sensitivity, and specify whether the
+search should 'wrap-around' the end of  the search region. You can  also
+substitute matching strings with new strings.
+
+See TEACH * VEDSEARCH for examples showing how to search and  substitute
+text in Ved.
+
+For  full  details  of  how  to  form  search  patterns  using   regular
+expressions, see  REF * REGEXP  For a  high  level overview  of  regular
+expressions, see TEACH * REGEXP.
+
+
+
+
+--------------------------
+3  Search Pattern Elements
+--------------------------
+
+Search and substitute commands take strings specifying what to look for.
+These strings  are 'regular  expressions',  which are  special  patterns
+containing both  normal characters  and wildcards.  The following  table
+summarises the wildcards that you can use:
+
+    Pattern     Meaning
+    -------     -------
+    @. or @?    match any single character
+    @*          match zero or more occurrences of the previous character
+    @^ or @a    constrains a match to the start of the line
+    @$ or @z    constrains a match to the end of the line
+    @<          constrains match to the start of a word boundary
+    @>          constrains match to the end of a word boundary
+    @{N@}       matches N occurrences of previous character, where N is
+                a positive integer.
+    @{N,@}      matches N or more occurrences of the previous character
+    @{N,M@}     match at least N, at most M occurrences of previous
+                character, where N and M are positive integers
+    @[...@]     match any character between the brackets, where ... is
+                any characters e.g. abc or range of characters e.g. A-Z
+    @[^...@]    match any character except those between the brackets
+    @(...@)     denotes a sub-expression for use with @N
+    @N          match a repeat of the N'th sub-expression where N is
+                a number 1-9
+    @C          match C where C is the search delimiter or `@'
+    @i          turns off case sensitivity for subsequent letters
+    @c          turns on case sensitivity for subsequent letters
+
+Also, to match things like control characters, Ved graphics  characters,
+or Ved special space characters,  you can use all `backslash'  sequences
+that are  recognised  in Pop-11  strings.  These are  described  in  the
+section `Backslash in Strings & Character Constants' in REF * ITEMISE
+
+Note that if you specify character attributes (using \[...] or \{...} ),
+these will  be ignored  in the  search string.  (However, they  are  not
+ignored in substitute strings, see below).
+
+
+
+
+--------------------------------
+4  Substitution Pattern Elements
+--------------------------------
+
+Substitution commands take two  strings - one is  a search pattern  (see
+the previous  section),  and  another  is  the  substitution  text.  The
+substitution text may itself contain special symbols:
+
+    Pattern     Meaning
+    -------     -------
+    @&          substitute in the string matched by the search
+    @n          substitute in a line break
+    @N          where N is 1-9, substitute in the N'th sub-expression
+    @p          paste in the contents of the clipboard (XVed only)
+
+See TEACH * VEDSEARCH for examples using these substitution patterns.
+
+As with the search  string, the substitute string  may also contain  any
+`backslash' sequence recognised in a Pop-11 string.
+
+Unlike the search string, character attributes specified with \[...]  or
+\{...} are not ignored, i.e. they are substituted in. So if you use:
+
+    \[u]@&
+
+then the matching  text will  become underlined.  By default,  character
+attributes specified in this  way are added  to character attributes  of
+text in the buffer. However, you can specify how existing attributes are
+merged together by specifying  an attribute mode just  after the @.  The
+mode is is one of:
+
+  Mode      Description        Logical Meaning
+  ----      -----------        ---------------
+    +       Add attributes     EXISTING || NEW     (the default)
+    -       Remove attributes  EXISTING && ~~ NEW
+    =       Set attributes     NEW
+    ~       Toggle attributes  EXISTING ||/& NEW
+
+(where EXISTING represents attributes of text  in the buffer and NEW  is
+the attributes of the text in the replacement pattern). e.g.
+
+    \[u]@=&
+
+means 'change all matching text to be underlined', and
+
+    \[u]@-&
+
+means 'remove all underlining from matching text', and
+
+    \[u]@~&
+
+means 'toggle the underlining attribute of matching text'.
+
+
+
+
+------------------
+5  Search Commands
+------------------
+
+Most of the search and substitute  commands do not have a  corresponding
+procedure as mentioned in the introduction to REF * VEDCOMMS, and  these
+are marked as  "pseudo procedures".  i.e. there isn't  actually a  ved_/
+procedure. Instead, ved_search is called to interpret ved_/ commands.
+
+ved_/string/ [ region ] [ +|- option ... ]            [pseudo procedure]
+ved_\string\ [ region ] [ +|- option ... ]            [pseudo procedure]
+ved_"string" [ region ] [ +|- option ... ]            [pseudo procedure]
+ved_`string` [ region ] [ +|- option ... ]            [pseudo procedure]
+        Searches for the  regular expression string  in the current  Ved
+        buffer. If  string is  empty,  Ved will  reuse the  last  search
+        string. string may  contain search wildcards  - see the  section
+        'Search Pattern Elements' above.
+
+        Note that there is not in fact a procedure called ved_/ or ved_"
+        (hence the description  'pseudo procedure'  above). In  reality,
+        <ENTER> / and <ENTER> "  call ved_search  whereas <ENTER> \  and
+        <ENTER> ` call ved_backsearch (see below).
+
+        The delimiter character  (the character after  the ved_  prefix)
+        determines the search  direction and whether  or not the  search
+        will match embedded strings, as follows:
+
+            Delimiter  Direction   Embedded matches
+            ---------  ---------   ----------------
+               /       Forward     Yes
+               "       Forward     No
+               \       Backward    Yes
+               `       Backward    No
+
+        Thus, using " as  a delimiter rather  than / restricts  matching
+        occurrences of string to whole words, e.g.
+
+            <ENTER> "define
+
+        finds "define" but not "enddefine".
+
+        Forward searches start one character after the cursor  position,
+        search to the end of the region, and then from the start of  the
+        region to the cursor position.
+
+        Backward  searches  starts  one  character  before  the   cursor
+        position, search to the start of  the region, and then from  the
+        end of the region to the cursor position.
+
+        See also the "here" option and the "wrap" option below.
+
+        If a match is found the cursor is positioned at the start of the
+        match. Additionally, under XVed,  the matching text is  selected
+        if *SearchDoesSelect is true  (so hitting backspace deletes  the
+        text, typing a character replaces the text with that  character,
+        and moving the cursor clears the selection).
+
+        After the  second  delimiter,  you can  optionally  specify  the
+        region of the buffer to search and one or more options.
+
+        region is one of the following:
+
+            file        - the whole file (the default)
+            range       - the marked range
+            procedure   - the current procedure
+            line        - the current line
+            paragraph   - the current paragraph
+            selection   - the current selection (XVed only)
+            sentence    - the current sentence
+            word        - the current word
+            window      - the visible text
+            toendfile   - from cursor position to end of file
+            tostartfile - from cursor position to start of file
+
+        Region names can be abbreviated to one or more characters, where
+        precedence is indicated by  the ordering of  the regions in  the
+        list above (i.e.  the region  "p" indicates  a procedure,  not a
+        paragraph, "t" indicates "toendfile" not "tostartfile", etc.).
+
+        As well  as  a region,  you  can  specify one  or  more  options
+        prefixed by either "+" (which turns on the option) or "-" (which
+        turns it off). eg. +case -wrap indicates that the search  should
+        be case sensitive,  but should not  wrap around the  end of  the
+        region. Options can be abbreviated  to one or more letters:  -c,
+        -ca, and  -case  are  all  the same  option.  The  "+"  and  "-"
+        'persist', so you can do: +case back wrap, which is the same  as
+        +case +back +wrap.
+
+        The following options are available:
+
+            back
+                +back forces the search to go backwards. -back forces
+                the search to go forwards. The default is determined by
+                the delimiter used.
+
+            case
+                +case (the default) makes the search case sensitive. Use
+                -case to ignore the case of letters.
+
+            embed
+                +embed makes the search match string even if it is
+                embedded in another string. -embed constrains the search
+                to non-embedded items. The default is determined by the
+                delimiter used.
+
+            here
+                +here (the default) searches from the current cursor
+                location in the buffer. -here searches from the start of
+                the region (searching forwards) or the end of the region
+                (searching backwards).
+
+            wrap
+                +wrap (the default) allows the search to wrap around the
+                end of the region. -wrap stops the search at the end of
+                the region.
+
+            an integer
+                an integer n finds the n'th occurrence of string. If n
+                is negative, the direction of the search is reversed.
+
+
+NOTE: The search and substitute commands  will, for the most part,  work
+without the closing string delimiter.  However a closing delimiter  must
+be given if the string ends with a space. You can include the  delimiter
+character as part of the the search or substitute string by preceding it
+with "@".
+
+ved_search                                          [procedure variable]
+        Procedure called by <ENTER> /  and <ENTER> " to perform  search.
+        See also ved_re_search.
+
+
+ved_backsearch                                      [procedure variable]
+        Procedure called by <ENTER> \  and <ENTER> ` to perform  search.
+        See also ved_re_backsearch.
+
+
+ved_ss string                                       [procedure variable]
+        Searches forward  for  string  regardless of  the  case  of  the
+        letters. This is an  abbreviation for:
+
+            <ENTER>/string/ -case
+
+
+ved_ww string                                       [procedure variable]
+        Search for string  regardless of case  but with word  boundaries
+        (analogous to "). This is  an abbreviation for:
+
+            <ENTER>"string" -case
+
+
+
+
+---------------------------------
+6  Search and Substitute Commands
+---------------------------------
+
+ved_s/string_1/string_2/ [ region ] [ +|- option ... ]       [procedure]
+ved_s"string_1"string_2" [ region ] [ +|- option ... ]
+ved_s`string_1`string_2` [ region ] [ +|- option ... ]
+        Substitutes occurrences of string_1  with string_2. See  'Search
+        Pattern Elements' and 'Substitution Pattern Elements' above  for
+        descriptions of special symbols that you can use in string_1 and
+        string_2.
+
+        region and  option  as for  REF  *VED_/ (see  above),  with  the
+        following additions:
+
+            ask
+                +ask (the default) asks the user interactively before
+                performing each substitution. -ask performs the
+                substitutions throughout the region, replacing as many
+                matches as possible, without confirmation.
+
+            every
+                +every (the default) replaces all occurrences of a
+                pattern on a line. -every makes the matcher find only
+                the first (forward searches) or last (backward searches)
+                match on each line.
+
+            verbose (only for non-interactive substitutions)
+                +verbose (the default) records progress on the status
+                line. -verbose doesn't record progress on the status
+                line, and is therefore slightly faster.
+
+            an integer
+                If an integer is n specified, at most n substitutions
+                are done. If n is negative, the direction of the search
+                is reversed.
+
+        If the  substitution is  interactive (i.e.  +ask, which  is  the
+        default) then,  when  string_1  is found,  Ved  prompts  for  an
+        action: press  Y  for  a single  substitution,  or  <RETURN>  to
+        substitute and continue; press N to terminate the  substitution,
+        or <DEL> to  ignore this occurrence  but continue searching  for
+        another. Press G to substitute all other occurrences globally.
+
+        ved_s examines  the delimiter  to determine  which direction  to
+        search in (see REF * ved_/ above for details). Thus, using "  as
+        a delimiter  rather than  /  restricts matching  occurrences  of
+        string_1 to whole words, e.g.
+
+            <ENTER> s"cat"cats"
+
+        would leave the word "catch" unchanged.
+
+        Note that use of  \ as a  delimiter for substitution  operations
+        can cause problems because \ is also recognised by the itemiser.
+        Instead use / as the delimiter and specify the +back option.
+
+        Any sign character  may be used  as a delimiter  in place of  /,
+        useful if either STRING contains the character `/`, e.g
+
+            <ENTER> s#/usr/users/#/usr2/users#
+
+        If you use a sign character as a delimiter, then by default  the
+        search will be forward and will match embedded strings.
+
+        If string_1 is empty, the last search string is used instead; if
+        no argument is given at all  (i.e just <ENTER> s) then the  last
+        search and substitute  strings are used  (but not the  options).
+        NB: this is not the same as
+
+            <ENTER> s///
+
+        which replaces all  occurrences of the  last search string  with
+        the empty string.
+
+
+ved_gs/string_1/string_2/                           [procedure variable]
+ved_gs"string_1"string_2"
+        Substitutes all occurrences of  string_1 by string_2  throughout
+        the entire file,  without asking  for confirmation.  This is  an
+        abbreviation for:
+
+            <ENTER> s/string_1/string_2/ -ask or
+            <ENTER> s"string_1"string_2" -ask
+
+        See REF * ved_s above for details.
+
+        Using  "  as  a  delimiter  rather  than  /  restricts  matching
+        occurrences of string_1 to whole words, e.g.
+
+            <ENTER> gs"cat"cats"
+
+        would leave the word "catch" unchanged. This is the same as:
+
+            <ENTER> s"cat"cats" -ask
+
+
+ved_gsr/string_1/string_2/                          [procedure variable]
+ved_gsr"string_1"string_2"
+        Global non-interactive substitute in marked range. Like  ved_gs.
+        This is an abbreviation for:
+
+            <ENTER> s/string_1/string_2/ range -ask or
+            <ENTER> s"string_1"string_2" range -ask
+
+        See REF * ved_s above for details.
+
+
+ved_gsp/string_1/string_2/                          [procedure variable]
+ved_gsp"string_1"string_2"
+        Global non-interactive substitute  in current procedure.  (Works
+        only  if  * ved_mcp  has  been  defined  for  the  language   in
+        question). This is an abbreviation for:
+
+            <ENTER> s/string_1/string_2/ procedure -ask or
+            <ENTER> s"string_1"string_2" procedure -ask
+
+        See REF * ved_s above for details.
+
+
+ved_gsl/string_1/string2/                           [procedure variable]
+ved_gsl"string_1"string2"
+        Global non-interactive substitute in current line - like  ved_gs
+        in current line. This is an abbreviation for:
+
+            <ENTER> s/string_1/STRING_2/ line -ask or
+            <ENTER> s"string_1"STRING_2" line -ask
+
+        See REF * ved_s above for details.
+
+
+ved_sgs/string_1/string_2/                          [procedure variable]
+ved_sgs"string_1"string_2"
+        Like ved_gs but "silent", i.e. doesn't record progress on status
+        line, and therefore faster. This is the same as:
+
+            <ENTER> s/string_1/string_2/ -ask -verbose or
+            <ENTER> s"string_1"string_2" -ask -verbose
+
+        See REF * ved_s above for details.
+
+
+ved_sgsr                                            [procedure variable]
+        Like ved_gsr  but  "silent",  i.e. doesn't  record  progress  on
+        status line, and therefore faster. This is the same as:
+
+            <ENTER> s/STRING_1/STRING_2/ range -ask -verbose or
+            <ENTER> s"STRING_1"STRING_2" range -ask -verbose
+
+        See REF * ved_s above for details.
+
+
+
+
+-------------------------------
+7  Creating New Search Commands
+-------------------------------
+
+All of the above search commands and procedures are in fact  implemented
+as closures of  a single procedure,  ved_search_or_substitute . You  can
+add your own  customised search  commands by creating  closures of  this
+procedure:
+
+ved_search_or_substitute(default_options, mode)              [procedure]
+        Implements the  command line  interface to  the Ved  search  and
+        substitute facilities.
+
+        default_options is either a string or a boolean.
+
+        If default_options is a string, then the string will be used  as
+        the region and options for the search command, and any region or
+        options specified by the user will  be ignored. See  REF * ved_/
+        above for a description of regions and options.
+
+        If default_options is  a boolean,  then any  region and  options
+        supplied on the command line by the user are used. In  addition,
+        false makes  the search  go forwards  by default,  whereas  true
+        makes the search go backwards by default.
+
+        Note that  if  the  search  direction and  embed  mode  are  not
+        specified explicitly  in  the default_options  string  they  are
+        determined from the delimiter specified by the user:
+
+            Delimiter  Direction   Embedded matches
+            ---------  ---------   ----------------
+               /       Forward     Yes
+               "       Forward     No
+               \       Backward    Yes
+               `       Backward    No
+
+        mode is  either  false, true  or  undef. Use  false  for  search
+        commands, true for search-and-substitute commands, and undef for
+        search commands  that  don't  have  delimiters  (eg.  ved_ww  or
+        ved_ss).
+
+
+
+
+------------------------------------
+8  Information About the Last Search
+------------------------------------
+
+The following variable  is used  by all  the <ENTER>  commands that  use
+ved_search_or_substitute to perform search or substitution:
+
+ved_search_state -> (item_1, ..., item_n)              [active variable]
+(item_1, ..., item_n) -> ved_search_state
+        Contains information  about  the  last  search  or  substitution
+        command performed by Ved. This  active variable is set and  used
+        by the procedure ved_search_or_substitute to redo a search  when
+        the  user  specifies  a   blank  search  string.  The   specific
+        datastructure that is placed in ved_search_state is unspecified.
+        Use ved_set_search and ved_query_last_search to query or  modify
+        the search parameters.
+
+        If you wish  to call ved_search_or_substitute  or to perform  an
+        <ENTER> search command without  modifying the information  about
+        the last search, use:
+
+            dlocal ved_search_state;
+
+        to save and  restore the  state information  about the  previous
+        search.
+
+
+The procedures  ved_query_last_search  and  ved_set_search  extract  and
+modify information held in ved_search_state:
+
+ved_query_last_search() -> (search_string, start_line,       [procedure]
+                            start_column, end_line, end_column)
+        Returns information  held  in ved_search_state  about  the  last
+        search    done    by    an    <ENTER>    command    that    uses
+        ved_search_or_substitute.
+
+        search_string is the string that was searched for. If no  search
+        has yet been performed, search_string is false.
+
+        start_line, start_column, end_line and end_column specify  where
+        in the  buffer  the  match  occurred. If  no  match  was  found,
+        first_line, first_column,  last_line  and  last_column  will  be
+        false.  If  the  search  succeeded,  first_line,   first_column,
+        last_line, last_column will be set such that
+
+            vedjumpto(first_line, first_column)
+
+        places the cursor on the start of the match and
+
+            vedjumpto(last_line, last_column + 1)
+
+        places the cursor one character after the end of the match.
+
+        Note that last_column will be one less than first_column if  the
+        pattern matches zero characters eg.  for patterns such as  '@$'.
+        Thus the result:
+
+                4, 18, 4, 17
+
+        indicates that  a zero-length  match  occurs at  the  eighteenth
+        column of line four.
+
+        Similarly, last_column will  be zero  if all  of the  characters
+        including the line break on previous line to last_line are  part
+        of the  match (i.e.  if  the pattern  ends  in @z@a).  Thus  the
+        result:
+
+                12, 1, 13, 0
+
+        indicates that the whole of line 12 including the line break  at
+        the end of line 12 are part of the match.
+
+
+
+ved_set_search(string, substitute_string, options)           [procedure]
+        Set the search pattern used  in redo operations by the  standard
+        search and substitute commands. Used  by e.g. ved_f to tell  the
+        search commands what  the last  thing that the  user looked  for
+        was.
+
+        This procedure constructs a new structure representing a  search
+        for item and assigns it to ved_search_state .
+
+        string is the regular expression pattern to look for.
+
+        options is a list of  words specifying additional parameters  of
+        the search. The following words can occur in the options list:
+
+            nowrap
+                the search stops at the end of the search region.
+
+            nocase
+                the search is case insensitive.
+
+            noembed
+                the search is constrained to match non-embedded items.
+
+        In addition, the  options list may  contain a search  constraint
+        region, which is one of the following words:
+
+            file        - the whole file (the default)
+            range       - the marked range
+            procedure   - the current procedure
+            line        - the current line
+            paragraph   - the current paragraph
+            selection   - the current selection (XVed only)
+            sentence    - the current sentence
+            word        - the current word
+            window      - the visible text
+            toendfile   - from cursor position to end of file
+            tostartfile - from cursor position to start of file
+
+        If options  is empty,  the redo  will perform  a  case-sensitive
+        forwards search in the whole file, wrapping over the end of  the
+        file, and the search will  match both embedded and  non-embedded
+        occurrences of the string.
+
+        If substitute_item is not false, it is used as the  substitution
+        pattern when  the  user types  a  substitution command  with  no
+        arguments.  Otherwise   the  current   substitution  string   is
+        retained.
+
+
+
+ved_re_backsearch()                                 [procedure variable]
+        Redo previous search, looking backwards. Assigned by default  to
+        the <ESC> \ key sequence.
+
+
+ved_re_search()                                     [procedure variable]
+        Redo the previous search, looking forwards. Assigned by  default
+        to the <ESC> / key sequence.
+
+
+
+
+-----------------------
+9  Procedural Interface
+-----------------------
+
+The following two utility procedures  offer an easy-to-use interface  to
+the Ved search mechanism. They both set the variable ved_search_state to
+reflect the last search that was performed:
+
+ved_try_search(string, options) -> bool                      [procedure]
+ved_check_search(string, options)                            [procedure]
+        Searches for string in the current Ved buffer, starting from the
+        current cursor position. If the string is found then the  cursor
+        is placed over the start of the matching text.
+
+        ved_try_search returns true if the search succeeds and false  if
+        the search  fails. On  the other  hand, ved_check_search  simply
+        returns if the search succeeds, but calls vederror if the search
+        fails.
+
+        By default, a case-sensitive forwards  search in the whole  file
+        is performed, wrapping over the end of the file, and the  search
+        will match  both embedded  and non-embedded  occurrences of  the
+        string.
+
+        The options  argument  is  a  list  of  words  that  alters  the
+        parameters of the  search described above.  The following  words
+        can occur in the options list:
+
+            back
+                a backwards search is performed.
+
+            nowrap
+                the search stops at the end of the search region.
+
+            nocase
+                the search is case insensitive.
+
+            noembed
+                the search is constrained to match non-embedded items.
+
+        In addition, the  options list may  contain a search  constraint
+        region, which is one of the following words:
+
+            file        - the whole file (the default)
+            range       - the marked range
+            procedure   - the current procedure
+            line        - the current line
+            paragraph   - the current paragraph
+            selection   - the current selection (XVed only)
+            sentence    - the current sentence
+            word        - the current word
+            window      - the visible text
+            toendfile   - from cursor position to end of file
+            tostartfile - from cursor position to start of file
+
+        You can use  ved_query_last_search to retrieve  the full  buffer
+        coordinates for the match.
+
+        These two procedures  both set ved_search_state  so that if  the
+        user hits  the  RE_SEARCH  key  another  search  for  string  is
+        performed. You can do:
+
+            dlocal ved_search_state;
+
+        inside a procedure before  calling these procedures to  preserve
+        the search state.
+
+
+
+--------------------
+10  Search Variables
+--------------------
+The following variables are used by the search and substitute mechanism:
+
+vedwrapped -> int                                             [variable]
+int -> vedwrapped
+        A system variable used  by Ved searching  routines to count  how
+        many times the search process has wrapped around the Ved buffer.
+
+
+vedsafesubstitute -> bool                                     [variable]
+bool -> vedsafesubstitute
+        If this is true (its default value), then ved_copy is called  by
+        the Ved substitution commands before a global (non  interactive)
+        substitution is performed. This saves the lines of a Ved  buffer
+        within the region that may  may be changed by the  substitution.
+        You can  then do  <ENTER> yank  to recover  the unchanged  lines
+        after the substitution.
+
+
+vvedfoundstring -> string                                     [variable]
+string -> vvedfoundstring
+        The text (in a string) that was last replaced by the most recent
+        substitute    commands.     This     remains     largely     for
+        backwards-compatibility.
+
+
+
+
+----------------------------
+10  Definition of "embedded"
+----------------------------
+
+What counts as  a non-embedded  string is by  default approximately  the
+same as what the Pop-11 itemiser would separate out from the surrounding
+text. This is defined by the procedures vedatitemstart and vedatitemend,
+which are  in  turn defined  in  terms  of vedchartype  .  This  default
+specification  would  not   suit  all  programming   languages  or   all
+text-editing contexts, so  by redefining vedchartype  it is possible  to
+alter what Ved regards as a text item boundary. For further details  see
+REF * VEDPROCS/vedatitemend, * VEDPROCS/vedchartype.
+
+
+
+--- C.all/ref/vedsearch
+--- Copyright University of Sussex 1995. All rights reserved.

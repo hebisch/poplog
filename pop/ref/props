@@ -1,0 +1,735 @@
+REF PROPS                                           John Gibson Apr 1992
+
+     COPYRIGHT University of Sussex 1992. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<         PROPERTIES          >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+This REF file describes the  difference between the types of  properties
+and when  each  type  should  be  used.  It  details  how  to  construct
+properties, the data  structure procedures which  apply, and also  gives
+some examples  of the  use of  properties. Finally  the use  of  hashing
+procedures and hashing algorithims is described.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+
+  2   Predicates on Properties
+
+  3   Constructing Properties
+
+  4   Manipulating Properties
+
+  5   Generic Data Structure Procedures on Properties
+
+  6   Destroy Properties
+
+  7   Examples of Using Properties
+
+  8   Hashing Procedures
+      8.1   Standard Hashing Algorithms
+
+
+
+
+---------------
+1  Introduction
+---------------
+
+A property  is  a  means  of storing  associations  between  items:  the
+property itself is a procedure which when called with some item item  as
+argument will return the item associated with item, if there is one,  or
+a user-supplied default value otherwise. Associations between items  may
+be set up by calling the same procedure in update mode, or by  supplying
+a list of initial  associations when the  property is constructed  using
+newproperty or newanyproperty.
+
+    Properties come  in two  basic types:  permanent and  temporary  (in
+addition to a special destroy type for associating destroy actions  with
+objects, see  below). The  difference  between permanent  and  temporary
+involves the  interaction  of  the  property  with  garbage  collection.
+Suppose a property prop has an entry associating an item val (the value)
+with an item  arg (the argument),  and suppose that  there are no  other
+references remaining to the argument  arg elsewhere in the system  (i.e.
+arg is otherwise garbage).  Then, if the entry  were treated by  garbage
+collection like any other record, the presence of arg in the entry would
+prevent it (i.e arg) from being  garbaged. Similar remarks apply to  the
+value val if that too has no other references remaining.
+
+    For some applications this may be the desired behaviour; for others,
+the property entry may no longer be required at all if either ARG or VAL
+are otherwise garbage. The system's action in this respect can therefore
+be specified for the  entries in a given  property, by supplying one  of
+the  following  keyword  arguments   when  the  property  is   initially
+constructed (with newproperty or newanyproperty):
+
+        Keyword     Meaning
+        -------     -------
+        "perm"      Permanent: entries are never discarded.
+
+        "tmparg"    Temporary on the argument: entries are discarded for
+                    which the arg items are otherwise garbage.
+
+        "tmpval"    Temporary on the  value: entries  are discarded  for
+                    which the val items are otherwise garbage.
+
+        "tmpboth"   Temporary on both: entries  are discarded for  which
+                    either the arg or val items are otherwise garbage.
+
+        "tmpclr"    Temporary cleared: all entries are cleared from  the
+                    property at every garbage collection.
+
+(Note of course that if an entry is kept in any case, then both arg  and
+val items are forced to be retained as well, regardless of whether  they
+were garbage or not.)
+
+    Thus for  example,  "perm"  properties may  be  used  for  retaining
+permanent tables of information,  and "tmparg" properties for  attaching
+ad hoc pieces of information to arbitrary records (which will be garbage
+collected along with  the records). "tmpclr"  properties are useful  for
+short-term caching of computed data.
+
+    A "destroy" property is  a special kind  of "tmparg" property.  Like
+the latter the  presence of arg  as the argument  of a destroy  property
+entry will not stop it from being considered as garbage, but instead  of
+simply discarding arg,  the entry containing  it is added  to a  special
+list maintained by  the garbage  collector. At  the end  of the  garbage
+collection those  destroy entries  whose argument  would otherwise  have
+become garbage (i.e.  and the  entry discarded) are  examined. If  their
+value slot  contains a  procedure,  or an  identifier whose  idval  is a
+procedure, the procedure is run, with arg passed as argument. Only  then
+is arg discarded in the same manner as with temporary properties.
+
+    Destroy properties thus allow arbitrary procedures to be attached to
+objects in such a way  that the procedure gets  run, with the object  as
+argument, at the point at which  the object would otherwise have  become
+garbage (the point of its destruction).
+
+    Properties are organised around a table of "buckets", each of  which
+contains a  list  of  entries;  which  bucket an  entry  is  put  in  is
+determined  by  a   hashing  algorithm.   The  number   of  buckets   is
+user-specifiable: a larger  number of buckets  will decrease the  access
+time for entry (since the lists in each bucket will be shorter), but  at
+the cost of using more space.
+
+    Using the more  verbose procedure newanyproperty  users may  specify
+their own hashing algorithm: this is particularly useful if you wish  to
+associate the same  data with items  that are not  always identical  (as
+tested with ==) but  merely structurally equal (as  tested by =).  Users
+may also  create  "expandable"  properties, the  tables  of  which  will
+automatically enlarge  by a  given factor  whenever the  table  passes a
+given threshold value. Expandable properties will never decrease in size
+even if the  number of  entries in the  property drops  below the  given
+threshold.
+
+    newanyproperty also allows the creation of "active" properties. When
+an item is not found in an active property then instead of returning the
+default value, the item  and the property is  passed to a user  supplied
+procedure to return the result.
+
+    A facility for constructing  "multi-dimensional" properties is  also
+provided by the "sparse array" mechanism, described in REF * ARRAYS.
+
+
+
+
+---------------------------
+2  Predicates on Properties
+---------------------------
+
+As mentioned above, properties are procedures: thus isprocedure is  true
+for any property.
+
+
+isproperty(item) -> bool                                     [procedure]
+        Returns true if item is a property, false if not.
+
+
+
+
+--------------------------
+3  Constructing Properties
+--------------------------
+
+newproperty(assoc_list, tab_size, default, gc_type) -> prop  [procedure]
+        This procedure returns a new property prop. The arguments are:
+
+        assoc_list
+            An initial list of associations, where each association is a
+            2-element list of the form [<argument> <value>].
+
+        tab_size
+            The table size, i.e. the number of buckets to be used.
+
+        default
+            The default value to be produced when there is no entry  for
+            a given argument.
+
+        gc_type
+            A keyword specifying the  permanent/temporary status of  the
+            property entries  with  respect to  garbage  collection  (as
+            described in the "Introduction" section):
+
+              Keyword    Meaning
+              -------    -------
+              "perm"     Permanent: entries are never discarded.
+
+              "tmparg"   Temporary  on   the   argument:   entries   are
+                         discarded for  which  the  argument  items  are
+                         otherwise garbage.
+
+              "tmpval"   Temporary on the  value: entries are  discarded
+                         for  which  the   value  items  are   otherwise
+                         garbage.
+
+              "tmpboth"  Temporary on  both: entries  are discarded  for
+                         which either the  argument or  value items  are
+                         otherwise garbage.
+
+              "tmpclr"   Temporary cleared: all entries are cleared from
+                         the property at every garbage collection.
+
+        Note that assigning  the default  value default  to an  argument
+        item actually  removes the  entry for  that item  (if there  was
+        one).
+
+
+newassoc(assoc_list) -> prop                                 [procedure]
+        Provides a simpler  interface to  newproperty, for  constructing
+        permanent properties with default value false. Defined as
+
+            newproperty(assoc_list, 20, false, "perm") -> prop
+
+        where assoc_list is as for newproperty.
+
+
+newanyproperty(assoc_list, tab_size, expand_pow, thresh,     [procedure]
+                    hash_p, equal_p, gc_type,
+                    default, active_default) -> prop
+        This is for constructing  more complex properties. It  returns a
+        new property prop, where the arguments are:
+
+        assoc_list
+            An initial list of associations, as above.
+
+        tab_size
+            The initial table size, as above.
+
+        expand_pow
+            false for a static property, or an integer for an expandable
+            one. When thresh entries have  been added the table size  of
+            the property will increase by the formula:
+
+                    new size = old size * (2 ** expand_pow)
+
+        thresh
+            An integer expansion threshold, as explained above (or false
+            if expand_pow is false).  After expansion, the threshold  is
+            increased in proportion to the property's size.
+
+        hash_p
+            Hashing procedure,  or  false  to use  the  default  hashing
+            algorithm. The hashing procedure is applied as
+
+                    hash_p(item) -> bucket
+
+            where bucket is an  item specifying a  bucket in the  table.
+            bucket can be a simple integer  (first bucket is 0), or  any
+            other item (in which case the address of that item is used).
+            In all cases, bucket is taken modulo the current table size.
+            (See Hashing Procedures below).
+                To specify  that the  hashing  algorithm relies  on  the
+            address of an item, and that the property must therefore  be
+            rehashed  after  every   garbage  collection,  enclose   the
+            procedure in a reference, i.e. consref(hash_p).
+
+        equal_p
+            Equality procedure used to check that an item matches on  in
+            the table. The default procedures (used if equal_p is false)
+            is absolute identity (==). You cannot specify an equal_p  if
+            you have not specified a hash_p.
+
+        gc_type
+            A keyword specifying the  permanent/temporary status of  the
+            property entries with respect to garbage collection; same as
+            the gc_type argument to newproperty above.
+                Note that because the concept  of an argument item  in a
+            property entry  being  'otherwise  garbage'  is  (generally)
+            irrelevant when  entries are  not matched  on the  basis  of
+            absolute identity,  you should  exercise care  in using  the
+            "tmparg" and "tmpboth" types with an equal_p other than  (or
+            defaulting to) == .
+
+        default
+            Default value, as for newproperty above.
+
+        active_default
+            Active  default  procedure   for  the   property  or   false
+            otherwise. If an item cannot  be found in the table  default
+            is  returned   if   active_default   is   false,   otherwise
+            active_default is applied to the item and the property, i.e.
+
+                    active_default(item, prop) -> value
+
+
+newmapping(assoc_list, tab_size, default, expand) -> prop    [procedure]
+        Provides a simpler interface to newanyproperty for  constructing
+        properties that  match  argument  items  on  the  basis  of  the
+        standard structure equality operator  "=" (see REF * DATA),  and
+        that use  the  standard procedure  syshash  to hash  items  into
+        buckets (see the description of syshash below).
+            If true,  the expand  argument specifies  that the  property
+        should have an expand_pow of 1  and a thresh of tab_size  (where
+        tab_size is also  the initial  table size).  newmapping is  thus
+        defined as
+
+            newanyproperty(assoc_list, tab_size,
+                           if expand then
+                               1, tab_size
+                           else
+                               false, false
+                           endif,
+                           syshash, nonop =, "perm",
+                           default, false) -> prop
+
+
+
+
+--------------------------
+4  Manipulating Properties
+--------------------------
+
+See  also  Fast   Operations  on  Properties   in  REF * FASTPROCS   for
+unsupported procedures  which  enable  some property  operations  to  be
+performed quicker.
+
+
+appproperty(prop, p)                                         [procedure]
+        Applies the procedure p to each entry in the property prop.  For
+        each entry, p is given two arguments, i.e
+
+                p(arg, value)
+
+        Note that p is effectively applied  to a temporary copy of  prop
+        so that any alterations made by  the procedure p to prop  itself
+        during the execution of appproperty  will have no effect on  the
+        entries to which p is applied (thus p can safely delete  entries
+        or add new ones). Also see fast_appproperty.
+
+        Note also  that  since  the  organisation  of  property  entries
+        depends on a hashing algorithm (and  also on the order in  which
+        entries are added, etc), the order in which entries are given to
+        p is  indeterminate (and  further,  may change  between  garbage
+        collections).
+
+
+fast_appproperty(prop, p)                                    [procedure]
+        Applies the procedure p to each entry in the property prop.  For
+        each entry, p is given two arguments, i.e.
+
+                p(arg, value)
+
+        This is just like appproperty except that property table is  not
+        copied first.  This means  that fast_appproperty  should not  be
+        used if the procedure is going  to change any of the entries  in
+        the property.
+
+
+clearproperty(prop)                                          [procedure]
+        Removes all entries from the property prop.
+
+
+clear_prop_entries(prop)                                     [procedure]
+        Removes all entries from the property prop. This is functionally
+        the same  as clearproperty  with the  addition of  clearing  the
+        contents of the individual  "property entry" data structures  in
+        prop. This is  only relevant if  you use fast_get_prop_entry  to
+        access the internal structure of prop.
+
+
+property_default(prop) -> item                               [procedure]
+        Returns the default value for the property prop.
+
+
+property_size(prop) -> tab_size                              [procedure]
+        Returns the  current table  size for  the property  prop.  For a
+        non-expandable property, this will be  the same as the  tab_size
+        specified to newproperty or newanyproperty when the property was
+        created.
+
+
+property_active(prop) -> active_default                      [procedure]
+active_default -> property_active(prop)
+        Returns or updates the active default procedure for the property
+        prop (which is either a procedure or false, see the  description
+        of the active_default argument to newanyproperty above).
+
+        A false argument to the  updater will remove the active  default
+        for prop (so that the property_default value will henceforth  be
+        returned for any item not in the property table).
+
+        Note that the updater of this  procedure can be used to give  an
+        active  default  procedure  to   any  property,  including   one
+        constructed with newproperty.
+
+
+Prop_entry_state_init                                        [procedure]
+Prop_entry_state_next                                        [procedure]
+        These two system  procedures are used  in LIB * in_property,  to
+        support the in_property for-form.
+
+
+property_equal(prop1, prop2) -> bool                         [procedure]
+property_equal(prop1, prop2, val_eq_p) -> bool
+        An equality predicate for  properties. Two properties are  equal
+        if the following conditions hold:
+
+            (a) They both use the same equality procedure (6'th argument
+                to newanyproperty) when locating and removing entries.
+
+            (b) They  both  contain  the   same  number  of   item/value
+                associations.
+
+            (c) For every item1, value1 association in prop1, there is a
+                corresponding association item2,  value2 in prop2,  such
+                that item1 and item2 are equal according to the equality
+                procedure used  in  constructing prop1  and  prop2,  and
+                value1 and value2 are  equal according to the  procedure
+                val_eq_p. (If  val_eq_p is  not supplied,  the  equality
+                procedure associated with prop1 is used instead).
+
+
+
+
+--------------------------------------------------
+5  Generic Data Structure Procedures on Properties
+--------------------------------------------------
+
+The  following   generic  data   structure  procedures   (described   in
+REF * DATA) are applicable to a property prop:
+
+    datalength(prop)
+        returns the number of entries in prop.
+
+    appdata(prop, p)
+        applies the procedure p to each entry of prop, each entry  being
+        given as a 2-element list [^arg ^val].
+
+    explode(prop)
+        puts all the entries of prop on the stack, in the same 2-element
+        list form as appdata.
+
+copy(prop) copies both its  table and all its  entries; thus the  result
+does  not  share  structure   with  the  original,   and  they  can   be
+independently modified.
+
+
+
+
+---------------------
+6  Destroy Properties
+---------------------
+
+As described above,  destroy properties  are used to  associate with  an
+object a procedure to be run when the object becomes garbage. There  are
+only two standard destroy  properties in the system  (sys_destroy_action
+and sys_process_destroy_action)  but others  can be  created by  copying
+them. By this means it is possible  for an object to have more than  one
+destroy action associated with it (in different properties), and in such
+a case, the order in which the  actions get run when the object  becomes
+garbage is undefined.
+
+    The association  of a  destroy  action with  an object  is  called a
+'destroy entry',  and  there  are  in  fact  two  types:  dependent  and
+independent. The difference between them  is in the handling of  destroy
+actions of other objects referred to by the object or its action. It  is
+commonly the  case that  when an  object becomes  garbage, some  of  its
+sub-objects (objects it  has pointers  to) become garbage  also. If  the
+object and one of its sub-objects both have destroy actions, there is an
+issue as to what actions should be done and in what order. Some  destroy
+actions do not care about whether the sub-objects' destroy actions  have
+been run.  These  are  called  independent actions,  and  the  order  of
+execution of their and their sub-objects' destroy actions is undefined.
+
+    Others, however,  require that  their sub-objects  still exist  when
+their destroy  action is  run (possibly  because the  destroy action  is
+going to 'save' the object ie not  destroy it at all). These are  called
+dependent actions. When a dependent action  is scheduled to be run,  any
+destroy  actions  associated  with   sub-objects  are  ignored  --   the
+sub-objects  are  in  fact  treated  as  though  they  were  non-garbage
+(typically the sub-objects will then become garbage on the NEXT  garbage
+collection).
+
+    The dependency status of  a destroy action is  controlled by a  flag
+called its 'dependency  flag'. This  is set  according to  the value  of
+sys_destroy_dependent when the entry is created, and may be inspected or
+altered later using sys_destroy_isdependent.
+
+
+sys_destroy_action(item) -> action                           [procedure]
+action -> sys_destroy_action(item)
+        This is the standard destroy property. The destroy action action
+        is a procedure P  or identifier record; in  the latter case  the
+        idval of  the identifier  at  the time  of running  the  destroy
+        action is used  (and must be  a procedure). The  procedure p  is
+        passed the object being destroyed as argument, i.e.
+
+                p(item)
+
+        If you  wish to  create  a new  destroy  property you  can  copy
+        sys_destroy_action and then clear it, i.e.
+
+                copy(sys_destroy_action) -> destroy_prop;
+                clearproperty(destroy_prop);
+
+
+sys_destroy_dependent -> bool                                 [variable]
+bool -> sys_destroy_dependent
+        This variable, which defaults to false, controls the setting  of
+        the destroy dependency flag when a destroy action is assigned to
+        an object (in  any destroy  property). When  false, the  destroy
+        action is created  as independent,  when true it  is created  as
+        dependent.
+
+
+sys_destroy_isdependent(item, destroy_prop) -> bool          [procedure]
+bool -> sys_destroy_isdependent(item, destroy_prop)
+        This procedure returns or updates the dependency flag associated
+        with item in the destroy property destroy_prop. A mishap  occurs
+        is   destroy_prop    is    not   a    destroy    property    (eg
+        sys_destroy_action), or if an attempt is made to update the flag
+        of an object not stored in the property.
+
+
+sys_process_destroy_action(item) -> action                   [procedure]
+action -> sys_process_destroy_action(item)
+        This is a special  destroy property which,  on Unix systems,  is
+        cleared completely (with  clear_prop_entries) after a  sys_fork.
+        In all other respects it is identical to sys_destroy_action.  It
+        is used when you only want destroy actions to be executed in the
+        same process they were set.
+
+        NOTE: Copies of sys_process_destroy_action  will NOT be  cleared
+        on a sys_fork, only sys_process_destroy_action.
+
+
+
+
+-------------------------------
+7  Examples of Using Properties
+-------------------------------
+
+The first  example  uses  newproperty  to  create  a  property  relating
+people's names to their ages:
+
+        constant procedure
+            ageof = newproperty([[fred 23][mary 18][bill 99]], 10, 0,
+                                                                "perm");
+
+        ageof("bill")=>
+        ** 99
+        ageof("mary")=>
+        ** 18
+        ageof("susan")=>
+        ** 0                ;;; produces default value
+
+        "ageless" -> ageof("susan");
+        ageof("susan")=>
+        ** ageless
+        0 -> ageof("bill"); ;;; removes entry for bill
+
+        define lconstant printage(person,age);
+            pr(person), pr(`\t`), pr(age), pr(newline);
+        enddefine;
+
+        appproperty(ageof, printage);
+
+        fred    23
+        mary    18
+        susan   ageless
+
+The second example  uses newanyproperty  to create  a property  relating
+peoples names  to  their  aliases, where  an  active  default  procedure
+nochange is used to map names with no explicit alias to the name itself:
+
+        define lconstant nochange(item, prop) -> item;
+            lvars item, prop;
+        enddefine;
+
+        constant procedure
+            alias = newanyproperty([[henry 'Henry James']
+                                    [fred 'Alfred Tenyson']],
+                                        8, false, false, false, false,
+                                        "perm", false, nochange);
+
+        alias("henry") =>
+        ** Henry James
+        alias("john") =>
+        ** john
+
+
+
+
+---------------------
+8  Hashing Procedures
+---------------------
+
+Hashing procedures are procedures  which take any  item as argument  and
+return a hash code for that item, the hash code normally being a  simple
+integer. Although their  principal use  is in  properties (as  described
+above), they are  potentially usable  in many situations,  and for  this
+reason Poplog provides  for a  hashing procedure to  be associated  with
+each class of object, via the * class_hash field in key structures  (see
+REF * KEYS). The procedure syshash when applied to an item then  returns
+the result of applying the class_hash of the item to the item, i.e.
+
+        class_hash(datakey(item))(item) -> hash_code
+
+    The hashing algorithm for a particular  class of object can thus  be
+altered by changing the class_hash procedure for the key of that  class.
+For example:
+
+        datalength -> class_hash(word_key);
+        syshash("foo") =>
+        ** 3
+        syshash("syshash") =>
+        ** 7
+
+    While class_hash procedures  may compute hash  codes for objects  in
+any appropriate way, the resulting codes should conform to the following
+rules:
+
+        1)  Hash codes are simple integers;
+
+        2)  Hash codes are independent  of machine addresses (and  hence
+            do not change after garbage collections);
+
+        3)  X = Y implies syshash(X) == syshash(Y).
+
+(note however that future versions of Poplog may use different  criteria
+for hashing on Prolog variables or terms).
+
+    Feature (3) makes it possible to use syshash and = as arguments  for
+newanyproperty, to create a hash table that maps arbitrary structures to
+values on the  basis of their  contents (as done  by newmapping  above);
+Feature (2) implies that syshash does not require an enclosing reference
+when supplied as the hash_p argument to newanyproperty.
+
+    The result of any new user-defined class_hash procedure should  obey
+the three rules stated above; also,  if the class_= procedure for a  key
+is  changed,  then  consideration  should  be  given  to  changing   the
+class_hash procedure too (since  structures that are  = are supposed  to
+produce == hash codes).
+
+
+syshash(item) -> hash_code                                   [procedure]
+        This procedure returns a hash code for any item item by applying
+        its class_hash procedure.  The standard  hashing algorithms  for
+        different data types are shown below, many of which  recursively
+        call syshash on sub-structures; on each call syshash  decrements
+        pop_hash_lim locally, and if  this becomes 0, further  recursion
+        is stopped by simply returning the hash code for the key of  the
+        current item. That is, syshash is defined as:
+
+            define syshash(item) -> hash_code;
+                lvars item, hash_code;
+                dlocal pop_hash_lim;
+                if pop_hash_lim == 0 then
+                    syshash(datakey(item)) -> hash_code
+                else
+                    pop_hash_lim - 1 -> pop_hash_lim;
+                    class_hash(datakey(item))(item) -> hash_code
+                endif
+            enddefine;
+
+
+pop_hash_lim -> int                                           [variable]
+int -> pop_hash_lim
+        This (active) integer  variable (default value  3) controls  the
+        depth to which syshash will recurse on structures or iterate  on
+        lists. E.g. To make the hash code for a list take account of its
+        first N elements, assign N + 1 to pop_hash_lim.
+
+
+NOTE:  Common  Lisp  users  should  beware  of  GLOBAL  changes  to  the
+class_hash of built-in classes:  the Lisp function  SXHASH may cease  to
+work properly.  In  such  cases, it  may  be  safer to  use  the  dlocal
+mechanism to locally redefine a class_hash procedure. For example:
+
+        define myprogram();
+            dlocal % class_hash(pair_key) % = myhashpdr;
+            ...
+        enddefine;
+
+
+
+8.1  Standard Hashing Algorithms
+--------------------------------
+The standard class_hash algorithms for different data types are  roughly
+as follows:
+
+    # number:
+
+        intof(item)
+
+    # word, string:
+
+        datalength(item) -> len;
+        if len > 2 then
+            (item(1)+len) + ((item(len)+len) << 3)
+                          + ((item((len>>1)+1)+len) << 6)
+            -> n;
+            n + (n >> 10)
+        elseif len = 2 then
+            item(1) + (item(2) << 3)
+        elseif len == 1 then
+            item(1)
+        else
+            0
+        endif;
+
+        (Note that this is intended to be used modulo 10 bits, e.g.  the
+        dictionary hashing algorithm is the above && 16:3FF.)
+
+    # list:   (N.B. dynamic lists are NOT expanded)
+
+        syshash(pair_key) -> n;
+        for i from 1 to min(pop_hash_lim, listlength(item)) do
+            (syshash(item(i)) << i) + n -> n
+        endfor
+
+    # record:
+
+        syshash(dataword(item)) + syshash(last(item))
+
+    # vector:
+
+        syshash(dataword(item))
+            + syshash(last(item))
+            + syshash(datalength(item))
+
+    # array:
+
+        syshash(arrayvector(item))
+
+    # procedure:
+
+        datasize(item) << pdnargs(item)
+
+    # prologterm:
+
+        syshash(prolog_functor(item)) + syshash(prolog_arity(item))
+            + syshash(prolog_arg(1, item))
+
+    # key:
+
+        syshash(class_dataword(item))
+
+
+
+--- C.all/ref/props
+--- Copyright University of Sussex 1992.  All rights reserved.

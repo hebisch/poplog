@@ -1,0 +1,1783 @@
+REF DEFSTRUCT                                       John Gibson Aug 1992
+
+        COPYRIGHT University of Sussex 1992. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<  POP-11 SYNTAX FOR DEFINING >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<   AND ACCESSING STRUCTURES  >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+The file REF * KEYS  describes the procedures  conskey and  cons_access,
+which allow  the  construction  of new  user-defined  record  or  vector
+classes and/or  procedures to  access the  data within  them. This  file
+describes the associated Pop-11 syntax interface to the same  facilities
+(which in normal programming contexts allows  them to be used in a  more
+convenient way). Information  is given  on defclass  which provides  for
+making new Poplog record and vector classes and the procedures to access
+their fields. Details  are also given  of defining externally  accessing
+procedures.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+
+  2   Basic Field-Type Specifications
+      2.1   N.B.
+
+  3   Defining New Record/Vector Classes
+      3.1   Examples
+      3.2   Note on Recompiling Record and Vectors
+
+  4   Declaring New Field Types
+      4.1   Examples
+
+  5   Field Value Conversion Procedures
+
+  6   External Data Accessing: Overview
+      6.1   Another  N.B.
+
+  7   External Compound Types
+      7.1   Structures
+      7.2   Overlaid Fields in Structures
+      7.3   Arrays
+      7.4   Functions
+
+  8   Defining External Access Procedures
+      8.1   Example
+
+  9   Implicit Access Procedures in External Type Specs
+
+ 10   Implicit Type Access and Typing on External Pointers
+      10.1  Pointer Typing
+
+ 11   In-Line Code for External Access
+      11.1  Examples
+
+ 12   Address Mode Accessing
+
+ 13   Updating External Data: Non-Writeable Types
+      13.1  General Points
+      13.2  Using "!"
+      13.3  Compound Types
+
+ 14   Pointer Values as Data
+
+ 15   External Structure Fields in Records
+
+ 16   Summary of typespec Syntax
+
+ 17   Notes on Efficiency
+
+ 18   Miscellaneous
+
+
+
+---------------
+1  Introduction
+---------------
+
+The construct defclass provides for making new Poplog record and  vector
+classes and procedures for accessing their fields.
+
+    For external data,  i.e. that referenced  by external pointer  class
+records, access code can either be generated in-line with the  construct
+exacc, or produced  as procedures with  defexacc (this includes  calling
+external functions, which is a special kind of data access).
+
+    These constructs require data types  to be specified for the  fields
+within the structures being  defined (i.e. whether  a field can  contain
+any  Poplog  item,   a  packed   integer  field  of   a  given   size, a
+floating-point quantity, etc).  While the basic  allowable field  values
+are governed by a set of built-in types, 'conversion' procedures can  be
+added on  top of  basic types  to enable  field values  to be  converted
+automatically in any appropriate way.
+
+    New types including such  procedures can then  be declared with  the
+constructs  p_typespec  or  l_typespec  (where  the  different  prefixes
+control the scope of the declaration).
+
+
+
+
+----------------------------------
+2  Basic Field-Type Specifications
+----------------------------------
+
+Throughout this file, the meta-notation <typespec> is used to indicate a
+type specification for a data field. Later sections will elaborate  this
+in full,  but for  now we  just  define the  basic forms.  The  simplest
+<typespec> is a colon followed by a <basetype>, i.e.
+
+        <typespec> -->  :<basetype>
+
+The values  for <basetype>  are given  below (these  are described  only
+informally here;  for  a fuller  description  see Field  Specifiers  for
+Poplog Structures in REF * KEYS):
+
+        Type            Field Value
+        ----            -----------
+        full            Any Poplog item
+        word            Signed   integer (natural wordsize of machine)
+        uword           Unsigned integer (natural wordsize of machine)
+        pint            As "word", but value within Poplog simple int
+        long            Signed integer   (as C type 'long')
+        ulong           Unsigned integer (as C type 'unsigned long')
+        int             Signed   integer (as C type 'int')
+        uint            Unsigned integer (as C type 'unsigned int')
+        short           Signed integer   (as C type 'short')
+        ushort          Unsigned integer (as C type 'unsigned short')
+        sbyte           Signed byte
+        byte            Unsigned byte
+        -N              Signed field of integer N bits
+        N               Unsigned field of integer N bits
+        dfloat          Double length float-point
+        sfloat          Single length floating-point
+        float           As "sfloat", except for external function
+                            results (see REF * EXTERNAL)
+        exptr           Pointer to external data (m/c wordsize)
+        exval           Any external data value (m/c wordsize)
+
+Thus for example, ':full' specifies a field to contain any Poplog  item,
+while ':-17' specifies a signed integer bitfield of 17 bits.
+
+    The next <typespec> form defines the layout of a structure, that  is
+an aggregate of (zero or more) fields  in a given order. Each field  has
+an identifying name and a individual <typespec> to say what it can hold:
+together these two form a <fieldspec>, i.e.
+
+        <fieldspec> --> <fieldname> <typespec>
+
+The syntax for the overall structure <typespec> is then
+
+     <typespec> --> { <fieldspec-1>, <fieldspec-2>, ..., <fieldspec-N> }
+
+that is,  a  comma-separated list  of  <fieldspec>s contained  in  curly
+brackets. For example:
+
+        {   person_name     :full,
+            person_address  :full,
+            person_age      :byte,
+            person_sex      :1
+        }
+
+specifies a 4-field structure.
+
+    Note that,  for  Poplog  records  and vectors  only  (i.e.  NOT  for
+external structures),  a  <typespec> may  also  be empty  to  indicate a
+'full' field. Thus
+
+    { person_name, person_address, person_age:byte, person_sex:1 }
+
+is equivalent to the above. The <fieldname> may also be omitted for  any
+field: this is generally only  useful for external structures, where  it
+prevents the generation of an access procedure for that field.
+
+
+
+2.1  N.B.
+---------
+A structure  may  also  contain  one occurrence  of  the  special  ">->"
+fieldname, with no associated <typespec>, e.g.
+
+        { field1, >-> field2:int }
+
+etc. This  is  relevant only  for  a  record class  structure  which  is
+required to be  used by  external procedures; the  'pointer' symbol  >->
+causes the fields following it to  be allocated starting at zero  offset
+from  the  structure  pointer.  See  "Format  of  Data  Structures"   in
+REF * DATA and "External Structure Specification" below.
+
+
+
+
+-------------------------------------
+3  Defining New Record/Vector Classes
+-------------------------------------
+
+Two distinct  kinds of  new Poplog  object classes  can be  constructed:
+record-class and  vector-class. A  record  is a  structure  containing a
+fixed number of distinct and possibly different fields, whereas a vector
+consists of a variable number of similar fields. (For example, a pair is
+a  record-class,  whereas   standard  full  vectors   and  strings   are
+vector-types. The  built-in classes  in the  system also  include  other
+types which  do not  fall  into these  categories  and which  cannot  be
+user-defined, e.g. keys, procedures, processes, etc.)
+
+
+defclass                                                        [syntax]
+        Used to construct new record and vector classes. It uses conskey
+        to create a new key structure  for the class being defined  (see
+        REF * KEYS), and then assigns to identifiers both the key itself
+        and all the "class_" procedures it contains.
+
+        The construct has the form
+
+           defclass <declaration> <dataword> <attributes> <typespec> ;
+
+        with the following parts:
+
+        <declaration>
+            Specifies the declaration for the identifiers to receive the
+            key and the procedures, and is identical in all respects  to
+            the  declaration  in  a  define  header,  including  default
+            declarations  when  omitted.  (Except  that  dlocal  is  NOT
+            allowed, and if "procedure" identprops are specified  either
+            explicitly or by default, this applies only to the procedure
+            identifiers, not to the key identifier.)
+
+        <dataword>
+            The dataword of the new class (i.e. its class name).
+
+        <attributes>
+            This is optional; if present it is a (square) bracketed list
+            of names specifying special  attributes for the class  (e.g.
+            [writeable]  ).  Permissible  attributes  are  described  in
+            * conskey.
+
+        <typespec>
+            A <typespec>  as described  above. If  this is  a  structure
+            (i.e. {...}  )  it  specifies a  record  class,  otherwise a
+            single type specifies a vector class.
+
+
+The identifiers declared  and initialised correspond  to the  procedures
+contained by the key,  some being prefixed/suffixed  by the class  name.
+Calling this X, the following identifiers are common to both records and
+vectors:
+
+        X_key           (class key)
+        isX             (recogniser procedure)
+        consX           (constructor procedure)
+        destX           (destructor procedure)
+
+These three are specific to vectors,
+
+        initX           (initialiser procedure)
+        subscrX         (subscriptor procedure with updater)
+        fast_subscrX    (fast subscriptor procedure with updater)
+
+while  for  records,  each  field  name  in  the  structure  defines  an
+identifier of that name containing the field access/update procedure (if
+a field name is omitted from the structure definition, no identifier  is
+generated, but the procedure is still in the key).
+
+
+
+3.1  Examples
+-------------
+To turn the structure  given in the  section above into  a new class  of
+Poplog records:
+
+        defclass person
+            {   person_name,
+                person_address,
+                person_age :byte,
+                person_sex :1
+            };
+
+This defines a record class whose class name is "person", and  instances
+of the class will contain the given fields. The identifiers defined are
+
+        person_key,
+        isperson, consperson, destperson,
+        person_name, person_address, person_age, person_sex
+
+For vectors,
+
+        defclass unsigned :uint;
+        defclass lconstant eyefull;
+
+create vector classes  with class  names "unsigned"  and "eyefull",  and
+whose element types are  respectively "uint" and  "full" (the latter  by
+default for an empty <typespec>). The identifiers defined by the  second
+are
+
+        eyefull_key,
+        iseyefull, conseyefull, desteyefull, initeyefull,
+        subscreyefull, fast_subscreyefull
+
+and similarily for the first, etc.
+
+
+
+3.2  Note on Recompiling Record and Vectors
+-------------------------------------------
+A potential problem can arise when re-compiling a defclass statement for
+which records/vectors of the  class have already  been created (and  are
+still in  existence). Since  all  objects are  identified by  their  key
+(which is  unique for  a given  class), the  creation of  a NEW  key  on
+recompilation would invalidate  all such existing  structures using  the
+old key (in the  sense that they  would no longer  be recognised by  the
+procedures associated with the new key).
+
+    To obviate  this  problem  (at least  when  <declaration>  specifies
+permanent  identifiers),  defclass  operates   as  follows:  If  a   key
+identifier (i.e.  X_key)  already exists  for  the class  name  X  being
+defined, and contains a key  whose class_field_spec exactly matches  the
+<typespec> of  the  current definition  (and  which also  has  the  same
+<attributes>), then this key is used instead of creating a new one.  The
+rest continues as  normal, i.e.  the identifiers  (including X_key)  are
+(re)declared and the key and its procedures assigned to them.
+
+    If you wish to stop  the old key being  used, you can simply  assign
+any non-key object to X_key before the defclass statement, e.g.
+
+        undef -> X_key
+
+    For lexical identifiers (e.g. lconstant), the strategy of trying  to
+use  an   existing  key   from  X_key   doesn't  work   (because   being
+lexically-scoped, the X_key identifier will  have ceased to exist  after
+the initial compilation). In this case,  if the problem arises you  will
+have to deal with it in some other way.
+
+
+
+
+----------------------------
+4  Declaring New Field Types
+----------------------------
+
+p_typespec                                                      [syntax]
+l_typespec                                                      [syntax]
+i_typespec                                                      [syntax]
+        These constructs can be used to declare new named field types in
+        terms of existing ones.  The three differ only  in the scope  of
+        the declaration  being  made  (see  below),  and  are  otherwise
+        identical, so x_typespec will be used to represent any of them.
+
+        The format of  an x_typespec statement  is very simple:  letting
+        <name-typespec> mean a name followed by a <typespec> (as defined
+        elsewhere in this file), i.e.
+
+            <name-typespec> -->  <typename> <typespec>
+
+        it is just
+
+            x_typespec <name-typespec-1>, ..., <name-typespec-N> ;
+
+        that is, a comma-separated  list of <name-typespec>s  terminated
+        by a semicolon. The effect of the statement is to associate each
+        <typespec> with its given  <typename>; the <typename>s can  then
+        occur  anywhere  a  <basetype>  can,  i.e.  the  definition   of
+        <typespec> can be extended to include
+
+            <typespec> -->  :<typename>
+
+
+
+4.1  Examples
+-------------
+After writing
+
+        p_typespec
+            an_age  :byte,
+            a_bit   :1
+            ;
+
+we could employ the  new types declared to  rewrite the "person"  record
+class example from the last section:
+
+        defclass person
+            {   person_name,
+                person_address,
+                person_age :an_age,
+                person_sex :a_bit
+            };
+
+    To enable type  declarations to  be scoped  in a  manner similar  to
+ordinary program identifiers,  the x_typespec forms  store and  retrieve
+the details of  each type  declared from  an identifier  (whose name  is
+derived from the typename, e.g. "an_age:typespec"). The declarations  of
+these identifiers (and thus the  scope required) may then be  controlled
+by using the construct with the appropriate prefix, i.e.
+
+        Construct       Typename Scope
+        ---------       --------------
+        p_typespec      permanent (identifier declared as constant)
+        l_typespec      lexical   (identifier declared as lconstant)
+
+The i_typespec form is for .ph include files, and behaves as  l_typespec
+in a #_INCLUDEd  file, but  p_typespec when directly  compiled (this  is
+achieved   by   testing   the   variable   used   by   #_INCLUDE,    see
+REF * Pop_#_INCLUDE_STACK).
+
+
+
+
+------------------------------------
+5  Field Value Conversion Procedures
+------------------------------------
+
+Although defining a new type name for a basetype is useful, it does  not
+affect the actual value that can  result from accessing a field of  that
+type in a structure (for example, defining the "person_sex" field in the
+last section as
+
+        person_sex :a_bit
+
+makes no difference to the  result of applying the person_sex  procedure
+to a "person" record, which will still be 0 or 1).
+
+    However, field typespecs also allow for the inclusion of one or more
+'conversion' procedures. These are applied successively when accessing a
+field, to convert its actual value to some final output form.  Moreover,
+since data in  that same form  should also  be input to  the field  when
+updating it,  corresponding procedure(s)  are  required to  convert  the
+input value back to  the actual value to  be assigned into the  field. A
+convenient way of doing this is to require each conversion procedure  to
+have an updater which performs the opposite conversion (and the updaters
+are run in the opposite order).
+
+The syntax for specifying a conversion procedure is
+
+        <typespec> -->  <typespec> # <identifier name>
+
+where <identifier name>  is the  name of  an identifier  whose value  is
+taken as the conversion procedure (N.B. its current, compile-time  value
+- the <typespec> cannot  indirect through a  variable at run-time).  The
+procedure must also have  an updater (at least,  it must for record  and
+vector class fields; for  external fields that are  not assigned to  the
+updater may be absent).  A conversion procedure  conv_p and its  updater
+are called as
+
+           conv_p(value) -> converted_value
+           -> conv_p(converted_value) -> value
+
+(N.B. Inasmuch as the updater is expected to return a result, this  is a
+somewhat strange way of using updaters!)
+
+    Applying conversion  procedures to  the  above example,  suppose  we
+wanted the  "person_sex"  field  to  produce  "male"  or  "female"  when
+accessed  (by  the   field  procedure  person_sex   or  the   destructor
+destperson), and to take the same values when updated (by person_sex  or
+the constructor consperson). The following procedure would achieve this:
+
+        define lconstant bitval_to_sex(bit);
+            lvars bit;
+            if bit == 0 then "male" else "female" endif
+        enddefine;
+        ;;;
+        define updaterof bitval_to_sex(sex);
+            lvars sex;
+            if sex == "male" then
+                0
+            elseif sex == "female" then
+                1
+            else
+                mishap(sex, 1, 'male OR female NEEDED FOR FIELD VALUE')
+            endif
+        enddefine;
+
+The procedure could then be specified directly in the definition of  the
+'person_sex' field
+
+        person_sex :1#bitval_to_sex
+
+or incorporated into a new type first
+
+        p_typespec sex :1#bitval_to_sex;
+
+and the field defined as
+
+        person_sex :sex
+
+etc.
+
+
+
+
+------------------------------------
+6  External Data Accessing: Overview
+------------------------------------
+
+'External' data is data maintained  in memory outside the Poplog  system
+proper  by  external  procedures,  i.e.  those  written  in   non-Poplog
+languages. Such data  is represented  and manipulated  inside Poplog  by
+'external pointer-class' structures, which  are ordinary Poplog  records
+having an "exptr" field  in a fixed position.  Access code generated  by
+exacc, or access procedures defined by defexacc, can then be applied  to
+such structures to  extract or  update external data  via their  pointer
+fields. (See  REF * EXTERNAL_DATA for  a  full explanation  of  external
+pointer-class structures.)
+
+    A special  case of  an external  data structure  is a  function  (or
+procedure -- the names mean the  same); here 'accessing' the data  means
+calling the function  to produce  its result  (if any).  Thus exacc  and
+defexacc can  also be  used to  call functions  pointed to  by  external
+pointers. (REF * EXTERNAL  deals in  more detail  with calling  external
+functions.)
+
+    Because external  data structures  (a) do  not have  to be  made  by
+Poplog -style constructor procedures, (b) are not relocatable and always
+reside in  fixed memory  locations, and  (c) are  not processed  by  the
+garbage collector, they allow  a greater range of  field types than  for
+native Poplog structures. In  particular, they allow 'compound'  fields,
+i.e. fields which are sub-structures or arrays, and for which the access
+procedure can  return the  address  of the  field (as  another  external
+pointer).
+
+    Alternatively, such address-value fields (as well as "exptr"  fields
+directly containing  an  address)  can include  in  their  specification
+automatic access through the address  to the underlying data, either  in
+terms   of    further   type-specifications    for   that    data,    or
+previously-defined access procedures for it.
+
+
+
+6.1  Another  N.B.
+------------------
+While "full" fields  can be used  in external structures,  they must  be
+used with EXTREME caution. Unlike a record or vector class (which  has a
+key  structure  describing  itself,   used  by  garbage  collection   in
+determining the position  of "full" fields  containing Poplog  structure
+pointers), external pointers contain no  description of what they  point
+to.
+
+Thus a "full"  field in an  external structure is  NOT processed by  the
+garbage collector, and the assignment of a Poplog structure into  such a
+field may result  in it containing  junk after a  garbage collection  --
+this will certainly be  the case if the  structure is not  fixed-address
+(see   Fixed-Address   Poplog   Structures    for   External   Use    in
+REF * EXTERNAL_DATA). In an  attempt to  guard against  this, an  access
+procedure for  such  a field  mishaps  if  its value  does  not  satisfy
+is_poplog_item (which is by no means guaranteed to pick up all errors).
+
+
+
+
+--------------------------
+7  External Compound Types
+--------------------------
+
+7.1  Structures
+---------------
+Note first  that  (to allow  the  material prior  to  this point  to  be
+concerned mainly with  defining Poplog structures),  the description  of
+the x_typespec constructs above omitted  to stress that structure  types
+can be declared, e.g. as in
+
+        p_typespec timeval
+                    { tv_sec :long,
+                      tv_usec :long
+                    };
+
+This is of limited  relevance for Poplog  structures because such  types
+cannot be specified as elements of record or vectors (although they  can
+be 'exploded'  as multiple  fields in  a record  class, see  below).  In
+addition, it should be  noted that (as described  under 'Format of  Data
+Structures' in  REF * DATA),  a Poplog  structure  has a  2-word  header
+BEHIND the structure pointer, and that by default, structures  specified
+to defclass will use the spare  word in this header where possible  (and
+thus do not necessarily start at the pointer).
+
+While Poplog records that are required to be used externally can include
+the `pointer' symbol >-> in their structure spec to force data to  start
+at the  pointer,  structures  declared  with  x_typespec  (or  given  to
+defexacc) AUTOMATICALLY do so (i.e. they have >-> added before the first
+field).
+
+    A structure type as above (or indeed an explicit structure) can thus
+appear as a field in an external structure. For example:
+
+        p_typespec rusage
+                    { ru_utime :timeval,
+                      ru_stime :timeval,
+                      ru_maxrss :int,
+
+                      <rest of fields>
+                    };
+
+As mentioned  above,  a  sub-structure field  such  as  "ru_stime"  is a
+`compound' field;  this means  that an  access procedure  for the  field
+returns an external pointer  to the start of  the field data (i.e.  when
+applied to  an pointer  to an  "rusage" structure).  The result  pointer
+could then in  turn be  used with  an access  procedure for  one of  the
+'timeval' structure fields, etc.
+
+
+
+7.2  Overlaid Fields in Structures
+----------------------------------
+To allow alternate  sets of  fields within a  single external  structure
+(like `unions' in C), the symbol "|" may occur anywhere between  fields,
+e.g.
+
+        p_typespec foo
+                    { a1_fld1 :int, a1_fld2 :int
+                    | a2_fld1 :dfloat
+                    | a3_fld1 :short, a3_fld2 :byte
+                    }
+
+The effect of "|" is simply to reset the offset of the next field to  0,
+i.e. back to the pointer position. Thus the fields in each alternate set
+will actually  overlay  each  other  in memory  (and  the  size  of  the
+structure as a whole is the greatest of any overlay).
+
+Aside from this, "|" has no other effect; each field in the structure is
+accessed  just  like  a  field  in  a  structure  without  overlays  (in
+particular, "|" does not allow alternatives in the sense of re-using the
+same name for different fields, etc).
+
+
+
+7.3  Arrays
+-----------
+The second compound type allowed is a sized or unsized array (currently,
+only 1-dimensional). Defining <element-typespec> by
+
+        <element-typespec>  -->  :<basetype or typename>
+                            -->  { <fieldspec>, ... }
+
+an array is a <element-typespec> followed by square brackets  containing
+an integer >= 0 for sized, or nothing for unsized, i.e.
+
+        <typespec> -->  <element-typespec> [ <integer> ]
+                   -->  <element-typespec> []
+
+Some examples:
+
+        p_typespec
+            timeval2    :timeval[2],
+
+            bytearray   :byte[],
+
+            direct  { dir_off    :long,
+                      dir_ino    :long,
+                      dir_reclen :short,
+                      dir_namlen :short,
+                      dir_name   :bytearray
+                    }
+            ;
+
+As with structures, the access procedure for an array-type field returns
+a pointer  to  its  first  element. Thus  when  applied  to  a  "direct"
+structure, the field procedure for "dir_name" would return a pointer  to
+its first  byte; this  could  then be  used  with a  subscriptor  access
+procedure for a byte array.
+
+Note that subscript values within arrays are as for Poplog vectors, i.e.
+the  first  element  is  numbered  1.  A  (non-fast)  array  subscriptor
+procedure therefore checks its subscript >= 1; if in addition the  array
+is sized, the subscript is checked <= size. (For obvious reasons,  there
+are various restrictions on the use  of unsized arrays: in a  structure,
+an unsized array  type can  only appear as  the last  field, and  such a
+structure cannot itself be arrayed, or  appear as anything but the  last
+field in an outer structure, etc.)
+
+
+
+7.4  Functions
+--------------
+The  final  compound  type  is  an  external  function.  A  function  is
+characterised by the number of arguments  it takes, and the type of  its
+result (if any). Syntactically, this is specified by
+
+        <typespec> -->  ( <arglist> ) <typespec>
+                   -->  ( <arglist> ) :void
+                   -->  ( <arglist> )
+
+where <typespec> refers to the result of the function.
+
+The result <typespec> is restricted  to non-compound types (i.e.  cannot
+be a structure, array or function, although  it can be a POINTER to  any
+of these). It  can also be  given as :void  or omitted altogether  for a
+function not returning a result.
+
+Although the result of an  external function is `statically typed',  its
+arguments are `dynamically typed'. That is, the actual values passed  to
+a function depend solely on the run-time arguments you supply to it, and
+(with the  exception  of (d)decimals),  any  particular kind  of  Poplog
+object is always passed  in the same way.  Argument processing is  dealt
+with  in  detail   in  the   section  Calling   External  Functions   in
+REF * EXTERNAL.
+
+Syntactically therefore, all that needs to be specified is:
+
+    #   The number of  arguments to the  function if this  is fixed,  or
+        alternately,  that  the  function  is  variadic,  i.e.   takes a
+        variable number of  arguments. In  the latter  case, the  actual
+        number of arguments  to a  given call  of the  function must  be
+        supplied as an extra last argument.
+
+    #   The treatment of pop decimals or ddecimals when passed for given
+        argument(s).
+
+<arglist> is thus a comma-separated sequence of zero or more <argspec>s,
+i.e.
+
+        <arglist> -->  <argspec>, <argspec>, ..., <argspec>
+
+where each <argspec> can be either
+
+    #   A simple argument name, e.g.
+
+                (x, y, z)
+
+        Except for the name "N" (see below), no significance is attached
+        to the names; they merely serve to mark the argument  positions,
+        and can be omitted if desired, e.g.
+
+                ( , , )
+
+        has the same effect.
+
+    #   An integer, standing for that number of arguments. E.g.
+
+                (3)
+                (x, y, 4, z)        ;;; = 7 arguments altogether
+
+    #   The special  argument  name  "...". This  must  come  last,  and
+        specifies an  indeterminate number  of further  arguments,  i.e.
+        that the function is variadic:
+
+                (...)
+                (x, y, z, ...)
+
+    #   Any of  the above  followed by  <SF>. This  indicates that  if a
+        (d)decimal is passed  for any  of the  argument(s) in  question,
+        then it should be passed as a machine single float rather than a
+        double:
+
+                (x, y<SF>, ...)
+                (x, y, 4<SF>, z)
+                (x, y, z, ...<SF>)
+
+        (You can  also use  <DF> to  indicate double,  but this  is  the
+        default so is  never required.)  In the  variadic case,  ...<SF>
+        applies to all the remaining arguments.
+
+        Note that <SF> is not a 'type' on the argument(s), in the  sense
+        of implying type-checking or conversion for other values passed;
+        it merely says "if (d)decimals are passed for these argument(s),
+        pass  them  as  single".  See  Calling  External  Functions   in
+        REF * EXTERNAL for details of when to use <SF>.
+
+(N.B. In previous versions of the  system, the single argument name  "N"
+indicated a variadic function, i.e. (N) was used instead of (...). Since
+this usage is still supported for backward compatibility, you cannot use
+`N` for the name of the first argument.)
+
+Some example declarations (of standard C library functions):
+
+        p_typespec
+            malloc(nbytes) :exptr,
+            atan2(x, y) :dfloat,
+            exit(status) :void,            ;;; no result
+            printf(string, ...) :int,      ;;; variadic
+            ;
+
+Note that (unlike structures and arrays), a function spec cannot  appear
+as an element of  a structure or an  array; it can only  be used as  the
+direct argument  to exacc  or defexacc,  or as  an implicit  type on  an
+external pointer field (that is, specifying  a POINTER to a function  --
+implicit pointer types are dealt with in a later section).
+
+
+
+
+--------------------------------------
+8  Defining External Access Procedures
+--------------------------------------
+
+External data can  be accessed  (or functions called,  etc) either  with
+in-line code generated by the syntax construct exacc, or with procedures
+defined by defexacc.  This section describes  defexacc; exacc (which  is
+generally more convenient  for calling  functions), is  dealt with  in a
+later section.
+
+
+defexacc                                                        [syntax]
+        Used to  construct  new access/update  procedures  for  external
+        data. It uses cons_access (see REF * KEYS) to create a procedure
+        or procedures appropriate to  the <typespec> argument  supplied,
+        and  then  assigns   the  procedure(s)   to  identifiers.   (The
+        procedures constructed will accept  as their input argument  any
+        external pointer-class structure -- see REF * EXTERNAL_DATA.)
+
+        The construct has the form
+
+            defexacc <declaration> <name> <attributes> <typespec> ;
+
+        with the following parts:
+
+        <declaration>
+            Specifies the declaration for  the identifier(s) to  receive
+            the procedure(s), and  is identical in  all respects to  the
+            declaration  in   a   define   header,   including   default
+            declarations  when  omitted.  (Except  that  dlocal  is  NOT
+            allowed.)
+
+        <name>
+            An optional word. If supplied it determines the names of the
+            identifier(s) to receive the procedure(s) -- see below.
+
+        <attributes>
+            This is  optional:  if present,  it  consists of  a  square-
+            bracketed  list  of  attribute  names  (words),   optionally
+            separated by commas. Valid attributes are
+
+                @       See "Address Mode Accessing" below.
+                nc      See "Notes on Efficiency" below
+                fast    See "Notes on Efficiency" below
+
+            (For example, [@,nc,fast] .)
+
+        <typespec>
+            A <typespec> as  described in  elsewhere in  this file.  The
+            type of this determines what procedures are constructed.
+
+                Type        Procedure(s)
+                ----        ------------
+                Structure   Access procedures for named structure fields
+                Array       Subscriptor procedure for array elements
+                Function    Apply procedure for function
+                Other       Access procedure for non-compound type
+
+            The table above shows the mapping.
+
+        Note that  whether  or  not the  constructed  procedure(s)  have
+        updaters depends  on whether  <typespec> specifies  a  writeable
+        type (see Updating External Data: Non-Writeable Types  below).
+        (An apply procedure for a function never has an updater.)
+
+
+The identifier names declared by -defexacc are determined as follows:
+
+    # For a structure, the field  access procedures are named after  the
+      structure fields,  with "<name>_"  prefixing  these if  <name>  is
+      supplied (no procedures are generated for unnamed fields).
+
+    # For an array, the subscriptor  procedure is just called <name>  if
+      that is supplied.  Otherwise the  <typespec> must be  of the  form
+      :<typename>  or  :<typename>[..],  and  the  procedure  is  called
+      "exsub_<typename>".
+
+    # For a function, the apply procedure is just called <name> if  that
+      is supplied. Otherwise, the procedure is called "exapp<nargs>"  or
+      "exapp<nargs>_<typename>",  where   <nargs>  is   the  number   of
+      arguments or "N" for a variadic function, and where  "_<typename>"
+      is present  if <typespec>  is of  the form  (..):<typename>  (i.e.
+      specifying a result of <typename>).
+
+    # For the last case, the access  procedure is just called <name>  if
+      that is supplied.  Otherwise the <typespec>  must consist of  just
+      :<typename>, and the procedure is called "exacc_<typename>".
+
+In all cases, "fast_" is prefixed to the name(s) if the "fast" attribute
+is present but not <name> (i.e. if you supply <name> this is assumed  to
+include any prefix you may or may not want).
+
+
+
+8.1  Example
+------------
+With the definition of the "direct" structure as in the section above,
+
+        p_typespec
+            direct  { dir_off    :long,
+                      dir_ino    :long,
+                      dir_reclen :short,
+                      dir_namlen :short,
+                      dir_name   :byte[]
+                    };
+
+the  following  will  generate   access  procedures  dir_off,   dir_ino,
+dir_reclen, dir_namlen and dir_name:
+
+        defexacc :direct;
+
+In this structure  (which is a  SunOS Unix directory  entry), the  field
+"dir_namelen" gives the length in  bytes of the "dir_name" field.  Since
+the latter is an array, the  procedure dir_name will return an  external
+pointer to the field, the bytes  of which could then be accessed  with a
+byte subscriptor procedure exsub_byte:
+
+        defexacc :byte[];
+
+Thus if a_direct contains an external pointer-class record pointing to a
+"direct" structure, then
+
+        exsub_byte(N, dir_name(a_direct))
+
+would return the N-th byte of the structure's "dir_name" field. However,
+since in this particular example the  bytes in the "dir_name" field  are
+guaranteed to be null-terminated (i.e. end with ASCII 0), a simpler  way
+to access the whole  name field would be  to use the built-in  procedure
+exacc_ntstring, which given a pointer  to a null-terminated sequence  of
+bytes extracts them as a Poplog string. Thus
+
+        exacc_ntstring(dir_name(a_direct))
+
+would return the whole name as a string.
+
+
+
+
+----------------------------------------------------
+9  Implicit Access Procedures in External Type Specs
+----------------------------------------------------
+
+In the above  example, it would  be convenient if  the "dir_name"  field
+could be specified so as to  produce a Poplog string automatically  when
+accessed; this can be done by specifying exacc_ntstring as an  'implicit
+access' procedure.  The syntax  for  this is  similiar to  a  conversion
+procedure, but using "." instead of "#", i.e.
+
+        <typespec> -->  <typespec> . <identifier name>
+
+where the procedure is taken from  <identifier name> in the same way  as
+for a conversion procedure. An  implicit access procedure ACC_P and  its
+updater are called as
+
+        ACC_P(EXPTR) -> RESULT
+        RESULT -> ACC_P(EXPTR)
+
+where EXPTR is  an external pointer  record and RESULT  is whatever  the
+procedure accesses from it. (N.B. Unlike conversion procedures, implicit
+access procedure  updaters  accord  with 'normal'  updater  usage;  this
+includes the fact that in a sequence of them, only the last is called in
+update mode -- see the next section.)
+
+    Using exacc_ntstring as an implicit access procedure, the definition
+of the field "dir_name" could now be rewritten
+
+        dir_name :byte[].exacc_ntstring
+
+after which
+
+        dir_name(a_direct)
+
+would produce a string directly. (Better still, we can declare a general
+field type for a null-terminated string and recast the field  definition
+to use that, e.g.
+
+        p_typespec ntstring :byte[].exacc_ntstring;
+
+        dir_name :ntstring
+
+etc.) Alternatively, reverting back  to accessing individual bytes,  the
+field could be declared
+
+        dir_name :byte[].exsub_byte
+
+giving a field procedure
+
+        dir_name(N, a_direct)
+
+that returns the N-th byte of the name.
+
+    It is important to note that  access procedures may only be  applied
+on  top  of   address-value  fields,  that   is,  (a)  compound   fields
+(structures, arrays and  functions), (b)  "exptr" fields,  or (c)  other
+access procedures producing a pointer. (It might be thought that in  the
+example exacc_ntstring  could be  specified  as a  conversion  procedure
+anyway, but  this  NOT the  case:  while conversion  procedures  may  be
+applied to "exptr" fields, they cannot be used with compound fields. The
+reason concerns the semantics of updating  the field -- see the  section
+on updating.)
+
+Of course,  conversion  procedures  can  be layered  on  top  of  access
+procedures. A typical example might be to turn the "ntstring" type  into
+one that produces a Poplog word:
+
+        define string_to_word()
+            consword()
+        enddefine;
+        define updaterof string_to_word()
+            word_string()
+        enddefine;
+
+        p_typespec ntword :ntstring#string_to_word;
+
+and so on.
+
+(Note that where an external <typespec> is given as the direct  argument
+to exacc or  defexacc, it  may consist  of access/conversion  procedures
+only. Thus something like
+
+        defexacc foobaz .exacc_ntstring#string_to_word;
+
+is valid, but the above <typespec> is not valid for a structure field or
+array element,  etc. This  facility is  mainly useful  for a  <typespec>
+given to exload, see REF * EXTERNAL.)
+
+
+
+
+--------------------------------------------------------
+10  Implicit Type Access and Typing on External Pointers
+--------------------------------------------------------
+
+The idea of  implicit access  can be taken  a stage  further to  include
+'implicit type access' specification. Suppose  we have an "exptr"  field
+(either a single one, or part of a structure), which we know  contains a
+pointer to say, an "int" value. We could use exacc_int as defined by
+
+        defexacc :int;
+
+as an implicit access procedure on top of the "exptr" field, to obtain a
+procedure which returns the "int" value indirectly through the  pointer,
+e.g.
+
+        defexacc exacc_int_indir :exptr.exacc_int;
+
+However, the type-specification  mechanism allows this  to be  expressed
+more succinctly (and generating more efficient code) as
+
+        :exptr.:int
+
+that is, we can use ':int' as an implicit access 'procedure'.
+
+    More generally,  any  <typespec> can  be  used in  this  way,  which
+syntactically gives
+
+        <typespec> -->  <typespec> . <typespec>
+
+For  a  non-compound  type,  its  use  for  implicit  access  is  simply
+equivalent to using the  procedure that defexacc  would produce for  it;
+however, for compound types the situation is different.
+
+    The system is  designed on the  basis that an  access to a  compound
+sub-field of a structure (or a compound element of an array) finishes by
+returning the address of the compound  item as a pointer (which  pointer
+will then be used by another access procedure appropriate for the  type,
+i.e. another field, subscriptor or apply procedure). defexacc and  exacc
+thus generate field, subscriptor  and apply procedures/code for  direct,
+'top-level' structures, arrays and functions only; elsewhere, these just
+mean mean 'return the address'. (Thus for example
+
+            defexacc :byte[];
+
+generates a subscriptor, but the same type for a structure field
+
+            dir_name :byte[]
+
+does not.)  So, when  used for  implicit access,  compound types  merely
+return an address -- which in fact, means they do nothing. To see  this,
+consider a type such as
+
+            :exptr.:ntstring
+
+This 'expands out' to
+
+            :exptr.:byte[].exacc_ntstring
+
+which is equivalent to just
+
+            :exptr.exacc_ntstring
+
+i.e. the '.:byte[]' part doesn't do anything.
+
+
+
+10.1  Pointer Typing
+--------------------
+In general therefore, an implicit compound type merely has the effect of
+'typing' the pointer that precedes it.  A special case of this is  where
+one appears at the end of a typespec, as in the following two examples:
+
+            ;;; pointer to byte array
+            :exptr.:byte[]
+
+            ;;; pointer to pointer to 1-arg function returning int
+            :exptr.:exptr.(ARG):int
+
+Not only do these have the same results as ':exptr' and  ':exptr.:exptr'
+respectively, but the system in fact  treats them as IDENTICAL to  those
+(i.e. both fields are just considered to be the final external pointer).
+The important  point  in  this  respect is  that  it  gives  a  sensible
+interpretation to UPDATING these fields (namely of assigning a new  byte
+array or function address into them, etc).
+
+    In addition, the  'typing' property  of implicit  compound types  is
+used by  the syntax  construct exacc  (described below),  to enable  one
+exacc applied to the result of another producing an external pointer, to
+determine the result  pointer type (making  it unnecessary to  respecify
+that type).  There  is  a special  convention  associated  with  this: a
+structure consisting of just one field with no field name, i.e.
+
+            { <typespec> }
+
+can be used to 'bracket' <typespec> for the purpose of typing a pointer.
+For example,
+
+            :exptr.{:int}
+
+types the pointer as pointing to "int". Note that in terms of the  field
+value there is nothing  special about this (it  being just a  particular
+case of an implicit compound type). However, when extracting the type of
+a pointer, exacc recognises such 1-field 'bracket' structures and strips
+off any number of levels of  them; thus it recognises the above  example
+as a pointer to "int", not to a 1-field structure.
+
+    For consistency, this convention is also recognised by defexacc,  in
+that it too strips outer 'bracket' structures from its argument. Thus
+
+            defexacc {:int};
+
+is the same as 'defexacc :int;',  etc. (A bracket structure is also  the
+correct way  to make  a non-compound  structure field  or array  element
+produce the address of the data rather than its value; for example, with
+
+            defexacc { f1 :int, f2 {:int} };
+
+the f2 procedure would return a pointer to "int".)
+
+
+
+
+------------------------------------
+11  In-Line Code for External Access
+------------------------------------
+
+As an alternative  to constructing procedures  with defexacc, the  exacc
+syntax form is provided for  generating in-line code to access  external
+data and  call  functions.  This  saves the  time  overhead  of  calling
+procedures (and can also save  the space overhead of procedure  records,
+although since each piece of in-line code generally takes a little  more
+space than a procedure call, a procedure may be more space-efficient for
+multiple uses of the same access).
+
+    exacc is also usually  a more convenient  form for calling  external
+functions; it  is  particularily  designed  for  use  with  pointers  to
+external functions  and data  loaded with  the exload  syntax form  (see
+REF * EXTERNAL), since  this has  the option  to automatically  generate
+typespec declarations under  the names of  the identifiers being  loaded
+(which therefore  require no  further <typespec>  declaration when  used
+with exacc).
+
+
+exacc                                                           [syntax]
+        Used to generate  in-line access/update code  for external  data
+        (for which  it  uses the  Poplog  VM instruction  sysFIELD,  see
+        REF * VMCODE).
+
+        This construct has the general form
+
+        exacc <attributes> <typespec> <pointer expression> <access part>
+
+        where the parts are as follows:
+
+        <attributes>
+            This is  optional:  if present,  it  consists of  a  square-
+            bracketed list  of  attribute  names as  for  defexacc  (see
+            above).
+
+        <typespec>
+            An optional type  'cast' for <pointer  expression>. This  is
+            mandatory  only  if  a  <typespec>  cannot  be  derived  for
+            <pointer expression>; if supplied, it overrides any  derived
+            type.
+
+        <pointer expression>
+            An  expression  whose   run-time  evaluation  produces   the
+            external  pointer-class   record   to  be   used   for   the
+            access/update. This can have three forms:
+
+                (1) A simple  identifier <name>,  meaning the  value  of
+                    that identifier. If <typespec> is not present,  then
+                    <name>  must   have  a   current  declaration   as a
+                    typename, and the <typespec> assumed is :<name>.
+
+                (2) Another exacc  construct  enclosed  in  parentheses,
+                    i.e.  (exacc  ...),  meaning  an  external   pointer
+                    resulting from  that access.  If <typespec>  is  not
+                    supplied,  then  the  result  pointer  type  of  the
+                    enclosed exacc must must be derivable (see below).
+
+                (3) Any other Pop11 expression enclosed in  parentheses,
+                    meaning the value of that expression. In this  case,
+                    <typespec> must be supplied.
+
+        <access part>
+            This  part  depends  on  the  kind  of  access/update  being
+            performed, as specified  by <typespec>  (and corresponds  to
+            the type  of procedure  that would  be generated  for it  by
+            defexacc):
+
+            Structure Field:
+                For <typespec> a structure, a dot followed by the name
+                of the field to be accessed, i.e.
+
+                        . <fieldname>
+
+                E.g.
+
+                        exacc struct.field
+
+            Array Element:
+                For <typespec> an array, a Pop11 expression for the
+                array subscript enclosed in square brackets, i.e.
+
+                        [ <expression> ]
+
+                E.g.
+
+                        exacc array[n+1]
+
+            Function:
+                For <typespec> a function, a Pop-11 expression sequence
+                for the function arguments enclosed in parentheses, i.e.
+
+                        (ARG_1, ARG_2, ..., ARG_N)
+
+                E.g.
+
+                        exacc func(1,2,3)
+
+            Other:
+                For <typespec> a non-compound type, nothing.
+                E.g.
+
+                       exacc pointer
+
+        Note that  an exacc  construct can  be used  for updating,  i.e.
+        appear after ` -> `; however, a compile-time mishap will  result
+        in this case if <typespec>  specifies a non-writeable type  (see
+        'Updating  External  Data:   Non-Writeable  Types'  below).   (A
+        function call in update mode will always produce a mishap).
+
+
+
+11.1  Examples
+--------------
+Before discussing form (2) for  the pointer expression (where one  exacc
+is applied to the result of  another), we illustrate forms (1) and  (3).
+Suppose (returning  to the  example  in the  section on  defexacc)  that
+get_direct is a Pop procedure returning an external pointer-class record
+pointing to a "direct" structure, defined as
+
+        p_typespec direct { dir_off    :long,
+                            dir_ino    :long,
+                            dir_reclen :short,
+                            dir_namlen :short,
+                            dir_name   :byte[]
+                          };
+
+Then (using form (3)),
+
+        exacc :direct (get_direct()).dir_namlen
+
+would access the "dir_namlen"  field (a short  integer). If instead  the
+procedure result were assigned to  a variable a_direct first, then  form
+(1) can be used:
+
+        get_direct() -> a_direct;
+        exacc :direct a_direct.dir_namlen
+
+However, if the name "a_direct" is itself declared as a typename,
+
+        l_typespec a_direct :direct;
+
+then the type cast can be omitted:
+
+        get_direct() -> a_direct;
+        exacc a_direct.dir_namlen
+
+etc.
+
+    Now suppose that  instead of  a Pop  procedure we  have an  external
+function readdir, again returning a pointer to a "direct" structure  (it
+takes an argument stream, but  this isn't relevant for the  discussion).
+If the function is declared
+
+        p_typespec readdir(stream) :exptr;
+
+then as before, the result could be assigned to a_direct first:
+
+        exacc readdir(stream) -> a_direct;
+        exacc a_direct.dir_namlen
+
+On the other hand,  form (2) could  be used, applying  one exacc to  the
+result of another. With a type cast this is
+
+        exacc :direct (exacc readdir(stream)).dir_namlen
+
+as with the Pop procedure, but we would like to omit the cast and write
+
+        exacc (exacc readdir(stream)).dir_namlen
+
+As things  stand however,  this  will produce  a compilation  mishap  --
+because although the result of the  function is known to be an  external
+pointer, it hasn't been declared as  a pointer to a "direct"  structure.
+Redeclaring the function with  a typed pointer  result enables exacc  to
+derive this information:
+
+        p_typespec readdir(stream) :exptr.{:direct};
+
+(note that in  this case  the 'bracket' structure  around :direct  isn't
+strictly necessary, because :direct is  already a compound type, but  it
+makes sense always  to use  it, since  it is  required for  non-compound
+types).
+
+Finally, consider  the "dir_name"  field:  as declared,  this  returns a
+pointer to a byte  array. The pointer could  be assigned to a  variable,
+and bytes accessed from there, e.g.
+
+        l_typespec bptr :byte[];
+
+        exacc (exacc readdir(stream)).dir_name -> bptr;
+        exacc bptr[1] -> byte;
+
+Alternatively, the pointer could be given directly to exacc_ntstring  to
+return a Pop string:
+
+        exacc_ntstring(exacc (exacc readdir(stream)).dir_name)
+
+Note though,  that exacc  can derive  the pointer  type produced  from a
+compound field in  a structure  or array; thus  a single  byte could  be
+accessed directly with
+
+        exacc (exacc (exacc readdir(stream)).dir_name) [1]
+
+(which is probably  not very useful  in this case,  but illustrates  the
+point).
+
+
+
+
+--------------------------
+12  Address Mode Accessing
+--------------------------
+
+As described above, both exacc and defexacc can take the `@`  attribute.
+This is `address mode', and makes the result of the access be a  pointer
+to the data rather than the data itself.
+
+In this case, the the (explicit or derived) <typespec> may only  specify
+a structure field, array  element or simple type  (i.e. not an  external
+function). The result is an  external pointer pointing to the  specified
+component; since the address of the component is returned, only the base
+type of <typespec> is relevant,  i.e. any implicit access or  conversion
+procedures it contains are ignored. (The `@` attribute cannot be used in
+update mode.)
+
+For example, with the structure "direct" as defined in the last section,
+
+        exacc[@] :direct a_direct.dir_namlen
+
+would return  a  pointer to  the  "dir_namlen" field,  rather  than  its
+integer  value.  For  a  compound  component,  address  mode  makes   no
+difference, since the  access returns  its address anyway;  thus if  the
+field "dir_name" is defined as just
+
+        dir_name   :byte[]
+
+then the `@` in
+
+        exacc[@] :direct a_direct.dir_name
+
+has no effect. On the other hand, with "dir_name" defined
+
+        dir_name   :byte[].exacc_ntstring
+
+the field is non-compound, and without `@` will produce a string; if  it
+is with `@`, then it will behave as before.
+
+
+
+
+-----------------------------------------------
+13  Updating External Data: Non-Writeable Types
+-----------------------------------------------
+
+This section concerns using exacc and procedures constructed by defexacc
+in update mode.
+
+To restrict the  use of exacc  in update mode  (i.e. when the  construct
+follows ` -> `),  and to allow control  over the generation of  updaters
+for defexacc procedures, the symbol  "!" (exclamation mark) can be  used
+anywhere in a <typespec> instead of ":". In general, "!" can be used  to
+flag types  as  `non-writeable';  an  update  mode  exacc  applied  to a
+non-writeable type  then  gives  a  compile-time  mishap,  and  defexacc
+procedures for non-writeable types have no updaters generated for them.
+
+
+
+13.1  General Points
+--------------------
+Note first  that `writeability'  as  applied to  a compound  type  never
+refers to  the status  of a  POINTER to  that type,  but always  to  the
+COMPONENTS of  that  type. An  implicit  compound type  on  an  external
+pointer (e.g. ':exptr.:int[]'  etc), is  ignored in the  sense that  the
+field value is taken to be the preceding external pointer (as  described
+above in 'Pointer Typing'),  and so such a  <typespec> is NOT  compound.
+When a compound  type does  not follow  an external  pointer (i.e.  as a
+component of a structure or array), its field value is a pointer,  which
+is simply not updateable anyway. Thus
+
+        :exptr.{!int}
+
+is writeable  (i.e. the  pointer can  be updated  even if  the "int"  it
+points to can't), whereas the structure field
+
+        bytefield :byte[]
+
+is non-writeable (i.e. the pointer value returned for the field can't be
+updated, although the bytes it points to can).
+
+    Another important aspect  of updating  that needs  to be  understood
+when using "!" is the following: as with Pop-11 procedure calls (e.g. as
+in
+
+        x -> list.tl.tl.tl.hd
+
+where only the  last procedure hd  has its updater  run), only the  last
+type or access  procedure in  a <typespec> actually  performs in  update
+mode; hence  in general,  this last  type or  access procedure  is  what
+governs writeability. (Conversion procedures at the end of a  <typespec>
+have no effect on in  this respect -- if a  type is writeable, then  all
+conversion procedures on it must have updaters.)
+
+
+
+13.2  Using "!"
+---------------
+Thus a <typespec> can be made  non-writeable by making its last type  or
+access procedure 'non-writeable'. For a type, this means using "!" ; for
+an access procedure, it means not  giving the procedure an updater.  For
+example,
+
+        :exptr.!int
+
+is non-writeable, and
+
+        :exptr.foo
+
+is writeable if and only if foo has an updater.
+
+    However, to make it  possible not to have  to bother about the  last
+type or access procedure,  a <typespec> STARTING with  an explicit !  is
+always considered non-writeable. Thus
+
+        !exptr.:int
+        !exptr.foo
+
+are both non-writeable (in  the second case,  regardless of whether  foo
+has an updater or not).
+
+Note that "!" always overrides ":". Thus, after
+
+        p_typespec nw_ntstring !ntstring;
+
+types such as
+
+        :nw_ntstring
+        :exptr.:nw_ntstring
+
+are non-writeable. (On the  other hand, because of  the rule about  only
+the last type being updated, a non-writeable pointer type like
+
+        p_typespec nw_exptr !exptr;
+
+does NOT prevent
+
+        :nw_exptr.:ntstring
+
+being writeable, etc.)
+
+
+
+13.3  Compound Types
+--------------------
+As explained previously, writeability for a compound type always  refers
+to the components of that type.
+
+    Functions are a special case: a function can be thought of as having
+one 'component', its result, which  is NEVER writeable; thus a  function
+is always non-writeable (i.e. can't be called in update mode).
+
+    For structure fields and array  elements, "!" overrides ":" as  with
+all other types. So in the structure
+
+        p_typespec timeval { tv_sec :long, tv_usec !long };
+
+the field tv_sec is writeable, but not tv_usec; on the other hand, using
+"!" on the typename,
+
+        !timeval
+
+will make all fields non-writeable.
+
+
+
+
+--------------------------
+14  Pointer Values as Data
+--------------------------
+
+A further extension to the <typespec> syntax allows the pointer value of
+an external  pointer to  be accessed  (or updated)  as data  in its  own
+right. It has the form
+
+            <typespec> -->  ^ <typename>
+
+where this may only appear as  the direct argument to exacc or  defexacc
+(or as an implicit type access on a pointer or "exval" field).
+
+    <typename> is  restricted to  being an  integer <basetype>  such  as
+'int' or N, etc,  a single-float "sfloat", or  "full" (or a renaming  of
+any of these). The effect of this form is to `back off' by one level  of
+pointer, and  then perform  the specified  access on  a pointer  to  the
+pointer value. E.g. if ptr contains an external pointer, then
+
+             exacc ^uint ptr
+
+would return  the  pointer value  as  an unsigned  integer.  (Note  that
+specifying a type smaller than a pointer is taken to mean the  low-order
+part of the value, e.g.
+
+             exacc ^byte ptr
+
+would return the least-significant byte of the pointer value.)
+
+
+
+
+----------------------------------------
+15  External Structure Fields in Records
+----------------------------------------
+
+Although  a  Poplog  record  cannot  contain  structures  declared  with
+x_typespec as  single  fields,  such structures  can  be  'exploded'  as
+multiple fields in a record class. For example, with "timeval" declared
+
+        p_typespec timeval { tv_sec :long, tv_usec :long };
+
+the form
+
+        defclass timeval :timeval;
+
+creates a record with fields tv_sec and tv_usec (where tv_sec starts  at
+the pointer). Alternatively, something like
+
+        defclass foo { foo_1, foo_2, foo :timeval };
+
+creates a record with  4 fields, where the  names for the  sub-structure
+fields are got by prefixing "<outer fieldname>_" to the structure  field
+names (i.e. foo_tv_sec and foo_tv_usec in this case).
+
+
+
+
+------------------------------
+16  Summary of typespec Syntax
+------------------------------
+
+    # named type
+
+        <typespec>  -->  : <typename>
+                    -->  ! <typename>
+                    -->  ^ <typename>
+
+    # structure
+
+        <typespec>  -->  { <fieldspec-1>, ..., <fieldspec-N> }
+       <fieldspec>  -->  <fieldname> <typespec>
+
+    # array
+
+        <typespec>  -->  <element-typespec> [ <integer> ]
+                    -->  <element-typespec> []
+        <element-typespec> --> :<typename>
+                           --> !<typename>
+                           --> { <fieldspec>, ... }
+
+    # function
+
+        <typespec>  -->  ( <arglist> ) <typespec>
+                    -->  ( <arglist> ) :void
+                    -->  ( <arglist> )
+         <arglist>  -->  <argspec>, ..., <argspec>   (0 or more)
+         <argspec>  -->  <dummy name>
+         <argspec>  -->  <integer>
+         <argspec>  -->  ...                         (variadic)
+         <argspec>  -->  <argspec> <SF>
+
+    # implicit type access
+
+        <typespec>  -->  <typespec> . <typespec>
+
+    # implicit access procedure
+
+        <typespec>  -->  <typespec> . <identifier name>
+
+    # conversion procedure
+
+        <typespec>  -->  <typespec> # <identifier name>
+
+N.B. While there are a number  of potential ambiguities in this  syntax,
+they are not  likely to  represent a  problem in  practice. Although  no
+general provision  is  made  for  bracketing  a  <typespec>  to  resolve
+ambiguities, this can always be done  by defining it as a new  typename.
+The most  serious  potential  problem  is  the  <typespec>  specifying a
+function  result,  which  can  absorb  something  following  that's  not
+intended to be part of it, e.g.
+
+        defexacc app_func (ARG):int;
+
+defines an  apply  procedure  for  a function;  if  this  is  used  in a
+<typespec> to apply a function pointer, e.g.
+
+        :exptr.(ARG):int.app_func
+
+then '.app_func'  will incorrectly  be  taken as  part of  the  function
+result. However,  since  functions  only type  external  pointers,  they
+should always be put in 'bracket' structures anyway (which resolves  the
+ambiguity):
+
+        :exptr.{(ARG):int}.app_func
+
+
+
+
+-----------------------
+17  Notes on Efficiency
+-----------------------
+
+    #   The "fast"  attribute  to  exacc  or  defexacc  means  that  the
+        code/procedure  produced  will  not  check  its  input   pointer
+        argument to be an external pointer-class structure. In addition,
+        an  array  subscriptor  will  not  check  its  subscript,  and a
+        variadic function call will not check its number of arguments.
+
+    #   Any <typespec>  producing an  external pointer  result (e.g.  an
+        "exptr" field, or an address-mode  access, etc) will by  default
+        construct a new external pointer record on each acccess. However
+        (so as to avoid creating unnecessary garbage), when the  pointer
+        is being passed to a  conversion procedure or external  implicit
+        access procedure, a fixed record is used instead (i.e. fixed for
+        each exacc  or  access  procedure  defined  by  defexacc).  This
+        optimisation should not cause problems, because (presumably) the
+        procedure receiving  it  is  always going  to  return  something
+        derived from the pointer, not the the pointer itself.
+
+        On the other hand,  this behaviour can be  forced with the  "nc"
+        (`non-constructing')  attribute  to  exacc  or  defexacc;   when
+        supplied, an external  pointer result will  use a fixed  record.
+        You must ensure that this pointer  is no longer in use the  next
+        time the exacc code or defexacc procedure is executed, otherwise
+        it will be overwritten.
+
+        You can  also force  a fixed  record to  be returned  by  simply
+        specifying identfn  as a  final conversion  procedure or  access
+        procedure.  <typespec>  syntax  caters  for  this  specially  by
+        allowing a  missing <identifier  name> after  "#" or  "." to  be
+        replaced with "identfn", e.g.
+
+           defexacc :exptr#;
+
+        (Note that  this  has  no  effect on  the  writeability  of  any
+        external type using it  with "." ; moreover  when used with  "#"
+        the fact that identfn has no updater doesn't matter either.)
+
+    #   In  compiling  code  for  conversion  procedures  and   external
+        implicit access procedures,  the system  guarantees to  optimise
+        out calls to both identfn itself  and closures of identfn of  no
+        arguments (identfn(%%)).
+
+        This is of particular relevance to using a conversion  procedure
+        to  type-check  assignments  into   "full"  fields  (all   other
+        <basetype>s are  checked  anyway);  the access  side  of  such a
+        procedure can simply be identfn(%%), resulting in no overhead on
+        accessing the field.
+
+
+
+
+-----------------
+18  Miscellaneous
+-----------------
+
+TYPESPEC                                                        [syntax]
+        This syntax construct takes a <typespec> (in procedure  brackets
+        (...)) and plants a PUSH  of the spec data structure  associated
+        with  it,  suitable  for  use  with  field_spec_info  etc..  For
+        example, if we have declared the typespec
+
+                p_typespec foo {a:full, b:int};
+
+        then we might use TYPESPEC thus:
+
+                field_spec_info(TYPESPEC(:foo)) =>
+                ** [>-> full full] 64
+
+        TYPESPEC  respects  the  scoping  constraints  as  specified  by
+        p_typespec (permanent scope) and l_typespec (lexical scope) etc.
+
+
+SIZEOFTYPE                                                       [macro]
+        This macro produces the base type size of a <typespec>, that  is
+        the amount of  space it  would occupy  as a  structure field  or
+        array element etc. It has two forms, viz
+
+              SIZEOFTYPE( <typespec> )
+              SIZEOFTYPE( <typespec> , <unit-typespec> )
+
+        In the second form, the size of <typespec> is given in units  of
+        the size of <unit-typespec>; in the first form,  <unit-typespec>
+        defaults to :byte, i.e. the size in bytes. E.g.
+
+              SIZEOFTYPE(:timeval)
+
+        gives the size of a "timeval" structure in bytes, whereas
+
+              SIZEOFTYPE(:int,:1)
+
+        is the number of bits in an "int", etc.
+
+        If  the  size  of  <typespec>  is  not  an  exact  multiple   of
+        <unit-typespec> it is rounded up to the next multiple; thus
+
+              SIZEOFTYPE(:1)
+
+        equals 1 (byte).
+
+        Note that  both <typespec>  and  <unit-typespec> must  be  sized
+        types,  i.e.  cannot  be   unsized  structures  or  arrays,   or
+        functions. (This macro uses field_spec_info, see REF * KEYS.)
+
+
+FIELDOFFSET                                                      [macro]
+        This macro produces  the offset  of a field  within a  structure
+        <typespec>. Usage is
+
+              FIELDOFFSET( <typespec> , <fieldname> )
+
+        For example, where structure "foo" is defined
+
+                p_typespec foo {a:full, b:int};
+
+        then
+
+            FIELDOFFSET(:foo,b)
+
+        would produce 4.
+
+        Note that the value is returned in units appropriate to  address
+        the given field; in all  current Poplog implementations this  is
+        bytes.
+
+
+EXPTRINITSTR                                                     [macro]
+        A macro  that creates  and returns  a fixed-address  "exptr_mem"
+        structure big enough to hold a a given external type. Usage is
+
+            EXPTRINITSTR( <typespec> )
+
+        where <typespec> specifies  the external  type/structure. It  is
+        simply equivalent to the code
+
+           initexptr_mem(SIZEOFTYPE(<typespec>))
+
+        See   the    description    of   "exptr_mem"    structures    in
+        REF * EXTERNAL_DATA, `Poplog Structures as External Data'. (Note
+        that since exptr_mems are fixed-address structures, it is  never
+        necessary to use writeable on them.)
+
+
+
+--- C.all/ref/defstruct
+--- Copyright University of Sussex 1992. All rights reserved.

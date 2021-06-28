@@ -1,0 +1,1098 @@
+REF POPSYNTAX                                       John Gibson Jan 1996
+
+      COPYRIGHT University of Sussex 1996. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<        POP-11 SYNTAX        >>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+This file  details the  syntax of  the Pop-11  language, in  terms  of a
+stream of items as produced by  the itemiser. See REF * ITEMISE for  the
+lexical syntax  of  character-stream  input  to  compilation  (i.e.  the
+textual representation of numbers, words, strings, character  constants,
+etc). See REF * POPCOMPILE for a description of the Pop-11 compiler.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Statement & Expression Sequences
+            ... compilation-stream
+            ... statement-sequence
+            ... statement
+            ... expression-sequence
+
+  2   Expressions
+            ... expression
+            ... empty-expression
+            ... non-empty-expression
+
+  3   Syntax Operator Forms
+      3.1   General
+            ... syntax-operator-form
+      3.2   Procedure Application and Parenthesised Statement Sequence
+            ... (
+      3.3   Postfix Procedure Call
+            ... .
+      3.4   Assignment Arrows
+            ... ->
+            ... ->>
+      3.5   Boolean Expressions
+            ... and
+            ... or
+      3.6   Labelled Expressions
+            ... :
+            ... :*
+      3.7   Identifier or Section Pathname
+            ... $-
+      3.8   Print Arrows
+            ... =>
+            ... ==>
+
+  4   Syntax Forms
+      4.1   General
+            ... syntax-form
+      4.2   Conditionals
+            ... if
+            ... unless
+      4.3   Iteration
+            ... while
+            ... until
+            ... repeat
+            ... for
+      4.4   Jumps
+            ... goto
+            ... go_on
+      4.5   Loop Exits
+            ... quitloop
+            ... nextloop
+            ... quitif
+            ... quitunless
+            ... nextif
+            ... nextunless
+      4.6   Procedure Exits
+            ... return
+            ... returnif
+            ... returnunless
+      4.7   Quoted Words and Identifiers
+            ... "
+            ... ident
+      4.8   Matchvars
+            ... =*
+            ... =**
+            ... =?
+            ... =??
+      4.9   Escapes for Active, Syntax and Operator Identifiers
+            ... nonactive
+            ... nonop
+            ... nonsyntax
+      4.10  Counted Statement Sequence
+            ... #|
+      4.11  List and Vector Constructors
+            ... [
+            ... {
+            ... cons_with
+      4.12  Identifier Scope Declarations
+            ... section
+            ... lblock
+      4.13  Identifier Declarations
+            ... lvars
+            ... dlvars
+            ... lconstant
+            ... vars
+            ... constant
+            ... iconstant
+            ... global
+            ... nonglobal
+      4.14  Dynamic Localisation of Variables/Expressions
+            ... dlocal
+      4.15  Procedure Definition
+            ... procedure
+            ... define
+
+
+
+
+
+-----------------------------------
+1  Statement & Expression Sequences
+-----------------------------------
+
+...  compilation-stream
+-----------------------
+
+                   ----------------------
+     --------------| statement-sequence |------ <termin> ---------
+                   ----------------------
+
+
+...  statement-sequence
+-----------------------
+
+                       -------------
+     ------------------| statement |--------------------
+                   |   -------------   |
+                   |                   |
+                   |---<---  ;  ---<---|
+                   |                   |
+                   |---<---  => ---<---|
+                   |                   |
+                   ----<--- ==> ---<----
+
+
+...  statement
+--------------
+
+                   -----------------------
+     --------------| expression-sequence |---------------
+                   -----------------------
+
+
+...  expression-sequence
+------------------------
+
+            ------------------>-----------------
+            |                                  |
+            |          --------------          |
+     ------------------| expression |--------------------
+                  |    --------------    |
+                  |                      |
+                  ----<----  ,  ----<-----
+
+
+
+
+
+--------------
+2  Expressions
+--------------
+
+The word categories referred to by the expression diagram are:
+
+    operator   : A word whose identprops  are N (/= 0),  where N is  the
+                 operator precedence.
+
+    identifier : Any  word  that  is  not  syntax,  syntax  operator  or
+                 operator,  i.e.  whose  identprops  are  not  "syntax",
+                 "syntax N" or N.
+
+A literal is any Poplog object except a word or <termin>.
+
+
+
+...  expression
+---------------
+
+                        --------------------
+     -------------------| empty-expression |------------------------
+     |                  --------------------                       |
+  ---|                                                             |---
+     |                ------------------------                     |
+     -----------------| non-empty-expression |----------------------
+                      ------------------------
+
+
+...  empty-expression
+---------------------
+
+     -------------------------------->--------------------------------
+
+
+...  non-empty-expression
+-------------------------
+
+                              -----------
+     -------------------------| literal |----------------------------
+     |                        -----------                           |
+     |                                                              |
+     |                       --------------                         |
+     |-----------------------| identifier |-------------------------|
+     |                       --------------                         |
+     |                                                              |
+     |      --------------    -------------    --------------       |
+  ---+------| expression |----|  operator |----| expression |-------+---
+     |      --------------    -------------    --------------       |
+     |                                                              |
+     |                   ------------------------                   |
+     |-------------------| syntax-operator-form |-------------------|
+     |                   ------------------------                   |
+     |                                                              |
+     |                       ---------------                        |
+     ------------------------| syntax-form |-------------------------
+                             ---------------
+
+
+
+
+
+------------------------
+3  Syntax Operator Forms
+------------------------
+
+3.1  General
+------------
+The generic form is:
+
+...  syntax-operator-form
+-------------------------
+
+          --------------    -------------------    ----------
+    ------| expression |----| syntax-operator |----|  body  |--------
+          --------------    -------------------    ----------
+
+where syntax-operator is a word whose identprops are "syntax N", N being
+the operator  precedence. body  is dependent  on the  particular  syntax
+operator. Standard syntax operator forms follow.
+
+
+
+3.2  Procedure Application and Parenthesised Statement Sequence
+---------------------------------------------------------------
+
+...  (                                                       (syntax -1)
+------
+
+    This takes two forms, depending on whether the preceding  expression
+    is     empty      or     not.      If     empty,      this      is a
+    parenthesised-statement-sequence.       Otherwise,       it       is
+    procedure-application or partial-application.
+
+    parenthesized-statement-sequence:
+
+    --------------------             ----------------------
+ ---| empty-expression |-- ( --------| statement-sequence |----- ) ---
+    --------------------             ----------------------
+
+    procedure-application or partial-application:
+
+                                     -----------------------
+                               ------| expression-sequence |------
+  ------------------------     |     -----------------------     |
+--| non-empty-expression |- ( -|                                 |- ) --
+  ------------------------     |     -----------------------     |
+                               -- % -| expression-sequence |- % --
+                                     -----------------------
+
+
+
+3.3  Postfix Procedure Call
+---------------------------
+
+...  .                                                        (syntax 1)
+------
+
+         --------------             --------------
+   ------| expression |----  .  ----| expression |--------
+         --------------             --------------
+
+    The result of the second expression is applied after evaluating  the
+    first expression.
+
+
+
+3.4  Assignment Arrows
+----------------------
+
+...  ->                                                      (syntax 11)
+-------
+...  ->>                                                     (syntax 11)
+--------
+
+                         -----  ->  ----
+       --------------    |             |    --------------
+   ----| expression |----|             |----| expression |------
+       --------------    |             |    --------------
+                         -----  ->> ----
+
+    After evaluating the  first expression (and  duplicating its  result
+    for ->>), the second expression is compiled in update mode.
+
+
+
+3.5  Boolean Expressions
+------------------------
+
+...  and                                                      (syntax 9)
+--------
+...  or                                                      (syntax 10)
+-------
+
+                         ----- and -----
+       --------------    |             |    --------------
+   ----| expression |----|             |----| expression |------
+       --------------    |             |    --------------
+                         ----- or  -----
+
+    The second expression  is not  evaluated if the  first evaluates  to
+    false (and) or to true (or).
+
+
+
+3.6  Labelled Expressions
+-------------------------
+
+...  :                                                      (syntax -1)
+------
+...  :*                                                     (syntax -1)
+-------
+
+                            -- :  --
+          --------------    |      |    --------------
+    ------| identifier |----|      |----| expression |--------
+          --------------    |      |    --------------
+                            -- :* --
+
+    If the preceding expression is not an identifier, a mishap  results.
+    No code is produced for the  identifier, instead it becomes a  label
+    for the second expression.
+
+    The :* form is for use with non-local jumps.
+
+
+
+3.7  Identifier or Section Pathname
+-----------------------------------
+
+...  $-                                                      (syntax -1)
+-------
+
+    In this, the preceding expression must be empty or a word.
+
+       ------>-------
+       |            |
+       |  --------  |              --------
+    ------| word |--------- $- ----| word |--------
+          --------      |          --------    |
+                        |                      |
+                        -------------<----------
+
+
+
+3.8  Print Arrows
+-----------------
+
+...  =>                                                      (syntax 12)
+-------
+...  ==>                                                     (syntax 12)
+--------
+
+                          -----  =>  ----
+        --------------    |             |
+    ----| expression |----|             |----
+        --------------    |             |
+                          -----  ==> ----
+
+    These are special syntax operators in the sense that after producing
+    the appropriate printing  code they replace  themselves on  proglist
+    with ;, thus terminating the current expression-sequence.
+
+
+
+
+
+---------------
+4  Syntax Forms
+---------------
+
+4.1  General
+------------
+The generic form is:
+
+...  syntax-form
+----------------
+
+           ------------------    ------------
+     ------|  syntax-opener |----|   body   |--------
+           ------------------    ------------
+
+where syntax-opener is a word  whose identprops are "syntax", AND  whose
+valof is a procedure. body is dependent on the particular syntax opener.
+Standard syntax forms follow.
+
+
+
+4.2  Conditionals
+-----------------
+
+...  if                                                         (syntax)
+-------
+...  unless                                                     (syntax)
+-----------
+
+  ---- if -----
+              |   --------------            -----------------
+              |---| expression |--- then ---| statement-seq |-----
+              |   --------------            -----------------    |
+  -- unless ---                                                  |
+                                                                 |
+  --------------------------------<-------------------------------
+  |
+  |   ---- elseif -----
+  |   |               |   --------------            -----------------
+  |->-|               |---| expression |--- then ---| statement-seq |---
+  |   |               |   --------------            -----------------  |
+  |   -- elseunless ---                                                |
+  |                                                                    |
+  |-------------------------------<-------------------------------------
+  |
+  |            -----------------
+  |->- else ---| statement-seq |----
+  |            -----------------   |
+  |                                |
+  |----------------<----------------
+  |
+  |   ----- endif -----
+  |   |
+  ----|
+      |
+      --- endunless ---
+
+    The closing syntax word must match the opener.
+
+
+
+4.3  Iteration
+--------------
+
+...  while                                                      (syntax)
+----------
+...  until                                                      (syntax)
+----------
+
+ - while ---                                               - endwhile -
+           |   --------------          -----------------   |
+           |---| expression |--- do ---| statement-seq |---|
+           |   --------------          -----------------   |
+ - until ---                                               - enduntil -
+
+    The closing syntax word must match the opener.
+
+
+
+...  repeat                                                     (syntax)
+-----------
+
+            -------------->--------------
+            |                           |
+            | --------------            | -----------------
+ - repeat ----| expression |-- times -----| statement-seq |- endrepeat-
+              --------------              -----------------
+
+
+
+...  for                                                        (syntax)
+--------
+
+            --------          --------          --------
+     -------| expr |-- step --| expr |-- till --| expr |------------
+     |      --------          --------          --------           |
+     |                                                             |
+for -|                                                             |
+     |                                                             |
+     |  --------------                                             |
+     ---| identifier |----                                         |
+        --------------   |                                         |
+                         |                                         |
+        ---------<--------                                         |
+        |                                                          |
+        |              --------                                    |
+        |   --- in ----| expr |------------------------------------|
+        |   |          --------                                    |
+        |   |                                                      |----
+        |   |          --------                                    |   |
+        |   |-- on ----| expr |------------------------------------|   |
+        |   |          --------                                    |   |
+        ----|                                                      |   |
+            |          --------         --------         --------  |   |
+            |-- from --| expr |--- by --| expr |--- to --| expr |--|   |
+            |          -------- |       -------- |       --------  |   |
+            |                   --------->-------|                 |   |
+            |----------------->-------------------                 |   |
+            |                                                      |   |
+            |   ------------------------   -----------             |   |
+            ----| for-subsyntax-opener |---| clauses |--------------   |
+                ------------------------   -----------                 |
+                                                                       |
+                                                                       |
+        ----------------------------<-----------------------------------
+        |
+        |         ----------------------
+        --- do ---| statement-sequence |---- endfor ----
+                  ----------------------
+
+    In the above,  for-subsyntax-opener is a  word whose identprops  are
+    "syntax", and whose valof  is a pair conspair("for",procedure).  The
+    clauses following the opener are  dependent on the particular  form.
+    See  HELP * FOR_FORM  for  a  description  of  the  standard   forms
+    available.
+
+
+
+4.4  Jumps
+----------
+
+...  goto                                                       (syntax)
+---------
+
+                    --------------
+      ---- goto ----| identifier |-----
+                    --------------
+
+
+
+...  go_on                                                      (syntax)
+----------
+
+
+          --------------
+- go_on --| expression |-- to ----
+          --------------         |
+                                 |
+       ---------------------------
+       |
+       |       ----------       ----------------------
+       |    ---| prefix |-- : --| statement-sequence |-- endgo_on ---
+       |    |  ----------       ----------------------
+       |    |
+       -----|
+            |                    ------------->------------
+            |   --------------   |         -------------- |
+            ----| identifier |----- else --| identifier |--- ; ----
+              | -------------- |           --------------
+              --------<---------
+
+    In the first form, the whole statement is generated inside a lexical
+    block.  prefix  should  be  a  word,  which  will  be  defined  as a
+    lexically-scoped macro within the block: this macro has one argument
+    and produces a label (of the form go_on-prefix-arg). Thus
+
+                prefix arg:
+
+    can be used within the statement to label different cases, where arg
+    is an integer or the word default. The form
+
+                goto prefix arg
+
+    can also be  used inside  the statement, including  goto prefix  end
+    (the prefix end label is generated automatically immediately  before
+    the endgo_on).
+
+
+
+4.5  Loop Exits
+---------------
+
+...  quitloop                                                   (syntax)
+-------------
+...  nextloop                                                   (syntax)
+-------------
+...  quitif                                                     (syntax)
+-----------
+...  quitunless                                                 (syntax)
+---------------
+...  nextif                                                     (syntax)
+-----------
+...  nextunless                                                 (syntax)
+---------------
+
+   --- quitloop ---                               -----------
+                  |-------------------------- ( --| integer |-- ) ---
+   --- nextloop ---                     |  |      -----------      |
+                                        |  |                       |
+                                        |  ------------->-----------
+   ---- quitif ----                     |
+                  |                     |
+   -- quitunless -|       --------      |
+                  |-- ( --| expr |- ) ---
+   ---- nextif ---|       --------
+                  |
+   -- nextunless --
+
+    If omitted, integer defaults to 1.
+
+
+
+4.6  Procedure Exits
+--------------------
+
+...  return                                                     (syntax)
+-----------
+
+                            -----------------------
+    --- return -------- ( --| expression-sequence |-- ) ------
+                    |       -----------------------       |
+                    |                                     |
+                    -------------------->------------------
+
+
+...  returnif                                                   (syntax)
+-------------
+...  returnunless                                               (syntax)
+-----------------
+
+
+    ------- returnif ----        --------------
+                        |--- ( --| expression |-- ) --------
+    --- returnunless ----        --------------            |
+                                                           |
+    -------------------------<------------------------------
+    |
+    |           -----------------------
+    ------- ( --| expression-sequence |--- ) ---------------
+       |        -----------------------          |
+       |                                         |
+       --------------------->---------------------
+
+
+
+
+4.7  Quoted Words and Identifiers
+---------------------------------
+
+...  "                                                          (syntax)
+------
+
+                            --------
+                 -----------| word |-----------
+                 |          --------          |
+                 |                            |
+                 |      -----------------     |
+      ----  "  --+------| quoted-string |-----+--  "  ----
+                 |      -----------------     |
+                 |                            |
+                 |            --------------  |
+                 --- ident ---| identifier |---
+                              --------------
+
+    In the last case,  identifier is any  word/pathname for a  permanent
+    identifier, and produces the word-identifier for that identifier.
+
+
+...  ident                                                      (syntax)
+----------
+
+                    --------------
+      ---- ident ---| identifier |----
+                    --------------
+
+    where identifier is  any word declared  as an identifier,  including
+    syntax and operators.
+
+
+
+4.8  Matchvars
+--------------
+
+...  =*                                                         (syntax)
+-------
+...  =**                                                        (syntax)
+--------
+...  =?                                                         (syntax)
+-------
+...  =??                                                        (syntax)
+--------
+
+                   --------------
+                ---| identifier |----
+  --- =?  ----  |  --------------   |
+             |--|                   |---
+  --- =?? ----  |  ---------------  |  |             -----------
+                ---| quoted-word |---  |         ----| integer |-----
+                   ---------------     |         |   -----------    |
+                                       |         |                  |
+  --- =*  ----                         |  - : -  |  --------------  |
+             |-------------------------+--|   |--+--| identifier |--+----
+  --- =** ----                         |  - # -  |  --------------  |  |
+                                       |         |                  |  |
+                                       |         |     --------     |  |
+                                       |         -- % -| expr |- % --  |
+                                       |               --------        |
+                                       |                               |
+                                       ---------------->----------------
+
+    quoted-word is the same as for " above.
+
+
+
+4.9  Escapes for Active, Syntax and Operator Identifiers
+--------------------------------------------------------
+
+...  nonactive                                                  (syntax)
+--------------
+
+                         --------------
+      ---- nonactive ----| identifier |----
+                         --------------
+
+    where identifier is any word declared as an active identifier.
+
+
+...  nonop                                                      (syntax)
+----------
+...  nonsyntax                                                  (syntax)
+--------------
+
+                         ----------------------------
+      ---- nonop --------| operator/syntax-operator |----
+                         ----------------------------
+
+                         -------------------------------
+      ---- nonsyntax ----| syntax-word/syntax-operator |----
+                         -------------------------------
+
+
+
+4.10  Counted Statement Sequence
+--------------------------------
+
+...  #|                                                         (syntax)
+-------
+
+                    ----------------------
+      ----- #| -----| statement-sequence |----- |# -----
+                    ----------------------
+
+    The  difference  between  the  userstack  length  after  and  before
+    statement-sequence (i.e.  after-before)  is pushed  onto  the  stack
+    after statement-sequence.
+
+
+
+4.11  List and Vector Constructors
+----------------------------------
+
+...  [                                                          (syntax)
+------
+...  {                                                          (syntax)
+------
+...  cons_with                                                  (syntax)
+--------------
+
+                              -----------
+                    ----------| literal |-----------
+                    |         -----------          |
+                    |                              |
+                    |         ------------         |
+                    |---------| matchvar |---------|
+                    |         ------------         |
+                    |                              |
+                    |          ----------          |
+    --- [ ---       |--- ^ ----| insert |----------|         --- ] ---
+            |       |          ----------          |         |
+            |-------|                              |---------|
+            |  |    |          ----------          |    |    |
+    --- { ---  |    |--- ^^ ---| insert |----------|    |    --- } ---
+               |    |          ----------          |    |
+               |    |                              |    |
+               |    |         ------------         |    |
+               |    |--- % ---| expr-seq |--- % ---|    |
+               |    |         ------------         |    |
+               |    |                              |    |
+               |    |        ---------------       |    |
+               |    ---------| constructor |--------    |
+               |             ---------------            |
+               |                                        |
+               ---------------------<--------------------
+
+    In the above, literal is any  Pop object except the words "[",  "{",
+    "^", "^^"  or  "%", matchvar  is  any  of the  four  matchvar  forms
+    described above, and constructor is the whole diagram recursively.
+
+    insert is  either  a word,  or  an expression  in  parentheses.  The
+    opening bracket must match the closing bracket.
+
+    For cons_with, vector-constructor is the {...} form of  constructor,
+    and expression must yield a vector constructor procedure:
+
+                       --------------   ----------------------
+      --- cons_with ---| expression |---| vector-constructor |---
+                       --------------   ----------------------
+
+
+
+4.12  Identifier Scope Declarations
+-----------------------------------
+
+...  section                                                    (syntax)
+------------
+
+        ----------------------------->-----------------------------
+        |                                                         |
+        |           -------->--------  ----------->-------------  |
+        |           |               |  |                       |  |
+        | --------  |  ----------   |  |         ----------    |  |
+section---| name |-----| import |-------- => ----| export |---------;---
+          --------   | ----------  |           | ----------  |         |
+                     -------<-------           -------<-------         |
+                                                                       |
+                                                                       |
+         ---------------------------------<-----------------------------
+         |
+         |     ----------------------
+         ------| statement-sequence |---- endsection --
+               ----------------------
+
+    import and export  are words.  name is either  a word  or a  section
+    pathname. If  name  is omitted  (i.e.  ; follows  immediately  after
+    section) then the top-level section popsection is used.
+
+
+...  lblock                                                     (syntax)
+-----------
+
+                    ----------------------
+      --- lblock ---| statement-sequence |--- endlblock ---
+                    ----------------------
+
+
+
+4.13  Identifier Declarations
+-----------------------------
+
+...  lvars                                                      (syntax)
+----------
+...  dlvars                                                     (syntax)
+-----------
+...  lconstant                                                  (syntax)
+--------------
+...  vars                                                       (syntax)
+---------
+...  constant                                                   (syntax)
+-------------
+...  iconstant                                                  (syntax)
+--------------
+...  global                                                     (syntax)
+-----------
+...  nonglobal                                                  (syntax)
+--------------
+
+    The above constructs and dlocal (below) have a similar format, and
+    both use the following diagrams:
+
+    declaration-list:
+
+     ---------------<-----------  ,  ---------------<----------
+     |                                                        |
+     |  --------->---------              --------             |
+     |  |                 |   -----------| spec |-----------  |
+     |  |  -------------  |   |          --------          |  |
+  ---------| attribute |------|                            |----- ; ---
+           -------------      |          --------          |
+                              --- ( -----| spec |----- ) ---
+                                      |  --------  |
+                                      |            |
+                                      --<--- , --<--
+
+    spec:
+
+                      ------------->--------------
+                      |                          |
+           ---------  |          --------------  |
+        ---| thing |-----  =  ---| expression |------
+           ---------             --------------
+
+    Here attribute may  only be  omitted if  a single  spec follows;  if
+    present, it applies either to the  single spec following, or to  all
+    the specs following in parentheses. Each spec is a thing  optionally
+    followed by an initialisation expression.
+
+    Using the above, identifier declarations are then simply
+
+                     ---- lvars ----
+                                   |
+                     --- dlvars ---|
+                                   |
+                     -- lconstant -|
+                                   |    --------------------
+                     ---- vars ----+----| declaration-list |---
+                                   |    --------------------
+                     -- constant --|
+                                   |
+                     -- iconstant -|
+                                   |
+                                   |
+      -- global ---  ---- vars ----|
+    --|           |--|             |
+      - nonglobal -  --- constant --
+
+    where thing is an identifier, and attribute is an identprops value.
+
+    Permissible values for the identprops are:  a number N in the  range
+    -12.7 <=  N  <= 12.7,  one  of  the words  "procedure",  "macro"  or
+    "syntax", or "syntax" followed by a number N (except that only 0  or
+    "procedure" are allowed  for lvars and  dlvars inside a  procedure).
+    identprops defaults to 0 if omitted.
+
+    To declare an active identifier, attribute is
+
+                  ------------->------------  --------->--------
+                  |                        |  |                |
+                  |      ----------------  |  |  ------------  |
+      --- active --- : --| multiplicity |--------|identprops|------
+                         ----------------        ------------
+
+    where multiplicity is an integer in  the range 0 - 255, or  defaults
+    to 1  if absent.  A multiplicity  other than  1 is  allowed only  if
+    identprops is 0 or omitted.
+
+
+
+4.14  Dynamic Localisation of Variables/Expressions
+---------------------------------------------------
+
+...  dlocal                                                     (syntax)
+-----------
+
+    Using the declaration-list diagrams given in Identifier Declarations
+    above, this is just
+
+                         --------------------
+          --- dlocal ----| declaration-list |---
+                         --------------------
+
+    but with the following thing and attribute values:
+
+    For a dynamic local variable, thing is an identifier (obviously  one
+    for a variable, not a constant). In this case, attribute if  present
+    has only only one permissible  value, the word "nonactive"  (meaning
+    that the non-active value of the identifier is to be local).
+
+    For a dynamic local expression, thing has the form
+
+                                 -------------->------------
+                                 |                         |
+                 --------------  |        --------------   |
+        --- % ---| expression |----- , ---| expression |------ % ---
+                 --------------           --------------
+
+    where the first expression  is the access  part, and the  (optional)
+    second expression is the update part; if the second is omitted, then
+    the update part defaults to  being the first expression compiled  in
+    update mode.
+
+    attribute if present  specifies the multiplicity  of the  expression
+    (i.e. how many values  it produces), and must  be an integer in  the
+    range 0 - 255. If omitted, it defaults to 1.
+
+
+
+4.15  Procedure Definition
+--------------------------
+
+...  procedure                                                  (syntax)
+--------------
+...  define                                                     (syntax)
+-----------
+
+            ---------
+-- define --| specs |---
+            ---------  |
+                       |   ----------   -----------   --------
+                       |---| inputs |---| outputs |---| with |--- ; ---
+                       |   ----------   -----------   --------        |
+--- procedure ----------                                              |
+                                                                      |
+                                                                      |
+         ------------------------------<-------------------------------
+         |
+         |                              ----- enddefine -----
+         |    ----------------------    |
+         -----| statement-sequence |----|
+              ----------------------    |
+                                        ----- endprocedure ---
+
+
+    inputs have  two possible  forms;  conventionally, the  second  form
+    without parentheses or commas is used only for macro definitions:
+
+                 --------------->--------------
+                 |       --------------       |
+        --- ( -----------| identifier |----------- ) ---
+                     |   --------------   |
+                     ---<----  ,  ----<----
+
+                 --------------->--------------
+                 |       --------------       |
+           --------------| identifier |------------
+                     |   --------------   |
+                     -----------<----------
+
+
+    outputs may be  empty, ->  followed by  a single  identifier, or  ->
+    followed by a comma-separated list of identifiers in parentheses:
+
+            ---------------->-----------------
+            |             --------------     |
+         --------  ->  ---| identifier |---------
+                          --------------
+
+                               --------------
+         ---  ->  --- ( -------| identifier |------- ) ---
+                           |   --------------   |
+                           ---<----  ,  ----<----
+
+
+    The with clause is:
+
+            ----------------->----------------------
+            |       ----------   -----------       |
+         -----------| with_x |---| literal |-----------
+                |   ----------   -----------   |
+                ----------------<---------------
+
+    where with_x may be either with_nargs or with_props, each  occurring
+    at most  once.  For with_nargs,  literal  must be  an  integer;  for
+    with_props it  may be  any item,  the word  false being  interpreted
+    specially as <false>.
+
+
+    In the define syntax form, specs are:
+
+        ------->--------
+        |              |     ---------------     --------------
+     ----- updaterof --------| declaration |-----| identifier |---
+                             ---------------     --------------
+
+    where declaration declares the procedure name identifier, and can be
+    either
+
+                       ----------->---------
+                       |                   |
+     ----- dlocal --------- nonactive ----------
+
+    or
+
+        ------->-----  ----------->---------  ---------->---------
+        |           |  |  ---------------  |  |  --------------  |
+     ----- global --------| declarator  |--------| identprops |------
+                          ---------------        --------------
+
+    In the  second  form,  declarator  follows the  same  rules  as  for
+    Identifier  Declarations,  i.e.  lvars,  dlvars,  lconstant,   vars,
+    constant, or iconstant,  but vars  or constant only  when global  is
+    present. If declarator is omitted,  the default declaration made  is
+    controlled by the variable popdefineconstant.
+
+    identprops has the  same values as  for Identifier Declarations.  If
+    omitted, it defaults to  "procedure" if popdefineprocedure is  true,
+    or 0 otherwise.
+
+    A special case for the define statement is when identprops  declares
+    an ordinary operator. In this  case, identifier is amalgamated  with
+    the inputs which  would normally  follow it, and  together take  the
+    form
+
+        ------->---------- --------->-------- -------->---------
+        | -------------- | | -------------- | | -------------- |
+     -----| identifier |-----| identifier |-----| identifier |-----
+          --------------     --------------     --------------
+
+    i.e. 1, 2 or 3 occurrences of identifier. The name being defined  is
+    then the first identifier  if 1 or 2  are present (nonary and  unary
+    prefix forms), and the second if 3 are present (binary infix form).
+
+
+
+
+--- C.all/ref/popsyntax
+--- Copyright University of Sussex 1996. All rights reserved.

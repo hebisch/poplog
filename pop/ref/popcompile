@@ -1,0 +1,1152 @@
+REF POPCOMPILE                                      John Gibson Apr 1996
+
+         COPYRIGHT University of Sussex 1996. All Rights Reserved.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<       POP-11 COMPILER       >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<         PROCEDURES          >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<                             >>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+This file describes the operation of the Poplog Pop-11 compiler and  the
+procedures  it  makes  available   for  reading  and  compiling   Pop-11
+expressions, defining new syntactic constructs,  etc. It should be  read
+in conjunction  with REF * VMCODE,  which  explains the  Poplog  Virtual
+Machine interface used by this and other Poplog compilers.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Overview of the Pop-11 Compiler
+
+  2   Compilation Procedures
+      2.1   Stream
+      2.2   Statement Sequence
+      2.3   Expression Sequence
+      2.4   Expression
+
+  3   Utility Procedures
+      3.1   Testing/Checking for Input Items
+      3.2   Procedures Associated With define and procedure
+      3.3   Procedures Associated With Other Syntax Constructs
+
+  4   More On Expression Compilation
+
+  5   Example Definitions of Syntax/Syntax Operator Words
+
+  6   Compilation Contexts
+      6.1   Statements Compiled at "Top Level"
+      6.2   Compiling in "Executing" and "Non-Executing" Contexts
+      6.3   Testing Compilation Context
+
+  7   See Also
+
+
+
+----------------------------------
+1  Overview of the Pop-11 Compiler
+----------------------------------
+
+The Pop-11 compiler consists of a set of procedures corresponding to the
+various syntactic constructs in the language, as specified by the syntax
+diagrams given  in  REF * POPSYNTAX.  These  divide  into  two  classes:
+meta-constructs like  expression  and  specific  syntax/syntax  operator
+words like define. While there is a basic set of the latter class  which
+constitute the 'normal' syntax of  Pop-11, the compiler itself makes  no
+direct reference to these, since they are all dealt with via the general
+mechanism of recognising words whose identprops are "syntax" or  "syntax
+N", and by calling procedures from the identifier values of such words.
+
+    This file therefore confines itself to procedures concerned with the
+meta-constructs  (compilation-stream,   statement-sequence,   statement,
+expression-sequence and expression), and deals only with those  specific
+constructs that have generally-useful utility procedures associated with
+them.
+
+    All compiler procedures take source  code input items from the  list
+proglist (using the  procedure itemread, see  REF * PROGLIST), and  emit
+Poplog Virtual  Machine  code  directly (currently,  no  parse  tree  is
+built). The interface procedure pop11_compile sets up proglist initially
+to compile code either from a character stream or from an existing list,
+and then commences compilation by calling  pop11_comp_stream to  compile
+the input stream.
+
+
+pop11_compile(source)                                        [procedure]
+        Compiles Pop-11  program text  from an  item list  or  character
+        source source. For example,
+
+            pop11_compile([2 + 2]) =>
+            ** 4
+
+            pop11_compile('myprogram.p');
+
+        This procedure is defined as
+
+            define pop11_compile(source);
+                dlocal  pop_default_type = '.p',
+                        popprompt        = ': ',
+                        proglist_state   = proglist_new_state(source);
+                pop11_comp_stream()
+            enddefine;
+
+        That is, it sets up a new local proglist_state from the argument
+        source (with  pop_default_type equal  to '.p'),  and then  calls
+        pop11_comp_stream.
+
+        See  REF * proglist_new_state  for  the  permissible  values  of
+        source.
+
+
+compile_mode                                                    [syntax]
+        This facility, defined in LIB * COMPILE_MODE enables setting and
+        clearing of the compiler flags pop_pop11_flags described  below.
+        See HELP * COMPILE_MODE for more details.
+
+
+trycompile(filename) -> bool                                 [procedure]
+        If the file specified by filename exists, then calls
+
+                subsystem_compile(filename, "pop11")
+
+        and returns  true (assuming  successful compilation).  false  is
+        returned if the file doesn't exist.
+
+
+pop_pop11_flags -> int                                        [variable]
+int -> pop_pop11_flags
+        Flag bits in  this integer variable  control certain aspects  of
+        the Pop-11 compiler's operation. These are defined and described
+        in the file
+
+            $usepop/pop/lib/include/pop11_flags.ph
+
+        Note that  the value  of pop_pop11_flags  is localised  to  each
+        compilation stream,  procedure  or lexical  block;  thus  when a
+        given scope is terminated, the value of pop_pop11_flags is reset
+        to its value on entry to that scope.
+
+        See HELP * COMPILE_MODE  for the  syntax construct  compile_mode
+        which enables  setting  and  clearing  of  these  flags  (either
+        individually or in groups) via keyword arguments.
+
+
+pop11_exec_compile(compile_p, has_result)                    [procedure]
+        Calls an arbitrary compiler  procedure compile_p to compile  and
+        plant VM code, and then executes the planted code immediately.
+
+        The boolean argument has_result says whether compile_p  produces
+        a result or not;  if true, then one  result is expected, and  is
+        saved  before  executing  the  code  and  returned  after  (thus
+        preventing it  from  being obscured  on  the stack  by  anything
+        produced by the code execution).
+
+        This procedure is basically just defined as
+
+                sysEXEC_COMPILE(compile_p, has_result)
+
+        except that  it locally  resets  certain global  Pop-11 compiler
+        variables. Note that it also sets pop_autoload true locally.
+
+
+
+
+-------------------------
+2  Compilation Procedures
+-------------------------
+
+
+2.1  Stream
+-----------
+
+pop11_comp_stream()                                          [procedure]
+        Sets up a new execute level compilation of Pop-11 code, and then
+        compiles proglist until it becomes null. Aside from initialising
+        certain global variables  locally, this  procedure is  basically
+        just
+
+                define pop11_comp_stream();
+                    sysCOMPILE(termin, pop11_exec_stmnt_seq_to) ->
+                enddefine;
+
+        that is,  call  pop11_exec_stmnt_seq_to(termin) to  compile  and
+        execute statements inside a new invocation of the VM compiler.
+
+
+popclosebracket -> word_or_list                               [variable]
+word_or_list -> popclosebracket
+        Contains the closing 'bracket' (usually  a syntax word) for  the
+        current syntax construct being compiled.  It can also be a  list
+        of such words when the construct has a choice of closers.
+
+        (A single word, or a word in a list, can also be given  inside a
+        1-element vector. This means accept the word as a closer only if
+        declared as a syntax word.)
+
+        At top-level (i.e. directly inside pop11_comp_stream), the value
+        of popclosebracket is <termin>.
+
+        Syntax procedures  normally  set  this variable  locally  to  an
+        appropriate value before commencing compilation of a  construct,
+        and then call pop11_need_nextitem with  that value to check  for
+        the closer at the end.
+
+
+popclosebracket_exec -> word                                  [variable]
+word -> popclosebracket_exec
+        Contains the value  of popclosebracket established  by the  most
+        recent  call   of  pop11_exec_stmnt_seq_to.   See  below   under
+        pop11_exec_stmnt_seq_to.
+
+
+
+2.2  Statement Sequence
+-----------------------
+A statement is  an expression  sequence, i.e. zero  or more  expressions
+separated by commas; a statement-sequence then consists of zero or  more
+such sequences, separated by semicolons  (note that the standard  syntax
+operators "=>" and "==>" also  act as statement separators by  replacing
+themselves on proglist with semicolons).
+
+    Expression and statement  sequences are  largely interchangeable  in
+Pop-11, except in a few places (such as procedure call arguments)  where
+the latter are not allowed. At execute level, the end of each  statement
+indicates where execution is to take place.
+
+
+pop11_comp_stmnt_seq()                                       [procedure]
+        Compiles and  plants  VM  code  for  a  sequence  of  statements
+        separated by semicolons.
+
+
+pop11_comp_stmnt_seq_to(closer) -> found                     [procedure]
+        Same as pop11_comp_stmnt_seq except  that during compilation  of
+        the sequence, popclosebracket is set locally to be the  argument
+        closer, and after compilation pop11_need_nextitem is called with
+        this argument to check the next item on proglist. The result  of
+        pop11_need_nextitem is  returned (see  Utility Procedures  below
+        for a description of pop11_need_nextitem).
+
+
+pop11_exec_stmnt_seq_to(closer) -> found                     [procedure]
+        As for pop11_comp_stmnt_seq_to, but executes the VM code planted
+        at the end of each statement (by calling * sysEXECUTE).
+
+        In addition to setting popclosebracket, this procedure also sets
+        popclosebracket_exec locally to the same value. The main purpose
+        of this is so that the test
+
+                popclosebracket == popclosebracket_exec
+
+        can  be  used  to  determine  whether  the  current  context  is
+        'executing' or not, i.e. whether there are any syntax constructs
+        currently compiling below the level of pop11_exec_stmnt_seq_to.
+
+        [For example, a syntax procedure  like section wants to be  able
+        to execute the statements in  its body immediately if  possible,
+        but it cannot do so if  it occurs inside any construct which  is
+        itself not executing code directly, e.g. define or if. While the
+        context  of  define  can  be  recognised  by  the  VM   variable
+        * pop_vm_compiling_list being non-empty, this  is not so for  an
+        if  statement  outside  of  a  procedure;  however,  in   such a
+        statement popclosebracket will be "endif", and so the above test
+        will be false. section therefore uses the code
+
+                if popclosebracket == popclosebracket_exec then
+                    pop11_exec_stmnt_seq_to
+                else
+                    pop11_comp_stmnt_seq_to
+                endif ("endsection");
+
+        to compile its body.]
+
+        To ensure  that  popclosebracket /==  popclosebracket_exec  when
+        inside  any  other  procedure  that  sets  popclosebracket,  the
+        actually value assigned to the two variables is not closer,  but
+        the following:
+
+                if ispair(closer) then
+                    copy(closer)
+                elseif closer == termin then
+                    termin
+                else
+                    closer :: []
+                endif ->> popclosebracket -> popclosebracket_exec;
+
+
+
+2.3  Expression Sequence
+------------------------
+
+pop11_comp_expr_seq()                                        [procedure]
+        Compiles and  plants  VM  code for  a  sequence  of  expressions
+        separated by commas.
+
+        A 'MISSING  SEPARATOR' mishap  will occur  if the  next item  on
+        proglist after the sequence does not match the current value  of
+        popclosebracket and  is  an  expression  opener  (an  expression
+        opener is  anything except  <termin> or  a non-procedure  syntax
+        word, i.e. a word whose identprops are "syntax" and whose  value
+        is not a procedure).
+
+
+pop11_comp_expr_seq_to(closer) -> found                      [procedure]
+        Same as pop11_comp_stmnt_seq except  that during compilation  of
+        the sequence, popclosebracket is set locally to be the  argument
+        closer, and after compilation pop11_need_nextitem is called with
+        this argument to check the next item on proglist. The result  of
+        pop11_need_nextitem is  returned (see  Utility Procedures  below
+        for a description of pop11_need_nextitem).
+
+
+
+2.4  Expression
+---------------
+The procedure pop11_comp_prec_expr is the heart of the Pop-11  compiler:
+it compiles a  single expression containing  operators upto a  specified
+maximum precedence. Since an understanding of this procedure is  helpful
+in writing new syntax  or syntax operator  constructs, its operation  is
+described  in  greater  detail  in   the  section  More  On   Expression
+Compilation below.
+
+
+pop11_comp_prec_expr(prec, update) -> nextitem               [procedure]
+        Compiles and plants VM code for a single expression, the  extent
+        of which is determined as follows:
+
+          # If the  first item  is  not an  expression opener,  or  is a
+            syntax word equal to popclosebracket, then the expression is
+            empty.
+
+          # Otherwise, the expression has the generic form
+
+               item  operator-expr  operator-expr ...
+
+            where each operator expression  is either a syntax  operator
+            followed  by  an  appropriate  code  body,  or  an  ordinary
+            operator followed  by a  sub-expression. The  expression  is
+            terminated by meeting either a non-operator, or an  operator
+            whose  internally-represented  precedence  (see  below)   is
+            greater than or equal to the argument prec.
+
+        The prec argument is a  value specifying the limit for  operator
+        precedences in this  expression; for efficiency  reasons, it  is
+        supplied not in the normal identprops format, but in the form in
+        which precedences are actually represented internally. If idprec
+        is a normal identprops  precedence, then the corresponding  prec
+        value is the positive integer given by
+
+                prec = intof(abs(idprec) * 20)
+                            + (if idprec > 0 then 1 else 0 endif)
+
+        (E.g. an idprec of 4  will give a prec  of 81, whereas -4  would
+        give 80.) Since an identprops precedence can range between -12.7
+        and 12.7,  the normal  range for  prec  is 2  - 255;  any  value
+        greater than 255 is  guaranteed to include  all operators in  an
+        expression.
+
+        The update  argument  is a  boolean  which if  true  causes  the
+        expression to  be compiled  in update  mode rather  than  normal
+        evaluate mode.
+
+        The result of the procedure is the item following the expression
+        (note that this remains as the next item on proglist).
+
+
+pop_expr_prec -> int                                          [variable]
+int -> pop_expr_prec
+pop_expr_update -> bool                                       [variable]
+bool -> pop_expr_update
+        These two variables  are dynamic  locals of  pop_comp_prec_expr,
+        and hold the  values of the  prec and update  arguments for  the
+        current call of that procedure.
+
+
+pop_expr_inst(item)                                 [procedure variable]
+pop_expr_item -> item                                         [variable]
+item -> pop_expr_item
+        These   two    variables   are    also   dynamic    locals    of
+        pop_comp_prec_expr,  and  together   constitute  a  buffer   for
+        planting VM code. Their use  is described in More On  Expression
+        Compilation below.
+
+
+pop11_comp_expr()                                            [procedure]
+        Compiles and  plants  VM  code  for  a  single  expression  with
+        unlimited operator precedence. Same as
+
+                pop11_comp_prec_expr(256, false)
+
+
+pop11_comp_expr_to(closer) -> found                          [procedure]
+        Same as pop11_comp_expr  except that during  compilation of  the
+        expression, popclosebracket is  set locally to  be the  argument
+        closer, and after compilation pop11_need_nextitem is called with
+        this argument to check the next item on proglist. The result  of
+        pop11_need_nextitem is returned.
+
+
+
+
+---------------------
+3  Utility Procedures
+---------------------
+
+
+3.1  Testing/Checking for Input Items
+-------------------------------------
+
+pop11_need_nextitem(item) -> found                           [procedure]
+        Checks the next item from proglist to be (a) a member of item if
+        item is  a list,  or  (b) equal  to  item otherwise.
+
+        (item may also be, or contain, a word inside a 1-element vector.
+        This means accept the word as equal only if it is declared  as a
+        syntax word.)
+
+        If neither condition holds, the mishap
+
+            msw: MISPLACED SYNTAX WORD
+
+        or
+
+            mei: MISPLACED EXPRESSION item
+
+        results (depending on  whether the  next item  is an  expression
+        opener or not), where the INVOLVING list of the mishap is
+
+            FOUND nextitem READING TO item
+
+        Otherwise, the next item is removed from proglist and  returned.
+        This procedure uses nextitem to examine the next item, so macros
+        are expanded, autoloading can occur, etc.
+
+
+pop11_need_nextreaditem(item) -> found                       [procedure]
+        Same as pop11_need_nextitem, except that nextreaditem is used to
+        get the next item, so that autoloading or macro expansion  can't
+        occur.
+
+
+pop11_try_nextitem(item) -> found                            [procedure]
+        As for  pop11_need_nextitem, except  that false  is returned  if
+        item (or a member of item) is not the next item. If it is,  then
+        the next item is removed  from proglist and returned as  result.
+        This procedure will expand macros and may cause autoloading.
+
+
+pop11_try_nextreaditem(item) -> found                        [procedure]
+        Same as pop11_try_nextitem, except that nextreaditem is used  to
+        get the next item, so that autoloading or macro expansion  can't
+        occur.
+
+
+
+3.2  Procedures Associated With define and procedure
+----------------------------------------------------
+
+pop11_define_declare(id_name, globl_p, decl_p,      [procedure variable]
+                                        idprops)
+        The procedure in  this variable (which  is dynamically local  to
+        pop11_compile) is called by the  define statement to declare  as
+        an identifier the name of the procedure being defined, when such
+        a declaration  is  needed.  This  is in  all  cases  EXCEPT  the
+        following:
+
+          # dlocal is specified,  i.e. define dlocal  .... In this  case
+            the identifier is assumed to be declared already.
+
+          # updaterof is specified without any declaration keywords, the
+            name  is  already  declared   as  a  lexical  or   permanent
+            identifier, and,  for a  nested  define, the  identifier  is
+            'local' to the enclosing procedure (i.e. an lvars of it,  or
+            a dlocal of it).
+
+        The arguments are:
+
+            Argument   Meaning
+            --------   -------
+            id_name    The name of the identifier to be declared.
+
+            globl_p    The procedure sysGLOBAL  if "global" was  present
+                       in the header and false otherwise.
+
+            decl_p     The sys_ declaration procedure for a  declaration
+                       keyword  if  present  (e.g.  sysVARS  for   vars,
+                       sysCONSTANT, sysLVARS, etc), or false if none.
+
+            idprops    A value for the identprops of the name, i.e.  the
+                       identprops keyword specified, or false if none.
+
+        The default  procedure  in  this variable  is  shown  below.  If
+        POP11_DEFINE_CONSTANT is  set in  pop_pop11_flags  (compile_mode
+        syntax :pop11 +defcon), then top-level defines are defaulted  to
+        constant; if  POP11_DEFINE_PROCEDURE  is set  (:pop11  +defpdr),
+        then identifiers are defaulted  to procedure-type.
+
+        Also, in the case where a  nested define would default to  vars,
+        it calls  pop11_vars_default_check if  POP11_VARS_CHECK  (:pop11
+        +varsch) is set:
+
+        define vars pop11_define_declare(id_name, globl_p, decl_p,
+                                                           idprops);
+            lvars globl_p, decl_p, idprops, id_name;
+
+            unless decl_p then
+                ;;; no explicit declaration given
+                sysVARS -> decl_p;  ;;; initially, default to vars
+                if pop_vm_compiling_list == [] then
+                    ;;; top level define
+                    if pop_pop11_flags &&/=_0 POP11_DEFINE_CONSTANT then
+                        sysCONSTANT -> decl_p
+                    endif
+                else
+                    ;;; nested define
+                    if pop_pop11_flags &&/=_0 POP11_OLD_VARS then
+                        ;;; old-style
+                        if pop_pop11_flags &&/=_0 POP11_VARS_CHECK then
+                            pop11_vars_default_check(p_idname) -> decl_p
+                        endif
+                    else
+                        ;;; new style -- just defaults to lconstant
+                        sysLCONSTANT -> decl_p
+                    endif
+                endif;
+            endunless;
+
+            unless idprops then
+                ;;; no explicit identprops given
+                if pop_pop11_flags &&/=_0 POP11_DEFINE_PROCEDURE then
+                    "procedure"
+                else
+                    0
+                endif -> idprops
+            endunless;
+
+            if globl_p
+            and decl_p /== sysVARS and decl_p /== sysCONSTANT
+            then
+                mishap(0, 'ids: INCORRECT DEFINE SYNTAX (not
+                                vars or constant after global')
+            endif;
+
+            ;;; do the declaration
+            decl_p(id_name, idprops);
+            if globl_p then globl_p(id_name) endif;
+        enddefine;
+
+
+pop11_define_props(id_name, p_name, updater)        [procedure variable]
+                                         -> props
+        The procedure in this variable is called by the define statement
+        to return  the default  pdprops value  for the  procedure  being
+        defined. (Note  that this  is  the DEFAULT  value, and  will  be
+        overridden by an explicit "with_props" declaration.)
+
+        The arguments are:
+
+            Argument   Meaning
+            --------   -------
+            id_name    The name of the identifier the procedure  resides
+                       in.
+
+            p_name     The name of the procedure, i.e. the id_name  with
+                       any section pathname removed.
+
+            updater    true if updaterof was present, false if not.
+
+        The standard version of this procedure appears below; by default
+        it returns  p_name  as the  pdprops  value, but  for  a  lexical
+        identifier  when  the  flag   POP11_NO_LEX_PDPROPS  is  set   in
+        pop_pop11_flags (and pop_debugging is false), it returns false:
+
+            define vars pop11_define_props(id_name, p_name, upd)
+                                                            -> props;
+                lvars id_name, p_name, upd, props;
+                if isident(sys_current_ident(id_name)) /== "perm"
+                and pop_pop11_flags &&/=_0 POP11_NO_LEX_PDPROPS
+                and not(pop_debugging)
+                then
+                    ;;; false for lexical procedure props
+                    false
+                else
+                    ;;; else default is procedure name as props
+                    p_name
+                endif -> props
+            enddefine;
+
+        (The  flag  POP11_NO_LEX_PDPROPS  corresponds  to   compile_mode
+        syntax :pop11 -lprops.
+
+
+pop11_comp_procedure(closer, id_name,  props) ->  p          [procedure]
+        This procedure,  called  by  define  and  procedure,  compiles a
+        procedure from just  before the  argument list up  to closer  (a
+        word  or   list   containing  words   e.g.   "end"   "enddefine"
+        "endprocedure"). id_name is the name of the procedure identifier
+        (e.g. as read in by "define", or false if there is no name, e.g.
+        in the  "procedure" syntactic  form.  props is  the item  to  be
+        inserted in the pdprops of the procedure, or false. props can be
+        over- ridden by with_props in  the header. The result  returned,
+        p, is  of  the  same  type  as  the  result  of  sysENDPROCEDURE
+        (described in REF * VMCODE),  i.e. either  the procedure  record
+        created or a 'procedure compilation' structure.
+
+        This  procedure  is  used  by  the  syntax  words  "define"  and
+        "procedure". E.g. the latter could be defined as:
+
+            define syntax procedure;
+                pop11_comp_procedure([endprocedure end], false, false)
+                        -> pop_expr_item;
+                sysPUSHQ -> pop_expr_inst
+            enddefine;
+
+        Note  that  (providing  the  flag  POP11_OLD_VARS  is  clear  in
+        pop_pop11_flags -- as it is by default), any formal argument  or
+        result identifier that is not  locally declared (i.e. that  does
+        not appear  in an  identifier  declaration or  dlocal  statement
+        immediately following  the  procedure header)  is  defaulted  to
+        lvars.
+
+        (If POP11_OLD_VARS is set, e.g. with compile_mode syntax  :pop11
+        +oldvar, then undeclared  formals default to  vars. However,  in
+        this case,  if  POP11_VARS_CHECK  is also  set  (+varsch),  then
+        pop11_comp_procedure    calls     the     variable     procedure
+        pop11_vars_default_check on any such formal.)
+
+        Note also that when POP11_VARS_CHECK is  set, it is an error  to
+        have an explicit vars statement inside a procedure (dlocal  must
+        be used  instead).  If  POP11_VARS_CHECK  is  clear,  a  warning
+        message is issued instead (unless POP11_OLD_VARS is set).
+
+
+pop11_vars_default_check(id_name) -> decl_p         [procedure variable]
+        This variable is redundant except when POP11_OLD_VARS is set  in
+        pop_pop11_flags (compile_mode syntax :pop11 +oldvar).
+
+        In this case only, pop11_comp_procedure and pop11_define_declare
+        call  the  procedure  in   this  variable,  whenever  the   flag
+        POP11_VARS_CHECK is set  in pop_pop11_flags and  a default  vars
+        declaration would be required (for  a formal argument or  result
+        identifier in  the  former case,  or  a procedure  name  in  the
+        latter).
+
+        id_name is is the name of the identifier concerned; after taking
+        any other  relevant  action,  the procedure  should  return  the
+        declaration  procedure  decl_p  to   be  used  to  declare   the
+        identifier. The standard value  of this procedure just  prints a
+        warning message and returns sysVARS, i.e.
+
+         define vars pop11_vars_default_check(id_name);
+           lvars id_name;
+           printf(';;; WARNING: %p DEFAULTED TO VARS IN PROCEDURE %p\n',
+                       [%id_name, pdprops(hd(pop_vm_compiling_list))%]);
+           sysVARS
+         enddefine;
+
+        (However,  in  Popc  compilation,  pop11_vars_default_check   is
+        redefined to treat the condition as an error).
+
+
+
+3.3  Procedures Associated With Other Syntax Constructs
+-------------------------------------------------------
+
+pop11_comp_constructor(closer) -> count_or_false             [procedure]
+        Compiles and  plants code  to push  the elements  in a  list  or
+        vector constructor,  i.e.  [...]  or {...},  after  the  opening
+        bracket has been read. The closing bracket closer terminates the
+        constructor expression (e.g. "]" or "}").
+
+        If the  constructor  expression  did  not  contain  any  of  the
+        'evaluate' keywords
+
+                        %  ^  ^^
+
+        and the flag POP11_CONSTRUCTOR_CONSTS is set in  pop_pop11_flags
+        (compile_mode :pop11 +constr), the result count_or_false is  the
+        number  of  elements  in  the  structure  (i.e.  the  number  of
+        sysPUSHQs executed). Otherwise, false is returned.
+
+        The count_or_false  result  allows  a syntax  procedure  to  use
+        pop11_comp_constructor  inside   the   compile_p   argument   to
+        * sysCONSTRUCT:
+
+            define syntax {;
+                sysCONSTRUCT(
+                    procedure();
+                        pop11_comp_constructor("}"), "sysvecons"
+                    endprocedure, 2)
+            enddefine;
+
+        If count_or_false is a count, sysCONSTRUCT will then try to make
+        the  structure   at  compile-time   (as  opposed   to   actually
+        incorporating the  constructor  code into  the  procedure  being
+        compiled, so that a  new structure will  be produced every  time
+        the code is run). See REF * VMCODE.
+
+        Note  that  if   POP11_CONSTRUCTOR_CONSTS  is   not  set,   then
+        pop11_comp_constructor will always  return false, regardless  of
+        whether the constructor  expression compiled contained  evaluate
+        keywords or not. In Pop-11 terms this means that list and vector
+        constructors will always produce  new structures every time  the
+        code is run; the  alternative, with POP_CONSTRUCTOR_CONSTS  set,
+        implies that constructor expressions  with no evaluate  keywords
+        will produce compile-time constants (so that in a procedure, for
+        example,  any  updating  of  the  structure's  components   will
+        permanently change it in all invocations of that procedure).
+
+
+pop11_comp_declaration(decl_p)                               [procedure]
+pop11_comp_declaration(decl_p, globword)
+        This procedure is used by the constant, vars, lvars, dlvars  and
+        lconstant   constructs   to   read    declaration/initialisation
+        statements for identifiers (see  REF * POPSYNTAX for the  syntax
+        of these). The argument decl_p is a declaration procedure of the
+        form
+
+                decl_p(word, idprops)
+
+        (e.g. sysVARS), which for each word appearing in the declaration
+        is called  on the  word and  its specified  IDPROPS (the  latter
+        defaulting to 0 when not specified).
+
+        globword is  an optional  word argument  that can  be used  when
+        declaring permanent identifiers, as follows:
+
+            Argument        Meaning
+            --------        -------
+            "global"        Declare each identifier global, ie
+                            sysGLOBAL(word).
+
+            "nonglobal"     Declare each identifier nonglobal, ie
+                            sysGLOBAL(word, false).
+
+            "undef"         Declare each identifier global if the
+                            bit POP11_PERM_GLOBAL is set in
+                            pop_pop11_flags.
+
+        If an identifier  declaration is followed  by an  initialisation
+        expression then this is compiled, and, except in the case  where
+        decl_p is sysLCONSTANT, the code
+
+                sysPOP(word)
+
+        is planted (and executed immediately  if at execute level).  For
+        sysLCONSTANT, the expression  is evaluated  immediately and  the
+        result item assigned with sysPASSIGN(item, word).
+
+
+pop11_loop_start(lab)                                        [procedure]
+        Adds the  label  lab  to  the  list  of  loop  iteration  labels
+        referenced by nextloop, nextif and nextunless (lab will normally
+        be a label produced by sysNEW_LABEL).
+
+
+pop11_loop_end(lab)                                          [procedure]
+        Adds the label lab to the list of loop end labels referenced  by
+        quitloop, quitif and quitunless.
+
+
+
+
+---------------------------------
+4  More On Expression Compilation
+---------------------------------
+
+This  section  describes  the  procedure  pop11_comp_prec_expr  in  more
+detail, and should  be read in  conjunction with Expression  Compilation
+above.
+
+    Essentially, the  procedure  has  two  phases:  phase  1  reads  and
+examines the first item  of the expression, while  phase 2 loops  around
+absorbing  operator  expressions  until  an  operator  is  found   whose
+precedence is too high  to form part of  the current expression (or  the
+next item is not  an operator). Phase 1  is responsible for  recognising
+syntax words and calling their associated procedures, while phase 2 does
+the same for syntax operators.
+
+    Although the procedure emits Poplog  VM code directly (i.e.  without
+constructing  an  intervening  parse  tree),  this  is  effected   via a
+1-instruction  'buffer'   to  allow   possible  re-interpretation   of a
+preceding instruction. The  buffer is represented  by the two  variables
+pop_expr_inst  and   pop_expr_item,   which  contain   respectively   an
+instruction-planting procedure (such as  sysPUSH) and an argument  value
+to be given to it. Two 'dummy' code-planting procedures, pop11_EMPTY and
+pop11_FLUSHED, are used in this context  to indicate that the buffer  is
+empty, and also to distinguish whether  this is because no code has  yet
+been compiled  (pop11_EMPTY),  or  because code  has  been  planted  but
+flushed (pop11_FLUSHED); in  these cases the  value of pop_expr_item  is
+irrelevant.
+
+(Note that both pop_expr_inst and pop_expr_item are dynamically local to
+pop11_comp_prec_expr, so  that nested  expressions have  no  interaction
+with each other in respect of buffered instructions.)
+
+    Phase 1 thus commences by  setting pop_expr_inst to pop11_EMPTY.  If
+item is the next item on proglist and is one of the following, then item
+is removed from proglist and the corresponding actions performed:
+
+     #  Non-operator syntax word with procedure value P, not equal to
+        popclosebracket:
+
+             P();                            ;;; Call syntax procedure
+             if pop_expr_inst == pop11_EMPTY then
+                 pop11_FLUSHED -> pop_expr_inst  ;;; see below
+             endif;
+
+     #  Any other non-syntax, non-operator word:
+
+             item -> pop_expr_item;
+             sysPUSH -> pop_expr_inst;
+
+     #  Any non-word except <termin>:
+
+             item -> pop_expr_item;
+             sysPUSHQ -> pop_expr_inst;
+
+Phase 2 (to which all other cases go directly without changing the  next
+item) then loops  while the  next item item  is an  operator word  whose
+internally-represented precedence  op_prec  is  less  than  the  current
+expression precedence  given by  pop_expr_prec  (see the  discussion  of
+internal precedence  values in  Expression Compilation).  For each  such
+operator, the word is  removed from proglist  and the following  actions
+taken:
+
+     #  syntax operator word with procedure value P:
+
+             P();                        ;;; Call syntax op procedure
+             if pop_expr_inst == pop11_EMPTY then
+                 pop11_FLUSHED -> pop_expr_inst  ;;; see below
+             endif;
+
+     #  ordinary operator word:
+
+             pop_expr_inst(pop_expr_item);       ;;; flush buffer
+             item -> pop_expr_item;
+             sysCALL -> pop_expr_inst;
+             pop11_comp_prec_expr(op_prec || 1, false);
+
+Note that for an  ordinary operator word, the  precedence passed to  the
+recursive call of pop11_comp_prec_expr for the following  sub-expression
+is the operator's precedence with bit  0 set. This value corresponds  to
+the absolute value of its  signed identprops precedence, and causes  the
+sub-expression to  include  operators  of negative  (but  not  positive)
+identprops precedence of the same  absolute value (thus making  negative
+operators associate to the right rather than to the left).
+
+    Note also that after calling either syntax procedures in phase 1  or
+syntax operator  procedures  in phase  2,  pop_expr_inst is  changed  to
+pop11_FLUSHED if it remains pop11_EMPTY. This ensures that a  subsequent
+syntax operator can use a test  for pop11_EMPTY to determine whether  it
+occurred at the beginning of an expression, without forcing every syntax
+procedure to make this change.
+
+    pop11_comp_prec_expr finishes by flushing the instruction buffer  in
+a mode  specified  by  the  value  of  the  update  argument  stored  in
+pop_expr_update. For normal evaluate mode (false) this is just
+
+            pop_expr_inst(pop_expr_item);
+
+Update  mode  (true)   is  interpreted   as  meaning   that  the   final
+instruction-planting procedure of the expression should have an updater,
+which will plant  appropriate update-mode  code; the absence  of one  is
+taken to mean that the compiled  code was illegal in an update  context,
+and results in the mishap 'IMPERMISSIBLE UPDATE EXPRESSION'.  Otherwise,
+the buffer is flushed by applying the updater:
+
+            updater(pop_expr_inst)(pop_expr_item);
+
+So that they work correctly with this scheme, all update-mode Poplog  VM
+instructions  are  the   updaters  of   the  corresponding   normal-mode
+procedures, e.g. sysPOP is the updater of sysPUSH, sysUCALL of  sysCALL,
+etc.
+
+
+pop11_EMPTY(dummy)                                           [procedure]
+-> pop11_EMPTY(dummy)
+pop11_FLUSHED(dummy)                                         [procedure]
+-> pop11_FLUSHED(dummy)
+        Both these procedures do nothing but erase their dummy argument.
+        This  means  that  whenever  one   of  them  is  the  value   of
+        pop_expr_inst,     it     is      always     safe     to      do
+        pop_expr_inst(pop_expr_item) to flush the instruction buffer.
+
+        Their updaters  are different,  however: on  the basis  that  an
+        arbitrary piece  of  already-flushed  code  has  no  update-mode
+        interpretation, the updater of pop11_FLUSHED produces the mishap
+        'IMPERMISSIBLE UPDATE EXPRESSION'.
+
+        On the other hand, the updater of pop11_EMPTY does allow that an
+        empty expression  can  be meaningful  in  this context:  if  the
+        (necessarily  true)  value  of  pop_expr_update  is  in   fact a
+        procedure, then  this is  run  without arguments,  otherwise  no
+        action is taken. (This facility is used, for example, by the  ->
+        and ->>  syntax  operators  to  interpret  an  empty  assignment
+        destination as a stack erase, by calling pop11_comp_prec_expr to
+        compile the  following expression  with  an update  argument  of
+        sysERASE(%0%).)
+
+
+
+
+------------------------------------------------------
+5  Example Definitions of Syntax/Syntax Operator Words
+------------------------------------------------------
+
+This section  gives  two  simple  examples  of  defining  new  syntactic
+constructs. The first is the syntax word ", for pushing a quoted word:
+
+    define syntax ";
+        readitem() -> pop_expr_item;
+        if isstring(pop_expr_item) then
+            consword(pop_expr_item) -> pop_expr_item
+        elseunless isword(pop_expr_item) then
+            mishap(pop_expr_item, 1, 'iqw: INCORRECT QUOTED WORD');
+        endif;
+        pop11_need_nextitem(""") -> ;
+        sysPUSHQ -> pop_expr_inst
+    enddefine;
+
+The  second  is  a  simplified  version  of  the  "("  syntax  operator,
+illustrating  how  push  instructions,  etc  generated  in  phase  1  of
+pop11_comp_prec_expr are re-interpreted in  phase 2 as procedure  calls.
+It also demonstrates how a syntax operator, by testing for  pop11_EMPTY,
+can behave differently depending  on whether it  opens an expression  or
+not:
+
+    define syntax -1 (;
+         dlocal popclosebracket = ")";
+
+        if pop_expr_inst == pop11_EMPTY then
+            ;;; starts expression -- just compile parenthesised
+            pop11_comp_stmnt_seq();              ;;; stmnt seq
+            pop11_FLUSHED -> pop_expr_inst
+        elseif pop_expr_inst == sysPUSH then
+            ;;; re-interpret push as call of identifier
+            pop11_comp_expr_seq();     ;;; compile arguments to call
+            sysCALL -> pop_expr_inst
+        elseif pop_expr_inst == sysPUSHQ then
+            ;;; re-interpret as call of quoted structure
+            pop11_comp_expr_seq();     ;;; compile arguments to call
+            sysCALLQ -> pop_expr_inst
+        else
+            ;;; call of whatever's on the stack
+            pop_expr_inst(pop_expr_item);              ;;; flush it
+            sysPOP(sysNEW_LVAR() ->> pop_expr_item);   ;;; save in
+                                                       ;;; temp lvar
+            pop11_comp_expr_seq();     ;;; compile arguments to call
+            sysCALL -> pop_expr_inst
+        endif;
+        ;;; check for closing bracket
+        pop11_need_nextitem(")") ->
+    enddefine;
+
+
+
+
+-----------------------
+6  Compilation Contexts
+-----------------------
+
+The context in which an expression  or statement is compiled can  change
+in subtle ways.  One context  concerns the current  section, which  maps
+words (see  REF * WORDS) onto  identifiers (see  REF * IDENT).  Changing
+from one section  to another can  imply that some  words have  different
+identifiers associated  with them  in the  new section,  with  different
+syntactic properties or different values, or both. For full details  see
+REF * SECTIONS.
+
+Other  types  of  compile-time  context  are  concerned  with  whether a
+procedure  is  currently  being  compiled  or  not,  and  with   whether
+instructions can be  executed as soon  as they are  compiled or  whether
+execution must be delayed until a larger structure has been compiled.
+
+These two distinctions are  labelled by the phrases  "at top level"  and
+"in executing context", which will now be explained.
+
+
+6.1  Statements Compiled at "Top Level"
+---------------------------------------
+A statement (as defined in  REF * POPSYNTAX) is compiled at "top  level"
+if it  is not  syntactically enclosed  within the  body of  an  explicit
+procedure definition or procedure expression in the current  compilation
+stream. In  that case  the  Pop-11 identifier  popexecute is  set  true.
+Otherwise it  is false.  So,  in a  non-nested procedure  definition  or
+procedure expression using one of the forms
+
+        define <header>;
+            <body>
+        enddefine;
+
+        procedure <header>;
+            <body>
+        endprocedure;
+
+popexecute remains true  while the  <header> is being  compiled, but  is
+made false as soon as compilation  of the <body> starts (i.e. after  the
+the semi-colon has been read in, which is when the call of  sysPROCEDURE
+(see REF * VMCODE)) occurs.  popexecute will  also be  set false  during
+compilation of user-defined  syntactic forms  that invoke  sysPROCEDURE,
+and it remains false until sysENDPROCEDURE is invoked, e.g. by enddefine
+or endprocedure,  after which  popexecute is  restored to  its  previous
+value. It  is  also  made  false by  lexical  blocks  in  "non-executing
+contexts" explained below.
+
+Most Pop-11  statement forms,  including loops,  conditionals,  variable
+declarations, etc. can be used at top level, though a goto or go_on (see
+REF * VMCODE) cannot. All statement forms  encountered at top level  are
+executed immediately,  unless in  a "non-executing"  context,  explained
+below.
+
+If a statement other than a procedure definition or an expression  other
+than a procedure expression, e.g. a  loop or conditional, occurs at  top
+level then  statements  in its  body  will also  be  at top  level.  For
+example, the  declaration  of  xxx  below  and  the  <instructions>  are
+compiled at top level if the following conditional is at top level:
+
+        if flag then
+            vars xxx = 99;
+            <instructions>
+        endif;
+
+During the compilation  of <instructions> the  value of popexecute  will
+remain true  unless a  nested  procedure body  or nested  lexical  block
+(using lblock ....  endlblock) is encountered.  If the same  conditional
+expression occurred in  a procedure definition  it would not  be at  top
+level and neither would the declaration and other embedded instructions.
+In that context popexecute would be false throughout the compilation  of
+the conditional.
+
+During compilation of a procedure  body popexecute is automatically  set
+false, but if  a macro  or syntax  word, or  the autoloading  mechanism,
+invokes the  procedure  pop11_compile  or  anything  else  that  invokes
+sysCOMPILE (see REF * VMCODE), then a  new compilation stream is set  up
+temporarily and popexecute  (which is  local to  sysCOMPILE) starts  off
+true  for  that  stream.  When  the  nested  compilation  is   finished,
+compilation of the original procedure continues and popexecute takes  on
+its previous value. (The  #_INCLUDE macro is  designed to merge  another
+file into  the current  compilation  stream instead  of starting  a  new
+compilation. So  it  will  not  change  the  value  of  popexecute.  See
+REF * #_INCLUDE)
+
+If a section (REF * SECTIONS)  or lexical block (HELP * LEXICAL)  occurs
+at top level, in  an "executing" context (defined  below), then the  top
+level statements within it are executed as soon as they are compiled. In
+such a  case  the  instructions will  be  obeyed  even if  there  is  no
+"endsection" or "endlblock", and a "misplaced syntax word" error will be
+reported only  when  the compilation  stream  ends without  the  closing
+bracket. Top level sections and lexical blocks may be nested within  one
+another without affecting popexecute or immediate execution.
+
+
+6.2  Compiling in "Executing" and "Non-Executing" Contexts
+----------------------------------------------------------
+However, not all top-level contexts (i.e. contexts not inside  procedure
+bodies) are equivalent. This is because something like a conditional  or
+loop statement at top level is implicitly a procedure and is compiled as
+a single entity before it can be executed. Thus, if the body of a  loop,
+or one of the branches  of a conditional includes declarations,  lexical
+blocks or other statements, they will also  be at top level, but not  in
+an "executing" context.
+
+So the first lvars  declaration below is at  top level (with  popexecute
+true) but in a non-executing context:
+
+        if flag then
+           lvars test1 = 99;
+           lblock
+                lvars test2 = 88;
+                ......
+           endlblock;
+            .....
+        endif;
+
+Because the lexical block is in a non-executing context it is treated as
+a nested procedure, i.e. as if surrounded by
+
+        procedure .... endprocedure();
+
+and therefore it sets popexecute false. This is because in this sort  of
+context, the  nested lexical  block has  to be  treated as  an  embedded
+procedure in order to  ensure that any Type-3  lexical variables in  its
+scope  work  properly.  (See  REF * VMCODE,  Implementation  of  Lexical
+Scoping.)
+
+Although "test1" is declared inside an implicit procedure it remains  at
+top level  and  can be  accessed  outside the  conditional,  though  the
+assignment will not  be done  until the whole  conditional is  executed,
+because the declaration  is in  a non-executing  context. Similarly  any
+instructions in the lexical block nested in the conditional will not  be
+done while the block  is being compiled.  Moreover, because the  lexical
+block is  compiled  as  if  it were  a  nested  procedure,  all  lexical
+variables declared  within  it,  such as  "test2",  are  not  accessible
+outside  the  conditional.  During  compilation  of  the  lexical  block
+popexecute is set false, for the reason explained above.
+
+Top level lexical blocks  can be nested inside  other top level  lexical
+blocks and for all of them the context will be executing if they are not
+inside any explicit or implicit procedure (i.e. loops or conditionals).
+
+
+6.3  Testing Compilation Context
+--------------------------------
+Macros and syntax  words that  have to behave  differently depending  on
+whether they occur inside a procedure body or not, or whether they occur
+in an executing context or not, cannot safely test the context by  using
+popexecute as  this may  be  set false  inside a  non-executing  lexical
+block, which  is  not  in  a  procedure body  but  inside  a  top  level
+conditional or loop.
+
+So, as explained  above and  in REF * VMCODE, the  test to  be used  for
+whether the  current context  is  executing or  not (i.e.  whether  some
+larger construct  has to  be  compiled before  the  current one  can  be
+executed) is
+
+            popclosebracket == popclosebracket_exec
+
+And the test for whether the current context is in a procedure body is
+
+            pop_vm_compiling_list /== []
+
+
+
+
+-----------
+7  See Also
+-----------
+
+For more information on the virtual machine instructions used above
+
+    # REF * VMCODE
+
+    # REF * POPSYNTAX
+
+Other examples of syntactic extensions can be found in
+
+    # LIB * FOREACH
+         (documented in HELP * FOREACH)
+
+    # LIB * FOREVERY
+         (documented in HELP * FOREVERY)
+
+    # HELP * DEFINE_FORM
+
+    # HELP * FOR_FORM
+
+For more complex examples see:
+
+    # LIB * FACETS
+         (documented in HELP * FACETS)
+
+    # LIB * NEWOBJ
+         (documented in HELP * NEWOBJ).
+
+    $usepop/pop/lib/flavours/*.p
+         (documented in TEACH * FLAVOURS)
+
+
+
+--- C.all/ref/popcompile
+--- Copyright University of Sussex 1996. All rights reserved.
