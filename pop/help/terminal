@@ -1,0 +1,554 @@
+HELP TERMINAL                               Robert Duncan, December 1989
+                                               Revised A.Sloman Oct 1990
+
+How to configure VED for your terminal.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Default Terminal Initialisation
+ -- Selecting Your Own Terminal Type
+ -- Use with X windows
+ -- Making a Saved Image
+ -- Writing a New Terminal Library
+ -- The "screen" file
+ -- Default built in screen settings available
+ -- The "keys" file
+ -- Default built in key bindings available
+ -- The wrapper file
+ -- Related documentation
+
+-- Default Terminal Initialisation ------------------------------------
+
+Default terminal selection and initialisation is performed by the
+procedure *VEDINITTERM called from *VEDSETUP. Without any intervention
+by the user, VEDINITTERM will try to determine the terminal type
+automatically. How this is done differs depending on the host operating
+system: on UNIX systems, VED uses the value of the $TERM environment
+variable; on VMS, VED interrogates the terminal's answer-back message
+with *VEDTERMINALSELECT. In either case, if the terminal type is
+unavailable or is not one which VED can make use of, VEDINITTERM will
+prompt you for an alternative terminal type to try.
+
+The mechanism is described more fully in REF * VEDTERMINALS.
+
+
+-- Selecting Your Own Terminal Type -----------------------------------
+
+The default terminal initialisation will often get things right, but may
+not do so: it may not be possible to determine the correct terminal type
+(not unusual if there are several machines and terminal types networked
+together) or the terminal may not be one which VED can recognise or make
+use of. In these circumstances you can select a terminal type explicitly
+for yourself: the code for this should go in your "vedinit.p" file,
+since VEDSETUP compiles this file before calling VEDINITTERM, giving you
+the opportunity to preempt the automatic selection strategy. If you're
+unfamiliar with the "vedinit.p" file, read HELP * INITIAL (the section
+on ``Initialising VED'').
+
+The procedure *VEDUSETERM is used to initialise VED for a particular
+terminal type. For example, if you always use a VT220-type terminal, you
+can put the following in your "vedinit.p" file:
+
+    veduseterm("vt220") -> ;
+
+This will search for a terminal library for the given terminal type or
+(on UNIX systems) use the TERMCAP database. The result of the call is a
+flag indicating whether the initialisation succeeded: strictly speaking
+you should test this, as VED won't work if the result is <false>, but
+for a library-supported terminal like the VT220 it should always return
+<true>. A list of terminal libraries is given in REF * VEDTERMINALS.
+
+This is fine provided that you always use the same terminal type. More
+often than not, the terminal type will vary depending on some condition:
+
+    if its_tuesday() then
+        veduseterm("vt220") ->
+    else
+        veduseterm("sun") ->
+    endif;
+
+What the condition is will vary enormously between sites and
+individuals. Useful indicators to consider are the machine name and type
+(from *SYS_HOST_NAME, *SYS_MACHINE_TYPE) or any of the information
+recorded in the property *POPHOST.
+
+Such information may still not be sufficient to uniquely identify the
+terminal type. For this situation, VED provides the *VEDTERMINALSELECT
+mechanism for interrogating the terminal and using the ``answer-back''
+message to determine its type. VEDTERMINALSELECT is a variable which, if
+set, should be a list containing either strings to send out to the
+terminal to try to elicit an answer-back message, or associations of
+possible replies and their corresponding terminal types. For a proper
+description see the reference in REF * VEDTERMINALS, but as an example
+consider the following assignment:
+
+    [
+        '\^[Z'
+            ['\^[[?1'     'vt100']
+            ['\^[[?62'    'vt200']
+    ] -> vedterminalselect;
+
+This will cause VED to send out the string '\^[Z', i.e. <ESC> Z, and
+compare the reply (if any) with the given alternatives, selecting the
+terminal type 'vt100' or 'vt200' as appropriate.
+
+An assignment to VEDTERMINALSELECT should go in your "vedinit.p" file
+too. A word of warning when using this: don't type ahead while waiting
+for VED to come up - characters received just as the answer-back is
+expected will cause confusion. Wait until VED has rung the terminal
+bell, or if you've disabled *VEDSCREENBELL, wait until the screen has
+been set. (You should anyway avoid type ahead with VED, because it
+changes the terminal modes which can cause loss of input.)
+
+As an alternative to calling VEDUSETERM, you can load a terminal library
+by name by doing:
+
+    lib vedvt220;
+
+etc. in your "vedinit.p" file. This often has much the same effect, but
+some terminal libraries can only be loaded this way, especially if they
+need some kind of special tailoring. See REF * VEDTERMINALS for details.
+It's even possible, because the terminal libraries are autoloadable, to
+call the terminal initialisation procedure directly, as with:
+
+    vedvt220();
+
+This is particularly useful if used in conjunction with a saved image
+(see below). Beware, however, of inadvertently autoloading more than one
+library, as the results will be unpredictable. It's better to ``quote''
+the procedure calls with *POPVAL to delay autoloading to the last
+minute:
+
+    popval([vedvt220()]);
+
+All these methods still rely on there being an existing library (or
+possibly a TERMCAP entry) which describes the selected terminal. If
+there isn't, you'll probably have to write your own library from scratch
+- see below for instructions on how to do this. You can however try some
+of the more basic terminal configurations (such as *VEDANSI, *VEDVT52,
+*VEDVT100) which may allow VED to at least work on the terminal, if not
+in the most efficient way.
+
+
+-- Use with X windows -------------------------------------------------
+
+Two cases need to be distinguished, depending on whether XVed or
+terminal VED is being used.
+
+CASE (a) VED is used with an X windows server in a window created by a
+program that provides a terminal emulation. POPLOG currently recognises
+two such terminal emulators, "xterm" and "dxterm". See HELP * VEDXTERM
+and HELP * VEDDXTERM respectively.
+
+CASE (b) Use of VED with special X windows interface for VED, including
+mouse and menu-driven interaction and the use of different windows for
+different files. See HELP *XVED and REF *XVED.
+
+
+-- Making a Saved Image -----------------------------------------------
+
+If configuring VED for your terminal requires loading a library, this
+can prolong startup time. Some users prefer to build saved images which
+have the library code built-in, so avoiding this overhead. The library
+LIB * MKVEDIMAGE can simplify this process. For example, to make a save
+image called "myved" which has the VT220 configuration code built in,
+simply type the following to the shell or DCL prompt:
+
+    pop11 mkvedimage myved.psv vedvt220
+
+The first argument instructs Poplog to make a VED image; the second
+argument is the image name ("ved.psv" in the current directory) and the
+last is the name of a terminal library to load.
+
+This image could be run with the command
+
+    pop11 +myved
+
+For general information about creating and running saved images, see
+HELP * INITIAL, REF * SYSTEM.
+
+An image built in this way will behave just like the standard "ved"
+command; in particular, it will still call VEDSETUP as its first action,
+and hence VEDINITTERM to choose the terminal type. The only difference
+is that if the terminal type selected (either explicitly or
+automatically) is a VT220, the library code to initialise it will
+already be compiled and so the startup time will be shorter. It does not
+restrict the image to being used on a VT220 terminal. You can in fact
+include several libraries into the image to cater for all the terminal
+types you might possibly use, e.g.
+
+    pop11 mkvedimage myved.psv vedvt220 vedsun vedxterm
+
+
+-- Writing a New Terminal Library -------------------------------------
+
+If there's nothing already available which allows VED to work with your
+terminal, you'll have to write your own library for it. This is quite
+easily done, if you follow the rules given below. You'll need your
+terminal manual on hand to find out what control sequences it responds
+to.
+
+A terminal library is typically built from three separate files. For the
+sake of illustration, we'll assume from now on that the terminal name is
+"abacus". In this case, the three files would be called:
+
+    vedabacusscreen.p
+    vedabacuskeys.p
+    vedabacus.p
+
+Filenames for other terminals are constructed in the same way. Only the
+first (the "screen" file) is really essential: it and the "keys" file
+provide an interface to VEDUSETERM; the last is a wrapper which
+simplifies loading the library explicitly in a "vedinit.p" file or as
+part of a saved image.
+
+
+-- The "screen" file --------------------------------------------------
+
+The file "vedabacusscreen.p" must define a global procedure
+
+    vedabacusscreen
+
+to perform the following actions:
+
+
+(1) Set the terminal name
+
+The terminal name ("abacus") should be assigned to VEDTERMINALNAME; the
+value <false> should be assigned to VEDTERMINALSELECT. These assignments
+must be done first: they indicate that the terminal type has been
+selected and initialised, so disabling any subsequent automatic
+initialisations.
+
+
+(2) Set the screen dimensions
+
+The number of usable lines on screen (i.e. ignoring any status lines)
+should be assigned to VEDSCREENLENGTH; the number of usable columns on
+screen should be assigned to VEDSCREENWIDTH. If the terminal has
+automatic margins, so that lines which are wider than the terminal
+screen are automatically broken, then you should assign <true> to the
+variable VEDSCREENWRAP. If you're not sure whether the terminal has this
+feature, or if it's optional, you should still set VEDSCREENWRAP: it's
+better for VED to think this feature is present when it's not than vice
+versa.
+
+
+(3) Set screen control sequences
+
+Screen control sequences are used to activate terminal functions such as
+moving the cursor, deleting a character etc. Control sequences are sent
+to the terminal by the procedure *VEDSCREENCONTROL. This will accept a
+single character, a string or a procedure as argument. Characters and
+strings are sufficient for most cases; a procedure value is appropriate
+where the control sequence is not a fixed string (dependent on the
+position of the cursor perhaps) or where more work is needed than just
+character output. Procedures should output any characters to the
+terminal using *VEDSCR_CHAR_OUT.
+
+The control sequences which VED can make use of are described next. You
+must provide values for at least the variables
+
+    vvedscreencharup
+    vvedscreencharright
+    vvedscreencleartail
+    vedscreenxy
+
+or VED will not be able to work at all; others are optional, as not all
+terminals provide the corresponding functions. A value of *NULLSTRING is
+used to indicate an unsupported feature; most of the variables have this
+as a default value, so you can just ignore those you can't (or don't
+want to) use. Where the default value is different to this is clearly
+indicated in the text: you may have to change some of them.
+
+The names of most screen control variables start with "vvedscreen", so
+string values may be assigned to them using the SCREEN keyword of
+*VEDSET.
+
+(3.i) Moving the cursor
+
+The control sequence to move the cursor up one line should be assigned
+to VVEDSCREENCHARUP; this must be set. The control sequence to move the
+cursor one place to the right should be assigned to VVEDSCREENCHARRIGHT;
+this must also be set. The control sequence to move the cursor down one
+line should be assigned to VVEDSCREENCHARDOWN; the default value for
+this is `\n` (newline). The control sequence to move the cursor one
+place to the left should be assigned to VVEDSCREENCHARLEFT; the default
+value for this is `\b` (backspace). The control sequence to move the
+cursor to the first column of the current line should be assigned to
+VVEDSCREENSCREENLEFT; the default value for this is `\r` (carriage
+return).
+
+These control sequences are never used at the boundaries of the screen.
+
+A procedure for moving the cursor to given screen coordinates must be
+assigned to VEDSCREENXY; a template for this procedure is
+
+    procedure(col, line);
+        lvars col, line;
+        /*
+         *  code to output the appropriate escape sequence goes here
+         */
+        col -> vedscreencolumn;
+        line -> vedscreenline;
+    endprocedure;
+
+where (col,line) are the screen coordinates: the north-west corner of
+the usable screen has coordinates (1,1). Note the assignments at the
+end: these must be present. You can write this procedure from scratch,
+or there are two predefined versions which work on several terminals:
+*VEDANSISCREENXY which uses ANSI conventions and *VEDVT52SCREENXY which
+outputs a VT52-type sequence based on *VVEDSCREENPOINT. For more details
+see REF * VEDTERMINALS.
+
+(3.ii) Clearing the screen
+
+The control sequence to clear from the cursor position to the end of the
+current line should be assigned to VVEDSCREENCLEARTAIL; this must be
+set. The control sequence to clear the entire screen should be assigned
+to VVEDSCREENCLEAR.
+
+(3.iii) Inserting and deleting characters
+
+If your terminal has a separate insert mode, the control sequence to
+enter insert mode should be assigned to VVEDSCREENINSERTMODE and the
+sequence to resume normal (overstrike) mode should be assigned to
+VVEDSCREENOVERMODE. If in addition the terminal requires an escape
+sequence to be sent immediately prior to inserting each character, this
+should be assigned to VVEDSCREENINSERTCHAR. If it's not possible to move
+the cursor while in insert mode, you should assign <true> to the
+variable VEDNOMOVEINSERT.
+
+If instead of a separate insert mode, your terminal has a control
+sequence to open up a single space at the current cursor position, you
+should assign this to the variable VVEDSCREENINSERTCHAR.
+
+The control sequence to delete the character under the cursor should be
+assigned to VVEDSCREENDELETECHAR. If the terminal has a separate delete
+mode, you can often construct a delete-one-character sequence by
+concatenating the sequences for enter-delete-mode, delete-character and
+exit-delete-mode.
+
+If the terminal doesn't support character insert and delete, VED can get
+by with redrawing parts of the screen as needed.
+
+(3.iv) Inserting and deleting lines
+
+The control sequence to insert a blank line at the current cursor
+position (moving the current and subsequent lines down the screen)
+should be assigned to VVEDSCREENINSERTLINE; the control sequence to
+delete the current line (moving subsequent lines up) should be assigned
+to VVEDSCREEDELETELINE.
+
+(3.v) Scrolling the screen
+
+The control sequence to scroll the screen up one line should be assigned
+to VVEDSCREENSCROLLUP; this is only ever used on the last line of the
+screen or scrolling region and has default value `\n` (newline). The
+control sequence to scroll the screen down one line should be assigned
+to VVEDSCREENSCROLLDOWN; this is only ever used on the first line of the
+screen or scrolling region.
+
+If the terminal supports scrolling regions (like the VT100), a procedure
+for setting a scrolling region should be assigned to VEDSETSCROLLREGION.
+A template for this procedure is:
+
+    procedure(top, bottom);
+        lvars top, bottom;
+        ....
+    endprocedure;
+
+where -top- and -bottom- are the line numbers of the first and last
+lines (inclusive) of the selected region. The first usable line of the
+screen is numbered 1. You can write this procedure from scratch, but
+there is a predefined version *VEDANSISETSCROLLREGION which uses ANSI
+(VT100) conventions.
+
+(3.vi) Initialisation
+
+The control sequence to initialise the terminal for editing should be
+assigned to VVEDSCREENINIT; this is output each time VED is reentered
+and whenever the display is refreshed with *VEDREFRESH. The control
+sequence to reset the terminal to normal (non-edit) mode should be
+assigned to VVEDSCREENRESET. The control sequence to enable a separate
+function keypad should be assigned to VVEDSCREENSETPAD; the control
+sequence to disable the keypad should be assigned to VVEDSCREENRESETPAD.
+
+(3.vii) Miscellaneous
+
+The control sequence for ringing the terminal bell (or for flashing the
+screen if a "visible bell" is preferred) should be assigned to
+VVEDSCREENBELL; the default for this is `\^G`. The control sequence to
+set the terminal into alternate character set (or graphic) mode should
+be assigned to VVEDSCREENGRAPHIC; the control sequence to reset the
+terminal to normal (alphabetic) mode should be assigned to
+VVEDSCREENALPHA.
+
+
+(4) Set graphic characters
+
+If the terminal has an extended character set, you can improve the
+appearance of the VED screen by writing a version of VEDSCREENGRAPHTRANS
+to translate the standard graphics-character codes defined by VED into
+an appropriate form for your terminal (the default value of
+VEDSCREENGRAPHTRANS just translates them all to ordinary printing
+characters). See REF *VEDSCREENGRAPHTRANS.
+
+(5) Set display of character attributes
+
+Characters in a VED buffer can have a number of attributes attached to
+them, such as 'bold', 'underline' etc. The procedure VEDSCREENCHARMODE
+deals with sending codes to the screen to make it display
+characters appropriately. You can either redefine this procedure
+altogether, or just change some of the control sequences it sends out.
+See REF *VEDSCREENCHARMODE.
+
+(6) Set other variables
+
+If the terminal scrolls slowly or distractingly, you can assign <false>
+to *VEDSCROLLSCREEN to make VED redraw the screen rather than scroll in
+some circumstances; this is a matter of taste. You might also consider
+setting the variable *VEDWIGGLETIMES to change the delay used by
+*VEDWIGGLE to match the terminal speed: the value to use is best
+obtained by experiment.
+
+
+-- Default built in screen settings available -------------------------
+
+There is a widely used "standard" set of screen facilities that can be
+set up for any terminal with a VT100 emulation by running the procedure
+
+    vedvt100screen()
+
+as is done in LIB * VEDVT220 for example. Some of these emulations,
+but not all, will support fast character insertion and deletion, and
+for such terminals the procedure
+
+    vedvt100screenextra()
+
+can be run to set up the relevant screen control variables. This will
+considerably speed up scrolling left and right, among other things.
+
+The procedure vedvi200screen() can be used for terminals with a VT52
+screen emulation. For other options see REF * VEDTERMINALS
+
+
+-- The "keys" file ----------------------------------------------------
+
+The file "vedabacuskeys.p" defines any function key bindings appropriate
+to the terminal keyboard. This is optional: you need not create this
+file if the terminal has no special function keys, or if you don't wish
+to use them. If you do use this file, it should define a global
+procedure
+
+    vedabacuskeys
+
+of no arguments which will define the function key bindings when called.
+Keys may be defined either by using *VEDSET with the KEYS keyword or by
+calling *VEDSETKEY directly.
+
+
+-- Default built in key bindings available ----------------------------
+
+There are some widely used built in procedures for setting default
+key bindings.
+
+    vednewkeys()
+        This sets the default key mapping described in HELP * VEDKEYS.
+
+    vedoldkeys()
+        This sets up an older mapping used as the default prior to
+        Version 14.5 and described in HELP * VEDOLDKEYS.
+
+    vedvi200keys()
+        This sets up a mapping originally devised for the Visual 200
+        terminal, which emulates a VT52 and provides additional
+        function keys. It is the same as vedoldkeys, plus mappings
+        for the keypad.
+
+    vedvt100keys();
+        This corresponds to a VT100 keyboard. It is extended by
+        LIB VEDVT220KEYS
+
+
+-- The wrapper file ---------------------------------------------------
+
+Having the "screen" file (and optionally the "keys" file too) allows the
+library to be loaded automatically by VEDUSETERM. This may be
+sufficient. If the third file "vedabacus.p" is to exist as well, it need
+only be a wrapper for the other two to simplify loading the library
+explicitly.
+
+If you do create this file, here is a model version to work from:
+
+    section;
+
+    uses vedabacusscreen;
+    uses vedabacuskeys;
+
+    define global vars vedabacus();
+        veduseterm("abacus") -> ;
+        identfn -> vedabacus;
+    enddefine;
+
+    if iscaller(vedsetup) then vedabacus() endif;
+
+    endsection;
+
+Including the "uses" statements means that loading this one file is
+sufficient to load all three. The procedure -vedabacus- itself just
+calls VEDUSETERM to avoid duplicating any work; it then redefines itself
+to *IDENTFN so that it can be called more than once without penalty
+(this can simplify a complex setup process). The test at the end of the
+file means that the procedure will be called automatically if the file
+is compiled inside *VEDSETUP: this would be the case if the line
+
+    lib vedabacus;
+
+were executed in a "vedinit.p" file. The procedure will not be called if
+the library is loaded elsewhere - when building a saved image for
+example.
+
+
+-- Related documentation ----------------------------------------------
+
+HELP * VED
+    Overview of online information on VED
+
+REF * VEDTERMINALS
+    General information about VED and terminals; lists all the terminal
+    libraries
+
+HELP * INITIAL
+    On initialising Poplog
+
+HELP * VEDKEYS
+    Default key  bindings in  VED.
+
+HELP * LOGICAL_KEYS
+    A list of frequently used logical names for VED functions accessible
+    from the keyboard.
+
+HELP * VEDEMACS
+    Alternative EMACS-like key bindings
+
+HELP * VEDWORDSTAR
+    WORDSTAR-like key bindings
+
+HELP * VEDSET
+    Notation for tailoring VED
+
+HELP * VEDSETKEY
+    Altering individual keyboard mappings
+
+HELP * VEDSCREENCONTROL
+    The procedure used for communicating with the screen
+
+Other useful online information referred to above:
+HELP * VEDUSETERM, * VEDINITTERM, * VEDSETUP, * VEDTERMINALSELECT
+REF * SYSTEM, * VEDVARS
+
+
+--- C.all/help/terminal
+--- Copyright University of Sussex 1993. All rights reserved. ----------

@@ -1,0 +1,222 @@
+HELP ARRAYS                                      Jon Cunningham Feb 1982
+                                               Updated A.Sloman May 1990
+
+Information on POP-11 arrays
+
+CONTENTS - (Use <ENTER> g to access desired sections)
+
+ -- Introduction
+ -- The structure of Arrays
+ -- Creating arrays using NEWARRAY
+ -- Initialising an array with a procedure
+ -- Arrays of characters (byte arrays)
+ -- More complex cases: NEWANYARRAY etc
+ -- Two arrays may share data
+ -- Arrays in POP-11 are procedures
+ -- Arrays are data-structures
+ -- Associated procedures
+ -- Non-numerical subscripts
+ -- Related documentation
+
+
+-- Introduction -------------------------------------------------------
+
+Arrays are multi-dimensional objects that can be used to store data
+accessed or updated by means of numerical subscripts. An N-dimensional
+array requires N integers as subscripts to access or update its
+components. Two dimensional arrays are often used to represent visual
+images.
+
+Ordinary arrays can contain any POP-11 objects including arrays
+themselves. Facilities are provided (See HELP * NEWANYARRAY) for
+creating an array restricted to 'packed' numerical data or bit patterns.
+For instance an array may be restricted to N bit integers, where 1 <= N
+<= 32. Such arrays use vector types that may be defined by the user. For
+details see REF *DEFSTRUCT
+
+
+-- The structure of Arrays --------------------------------------------
+
+An array in POP-11 is a structure composed of:
+
+    1. a vector-type object containing the data
+    2. a 'boundslist' specifying the dimensions of the array and
+       the bounds for each dimension
+    3. an accessing/updating procedure that computes which component
+       of the vector corresponds to the numerical subscripts given when
+       the array is used.
+
+For this reason an array will take up more space than a vector with the
+same components. However arrays are very convenient when representing
+two, three or N-dimensional structures.
+
+
+-- Creating arrays using NEWARRAY -------------------------------------
+
+The simplest procedure for creating arrays is -newarrray-. Its use takes
+various formats, the most common being
+
+    newarray(<boundslist>, <initial value>) -> <array>
+
+For example,
+
+    newarray([1 10 1 10], 0) -> aa;
+
+will create and assign to aa, a 10 by 10 two dimensional array each of
+whose elements is 0 initially. Arrays are printed out including the
+boundslist:
+
+    aa =>
+    ** <array [1 10 1 10]>
+
+The elements are accessed by means of two integers in the ranges of the
+boundslist.
+
+    aa(3,9) =>
+    ** 0
+
+If the subscripts are out of bounds a mishap results.
+
+    aa(3,29) =>
+    ;;; MISHAP - INVALID ARRAY SUBSCRIPT
+    ;;; INVOLVING:  29
+    ;;; DOING    :  compile nextitem popval compile
+
+The bounds may be negative, as in: newarray([-5 5 -9 90], []).
+
+The variable -poparray_by_row- controls the way elements are stored. If
+it is -true- (the default) then the first parameter of arrays determine
+adjacency in underlying vector. If -false-, then the last parameter.
+
+If the second argument of -newarray- is missing it defaults to the word
+"undef". (See HELP * UNDEF). The second argument may be the empty list
+[], but not any other list as it will be confused with the boundslist.
+If it is a procedure then the procedure will be used to compute initial
+components of the array, as follows.
+
+
+-- Initialising an array with a procedure -----------------------------
+
+    newarray(<boundslist>, <procedure>) -> aa;
+
+where <boundslist> has 2N elements and <procedure> takes N integers and
+returns one result will create and assign to aa an array whose elements
+are initialised to be the result of applying the <procedure> to the
+subscripts. (For a simple example see HELP * NEWARRAY.) So the value of
+aa(i1, i2, ... in) will be the same is the result of applying the
+procedure to (i1, i2, ... in). However, the values can be changed, since
+every array has an 'updater' (See HELP * UPDATER). Thus:
+
+    <item> -> aa(i1, i2, ... in)
+
+will change the value stored in the location accessed by those
+subscripts.
+
+
+-- Arrays of characters (byte arrays) ---------------------------------
+
+newsarray(<list:B>) -> <array>
+newsarray(<list:B>, <character:CHAR>) -> <array>
+    Constructs a character array with bounds B and cells initialised to
+    CHAR (see LIB * NEWSARRAY)
+
+
+-- More complex cases: NEWANYARRAY etc --------------------------------
+
+More complex options, including building arrays out of user-defined
+vector-types are provided by -newanyarray-. Sparse arrays may be created
+by -newsparse-, and -newanysparse- provides more flexible facilities.
+For details and examples see the following help files:
+
+    HELP * NEWARRAY * NEWANYARRAY
+        Creating arrays
+
+    HELP * NEWSPARSE * NEWANYSPARSE
+        Creating "sparse" arrays with properties
+
+
+-- Two arrays may share data ------------------------------------------
+
+It is possible for two arrays to share the same vector or a part of a
+vector, whilst viewing it in different ways, for instance using
+different boundslists. Thus a 12 by 12 array and a 3 by 6 by 8 array may
+have the same vector accessed in the one case by two integers and in the
+other by three. For details see HELP * NEWANYARRAY.
+
+
+-- Arrays in POP-11 are procedures ------------------------------------
+
+As the above implies, POP-11 allows an N-dimensional array to be used in
+any context in which a procedure of N integer arguments and one result
+may be used, and therefore procedures like -pdprops-, -partapply-,
+-updater-, -pdnargs- may be applied to them. Closures may be formed as
+with procedures. E.g. if aa is a 3-D array then aa(%5%) will be a 2-D
+array obtained by 'freezing' the third subscript at the value 5. (See
+HELP * CLOSURES)
+
+-isprocedure- will return -true- if applied to an array. -isarray- can
+be used to distinguish arrays from procedures (though it returns the
+array itself, not -true-, if the argument is an array).
+
+If something is assigned to the -pdprops- of an array it will alter the
+way the array is printed. E.g.
+
+    "demo_array" -> pdprops(aa);
+    aa =>
+    ** <array demo_array [1 10 1 10]>
+
+Since the datakey of an array is the procedure key, arrays as such do
+not have their own -class_print-. (See HELP * CLASSES)
+
+
+-- Arrays are data-structures -----------------------------------------
+
+Many of the procedures that apply to POP-11 data-structures can be
+applied to arrays. See, for example *DATALENGTH  *EXPLODE *DATALIST
+*APPDATA and *COPY
+
+
+-- Associated procedures ----------------------------------------------
+
+The procedure -boundslist- applied to an array will return the list of
+bounds given as first argument to -newarray- or -newanyarray-.
+
+The procedure -arrayvector- returns the vector of the array (see HELP
+*ARRAYVECTOR.)
+
+The procedure -arrayvector_bounds- returns the bounds of the used
+portion of this array (normally 1 and the length of the array.)
+
+
+-- Non-numerical subscripts -------------------------------------------
+
+Arrays store association between sets of numbers and arbitrary values.
+POP-11 also provides mechanisms for storing associations between
+arbitrary objects:
+
+See HELP *NEWASSOC, *NEWPROPERTY, *NEWANYPROPERTY, *NEWANYSPARSE
+*NEWMAPPING, and REF *ASSOC.
+
+
+-- Related documentation ----------------------------------------------
+
+For technical details on arrays, see REF * ARRAYS
+
+For a library to print arrays as tables as numbers or as blocks of
+'grey-level' characters, see TEACH * SHOWARRAY. For a library to read
+blocks of characters (like LIB * GREYPIC) into arrays, see HELP
+*READARRAY.
+
+For more general information on POP-11 data-structures see:
+
+    HELP *DATASTRUCTURES *VECTORS *CLASSES *KEYS
+
+    REF *DATA *KEYS *VECTORS *DEFSTRUCT *ARRAYSCAN
+
+For generalised mappings from arbitrary objects to arbitrary objects see
+HELP *PROPERTIES and REF *PROPS
+
+
+
+--- C.all/help/arrays
+--- Copyright University of Sussex 1992. All rights reserved. ----------

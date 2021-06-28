@@ -1,0 +1,459 @@
+HELP PLOGNEWS
+
+A chronological summary of changes to the Prolog system.
+
+For news prior to Poplog Version 14.1 see HELP * PLOGNEWS.V14.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Poplog Version 14.5
+
+  2   Poplog Version 14.2
+
+  3   Poplog Version 14.1
+
+
+-----------------------------------------------------------------------
+1  Poplog Version 14.5
+-----------------------------------------------------------------------
+
+16/09/83 (Simon Nichols)
+--- A similar problem in LIBRARY * SHOWTREE to the one noted below has
+    been fixed as a result of changes to the Pop-11 library
+    LIB * SHOWTREE.
+
+19/08/93 (Robert Duncan)
+--- Fixed a bug in LIBRARY * SHOWTERM which prevented variables from
+    being displayed correctly.
+
+04/08/93 (Robert Duncan)
+--- The compiler now records for each predicate the full pathname of the
+    file in which it was defined. This information can be recovered for
+    a predicate using predicate_info/2 which includes in its output a
+    term of the form:
+
+        file = File
+
+    where File is the pathname of the defining file as an atom.
+
+--- A new source command invokes the editor on the definition of a
+    predicate. The command takes a predicate name as argument and can be
+    called either from the top-level or from Ved. For example, to edit
+    the definition of example/3 do:
+
+        ?- source example/3
+
+    or
+
+        <ENTER> source example/3
+
+    The command works by calling Ved on the file in which the predicate
+    was defined and then using the <ENTER> f command to find the start
+    of the definition. It can only work for predicates which have been
+    compiled and which have their file names recorded: this excludes
+    built-in predicates and any predicate defined dynamically using
+    assert/1.
+
+03/08/93 (Robert Duncan)
+--- Printing to the user output stream has been modified to reduce the
+    number of atoms which get split across line-breaks.
+
+02/08/93 (Robert Duncan)
+--- The file extension '.pro' is now recognised by Ved as indicating a
+    Prolog program file. This is the default extension used by some
+    other Prolog systems, and this change means that Ved will
+    automatically select the prolog subsystem when editing such a file.
+
+    You can arrange for other types of file to be recognised as Prolog
+    programs by adding their extensions to the Pop-11 list variable
+    prologfiletypes whose initial value is:
+
+        ['.pl' '.pro']
+
+    Items in this list must be strings and should include a leading '.'.
+    The first item in the list is used as the default file extension by
+    the Prolog compiler.
+
+16/07/93 (Robert Duncan)
+--- Changes to the semantics of dynamic predicates:
+
+    o   The declaration dynamic/1 now ensures that a definition exists
+        for each predicate so declared: if there is no existing
+        definition, then a new one is created with no clauses. The
+        effect is the same as if a single clause had been asserted and
+        then immediately retracted; if called, the predicate will always
+        fail. Thus, a dynamic predicate will never raise an 'UNDEFINED
+        PREDICATE' error and the behaviour of dynamic predicates is
+        unaffected by the handling of such errors selected by unknown/2.
+        Similarly, predicate_info/2 will never return an attribute list
+        containing both the atoms 'dynamic' and 'undefined'.
+
+    o   The operations of assert and retract are still valid for static
+        predicates, but now perform an implicit dynamic declaration as a
+        side-effect. Thus, once a predicate has been asserted or
+        retracted it becomes dynamic and remains so until it is either
+        explicitly declared static again, or is abolished. In
+        particular, if the predicate is redefined by reconsulting, it
+        will be redefined still in dynamic mode.
+
+16/07/93 (Robert Duncan)
+--- abolish/1 now removes all trace of a predicate, including any
+    declarations for that predicate and any spy-points. For a predicate
+    that has been abolished, predicate_info/2 will always report just:
+
+        [undefined]
+
+16/07/93 (Robert Duncan)
+--- predicate_info/2 now always succeeds, even for predicates which are
+    undefined: in this case, the list of attributes returned for the
+    predicate will contain the atom 'undefined', e.g.
+
+        ?- predicate_info(unlikely/103, I).
+        I = [undefined] ?
+
+    predicate_info/2 reports 'undefined' for precisely those predicates
+    which would raise an 'UNDEFINED PREDICATE' error if called.
+
+16/07/93 (Robert Duncan)
+    The predicate expand_term/2 is now applied to all terms read by the
+    compiler, including goals for evaluation read in query mode.
+
+16/07/93 (Robert Duncan)
+--- A new predicate include/1 allows the contents of a file or a list of
+    files to be included in the current compilation stream. This is
+    designed to be used as a directive:
+
+        :- include(Files).
+
+    which causes terms read from the named Files to be interpolated in
+    the current compilation stream as if they had been read from the
+    stream itself. This is distinct from explicitly compiling the same
+    files:
+
+        :- compile(Files).
+
+    which causes a nested invocation of the compiler to be created. Note
+    that inclusion of files is done on the basis of terms rather than
+    characters, so each included file must be sufficiently well-formed
+    that it could be compiled in its own right.
+
+16/07/93 (Robert Duncan)
+    Input streams opened by the compiler are now completely independent
+    of those opened by see/1. In the following example, variables C1 and
+    C2 will be bound to the first two clauses read from File:
+
+        see(File), read(C1),
+        compile(File),
+        see(File), read(C2).
+
+    (Previously, the intervening call to the compiler would have closed
+    the File stream, so that the second see would have reopened the file
+    and C2 would have been bound to the same first clause as C1.) As a
+    consequence of this change, the predicate seeing/1 evaluated as a
+    directive will always report the current input as 'inchan'.
+
+16/07/93 (Robert Duncan)
+--- A new predicate compile/2 provides a standard interface to the
+    Prolog compiler: all other compilation predicates are now defined in
+    terms of this. A call to the compiler has the general form:
+
+        ?- compile(Files, CompileMode).
+
+    Files is a single filename or a list of filenames to be compiled in
+    order according to CompileMode. The compile mode determines the way
+    terms read from the files are interpreted, and must be one of the
+    atoms:
+
+        consult
+        reconsult
+        query
+
+    The consult and reconsult modes are as before, but the query mode is
+    new: this behaves like the interactive top-level, where each term
+    read is interpreted as a goal to be evaluated and any variable
+    bindings are displayed on the user stream.
+
+    Directives in a file -- i.e terms with the functor :-/1 -- and
+    queries explicitly introduced with the functor ?-/1 are interpreted
+    identically in all modes.
+
+    The existing compilation predicates have been redefined as follows:
+
+        compile(File) :-
+            compile(File, reconsult).
+
+        reconsult(File) :-
+            compile(File, reconsult).
+
+        consult(File) :-
+            compile(File, consult).
+
+        [File|Files] :-
+            compile([File|Files], consult).
+
+    See PLOGHELP * COMPILE.
+
+15/07/93 (Robert Duncan)
+--- The Pop-11 identifiers prolog, :- and ?- are now syntax words rather
+    than macros. One side-effect of this change is that it's now
+    possible to use the :- and ?- syntax in contexts other than at
+    execute level, e.g.
+
+        :- prolog_language(pop11).
+
+        define hello();
+            :- format("Hello from Prolog~n").
+        enddefine;
+
+        hello();
+        Hello from Prolog
+
+    (although the value of this is limited).
+
+14/07/93 (Robert Duncan)
+--- The Pop-11 library LIB * PROLOGLIBLIST has been changed so that it
+    no longer adds the Prolog library directories into popuseslist.
+    Anybody who has been relying on this behaviour to allow the viewing
+    of Prolog library files without the Prolog system being loaded, can
+    get the same effect with the command:
+
+        <ENTER> prolog showlib <library-name>
+
+    The directories in prologliblist are still searched by Prolog both
+    for the showlib command and for the predicate library/1.
+
+28/04/93 (Robert Duncan)
+--- For mixed-language programmers, a new Pop-11 syntax form
+    define_prolog has been added which simplifies the business of
+    creating Prolog predicates using the Pop-11 continuation-passing
+    style. So you can now do:
+
+        :- prolog_language(pop11).
+
+        define:prolog hello/0(contn);
+            lvars contn;
+            printf('Hello world\n');
+            chain(contn);
+        enddefine;
+
+        :- prolog_language(prolog).
+
+        ?- hello.
+        Hello world
+        yes
+
+    See HELP * DEFINE_PROLOG for more details.
+
+
+-----------------------------------------------------------------------
+2  Poplog Version 14.2
+-----------------------------------------------------------------------
+
+01/06/93 (Simon Nichols)
+--- Two bugs in LIBRARY * EDINSYNT have been fixed:
+
+    o   If an incomplete term was followed by end of file, the
+        tokenizer would go into a loop, terminated only by Prolog
+        running out of memory. This situation is now correctly handled,
+        resulting in the error message "incomplete term before end of
+        file". The incomplete term is discarded.
+
+    o   In a file being consulted or reconsulted, a command (see
+        PLOGHELP * COMMANDS) immediately following a comment was
+        ignored. This has been fixed.
+
+22/05/92 (Simon Nichols)
+--- A new library LIBRARY * HIGHER_ORDER has been added. This library
+    defines some higher-order predicates which operate on lists and on
+    the arguments of terms. In particular, it defines the useful
+    maplist/2 and maplist/3.
+
+    For practical purposes, a higher-order predicate is one which takes
+    as arguments a predicate and some structured data, and applies the
+    predicate to each component of the data.
+
+    These higher-order predicates are efficent as they have been defined
+    in terms of the new call/N family of predicates (see below).
+
+    See PLOGHELP * HIGHER_ORDER for details.
+
+21/05/92 (Simon Nichols)
+--- Attempting to call a number as a goal now results in an appropriate
+    error. Previously, such calls either failed or raised "undefined
+    predicate" errors.
+
+25/04/92 (Simon Nichols)
+--- The call/1 built-in predicate has been augmented by a whole family
+    of predicates call/N (for all N > 0). In general, call/N invokes a
+    goal formed from its arguments: the first argument is either an atom
+    standing for a predicate name or a term representing a "closure"
+    (i.e., a predicate with one or more "frozen" arguments), and this is
+    applied to the remaining N - 1 arguments.
+
+    The practical benefit is that a term representing the goal to be
+    called does not have to be constructed, which is the case when only
+    call/1 is available.
+
+    The call/N family is implemented efficiently: there is an almost
+    negligible overhead in using them, compared with invoking a goal
+    directly in the body of a clause. There is thus no longer any
+    efficiency barrier to defining and using "higher-order" predicates,
+    such as maplist/2 and maplist/3, providing they are defined in terms
+    of the appropriate call/N predicate.
+
+    See PLOGHELP * CALL for details.
+
+14/04/92 (Robert Duncan)
+--- New predicates format/1 and format/2 can be used for formatting
+    output. See PLOGHELP * FORMAT.
+
+10/04/92 (Robert Duncan)
+--- Changes to the all-solutions predicates:
+
+     o  setof/3 and bagof/3 have been extended to allow existential
+        quantification anywhere within the goal being evaluated. So for
+        example, the following two goals are now equivalent:
+
+            ?- setof(X, (Y^p(X,Y), Z^q(X,Z)), S).
+            ?- setof(X, Y^Z^(p(X,Y), q(X,Z)), S).
+
+        As a consequence, the existential quantifier ^/2 is now
+        evaluable in its own right, with the interpretation:
+
+            _ ^ G :- G .
+
+     o  findall/3 has been built in to the system, making the findall
+        library redundant. See PLOGHELP * FINDALL.
+
+     o  fast_bagof/3 has been redefined in terms of findall/3, as
+        follows:
+
+            fast_bagof(X, P, B) :-
+                findall(X, P, B),
+                B \== [].
+
+        This does cause a change in behaviour: any solutions in B will
+        be in the natural (database) order where previously they were
+        returned in *reverse* order. This was always a mistake: the
+        change means that now findall/3, bagof/3 and fast_bagof/3 all
+        return solutions in the same order.
+
+        Given the trivial nature of the above definition, and the
+        equally trivial:
+
+            fast_setof(X, P, S) :-
+                findall(X, P, B),
+                B \== [],
+                sort(B, S).
+
+        use of these highly non-standard predicates is deprecated in
+        favour of the standard findall/3.
+
+18/02/92 (Robert Duncan)
+--- Modifications to the behaviour of the run-time error handler
+    prolog_error/2 (these should be of interest only to users who've
+    redefined this for themselves):
+
+    (1) It is no longer necessary for prolog_error/2 to have a final
+        "catch-all" clause which traps any error: errors not catered for
+        explicitly now get passed automatically to prolog_syserror/2.
+
+    (2) Run-time error-handling is now disabled during calls to
+        prolog_error/2 to avoid problems with infinite error loops. A
+        new predicate prolog_error_handling/1 allows explicit
+        re-enabling of the error handler where necessary.
+
+    See PLOGHELP * PROLOG_ERROR for details.
+
+28/01/92 (Robert Duncan)
+--- New predicates spy_action/1 and spy_action/2 can be used to change
+    the behaviour of the spy debugger: see PLOGHELP * SPY_ACTION.
+    leash/1 and unleash/1 are now defined in terms of these.
+
+28/01/92 (Robert Duncan)
+--- New VED commands:
+
+        <ENTER> spy [spec]
+        <ENTER> nospy [spec]
+
+    allow for adding and removing spy-points from the command line. The
+    optional argument has the same form as that expected by the
+    corresponding predicates spy/1 and nospy/1.
+
+28/01/92 (Robert Duncan)
+--- spy/0 no longer places spy-points on predicates whose names begin
+    'prolog_'. Such predicates can still be spied, but must be named
+    explicitly.
+
+
+-----------------------------------------------------------------------
+3  Poplog Version 14.1
+-----------------------------------------------------------------------
+
+13/12/91 (Simon Nichols)
+--- The new evaluable predicate prolog_area_size/1 allows the absolute
+    size of the Prolog memory area to be set or inspected.
+    See PLOGHELP * SYSTEM.
+
+10/91 (Robert Duncan)
+--- A fix to LIBRARY SIMPLEPOP: all the 'dopop' predicates now fully
+    dereference their arguments before evaluating them. Also, passing
+    anything other than an atom or string for evaluation now raises an
+    error where previously the goal would just fail.
+    See PLOGHELP * SIMPLEPOP.
+
+10/91 (Simon Nichols)
+--- The name of the predicate which switches between Poplog Prolog
+    syntax and full Edinburgh syntax once LIBRARY * EDINSYNT has been
+    loaded has been changed from syntax/1 to prolog_syntax/1. This
+    (unfortunately non-upwardly compatible) change has been made to
+    avoid clashes with predicates named syntax/1 in users' programs.
+
+--- A new evaluable predicate, close/1, has been added. This closes
+    the specified stream, currently open for either input or output.
+    See PLOGHELP * CLOSE.
+
+06/91 (Simon Nichols)
+--- The new evaluable predicate prolog_restart/0 performs a full
+    restart of the Prolog system, useful after restoration of a saved
+    image. See PLOGHELP * PROLOG_RESTART.
+
+--- The behaviour of syntax errors when compiling a file from inside VED
+    has changed. Outside of VED, the Prolog system attempts to skip past
+    the erroneous clause and then resumes reading. This used to happen
+    inside VED also. Now, the system will stop after the first syntax
+    error in a file loaded from within VED, thereby leaving the cursor
+    near the point at which the error occurred. See PLOGHELP * ERROR for
+    further information about syntax (and other) errors in Prolog.
+
+--- The new LIBRARY CATCH defines the predicates catch/3 and throw/1:
+    these provide a method for user programs to raise and handle
+    exceptions. The exception handling mechanism is complementary to
+    that provided by the standard error handling predicate,
+    prolog_error/2 (see PLOGHELP * PROLOG_ERROR). They are based on the
+    description given in the draft ISO specification for Standard
+    Prolog. See PLOGHELP * CATCH for details.
+
+--- The new LIBRARY ON_INTERRUPT defines the predicate on_interrupt/2:
+    this provides a way for Prolog programs to trap interrupts (such as
+    occur when you type the terminal interrupt character, usually
+    CTRL-C) by specifying an "interrupt action", usually a goal, which
+    is called when an interrupt occurs. See PLOGHELP * ON_INTERRUPT for
+    details.
+
+
+05/91 (Simon Nichols)
+--- A new evaluable predicate, printq/1, has been added. This is
+    simlilar to print/1, except that it behaves like writeq/1 rather
+    than write/1 if no suitable portray clause exists for the term to be
+    printed. In other words, it quotes atoms which need to be quoted in
+    order to be re-readable using read/1 (see PLOGHELP * PRINT).
+
+--- A new command, bye, has been added which exits Prolog (like the
+    evaluable predicate halt/0). This is for consistency with the other
+    Poplog languages, which can all be exited by typing "bye".
+
+
+--- C.all/help/plognews
+--- Copyright University of Sussex 1993. All rights reserved.

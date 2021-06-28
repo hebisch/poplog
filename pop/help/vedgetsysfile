@@ -1,0 +1,228 @@
+HELP VEDGETSYSFILE                          Mark Rubinstein, August 1985
+HELP VEDGETSYSFILEPDR                         Updated A.Sloman Sept 1990
+
+
+Browsing With Cross-References In Documentation And Library Files
+
+VEDGETSYSFILE, VEDGETSYSFILEPDR and related procedures, VEDNEXTHELP
+and VEDPREVIOUSHELP provide a mechanism for browsing in documentation
+files, with automatic access to cross referenced files in different
+categories, including user-defined documentation categories.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Overview
+ -- Procedures provided
+ -- Formatting for cross references
+ -- Using the facilities
+ -- Mapping 'types' onto search procedures
+ -- Cross references with search strings
+ -- Extending the range of known file types
+ -- For more information see
+
+-- Overview -----------------------------------------------------------
+
+POPLOG Provides a browsing facility based on the VED editor. It makes
+use of:
+
+    1. a convention for putting cross references into VED
+       documentation and library files
+
+    2. two procedures for finding cross references in the current file
+
+    3. a procedure for accessing the files referenced
+
+The mechanism assumes that files for online browsing fall into a number
+of different categories, and that files in different categories are
+invoked by different procedures. For instance, HELP files are invoked
+by VED_HELP, TEACH files by VED_TEACH, library files by VED_SHOWLIB, and
+so on.
+
+Files in any category may reference files in any other category, using
+this mechanism.
+
+The accessing procedures are mapped onto keystrokes for convenience.
+This enables HELP, TEACH, REF, DOC and program library files to be
+accessed very simply by pointing at an item in the current file with the
+VED cursor, then pressing a key sequence or function key.
+
+When the new file has been read in, further cross references may be
+accessed in the same way.
+
+The files can be abandoned using <ESC> q (or <ENTER> q). The user is not
+constrained to treat the files in a rigid last-in first-out fashion.
+Normal VED mechanisms can be used for switching between the different
+files. (See HELP * VEDFILESELECT and HELP * BUFFERS).
+
+The mechanisms may be extended in user programs to provide a browsing
+facility for user files.
+
+-- Overview files -----------------------------------------------------
+
+For each category of system documentation there are overview files,
+described in HELP * DOCUMENTATION. Working down from these overview
+files enables the documentation libraries to function partly like a
+tree-structured menu-driven help system. But since all the accessed
+files remain in the editor as ordinary VED buffers, the user is not
+constrained to treat them as in a menu-tree.
+
+
+-- Procedures provided ------------------------------------------------
+
+The following procedures are available to drive the mechanism.
+
+VEDNEXTHELP (usually invoked by  <ESC> n) finds the NEXT cross-reference
+    in the current file - marked by an asterisk, as in HELP * CONTENTS.
+
+VEDPREVIOUSHELP (usually invoked by <ESC> N) finds the PREVIOUS cross-
+    reference in the current file - marked by an asterisk.
+
+VEDGETSYSFILE (usually invoked by <ESC> h) reads in the documentation or
+    programm library file so referenced. It uses the property
+    VEDGETSYSFILEPDR which maps words indicating file categories onto
+    access procedures. E.g. The category name "LIB" is mapped onto
+    the procedure VED_SHOWLIB, the category name "HELP" onto VED_HELP.
+
+    The default category is HELP.
+
+-- Formatting for cross references ------------------------------------
+
+The mechanism assumes formatting conventions for cross-references in
+online files.
+
+Each cross reference is of the form
+
+    <doc-type> * file1 file2 file3 ...
+
+The <doc-type> is optional. It is the name of a documentation category
+e.g. HELP, TEACH, LIB, PLOGHELP, etc), and defaults to HELP if not
+specified.
+
+The asterisk is not essential - it is used only by the VEDNEXTHELP and
+VEDPREVIOUSHELP facilities described above.
+
+The <doc-type> (if present) will only affect files listed on the same
+line.
+
+The file names may optionally be followed by "/" and a search string
+indicating an item to be found in the file.
+
+Examples of cross-references are:
+
+    HELP * HELPFOR,   LIB * HELPFOR
+
+Notice that the two files have the same name, but are in different
+categories. <ESC> h on the first one will get a help file, on the
+second a program library file, as if the user had typed:
+
+    <ENTER> showlib helpfor
+
+A <doc-type> may be followed by several files:
+
+    TEACH * TEACHFILES, * GRAMMAR, * PARSING
+
+The default <doc-type> is HELP, as the following will show.
+
+    * LISTS, * DEFINE
+
+Examples using search strings:
+
+    REF * VEDCOMMS/ved_g, HELP * ENTER_G/indexify
+
+The effects of these cross-references may be explored by placing the
+cursor on one of the asterisks (using <ESC> n or <ESC> N) then typing
+<ESC> h (or invoking the procedure VEDGETSYSFILE). The appropriate
+documentation or library file is then read in.
+
+In REF files, identifier names are denoted by surrounding the name with
+hyphens, e.g. -foo-. The procedure VEDGETSYSFILE ignores these hyphens,
+which means you can use <ESC> h to locate the documentation for the
+identifier.
+
+
+-- Using the facilities -----------------------------------------------
+
+First find the required cross reference in the current file and put the
+cursor on the asterisk if there is one, or immediately to the left of
+the file name, e.g. at one of the locations indicated by ^:
+
+    HELP ENTER_G        SHOWLIB HELPFOR        TEACH * TEACHFILES
+         ^                      ^                    ^
+
+Where an asterisk is present it may be located either using ordinary
+cursor move keys or by means of VEDNEXTHELP (<ESC> n), which searches
+down the file or VEDPREVIOUSHELP (<ESC> N) which searches up.
+
+Then invoke VEDGETSYSFILE (<ESC> h). The appropriate library file will
+then be found.
+
+If there is no type specified then the type is assumed to be HELP. This
+means that the cursor can be put immediately to the left of ANY word in
+any file, and <ESC> h typed to see if there is a corresponding help
+file. E.g. in a program file this can be done with a procedure name
+to access the relevant help file.
+
+
+-- Mapping 'types' onto search procedures -----------------------------
+
+A file type for searching is indicated by a word which has a value
+associated with it in the property VEDGETSYSFILEPDR. The value should be
+either a procedure or the name of a procedure. For example, the
+procedure might be VED_HELP or VED_TEACH or VED_SHOWLIB or a similar user
+defined procedure.
+
+Before VEDGETSYSFILE runs the procedure, it assigns the file name to
+VEDARGUMENT. So if invoked with the cursor on the asterisk in
+
+    HELP * VEDGETSYSFILE
+
+it behaves as if the user had given the VED command
+
+    <ENTER> help vedgetsysfile
+
+(If all the characters are the same case, they are mapped onto lower
+case.)
+
+
+-- Cross references with search strings -------------------------------
+
+If the file name is followed by /<string> then <string> will be searched
+for when the next file is set on screen.
+
+For example use <ESC> n to move your cursor to the asterisks on the
+lines below and then use <ESC> h to see what files you get.
+
+    HELP * VALOF, *VEDVARS /vvedgotoplace, *NEWPROPERTY,
+         *VEDPROCS /vedgetsysfile
+
+    HELP * PROLOG, TEACH * PROLOG, LIB * VED_SHOWLIB
+
+
+-- Extending the range of known file types ----------------------------
+
+Users can associate their own ved searching procedures type names in
+*VEDGETSYSFILEPDR. For example, try
+
+    ved_sourcefile -> vedgetsysfilepdr("SOURCE");
+
+    SOURCE * vedgetsysfile
+
+
+-- Further reading ----------------------------------------------------
+
+The following should give more information
+
+    HELP * DOCUMENTATION    - General overview of Poplog documentation
+    HELP * DOC              - The DOC command
+    HELP * HELP             - The HELP command
+    HELP * REF              - The REF command
+    HELP * TEACH            - The TEACH command
+    HELP * SHOWLIB          - The SHOWLIB command
+    HELP * VEDSEARCH        - Searching within a file
+    HELP * VEDSYSFILE       - Explains how HELP, TEACH, etc work
+    REF * VEDPROCS          - Complete list of VED procedures
+
+
+--- C.all/help/vedgetsysfile
+--- Copyright University of Sussex 1993. All rights reserved. ----------

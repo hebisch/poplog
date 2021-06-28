@@ -1,0 +1,820 @@
+HELP READPATTERN                                 Aaron Sloman, Oct 1996
+
+LIB READPATTERN
+
+To make this available do
+
+    uses readpattern
+
+Unless ! has been made autoloadable, in $poplocal/local/auto/!.p
+
+
+CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Prerequisites
+ -- Introduction
+ -- -- pop_pattern_lvars (default true)
+ -- -- pop_lvars_warning (default true)
+ -- Motivation for "!"
+ -- FMATCHES and DOESMATCH
+ -- Examples of the use of "!"
+ -- -- list_between
+ -- -- Using ![ ... ] outside a procedure definition
+ -- Do not use "vars" with ![ ... ]
+ -- The structures created using "!"
+ -- -- Example of use with with "vars"
+ -- -- Example using lvars
+ -- -- ?<var> and ??<var> are ignored in embedded vector expressions
+ -- -- "!" works with a list inside an embedded vector expression
+ -- -- Note on tracing procedures using "!"
+ -- -- WARNING: avoid quoted occurrences of "?" and "??"
+ -- Using a restriction procedure held in an lvars variable
+ -- Using an optional procedure to constrain doesmatch
+ -- Use of "!" with section variables
+ -- Using "!" with dlvars
+ -- Type3 lvars bound by the matcher
+ -- Using "!" with database procedures
+ -- -- Some examples of "!" used with the database
+ -- . present
+ -- . allpresent
+ -- . foreach
+ -- . forevery
+ -- . which and which_values
+
+-- Prerequisites ------------------------------------------------------
+It is assumed that the reader is familiar with the Pop-11 pattern
+matcher. See HELP * MATCHES for a summary overview.
+
+For a full tutorial introduction see the following
+    TEACH *MATCHES
+    TEACH *MATCHES2
+    TEACH *MOREMATCH
+    TEACH *MATCHARROW
+        (Birmingham only. Revised version of MATCHES2)
+
+or the POP-11 Primer TEACH * PRIMER, chapter 7.
+From Poplog version 15.0 this is available as TEACH * PRIMER7
+
+For information about the Pop-11 database, which makes use of the
+matcher, see
+    HELP * DATABASE
+
+A tutorial introduction can be found in
+    TEACH * DATABASE
+    TEACH * FOREACH
+    TEACH * RIVER2
+        (Improved version available at Birmingham.)
+
+
+-- Introduction -------------------------------------------------------
+
+LIB READPATTERN makes available a new syntactic operator "!" and a new
+syntax word "where", for creating patterns in which the words
+representing pattern variables are replaced by identifers, so that the
+pattern matcher can be used with lvars and with variables that are local
+to sections, in the following sort of construct
+
+    [ .... ] matches ![ ... ?x .... ??y ...]
+
+The pattern variables "x" and "y" will be replaced, at compile time,
+with identifiers.
+
+The main addition is "!". The syntax word "where" is for use with a new
+more general version of the matcher, defined in LIB DOESMATCH, which
+takes an optional extra procedure for checking whether a match is
+satisfactory. See HELP DOESMATCH. If you use only "matches" then you can
+ignore "where".
+
+In addition a utility procedure, readpattern, is provided.
+
+-- -- pop_pattern_lvars (default true)
+Note: by default the identifiers introduced by "!" will be defined as
+lexical idents. I.e. they will be compatible with existing lvars
+declarations of the variables used, or will create new implicit
+lvars declarations, so that the variables are totally local to a
+procedure, as they should be. This default can be turned off, by the
+assignment
+
+    false -> pop_pattern_lvars;
+
+However, in general it may be better to leave the default and do a
+separate assignment.
+
+-- -- pop_lvars_warning (default true)
+
+If a pattern variable has not yet been declared, or if it is to be
+automatically declared as lvars in a procedure and the only
+declaration currently in scope is as a permanent variable using "vars",
+then a warning message is displayed, unless pop_lvars_warning is false.
+
+Warning messages are displayed by a procedure that users can redefine.
+Its default definition is
+
+define global vars pr_patt_var_warning(word);
+    printf(word, ';;; WARNING DECLARING PATTERN VARIABLE %P AS LVARS\n');
+    if popfilename then
+        printf(popfilename, ';;; IN FILE %P\n');
+    endif;
+    if isinteger(poplinenum) then
+        printf(poplinenum, ';;; LINE %P\n');
+    endif
+enddefine;
+
+
+-- Motivation for "!" -------------------------------------------------
+
+Prior to Poplog version 15 a major weakness of the Pop-11 pattern
+matcher was that because it used valof to manipulate pattern variables
+it could not be used with lvars variables nor with section variables,
+as the procedure valof was applied only to words, and worked only in the
+current section, not the section in which a pattern had been
+constructed. See HELP * VALOF
+
+In Poplog version 15 the procedure valof was generalised so that it
+could be applied to identifiers, often referred to as idents.
+(See REF * IDENT). This made it possible to use the syntax operator "!"
+to transform patterns to contain idents instead of words. This makes the
+use of the matcher much safer, since it no longer requires access to
+"permanent" variables (i.e dynamically scoped variables).
+
+    See HELP * LEXICAL for a brief introduction to types of variables.
+    REF * IDENT gives more detail.
+
+
+-- FMATCHES and DOESMATCH ---------------------------------------------
+
+LIB * FMATCHES was an early attempt to overcome the restriction of
+MATCHES to dynamically scoped variables, but it had some serious
+disadvantages, as it did not allow patterns to be given as arguments to
+procedures. See HELP * FMATCHES
+
+FMATCHES also remedied some deficiencies in the standard matcher, which
+prevented it finding certain matches involving patterns with more than
+one segment variable.
+
+LIB DOESMATCH, available from the Birmingham ftp site, generalises the
+matcher to cope with the extra matches not found by the standard
+matcher, and also provides an optional extra "where" construct, when
+used with "!". However, DOESMATCH can be used without "!" and "!" can be
+used without DOESMATCH. (See HELP * DOESMATCH).
+
+-- Examples of the use of "!" -----------------------------------------
+
+Almost any use of the pattern matcher can be converted to work more
+safely and efficiently with "!". Here are some examples.
+
+-- -- list_between
+
+E.g. here's a procedure to make a list of the items between two
+specified elements in a list.
+
+;;; Make sure readpattern has been compiled
+
+uses readpattern
+
+define list_between(item1, item2, list) -> found;
+    ;;; Here found is automatically declared as lvars, as are the input variables
+    ;;; in Poplog version 15
+
+    unless list matches ![== ^item1 ??found  ^item2 ==] then
+        false -> found;
+    endunless;
+
+enddefine;
+
+;;; Now test the procedure
+
+vars words = [a b c d e f g];
+
+list_between("a", "g", words) =>
+** [b c d e f]
+
+list_between("c", "g", words) =>
+** [d e f]
+
+list_between("b", "b", words) =>
+** <false>
+
+list_between("g", "e", words) =>
+** <false>
+
+Note that the value returned by the procedure is the value of the output
+local variable found, which is a lexical variable, which is given a
+value by matches when the match is successful. This is possible only
+because valof, which is used by the matcher, now works on identifier
+records as well as words.
+
+-- -- Using ![ ... ] outside a procedure definition
+
+If ![ ... ] is used in a procedure definition then it is assumed by
+default (unless pop_pattern_lvars is made false) that all pattern
+variables are lvars. However if it is used outside a procedure
+definition, the pattern variables are not redefined. Their current type
+is simply used, i.e. permanent or lexical.
+
+Here's an example with a permanent variable. At the top level, outside
+the scope of an existing lvars declaration, "!" assumes that pattern
+variables should be non-lexical, i.e. permanent.
+
+Compile the next two lines separately:
+
+vars silly1;
+
+[1 2 3 4 5] matches ![== 2 ??silly1 = ], silly1 =>
+** <true> [3 4]
+
+Here's an example with a lexical variable. Mark and compile the next two
+lines at once.
+
+lvars silly2;
+
+[1 2 3 4 5] matches ![== 2 ??silly2 = ], silly2 =>
+** <true> [3 4]
+
+If, outside a procedure definition, you use a pattern variable that has
+not been declared previously, it will be declared automatically, as
+usual:
+
+[1 2 3 4 5] matches ![== 2 ??silly3 = ], silly3 =>
+;;; DECLARING VARIABLE silly3
+** <true> [3 4]
+
+
+-- Do not use "vars" with ![ ... ] ------------------------------------
+
+Because variables in patterns created with ![ ... ] are lexical by
+default, they should not be declared as local variables with vars
+or dlocal, or an error message will result.
+
+vars silly4;
+
+define test();
+    dlocal silly4;
+
+    [1 2 3 4 5] matches ![== 2 ??silly4 = ] =>
+
+enddefine;
+
+;;; MISHAP - LEXICAL IDENTIFIER IS ALREADY A DYNAMIC LOCAL
+;;; INVOLVING:  silly4
+;;; COMPILING:  test
+;;; DOING    : ....
+
+The same error message would result if "vars" were used in the
+definition instead of "dlocal".
+
+The global variable pop_pattern_lvars, which defaults to true, can be
+made false if you need to have a pattern variable which is dlocal. But
+normally that is best done as follows.
+
+
+vars silly4;
+
+define test2();
+    dlocal silly4;
+
+    if [1 2 3 4 5] matches ![== 2 ??silly5 = ] then
+        silly5 -> silly4;
+        ;;; etc
+    endif;
+
+enddefine;
+
+
+I.e. if the match is successful, use the lvars pattern variable (in this
+case silly5) to set the value of the permanent variable which has been
+made dlocal (in this case silly4). This method can be used with global
+non-lexical variables such as database, cucharout, interrupt, etc.
+
+
+-- The structures created using "!" -----------------------------------
+
+It is possible to create and examine the lists that "!" creates.
+
+-- -- Example of use with with "vars"
+
+"vars" can be used to declare permanent identifiers. The use of ![ .... ]
+allows a pattern to include the corresponding identifier records instead
+of the words. E.g.
+
+vars var1, var2;
+![cat ?var1 mouse ??var2 ==]  =>
+** [cat ? <ID var1 <undef var1>> mouse ?? <ID var2 <undef var2>> ==]
+
+How the identifiers are shown when such a pattern is printed
+out will depend on their values. Once an identifier has been given a
+value, its printed appearance changes.
+
+99 -> var2;
+![?var1 ?var2] =>
+** [? <ID var1 <undef var1>> ? <ID var2 99>]
+
+Here var1 still lacks a value, whereas var2 has 99 as value. Once an
+identifier has a value the printed form no longer indicates which
+identifier it was, which can sometimes be a problem during debugging.
+
+Note that because var1 and var2 are declared using "vars" the
+declarations and the commands using them do not have to be compiled
+simultaneously (as explained in TEACH * VARS_AND_LVARS).
+
+Contrast the use of lvars:
+
+-- -- Example using lvars
+
+Ensure that both the following two lines are marked and loaded at once:
+
+lvars lv1, lv2;
+! [lv1 ?lv1 lv2 ?lv2 ] =>
+** [lv1 ? <ID lv1 <undef>> lv2 ? <ID lv2 <undef>>]
+
+Here the lexical idents are substituted after occurrences of "?".
+Lexical idents do not show the original names, even if they have not
+been initialised. If they have been given values, this is what happens:
+
+lvars lv1 = 88, lv2 = 99;
+! [lv1 ?lv1 lv2 ?lv2 ] =>
+** [lv1 ? <ID lv1 88> lv2 ? <ID lv2 99>]
+
+I.e. the values of the idents are shown.
+
+
+If the pattern expression is compiled on its own, it is outside the
+scope of the lexical declarations, so the lexical identifiers will not
+be used:
+! [A ?XX B ??Y] =>
+;;; DECLARING VARIABLE XX
+;;; DECLARING VARIABLE Y
+** [A ? <ID XX <undef XX>> B ?? <ID Y <undef Y>>]
+
+Note that this causes XX and YY to be declared globally. They are not
+lvars.
+
+If such a pattern occurred inside a procedure definition, however, the
+variables would be made lexical locals to the procedure.
+
+
+-- -- ?<var> and ??<var> are ignored in embedded vector expressions
+
+Note that the occurrences of ?v2 inside an embedded vector expression
+will not be replaced with identifiers. All occurrences of a word after
+"?" or "??" which are not embedded in vector sub-expressions, will be
+replaced.
+
+vars v1,v2,v3;
+! [v1 ?v1 {v2 ?v2 [?v2]} [v3 ??v3]] =>
+** [v1 ? <ID v1 <undef v1>> {v2 ? v2 [? v2]} [v3 ?? <ID v3 <undef v3>>]]
+
+
+-- -- "!" works with a list inside an embedded vector expression
+
+vars v1, v2;
+![{% ![?v1] % ?v2 }] =>
+** [{[? <ID v1 <undef v1>>] ? v2}]
+
+The sub expression ![?v1] works even though it is inside a vector
+expression, because it is between "% ... %" implying that the code is to
+be evaluated.
+
+
+-- -- Note on tracing procedures using "!"
+
+If doesmatch and other procedures using patterns created with "!" are
+traced, then identifiers will show up in patterns with their current
+values, not the names of the identifiers.
+
+This example shows how identifiers look if they are initialised before
+the patterns are created. Compile the next two lines together.
+
+lvars lv4 = 99, lv5 = "cat" ;
+![lv4 ?lv4 lv5 ?lv5] =>
+** [lv4 ? <ID lv4 99> lv5 ? <ID lv5 cat>]
+
+-- -- WARNING: avoid quoted occurrences of "?" and "??"
+
+Patterns created using "!" must not contain evaluated sub-expressions
+quoting "?" or "??", e.g.
+
+    ![== [?x b] == [?x h ^(consword("?" >< 'foo')] ==], x =>
+    ;;; MISHAP - NON-WORD AFTER ?
+    ;;; INVOLVING:  'foo'
+
+Finally note that patterns containing lexically scoped variables cannot
+be compiled as list constants. (See LIB * COMPILE_MODE)
+
+
+-- Using a restriction procedure held in an lvars variable ------------
+
+When "!" is used to transform a pattern, the item following ":" can be a
+lexical variable whose value is a procedure, or a number, as in this
+example. Note the need to separate ":" and "^":
+
+This will also work with matches:
+lvars x, check = isword;
+[a b c 3 4 c d 4 5 e] matches ![== ?x == ?x: ^check ==], x=>
+** <true> c
+
+The restriction can also be a number, restricting the length of a
+segment variable. Find four items just before "c".
+
+lvars x, check = 4;
+[a b c 3 4 c d 4 5 e] matches ![== ??x: ^check c ==], x=>
+** <true> [b c 3 4]
+
+This also works with restriction held in vars variables.
+vars x, num = 4;
+[a b c 3 4 c d 4 5 e] matches ![== ??x: ^num c ==], x=>
+** <true> [b c 3 4]
+
+NB: the space between ":" and "^" is essential. (Why?)
+
+
+-- Using an optional procedure to constrain doesmatch -----------------
+
+Doesmatch can take an optional extra boolean procedure as third
+argument, which it uses to check that the match is OK.
+
+See HELP DOESMATCH for information on how a "where" clause can be used
+with the "!" notation in some contexts. E.g.
+
+lvars aaa, bbb;
+[1 2 3 4] doesmatch ![?? aaa ?? bbb] where ([^aaa ^bbb] => false) ->;
+** [[] [1 2 3 4]]
+** [[1] [2 3 4]]
+** [[1 2] [3 4]]
+** [[1 2 3] [4]]
+** [[1 2 3 4] []]
+
+Compare the following, which does not use "!", and therefore cannot use
+a where clause, but needs a procedure argument for doesmatch:
+
+lvars aaa, bbb;
+[1 2 3 4]
+    doesmatch
+        ([??aaa ?? bbb], procedure; [^aaa ^bbb] => false endprocedure) ->;
+;;; DECLARING VARIABLE aaa
+;;; DECLARING VARIABLE bbb
+** [<undef> <undef>]
+** [<undef> <undef>]
+** [<undef> <undef>]
+** [<undef> <undef>]
+** [<undef> <undef>]
+
+The reason for this unhelpful printout is that without using "!" the
+pattern contains words, and when the matcher runs it uses the updater of
+valof on the words. That does not access the lexical variables aaa and
+bbb, and causes new global (permanent) variables to be declared.
+
+Consequently aaa and bbb retain their undefined values in the procedure,
+and these are printed out by the print command .
+
+-- Use of "!" with section variables ----------------------------------
+
+One of the problems with the Pop-11 matcher was this: If a procedure is
+defined in a section, and then invoked in another section the matcher
+was unable to access the variables that were in the section in which the
+procedure was compiled. By using "!" to insert identifier records in
+patterns we can overcome this restriction.
+
+However, to prevent "!" always turning the lvars into lexical variables,
+which is the default behaviour we can use the following to allow
+pattern identifiers to be ether vars or lvars, depending on their
+current status:
+
+    false -> pop_pattern_lvars;
+
+The default is
+
+    true -> pop_pattern_lvars;
+
+
+Mark and load the whole section, which exports the procedure test1,
+which checks whether its input includes a word.
+
+    section ss1 => test1;
+
+    ;;; allow non-lexical pattern variables.
+    false -> pop_pattern_lvars;
+
+    vars item;
+    define test1(list) -> x;
+        dlocal item;
+        if list matches ![== ? item:isword ==] then
+            item -> x;
+        else
+            false -> x;
+        endif;
+    enddefine;
+
+    endsection;
+
+;;; test test1 outside the section.
+test1([1 2 3 ]) =>
+** <false>
+test1([1 2 a 3 ]) =>
+** a
+
+Using "!", we can also import a procedure into a section without
+importing its local vars. Compile the whole section below in one go,
+after compiling test3
+
+vars pp, list;
+;;; allow non-lexical pattern variables.
+false -> pop_pattern_lvars;
+
+define test3(list) -> pp;
+    ;;; find at least three elements in a five (or more) element list
+    dlocal list, pp;
+    unless list matches ![ == = ??pp:3 = ==] then
+        false -> pp
+    endunless
+enddefine;
+
+section ss2 test3;
+
+test3([1 2 3 4]) =>
+
+test3([1 2 3 4 5 6]) =>
+
+endsection;
+
+;;; it should print out
+** <false>
+** [2 3 4]
+
+It would also work with doesmatch instead of matches, though it may not
+find the same three elements. When there are several occurrences of
+segment pattern elements, i.e. "==" and "??", in a pattern, the result
+of matching can be non-determined.
+
+Without "!" the matching would not work. (Why not?)
+
+We can reset the default behaviour of "!" by doing
+    true -> pop_pattern_lvars;
+
+
+-- Using "!" with dlvars ----------------------------------------------
+
+Reset the default.
+    true -> pop_pattern_lvars;
+
+In some cases dlvars can be more efficient than lvars, where no closure
+is to be returned by the procedure, or stored anywhere.
+(See HELP * LVARS)
+
+This procedure looks in a list for a repeated segment of length >= 2.
+
+define test2(list) -> p;
+    lvars list;
+
+    dlvars p, q ;   ;;; pattern variables
+
+    unless list doesmatch ![== ??p == ??q == ]
+        where p = q and length(p) > 1 and length(q) > 1
+    then
+        false -> p
+    endunless;
+enddefine;
+
+test2([1 2 3]) =>
+** <false>
+
+test2([1 2 3 4 2 3 5]) =>
+** [2 3]
+
+;;; But it does not find them all
+test2([1 2 3 4 a 2 3 4 5]) =>
+** [2 3]
+
+The above would also work with "lvars" instead of "dlvars".
+
+
+-- Type3 lvars bound by the matcher -----------------------------------
+
+Lexical pattern vars work with type 3 lvars as defined in REF VMCODE,
+e.g. lvars that are non-local to a procedure that is returned as a
+result.
+
+define make_proc(list) -> proc;
+    ;;; Return a procedure containing a lexical variable bound in
+    ;;; the pattern match
+    lvars list, proc, pp;
+
+    if list matches ![ = ? pp = ] then
+        ;;; return this procedure to access the value of pp
+        procedure; pp endprocedure
+    else
+        false
+    endif -> proc;
+
+    ;;; Give the procedure an updater
+    procedure();
+        -> pp
+    endprocedure -> updater(proc);
+enddefine;
+
+;;; use make_proc to create a procedure
+vars proc = make_proc([1 2 3]);
+
+;;; Test the procedure
+proc()=>
+** 2
+
+;;; Test its updater
+99 -> proc();
+proc()=>
+** 99
+
+;;; Check that two such results do not interfere with each other.
+;;; Make another procedure
+vars proc2 = make_proc([5 6 7]);
+
+;;; Test the new procedure
+proc2()=>
+** 6
+
+;;; Has it affected the previous one?
+proc() =>
+** 99
+
+;;; Test its updater
+55 -> proc2();
+proc2()=>
+** 55
+
+;;; Does proc still have the same stored value?
+proc() =>
+** 99
+
+-- Using "!" with database procedures ---------------------------------
+
+See HELP * DATABASE, TEACH * DATABASE
+
+LIB FMATCHES could not be used to define procedures like the Pop-11
+database procedures, present, remove, flush, allpresent, and the
+iteration constructs foreach, forevery, etc. (see HELP * DATABASE).
+The reason it could not be used was that fmatches could not be passed a
+pattern created in another procedure, as is possible with doesmatch and
+matches.
+
+Consequently, it was not previously possible to use the Pop-11 database
+procedures with lexical variables or section variables. This can now be
+done using "!", whether the matcher used is matches or doesmatch.
+
+-- -- Some examples of "!" used with the database
+
+;;; Set up an initial database
+[[a ison b][d ison c] [b ison table][e ison c][c ison table]] -> database;
+
+-- . present
+;;; We can use present with a pattern containing a lexical variable:
+;;; See HELP * PRESENT
+
+lvars x1; present( ![?x1 ison c] ), x1 =>
+** <true> d
+
+it =>
+** [d ison c]
+
+-- . allpresent
+;;; We can make all the database facilities work with lvars, section
+;;; variables, etc., if we use "!"
+;;; See HELP * ALLPRESENT
+
+;;; Compile the next two lines together
+
+lvars item1, item2, item3;
+allpresent(![[?item1 ison ?item2][?item2 ison ?item3][?item3 ison table]])=>
+** <false>
+
+;;; compile the next two lines together.
+lvars item1, item2, item3;
+allpresent(![[?item1 ison ?item2][?item2 ison ?item3]])=>
+** <true>
+them =>
+** [[a ison b] [b ison table]]
+
+(See HELP * ALLPRESENT)
+
+-- . foreach
+;;; Now try foreach with lvars pattern variables. See HELP * FOREACH
+
+lvars x,y; foreach ![?x ison ?y] in database do [^x ^y] => endforeach;
+** [a b]
+** [d c]
+** [b table]
+** [e c]
+** [c table]
+
+
+;;; try it without "!", after cancelling x and y, and see what happens
+cancel x,y;
+lvars x,y; foreach [?x ison ?y] in database do [^x ^y] => endforeach;
+;;; DECLARING VARIABLE x
+;;; DECLARING VARIABLE y
+** [<undef> <undef>]
+** [<undef> <undef>]
+** [<undef> <undef>]
+** [<undef> <undef>]
+** [<undef> <undef>]
+
+Because "!" was not used, identifiers were not inserted in the list, so
+the words "x" and "y" are left. The matcher uses the words as globals,
+but the list expression [^x ^y] uses the lexical variables, which are
+not bound by the matcher. Hence the undef values.
+
+-- . forevery
+;;; forevery also works with lvars, if we use !
+;;; See HELP * FOREVERY
+
+;;; Compile the next three lines together
+lvars x,y,z;
+forevery ![[ ?x ison ? y][?y ison ?z]] do [^x above ^z]=>
+endforevery;
+** [a above table]
+** [d above table]
+** [e above table]
+
+;;; WARNING:
+;;; you can't use "where" in the above database looping constructs
+
+lvars x,y;
+foreach ![?x ison ?y] where y == "table" do [^x ^y] =>
+endforeach =>
+** [? <ID x <undef>> ison ? <ID y <undef>>]
+
+
+-- . which and which_values
+Some of the database procedures, e.g. which, require slight
+modifications to handle patterns containing identifier records, as they
+explicitly check only for words.
+
+See HELP * WHICH
+
+;;; Set up an initial database
+[[a ison b][d ison c] [b ison table][e ison c][c ison table]] -> database;
+database ==>
+
+which([x z], [[?x ison ?y][?y ison ?z]]) ==>
+** [[a table] [d table] [e table]]
+
+
+;;; This also works with ! provided the variables are not lvars.
+vars x, z;
+database ==>
+which([x z], ![[?x ison ?y][?y ison ?z]]) ==>
+
+It cannot work with lvars. However the following procedure which_values
+loosely modelled on LIB * WHICH will work, provided that the first
+argument uses "?" before each variable.
+
+
+define which_values(Vars, Patternlist) -> List;
+    ;;; Vars should be a list of variables prefixed by "?" transformed by "!"
+    ;;; Patternlist should be a list of patterns, the whole having been transformed
+    ;;; by "!"
+
+    lconstant err_string = 'LIST NEEDED FOR "WHICH"';
+
+    if ispair(Vars) then
+        if ispair(Patternlist) then
+            [%forevery Patternlist do
+                lvars list;
+                [%for list on Vars do
+                    if hd(list) == "?" or hd(list) == "??" then
+                        valof(hd(tl(list)))
+                    endif
+                  endfor%]
+              endforevery%] -> List
+        else mishap(err_string, [^Patternlist])
+        endif;
+    else
+        mishap(err_string, [^Vars] )
+    endif;
+enddefine;
+
+/*
+;;; Now some tests
+;;; Set up a database
+
+[[a ison b][d ison c] [b ison table][e ison c][c ison table]] -> database;
+database ==>
+
+;;; Now we can do the following. We put "!" before the variable
+;;; list as well as before the pattern.
+
+;;; Find all the things x, z such that
+;;;         there is a y, and x ison y and y ison z.
+
+lvars x, y, z;
+which_values(![?x ?z], ![[?x ison ?y][?y ison ?z]]) ==>
+** [[a table] [d table] [e table]]
+** [[a table] [d table] [e table]]
+
+There may be some other database procedures that would have to be
+rewritten to work with patterns transformed by "!"
+
+At Birmingham, which_values is available as an autoloadable procedure.
+
+--- $poplocal/local/newkit/prb/help/readpattern
+--- $poplocal/local/help/readpattern
+--- Copyright University of Birmingham 2000. All rights reserved. ------

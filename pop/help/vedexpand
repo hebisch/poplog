@@ -1,0 +1,96 @@
+HELP VEDEXPAND                                John Williams, August 1986
+
+This file describes a VED command line substitution mechanism. By
+default, this facility is switched off. To use it, assign an *ASCII code
+to the variable VEDEXPANDCHAR, like this
+
+    `^` -> vedexpandchar;
+
+Having done this, VED <ENTER> commands will be interpreted in a special
+way. Whenever ^ occurs in the command, the character following it will
+be used to select and execute a procedure from the property
+VEDEXPANDCHARS. The printed representation of whatever this procedure
+returns is spliced into the original command in place of the ^ and
+subsequent character.
+
+The following expander commands are defined:
+
+    ^w      replace ^w with word at cursor position in current file
+    ^l      replace ^l with the current line
+    ^f      replace ^f with a filename read from the current line
+    ^e      replace ^e with characters from cursor to end of line
+    ^%      replace ^% with VEDPATHNAME (full name of current file)
+    ^p      replace ^p with SYS_FNAME_PATH(VEDPATHNAME)
+                        (i.e. directory part of current file name)
+    ^#      replace ^# with path name of next file on VEDBUFFERLIST
+    ^^      replace ^^ with ^   (!)
+
+
+To illustrate, imagine that you have a VED file that contains a
+directory listing (perhaps obtained by doing <ENTER> LS). To edit one of
+the files listed, you could simply move the cursor to the start of the
+desired filename, and do
+
+    <ENTER> ved ^f <RETURN>
+
+Note - this option treats as a file name all the text to the right of
+the cursor, up to the next space, tab, ', ), or newline. There is no
+check that it is a legal file name. So this option can be used for any
+purpose where it would be useful to incorporate such text into a ved
+command.
+
+By contrast the '^w' option uses the text on the right of the cursor
+that would be returned by VEDNEXTITEM.
+
+The ^w option is often used in conjunction with the <ENTER> commands for
+searching and substituting text items. For example, if your file
+included the mispelt word 'hipopotamus', you could correct the mistake
+by moving the cursor to the beginning of the word, and giving the
+command
+
+    <ENTER> s"^w"hippopotamus <RETURN>
+
+
+To include a ^ as a literal character in a command, use ^^
+
+
+-- Looking back at previous commands ----------------------------------
+
+Expanded versions of the commands are saved in the VED command file. In
+order to view them (and, if necessary re-do them), get the cursor to the
+VED status line, using the STATUSSWITCH key (sometimes called CHANGE
+MODE key), then use the CHARUP key.
+
+
+-- Customising the VEDEXPAND facility ----------------------------------
+
+Expansion of <ENTER> commands only occurs if the variable VEDEXPANDCHAR
+has a non-FALSE value. Above, it was suggested that `^` should be
+assigned to it. However, any ASCII code will do, although it would be
+unwise to use an alphabetic or numeric character code.
+
+As outlined above, the character following the instance of VEDEXPANDCHAR
+in the command is used to select the expander procedure. The property
+VEDEXPANDCHARS controls the mapping from selector characters to
+expansion procedures. Users can assign their own procedures into this
+property. Such procedures should return an object to which
+*DEST_CHARACTERS can be applied. The characters so produced are spliced
+into the command in place of VEDEXPANDCHAR and the subsequent selector
+character.
+
+For example, one might want to insert the "name" part of of the current
+file name into a command, in order to edit files with the same name but
+a different extension. This is how that might be done:
+
+    procedure();
+        sys_fname_name(vedpathname)
+    endprocedure -> vedexpandchars(`n`);
+
+Then, while editing a file called 'longfilename.p', one could edit
+'longfilename.lsp' by doing
+
+    <ENTER> ved ^n.lsp
+
+
+--- C.all/help/vedexpand
+--- Copyright University of Sussex 1990. All rights reserved. ----------

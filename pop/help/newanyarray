@@ -1,0 +1,164 @@
+HELP NEWANYARRAY                              Steven Hardy, January 1978
+                                            John Williams, December 1984
+                                                    A. Sloman April 1986
+
+NEWANYARRAY is used for creating arrays. The main formats are:
+
+  newanyarray(boundslist,
+                optional-initialise-pdr,
+                object,
+                optional-by-row);
+OR
+
+  newanyarray(boundslist,
+                optional-initialise-pdr,
+                init-pdr,
+                subscr-pdr,
+                optional-by-row)
+
+See HELP * ARRAYS for a general introduction to arrays in POP-11
+and REF *ARRAYS for more formal specifications.
+
+NEWANYARRAY is the most general procedure for creating arrays in POP-11.
+It gives far more flexibility than * NEWARRAY, in particular allowing
+arrays to be constructed from user-defined vector types or vector types
+which are more compact than standard POP-11 vectors. For instance,
+byte arrays may be constructed. (See HELP * STRINGS).
+
+NEWANYARRAY takes between two and six arguments, depending on how the
+array and its components are initialised. The permitted argument values
+are described below.
+
+
+(1) A boundslist (a list of integers) specifying the size of the
+    array. If the list has 2N integers an N-dimensional array is created.
+    The Kth pair of integers specifies the bounds of the Kth dimension -
+    the permitted range of values for the Kth subscript of the array.
+    Thus [1 10] specifies a one-dimensional array, components numbered
+    from one to ten; whereas [1 10 3 20] specifies a two dimensional
+    array of 180 elements. The lower bound need not be 1 (as here):
+    [-5 5] specifies a one dimensional array with eleven components.
+
+
+(2) An optional procedure to specify the initial contents of the
+    array. The results of applying this procedure to every possible set
+    of subscript values are stored in the array. The procedure must take
+    N arguments if the array is N-dimensional. For example, to create a
+    "multiplication" table, supply NONOP * as the second argument.
+    (See HELP * NONOP)
+
+    Instead of a procedure this argument can be a constant, though if it
+    is a list it may not contain more than one element (to prevent
+    confusion with the boundslist.) So, to initialise every element of
+    the array to the empty list, supply [] as the second argument.
+
+    The second argument is optional.  If not supplied, the array is
+    initialized with *UNDEF in the case of a full vector, and zero
+    otherwise.
+
+
+3)  This argument either (a) supplies a vector class object (see
+    *VECTORCLASS) in which the elements of the array are to be stored,
+    or (b) specifies how such an object is to be created. This
+    specification may be a vector type KEY, or constructor procedure,
+    like INITV or INITS. (See HELP * KEYS)
+
+    If the third argument is an array, its *ARRAYVECTOR is used to store
+    the components of the new array. Thus two different arrays, with
+    different boundslists, can access and update the same information,
+    possibly viewing it as differently organised. Or one may access a
+    sub-array of the other.
+
+    When an array or vector is supplied, its size must be consistent
+    with the array size indicated by the boundslist. For example, doing
+
+        newanyarray([1 4 0 2], {a vector with only six elements})
+
+    will cause a *MISHAP, since the bounds specify an array that can
+    hold twelve elements. However, the reverse constraint does NOT
+    apply: the vector can be larger than the bounds require.
+
+
+(4) This argument specifies the subscriptor procedure used to access
+    the vector class object in which the array elements are stored.
+    It is optional unless argument (3) was a vector class initialiser
+    procedure. If a subscriptor procedure is not supplied, it is
+    defaulted from the class subscriptor of the array vector. Note that
+    the subscriptor procedure cannot be an array, because it would then
+    be confused with argument (3).
+
+
+ 5) This argument is optional. If present, it should be an integer
+    "index offset" into the vector. This specifies where the portion of
+    the vector used by the array should begin. Thus, if VEC is a fifteen
+    element vector, the array created by
+
+        newanyarray([1 3 1 3], vec, 5)
+
+    uses elements 6 - 14 (inclusive) of VEC.
+
+
+(6) This argument is also optional. If supplied, it should be a boolean,
+    which is locally assigned to the variable POPARRAY_BY_ROW. This
+    controls the mapping between subscripts and positions in the
+    underlying *ARRAYVECTOR. For example:
+
+        vars a b;
+        newanyarray([1 3 1 3], {a b c d e f g h i}, true) -> a;
+        newanyarray([1 3 1 3], {a b c d e f g h i}, false) -> b;
+        a(3,1) =>
+        ** c
+        b(3,1) =>
+        ** g
+
+    The value of POPARRAY_BY_ROW is irrelevant when creating
+    one-dimensional arrays.
+
+
+-- Some examples ------------------------------------------------------
+
+To create a multiplication table:
+
+    vars m;
+    newanyarray([1 12 1 12], nonop *, initv, subscrv) -> m;
+    m(4,3) =>
+    ** 12
+
+
+To create a turtle type picture, using a string to store the components:
+
+    vars pic;
+    newanyarray([1 10 1 10], `\s`, datakey('a string')) -> pic;
+    pic(5,5) =>
+    ** 32
+
+
+To turn an existing string of "noughts-and-crosses" into an array:
+
+    vars oxo;
+    newanyarray([1 3 1 3], '0 X X00 X') -> oxo;
+    cucharout(oxo(1,3));
+    0
+
+If, in the previous example, we make the array by row instead of by
+column, the mapping between subscripts and positions in the string is
+"reversed":
+
+    vars oxo2;
+    newanyarray([1 3 1 3], '0 X X00 X', false) -> oxo2;
+    cucharout(oxo2(1,3));
+    X
+
+
+------------------------------------------------------------------------
+
+See also:
+    HELP * ARRAYS
+    HELP * ARRAYVECTOR
+    HELP * ISARRAY
+    HELP * NEWARRAY
+    REF  * ARRAYS
+    REF  * ARRAYSCAN
+
+--- C.all/help/newanyarray ---------------------------------------------
+--- Copyright University of Sussex 1987. All rights reserved. ----------

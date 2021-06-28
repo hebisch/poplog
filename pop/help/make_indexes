@@ -1,0 +1,301 @@
+HELP MAKE_INDEXES                                 Adrian Howard Feb 1992
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Overview
+ -- Using LIB *MAKE_INDEXES
+ -- Example
+ -- How Index Names Are Formed
+ -- What An Index File Contains
+ -- How "doc_index" directories are updated
+ -- Calling LIB *MAKE_INDEXES From The Command Line
+ -- Summary
+ -- Related Documentation
+
+
+-- Overview -----------------------------------------------------------
+
+Creating indexes for  documentation files in a Poplog directory tree
+involves two processes:
+
+    i)  Creating index files (for example, HELP *INDEX)
+
+    ii) Updating index directories (named "doc_index") used by -ved_?-
+        and its sister procedures. See HELP *QUERY and HELP *MKREFINDEX.
+
+The library LIB *MAKE_INDEXES automates this task for directory trees of
+a "standard" shape. For the library to work, directories containing
+documentation be named after the type of documentation they contain:
+
+    o   REF file directories should be named "ref"
+    o   HELP file directories should be named "help"
+    o   TEACH file directories should be named "teach"
+    o   DOC file directories should be named "doc"
+
+
+-- Using LIB *MAKE_INDEXES --------------------------------------------
+
+To use LIB *MAKE_INDEXES from Pop11 do:
+
+    uses make_indexes;
+
+    make_indexes(ROOT, SKIP_PATHS, PREFIX, SUFFIX, DOC_TYPES, STRIP);
+
+Where:
+
+    ROOT is the root directory of the tree which is to be indexed.
+
+    SKIP_PATHS is a list of directories which should be ignored.
+
+    PREFIX is the word or string which should be added to the start of
+    all index files created.
+
+    SUFFIX is the word or string which should be added to the end of all
+    index files created.
+
+    DOC_TYPES is a list of the documentation types whose indexes should
+    be created.
+
+    STRIP is a boolean which if true means strip VED character
+    attributes and graphics characters from all documentation files for
+    which indexes are built.
+
+
+-- Example ------------------------------------------------------------
+
+If you have the following directory tree in your home directory
+
+                            [login directory]
+                                    |
+                                    |
+                                  poplog
+                                    |
+                  __________________|___________________
+                 |             |            |           |
+                help          ref         teach         x
+                 |             |            |           |
+            (help files)  (ref files)  (teach files)   help
+                                                        |
+                                                   (help files)
+
+Then issuing the following command
+
+        UNIX                            VMS
+
+    make_indexes(                   make_indexes(
+        '$HOME/poplog',                 '$sys$login/poplog/',
+        [ '$HOME/poplog/teach' ],       [ '$sys$login/poplog/teach/' ],
+        'my', 'index',                  'my', 'index',
+        [help ref teach],                [help ref teach],
+        false                            false
+    );                              );
+
+would do the following:
+
+    i)  Create the following index files:
+        o   "myindex" in the directory poplog/help
+        o   "myindex" in the directory poplog/ref
+        o   "myxindex" in the directory poplog/x/help
+
+    ii) Update any "doc_index" directories (see HELP *MKREFINDEX)
+
+Note that the directory poplog/teach is ignored because it is a member
+of the SKIP_PATHS argument.
+
+By default, the procedure displays trace information. If you executed
+the above command you would see output similar to this:
+
+    Making help indexes in <HOME DIRECTORY>/poplog...
+    Locating directories..
+    Calculating index names...
+    Creating index file <HOME DIRECTORY>/poplog/help/myindex
+
+    Making ref indexes in <HOME DIRECTORY>/poplog...
+    Locating directories..
+    Calculating index names...
+    Indexing ref directory <HOME DIRECTORY>/poplog/ref
+    Creating index file <HOME DIRECTORY>/poplog/ref/myindex
+
+    [ and so on ]
+
+    Finished.
+
+It is assumed that all REF directories should have a "doc_index"
+directory and a warning is printed if any are found which do not.
+
+If you do not wish to see any warnings or trace information assign
+-false- to the variable -mi_verbose-.
+
+
+-- How Index Names Are Formed -----------------------------------------
+
+The name of an index file for a given directory is given by the
+following algorithm.
+
+    a)  Remove the ROOT passed to -make_indexes- from the directory
+        name.
+
+    b)  Remove the last component of the directory name.
+
+    c)  Concatenate the remaining components of the directory.
+
+    d)  Add the PREFIX and SUFFIX passed to
+
+In the above example the directory
+
+    <HOME DIRECTORY/poplog/x/help/
+
+is transformed like this:
+
+    <HOME DIRECTORY/poplog/x/help/ --> x/help --> x --> myxindex
+
+
+-- What An Index File Contains ----------------------------------------
+
+An index file contains an alphabetical list of all the files in the
+relevant directory. The files are placed in columns, as many as will fit
+onto a screen -mi_num_columns- wide (72 by default).
+
+The bottom of the index file will contain cross references to any other
+indexes of the same documentation type (if any).
+
+By default, the format of index files depends on the documentation type,
+to see this compare HELP *INDEX and REF *INDEX. This format can be
+altered by redefining the procedures -mi_pr_index_header- and
+-mi_pr_index_footer-.
+
+Both procedures take the same arguments:
+
+    mi_pr_index_header(DOC_TYPE, INDEX_NAME, INDEX_PATH, OTHER_INDEXES)
+    mi_pr_index_footer(DOC_TYPE, INDEX_NAME, INDEX_PATH, OTHER_INDEXES)
+
+Where:
+
+    DOC_TYPE is the documentation type (eg, 'ref')
+
+    INDEX_NAME is the name of the index file (eg, 'myindex')
+
+    INDEX_PATH is the full pathname of the index file.
+
+    OTHER_INDEXES is a list of the names of any other index files of the
+    same documentation type.
+
+The procedure -mi_pr_index_header- should display the section of the
+index file before the list of files. The procedure -mi_pr_index_footer-
+should display the information after the list of files. Both procedures
+should do this by printing to the logical standard output channel (for
+example by using -pr- and -npr-).
+
+
+-- How "doc_index" directories are updated ----------------------------
+
+The method used to update "doc_index" directories is controlled by the
+list -mi_indexing_commands-. Each element of -mi_indexing_commands- is a
+two element list of the form:
+
+    [DIR COMMAND]
+
+When -make_indexes- attempts to update the "doc_index" of a given
+directory it examines each element of -mi_indexing_commands- in turn.
+
+If the pathname of the directory containing "doc_index" contains DIR as
+one of its components then COMMAND is called and no more elements of
+-mi_indexing_commands- are examined.
+
+If COMMAND is a procedure it is called with the pathname of the
+directory as its argument. If COMMAND is a string, then the string
+
+    COMMAND sys_>< space sys_>< PATH
+
+is passed to -sysobey-, where PATH is the full pathname of the directory
+containing "doc_index".
+
+If no DIR can be found in -mi_indexing_commands- which will match the
+directory, a -mishap- will occur.
+
+On Unix systems the default value of -mi_indexing_commands- is:
+
+    [
+        ['lisp'   'pop11 $usepop/pop/lisp/mklisprefindex']
+        ['pml'    'pop11 +$popsavelib/pml $usepop/pop/pml/src/mkindex']
+        ['ref'    'pop11 mkrefindex']
+    ]
+
+On VMS systems the default value of -mi_indexing_commands- is:
+
+    [
+        ['lisp'   'pop11 usepop:[pop.lisp]mklisprefindex.p']
+        ['pml'    'pop11/popsavelib:pml usepop:[pop.pml.src]mkindex.ml']
+        ['ref'    'pop11 mkrefindex']
+    ]
+
+So, for example:
+
+    /foo/baz/ref        will be indexed with    mkrefindex
+    /foo/baz/lisp/ref   will be indexed with    mklisprefindex
+    /foo/baz/pml/ref    will be indexed with    mkindex
+
+
+-- Calling LIB *MAKE_INDEXES From The Command Line --------------------
+
+LIB *MAKE_INDEXES may also be invoked from the shell (on Unix systems)
+or DCL (on VMS systems) as follows:
+
+    pop11 make_indexes ROOT -strip SKIP_PATHS PREFIX SUFFIX DOC_TYPES
+
+Where ROOT, SKIP_PATHS, PREFIX, SUFFIX, and DOC_TYPES are the same as a
+normal call to -make_indexes-. The items in the lists SKIP_PATHS and
+DOC_TYPES will have to be enclosed in "(" and ")" brackets (remember to
+escape the brackets with "\" when using Unix).
+
+The '-strip' flag if present sets the STRIP argument to -make_indexes-
+true (otherwise STRIP is false).
+
+All arguments except ROOT are optional, including the '-strip' flag. The
+default values if they are absent are as follows:
+
+    STRIP       == false
+
+    SKIP_PATHS  ==  []
+
+    PREFIX      ==  ''
+
+    SUFFIX      ==  'index'
+
+    DOC_TYPES   ==  [ref help teach doc]
+
+
+-- Summary ------------------------------------------------------------
+
+The library LIB *MAKE_INDEXES defined the following:
+
+make_indexes(PATH, SKIP_PATHS, PREFIX, SUFFIX, DOC_TYPES, STRIP)
+    Index a directory tree.
+
+mi_verbose -> BOOL
+    Unless -false-, warning and trace information is displayed when
+    -make_indexes- is running.
+
+mi_num_columns -> INTEGER
+    The number of columns available in an index file.
+
+mi_pr_index_header(DOC_TYPE, INDEX_NAME, INDEX_PATH, OTHER_INDEXES)
+mi_pr_index_footer(DOC_TYPE, INDEX_NAME, INDEX_PATH, OTHER_INDEXES)
+    Procedures used to format contents of index files.
+
+mi_indexing_commands -> LIST
+    Procedures or Unix/DCL scripts for updating "doc_index" directories.
+
+
+-- Related Documentation ----------------------------------------------
+
+HELP *MKREFINDEX --- Library for indexing documentation files
+HELP *QUERY      --- VED commands for locating information
+
+REF *STANDARDS      --- Poplog documentation and library standards
+REF *REFFORM        --- Details of REF file format
+
+
+--- C.all/help/make_indexes
+--- Copyright University of Sussex 1992. All rights reserved. ----------

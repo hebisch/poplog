@@ -1,0 +1,1371 @@
+HELP DEFINE                                       A.Sloman November 1987
+                                          Revised Aaron Sloman Sept 1997
+
+define .... enddefine
+
+    On procedures and procedure definitions in Pop-11.
+    See also TEACH * PRIMER/'CHAPTER.4'
+
+
+CONTENTS - (Use <ENTER> g to access sections)
+
+ -- Introduction
+ -- The role of a procedure definition
+ -- Specifying output variables
+ -- -- Use ENTER getvars to insert lvars declarations
+ -- -- Obsolete syntax for output locals
+ -- Procedures as arguments and results
+ -- "define updaterof"
+ -- The "dot" notation.
+ -- -- Using the dot notation with more than one argument
+ -- Referring to a procedure as an object
+ -- The concept of a procedure in Pop11
+ -- Other types of procedure identifiers
+ -- -- Operation identifiers
+ -- -- Active variables
+ -- -- Macros and syntax words
+ -- -- Scoping of procedure identifiers
+ -- Invoking different sorts of procedures
+ -- Invoking operations
+ -- Infix operators have a numeric "precedence"
+ -- Defining operation identifiers
+ -- Invoking infix operators
+ -- Invoking the updater of an operation
+ -- Using NONOP to suppress invocation
+ -- Formats for defining operation identifiers
+ -- Macros
+ -- -- Warning to Lisp experts
+ -- Syntax Procedures
+ -- Active variables
+ -- WITH_PROPS and WITH_NARGS
+ -- Nested procedure definitions
+ -- Making the procedure name a lexical identifier
+ -- Making the procedure name global to sections
+ -- Making a procedure name a procedure identifier
+ -- Making a procedure name a constant
+ -- -- compile_mode
+ -- Declaring local variables
+ -- Restrictions on the use of lexical locals
+ -- Extending the define ... enddefine syntax, using define_form
+ -- Alternative formats for procedure definitions
+ -- Archaic forms
+ -- LIB POP2
+ -- Archaic form for output locals
+ -- RELATED DOCUMENTATION
+
+-- Introduction -------------------------------------------------------
+
+The
+
+    define .... enddefine
+
+syntax form in Pop-11 is used to define named procedures and their
+updaters. It can be used in several different formats.
+
+The editor VED knows about "define" and "enddefine" opening and closing
+brackets so it can help the user quickly locate a complete procedure
+definition, in order to mark it, or compile it, or globally replace some
+string within it, etc. (See * VEDOPENERS, * VEDCLOSERS)
+
+A standard procedure definition has the form:
+
+    define <header-line>;
+        <body>
+    enddefine;
+
+The header-line describes the type of the procedure, its arguments and
+results, and possibly the PDNARGS (a field in the procedure record
+indicating the number of arguments) and PDPROPS (a field indicating
+the name and possibly other properties of the procedure)..
+
+The body is any POP-11 expression sequence, including declarations of
+local variables, nested procedures and dynamic local expressions (using
+dlocal).
+
+The definition of the *UPDATER of a named procedure has the form:
+
+    define updaterof <header-line>;
+        <body>
+    enddefine;
+
+As described in HELP * PROCEDURE, it is also possible to create
+anonymous procedures using the syntax:
+
+            procedure ... endprocedure
+
+
+TEACH * PRIMER/'CHAPTER.4' gives more detailed information about
+procedures and how to define them.
+
+More information about procedure definitions can be found in the file
+REF *POPSYNTAX/define. Only the main cases are specified here.
+
+TEACH * DEFINE gives an introduction to the basic facilities, for
+beginners.
+
+Pointers to documentation on additional options are given below.
+
+
+-- The role of a procedure definition ---------------------------------
+
+A procedure definition does two things; it declares an identifier (the
+name of the procedure) and assigns it a value an actual Pop-11
+procedure created from the definition.
+
+The value is a procedure record, usually containing compiled machine
+code derived from the procedure definition.
+
+The procedure record will have associated with it a PDPROPS field,
+normally the name of the procedure, and a PDNARGS field, which is
+normally the number of input parameters specified in the procedure
+definition. Thus
+
+    define proc(a, b, c) ->(d, e);
+        <expression sequence>
+    enddfine;
+
+or, equivalently (not the reversal after "->"):
+
+    define proc(a, b, c) -> e -> d;
+        <expression sequence>
+    enddfine;
+
+defines a procedure of three arguments (PDNARGS = 3), and two results
+with the name "proc", assigned to the PDPROPS of the procedure.
+
+The name "proc" is defined as an ordinary global variable and the
+procedure is assigned to be its value, i.e. it is assigned to
+valof("proc").
+
+In the above example, five local variables (three input locals, a, b, c
+and two output locals d, e) will be declared automatically. They will be
+made local variables of the procedure called proc.
+
+Whether they are made lexical variables (lvars) or not, will depend on
+whether they are explicitly declared in the body of the procedure.
+
+Prior to Poplog Version 15 they default to being declared non-lexical,
+if not explicitly declared. From Poplog Version 15, the default is
+reversed: they are lexical unless declared to be "dynamic" variables,
+using vars and dlocal. (Dynamic variables are needed for the Pop-11
+pattern matcher described in HELP * MATCHES, and for other purposes.)
+
+Normally it is preferable to make the declarations of variables
+explicit:
+
+    define proc(a, b, c) ->(d, e);
+        lvars a, b, c, d, e,;
+        <expression sequence>
+    enddfine;
+
+Depending on the machine used, the first few lexical variables named in
+the local LVARS declaration will be allocated to registers for extra
+speed of access. How many are allocated to registers depends on the
+machine architecture. See HELP * LVARS/registers
+
+-- Specifying output variables ----------------------------------------
+
+If the procedure has any result variables these should be specified
+thus:
+
+    define foo() -> x;            ;;; for one result
+    define foo() -> (x, y);       ;;; for two results
+    define foo() -> (x, y, z);    ;;; for three results (and so on).
+
+When the procedure execution terminates, the values of all of the result
+variables are left on the stack, in the order in which they were given
+in the procedure header.
+    (See TEACH * STACK, or TEACH * PRIMER/'CHAPTER.3'
+
+
+NOTE:
+It is not necessary for a procedure to have result variables for it to
+return a result. If preferred, the results may be stacked explicitly by
+the procedure, as in:
+
+    define sum_of_squares(x, y);
+        lvars x, y;
+        x * x + y * y
+    enddefine;
+
+However, including output locals in the procedure heading makes clearer
+what the procedure is intended to do, and makes it easier for a new
+programmer to look after old programs. (There is a slight loss of
+efficiency, compared with simply stacking the results directly.)
+
+The output variables, like the input variables, are made local variables
+of the procedure. They are therefore often referred to as 'output
+locals', as contrasted with 'input locals'.
+
+-- -- Use ENTER getvars to insert lvars declarations
+
+This paragraph is no longer required for Poplog Version 15 or later,
+since input and output variables are now automatically declared as
+"lvars".
+
+The VED command
+    ENTER getvars
+available at Birmingham, inserts lvars declarations automatically for
+all input variables and output variables, immediately after the
+procedure header. So you can use it after completing or modifying the
+header line. (If there was previously a vars line there, it is left
+unchanged after the new line, as it may have declared additional local
+variables. You may have to edit it.)
+
+-- -- Obsolete syntax for output locals
+
+Early versions of Pop-11 required the above to be expressed thus:
+
+    define foo() -> x;            ;;; for one result
+    define foo() -> y -> x;       ;;; for two results
+    define foo() -> z -> y -> x;  ;;; for three results (and so on).
+
+If this format is used, on exit the procedure will stack the values of
+output locals in the reverse order to that given in the header.
+
+
+-- Procedures as arguments and results --------------------------------
+
+A procedure can specify that one or more of its input or output
+parameters is to be a variable of type PROCEDURE, thus
+
+    define applyto (list, procedure proc);
+        lvars list, proc;
+
+        lvars x;
+        for x in list do proc(x) endfor
+    enddefine;
+
+would define a procedure equivalent to the system procedure *APPLIST.
+
+E.g.
+
+    applyto([a b c], npr);
+    a
+    b
+    c
+
+If you try to give it a non-procedure as second argument a mishap
+results.
+
+    applyto([a b c], 55);
+    ;;; MISHAP - ASSIGNING NON-PROCEDURE TO PROCEDURE IDENTIFIER
+    ;;; INVOLVING:  55 proc
+    ;;; DOING    :  mishap applyto ...
+
+
+Alternatively the specification that the second argument must be a
+procedure can occur in the lvars declaration.
+
+    define applyto (list, proc);
+        lvars list, procedure proc;
+
+        lvars x;
+        for x in list do proc(x) endfor
+    enddefine;
+
+Note that one procedure can define another inside it, if it is to be
+used nowhere else. Normally it is best defined as lconstant.
+
+For example here is a procedure that takes a list of numbers and
+returns a list of their squares
+
+    define squares(list) -> result;
+        lvars list, result;
+
+        define lconstant square(num);
+            lvars num;
+            num*num
+        enddefine;
+
+        ;;; now make a list of squares using applyto
+
+        [% applyto(list, square) %] -> result
+
+    enddefine;
+
+Test it:
+
+    squares([ 1 2 3 4]) =>
+    ** [1 4 9 16]
+
+
+Note that nested procedure definitions can also contain nested
+definitions. There is no limit to the depth of nesting.
+
+Sometimes a procedure is nested because it is used to refer to a
+variable that is local to the enclosing procedure.
+
+There are further comments on nested procedure definitions below, and
+(for experts) in REF * VMCODE, which explains why making the procedure
+lconstant improves efficiency.
+
+Many forms of sophisticated "higher order" programming depend on the
+fact that procedures can be returned as results. If the procedure that
+is returned as a result includes a variable that is not local to it but
+is local to the enclosing procedure, declared using lvars, then when the
+result is returned it is an "instance" of the original nested procedure,
+with the non-local variable replaced by its value at execution time.
+Examples are given in HELP * LVARS in the section on lexical closures.
+(This is for sophisticated users only.)
+
+
+-- "define updaterof" -------------------------------------------------
+
+A procedure may have an updater associated with it, which is invoked
+when the name occurs on the right of an assignment, in the format
+
+    ... -> foo(...);
+
+E.g. we can define a variable called storevar holding a Pop-11 "ref"
+record, and a procedure to access or update the contents of the record,
+using the procedure cont and its update. See *consref, *cont.
+
+    vars storevar = consref(0);
+
+    define store() -> val;
+        lvars result;
+        cont(storevar) -> val;
+    enddefine;
+
+When the procedure is invoked the result is left on the stack.
+
+    store() =>
+    ** 0
+
+To change the value stored we can define an updater of store, thus:
+
+    define updaterof store(x);
+        lvars x;
+        x -> cont(storevar)
+    enddefine;
+
+    99 -> store();
+    store() =>
+    ** 99
+
+    [the cat] -> store();
+    store() =>
+    ** [the cat]
+
+See HELP *UPDATER, *UPDATEROF
+
+Many system procedures come with their updaters already defined, so that
+they are invoked on the right of an assignment. As the above example
+indicates cont is one of them. Others are:
+
+    hd, tl, front, back, subscrs, subscrv, valof
+
+
+-- The "dot" notation. ------------------------------------------------
+
+Normally a procedure is invoked by following its name with parentheses,
+enclosing arguments if there are any, e.g
+
+    store() =>
+    ** [the cat]
+
+    sqrt(4.0) =>
+    ** 2.0
+
+Instead of parentheses after the procedure name, a dot "." can be used
+just before the procedure name, e.g.
+
+    .store =>
+    ** [the cat]
+
+Similarly procedures that require an input can be invoked using either
+parentheses
+    sqrt(16.0) =>
+    ** 4.0
+
+or the dot notation:
+    16.0.sqrt =>
+    ** 4.0
+
+Notice that in the above the first "." is part of the number
+specification for the decimal number 16.0, and the second "." indicates
+that a procedure is being applied. A space can occur before the second
+dot, but not before the first.
+
+    16.0 .sqrt =>
+    ** 4.0
+
+whereas this version attempts to treat 0 as a procedure, after the first
+dot:
+
+    16. 0.sqrt =>
+
+and produces an obscure error message:
+    ;;; MISHAP - COMPILING CALL TO NON-STRUCTURE
+    ;;; INVOLVING:  0
+
+-- -- Using the dot notation with more than one argument
+
+If a procedure takes two or more arguments, e.g. substring, then it can
+be invoked with the arguments between parentheses separated by commas,
+e.g.
+
+    substring(4, 3, 'In the house') =>
+    ** the
+
+or using the dot notation by separating the arguments with commas,
+without parentheses:
+
+    4, 3, 'In the house'.substring =>
+    ** the
+
+Sometimes repeated uses of the dot notation can be clearer than nested
+procedure calls. E.g. these two are equivalent, but some people find
+the second easier to read:
+
+    hd(tl(tl([cat dog mouse pig]))) =>
+    ** mouse
+
+    [cat dog mouse pig].tl.tl.hd =>
+    ** mouse
+
+Note that when using the dot notation the order of occurrence of
+procedure names is reversed: the last procedure call in the dot notation
+corresponds to the "outermost" (i.e. first) procedure in the first
+notation.
+
+
+-- Referring to a procedure as an object ------------------------------
+
+If the procedure name is not an infix operator (like "+") then it can be
+used as an ordinary variable to refer to the procedure. I.e. it is used
+without the extra procedure-invocation syntax (dot before, or
+parentheses after).
+
+Its value is simply left on the stack, as with any other normal
+identifier, unless it occurs on the right of an assignment, in which
+case it may receive a new value. E.g if foo is an ordinary procedure
+identifier:
+
+        foo(a,b,c)      - puts a,b,c on the stack and runs FOO
+
+        pr(foo)         - puts the procedure on the stack and runs PR
+
+        [the procedure ^foo]
+                        - makes a list with foo as its third element
+
+        99 -> foo       - gives FOO a new value, the number 99.
+
+
+-- The concept of a procedure in Pop11 --------------------------------
+
+Pop-11 procedures a recognizer procedure isprocedure which can be
+applied to any object and will return true if it is a procedure
+otherwise false.
+
+    isprocedure(sqrt) =>
+    ** <true>
+
+but its name is not one
+    isprocedure("sqrt") =>
+    ** <false>
+
+    isprocedure([a list]) =>
+    ** <false>
+
+Notice that it recognizes itself:
+    isprocedure(isprocedure) =>
+    ** <true>
+
+(If you know about Russell's paradox you can think about that example.)
+
+In Pop-11 besides ordinary procedures defined using the syntax described
+above and the other forms described below there are types of objects
+that contain data that are treated as if they were procedures. Examples
+are
+
+    o properties
+        See HELP * PROPERTIES for a list of relevant documentation
+
+    o arrays
+        See HELP * ARRAYS
+
+We can illustrate by creating a property prop and an array arr (don't
+worry if you don't know what they are)
+
+    vars prop = newproperty([], 10, false, false);
+
+    vars arr = newarray([1 2 3 4]);
+
+Both of these are recogized as procedures:
+
+    isprocedure(prop) =>
+    ** <true>
+
+    isprocedure(arr) =>
+    ** <true>
+
+But prop is also recognized as a property
+    isproperty(prop) =>
+    ** <true>
+
+and similarly
+    isarray(arr) =>
+    ** <array [1 2 3 4]>
+
+(isrray returns the array itself, rather than true, for reasons that
+have to do with how it recognizes more complex cases, as explained in
+REF * isarray)
+
+
+-- Other types of procedure identifiers -------------------------------
+
+We previously showed how to define two procedures, proc and store.
+
+The above forms define "proc" and "store" as ordinary identifiers, whose
+values just happen to be a procedure.
+
+There are several main types of procedure identifier, ordinary,
+operation, macro, syntax, and active. The main difference between
+ordinary identifiers and identifiers of these types is concerned with
+how they are invoked and what happens when they are invoked.
+
+The procedure header-line can specify the type of the identifier naming
+the procedure.
+
+-- -- Operation identifiers
+
+An operation identifier (like many of the arithmetic operators) can be
+inserted between its arguments, without any parentheses, as in
+
+    3 + 5
+    99 / (6 * 5)
+
+-- -- Active variables
+
+An active variable is a bit like an operator which takes no arguments,
+yet returns a result (or more than one). It can also, unlike an
+operator, be used with "dlocal" to make its value local to a procedure.
+See HELP * ACTIVE_VARIABLES for more on active variables.)
+
+-- -- Macros and syntax words
+
+Macro and syntax identifiers are used to extend the syntax of Pop-11,
+e.g. introducing new forms of loops or other expressions. The syntax
+they use is not fixed, since they can change the syntax almost
+arbitrarily. Unlike the other sorts of procedures mentione they are
+invoked at compile time, when the Pop-11 compiler is reading in Pop-11
+text. When it finds a macro or syntax word it allows the associated
+procedure to take over reading in and compiling text, up to the
+occurrence of some closing bracket. For example "foreach" is a syntax
+word which reads in text up to "endforeach" and then compiles
+instructions for a special kind of loop. All the main Pop-11 syntax
+forms are implemented using syntax words which take over compilation
+when they are encountered.
+
+A macro does not do any actual compiling. Instead it reads in some
+Pop-11 text and then replaces it with some different text, after which
+the normal compiler takes control again.
+
+For more information on syntactic types of identifiers see
+HELP * IDENTPROPS, * IDENTTYPE
+
+-- -- Scoping of procedure identifiers
+
+Besides having a syntactic role and having a procedure as value, a
+procedure identifier may either be lexically scoped or dynamically
+scoped (e.g. declared with lvars or vars). It may also be constant or
+variable (re-definable), global to sections, or not.
+
+It may also be local to another procedure, if defined within it.
+
+Some of these options are illustrated below.
+
+
+-- Invoking different sorts of procedures -----------------------------
+
+A normal procedure identifier is simply an identifier that has a
+procedure as its value. Its IDENTPROPS is 0, like any other identifier,
+
+    identprops("hd") =>
+    ** 0
+
+and unlike an infix operator, whose identprops is a non-zero number:
+    identprops("+") =>
+    ** 5
+
+In order to indicate that an ordinary procedure is to be invoked the
+identifier is followed by a pair of parentheses, possibly containing
+argument expressions separated by commas. E.g.
+    store() =>
+    ** 99
+
+However the syntax used is different for infix operators.
+
+-- Invoking operations ------------------------------------------------
+
+Some procedures have names that are operation identifiers.
+
+Such an identifier (e.g. +, > =) names a procedure that can be invoked
+without using parentheses or a dot. Often, but not always infix
+operations procedures have two arguments. For example '+' is an infix
+procedure, thus:
+
+    3 + 4 =>
+    ** 7
+
+as are "<>" and ">"
+
+    [a b c] <> [d e f] =>       ;;; join two lists
+    ** [a b c d e f]
+
+    4 > 5 =>
+    ** <false>
+
+However, "-" can be used as both unary operator that takes one input
+as in
+
+    - 66 =>
+    ** -66
+
+or as a binary operator that takes two inputs (one each side):
+
+    77 - 66 =>
+    ** 11
+
+
+-- Infix operators have a numeric "precedence" ------------------------
+
+The procedure identprops can be applied to the name of another procedure
+to find out what type of use it has. An ordinary procedure name has
+an identrops value of 0.
+
+    identprops("hd") =>
+    ** 0
+
+    identprops("substring") =>
+    ** 0
+
+whereas infix operators have an identprops value that is a number value
+other than 0:
+
+    identprops("+") =>
+    ** 5
+
+    identprops(">") =>
+    ** 6
+
+    identprops("=") =>
+    ** 7
+
+Infix operators have a numerical precedence (between -12.7 and +12.7).
+The numeric value is used to disambiguate expressions such as:
+
+    3 + 4 * 5
+
+In such expressions, infix procedures whose precedences have the LOWEST
+absolute value are evaluated first. The precedence of '*' is 4 and that
+of '+' is 5 so the above expression is equivalent to '3 + (4 * 5)'.
+Otherwise infix procedures are evaluated left to right if the precedence
+is positive, right to left if negative.
+
+(WARNING: In many other languages the operators with HIGHEST precedence
+are evaluated first. This difference sometimes causes confusion.)
+
+
+-- Defining operation identifiers -------------------------------------
+
+Users can define their own infix operators.
+
+"define" can be followed by an integer or decimal number between -12.7
+and +12.7 in order to specify that the procedure name is an operation
+identifier with that precedence. For example,
+
+    define -3 sumsq(a, b) -> c;
+        lvars a, b, c;
+
+        a*a + b*b -> c
+
+    enddefine;
+
+Check that it has a non-zero precedence.
+
+    identprops("sumsq") =>
+    ** -3
+
+Since there are exactly two arguments Pop-11 allows us to omit the
+parentheses on the header line and put the procedure name between the
+argument names.
+
+    define -3 a sumsq b -> c;
+        lvars a b, c;
+
+        a*a + b*b -> c
+
+    enddefine;
+
+declares "sumsq" as an operation identifier with precedence -3.
+    3 sumsq 4 =>
+    ** 25
+
+Operations with negative precedence associate to the right, with positive
+precedence to the left. So sumsq associates to the right.
+
+    2 sumsq 3 sumsq 4 =>
+    ** 629
+
+    (2 sumsq 3) sumsq 4 =>
+    ** 185
+
+    2 sumsq (3 sumsq 4) =>
+    ** 629
+
+
+Examples of built in operation identifiers in Pop-11 are:
+
+
+You can apply identprops to each of these to find out its precedence:
+        "+", "=", ">", "::", "<>", "-"
+
+    lvars word;
+    for word in [+ = > :: <> -] do
+        pr(word); pr(tab); pr(identprops(word)); pr(newline)
+    endfor;
+    +   5
+    =   7
+    >   6
+    ::  4
+    <>  5
+    -   5
+
+
+See HELP * SYSWORDS for more.
+
+
+-- Invoking infix operators -------------------------------------------
+
+Operation identifiers may be invoked with any number of arguments, in
+any of the following forms
+        OP                      ;;; no arguments
+        OP a1                   ;;; one argument
+        a1 OP                   ;;; one argument
+        a1 OP a2                ;;; two arguments
+        a1,a2, ... ,aN-1 OP aN  ;;; N arguments
+
+They may also be invoked with arguments between "(....)", like ordinary
+procedure identifiers.
+    sumsq(3, 4) =>
+    ** 25
+
+
+-- Invoking the updater of an operation -------------------------------
+
+If an operation identifier is used on the right of an assignment, its
+updater will be invoked. If there is no updater, an error occurs:
+
+    99 -> 3 sumsq 4;
+    ;;; MISHAP - EXECUTING NON-EXISTENT UPDATER
+    ;;; INVOLVING:  <procedure sumsq>
+
+
+-- Using NONOP to suppress invocation ---------------------------------
+
+Normal occurrences of an operation identifier will cause it to be
+invoked, and if it requires arguments an error may result.
+
+    sumsq =>
+    ;;; MISHAP - STE: STACK EMPTY (missing argument? missing result?)
+    ;;; DOING    :  mishap sumsq compile
+
+Invocation can be suppressed by using NONOP
+
+    nonop sumsq =>
+    ** <procedure sumsq>
+
+If we wish to give the value of an infix procedure to another procedure,
+e.g. a recognizer, we can use nonop, thus:
+
+    isprocedure( nonop sumsq ) =>
+    ** <true>
+
+    isprocedure( nonop = ) =>
+    ** <true>
+
+    isword( nonop sumsq ) =>
+    ** <false>
+
+That the value of an operation identifier is just an ordinary procedure.
+The difference between a normal type of procedure identifier and an
+infix operator is only concered with the syntax used to define it and
+the syntax used to invoke it. The actual object associated with the
+identifier is just an ordinary Pop-11 procedure.
+
+Using NONOP, a new value may be assigned to an infix operator
+identifier. E.g.
+
+    conspair -> nonop sumsq;
+
+    3 sumsq 4 =>
+    ** [3|4]
+
+If an operation identifier is preceded by NONOP it then behaves like an
+ordinary identifier. See HELP *OPERATION, *NONOP
+
+Only a procedure may be assigned to an operation identifier so there
+need be no run-time checking that SUMSQ has a procedure value, as there
+is with ordinary procedure names.
+
+e.g. trying to assign a non-procedure produces a mishap:
+
+    [the cat] -> nonop sumsq;
+    ;;; MISHAP - ASSIGNING NON-PROCEDURE TO PROCEDURE IDENTIFIER
+    ;;; INVOLVING:  [the cat] sumsq
+
+
+-- Formats for defining operation identifiers -------------------------
+
+The recommended syntax for the header-line of an infix operation with
+two arguments and no result variables is:
+
+    define <precedence> <argument1> <name> <argument2>;
+
+For example:
+
+    define 4 x foo y;
+
+This defines FOO to be an infix operation of precedence 4 with two
+arguments X and Y and no result variables.
+
+Result variables are specified as for normal procedures, for example:
+
+    define 4 x foo y -> z;
+
+It is possible to define 'infix' operations with one or no arguments
+(strictly, these should be called unary and nonary procedures). For
+example:
+
+    define 4 foo x;       ;;; one argument
+    define 4 foo;         ;;; no arguments
+
+Be careful with nonary procedures. A call of a nonary procedure looks
+just like a variable access.
+
+
+-- Macros -------------------------------------------------------------
+
+A procedure identifier may be declared to be of type macro, as in
+
+    define macro cube x;
+        x, "*", x , "*", x
+    enddefine;
+
+When the word "cube" defined in that way is read by the POP-11
+compiler, whether inside a procedure definition or at top level, the
+procedure is run immediately.
+
+It reads one more item (e.g. a word or number) from the input text
+stream assigns it to x, then creates a new expression of the form
+
+     x * x * x
+
+which is then read by the compiler. So typing
+
+    cube 55
+
+anywhere is exactly equivalent to typing
+
+    55 * 55 * 55
+
+e.g.
+
+    vars xx = cube 55;
+    xx =>
+    ** 166375
+
+This may be more efficient than defining a procedure cube, as the
+multiplication instructions are "planted inline" wherever "cube" is
+used, avoiding the overhead of invoking an extra procedure to do the
+multiplication.
+
+Macros can also do things that cannot be done using procedures. For an
+example see the macro SWAP defined in HELP * MACROS.
+
+A macro can have more than one argument. It will read in as many items
+from the program input stream as it has arguments.
+
+
+-- -- Warning to Lisp experts
+
+Macro procedures are evaluated at compile time (ie when read in by the
+compiler). Their arguments (if they have any) are bound to the following
+text items, not to expressions (as LISP users might expect). So because
+CUBE has one argument, the expressions
+
+    cube 7
+or
+    cube x
+
+will work, but not
+
+    cube hd(x)
+or
+    cube (a + b)
+
+Since in this case CUBE would get "(" as the value of X, producing the
+nonsensical program text
+    ( * ( * ( a + b
+
+When a macro identifier is read by *ITEMREAD the procedure it names is
+run immediately. The procedure can read in and re-arrange the compiler
+input stream *PROGLIST. This may be useful for defining syntactic
+extensions to the language, so that complex constructs may be expressed
+simply. For a complex library macro extending the syntax of POP-11 in a
+useful way, see LIB * SWITCHON, documented in HELP *SWITCHON
+
+Because they are run when read by ITEMREAD macros themselves are never
+seen by the compiler. The effect can be disabled if they are preceded by
+NONMAC. See HELP *MACRO, *NONMAC.
+
+    nonmac cube =>
+    ** <procedure cube>
+
+The recommended syntax for the header-line of a macro procedure is:
+
+    define macro <name> <argument1> <argument2> ...;
+
+Notice that the arguments are NOT separated by commas or put in
+parentheses. Result variables (if any) are specified as for normal
+procedures though it is unusual for macros to have result variables.
+Usually macros have many results, that is they leave many things on the
+stack. These are spliced into the input stream to the compiler in place
+of the macro call, i.e. they are added to the front of PROGLIST.
+
+REF * PROGLIST explains the role of PROGLIST and macros etc. during
+compilation.
+
+
+-- Syntax Procedures --------------------------------------------------
+
+The recommended form for the header-line of a syntax procedure is:
+
+    define syntax <name>;
+
+Syntax procedures should have neither arguments nor results. They achieve
+their effects by calling compiler routines to plant machine language
+instructions.
+
+Like macros, syntax procedures are executed at compile time. System
+syntax words, such as *IF, DEFINE, *UNTIL correspond to syntax
+procedures.
+
+    define syntax foo;
+        <action>
+    enddefine;
+
+    define syntax 5 foo;
+        <action>
+    enddefine;
+
+Each of these defines "foo" as a syntax word, the latter as a syntax
+operator of precedence 5.
+
+When syntax words have a precedence this is used in parsing the input
+stream during compilation. E.g "(" is a syntax word of precdence -1,
+"->" a syntax word of precedence 11. See HELP * IDENTPROPS
+
+When a syntax identifier is read by the compiler, the procedure it names
+is run immediately. Normally this will call code-planting procedures of
+the kinds defined in REF * VMCODE to compile an expression, or
+expression sequence, or perform declarations, etc. ITEMREAD does not run
+syntax procedures itself. Closing brackets can be declared as syntax
+identifiers, in order that they may trigger syntax checking.
+
+For an example of the definition of a new syntax word for looping over
+items in the POP-11 database, see LIB * FOREACH, documented in
+HELP *FOREACH
+
+See HELP * SYSWORDS for some built in sytax words.
+
+
+-- Active variables ---------------------------------------------------
+
+Active identifiers are associated with procedures which are run when
+the identifiers are accessed or updated. Each has a multiplicity, an
+integer N specifying how many values the active variable can store.
+N defaults to 1 if not specified. The activation of the procedure is
+suppressed if the identifier is preceded by NONACTIVE.
+
+    See HELP * ACTIVE_VARIABLES for details
+
+
+-- WITH_PROPS and WITH_NARGS ------------------------------------------
+
+The main procedure heading can end (after output locals and before the
+semi colon) with either or both of WITH_PROPS or WITH_NARGS
+specifications.
+
+    define ....... with_props foo;
+
+indicates that the word "foo" should be assigned to the PDPROPS of the
+procedure rather than the normal name.
+    See HELP *WITH_PROPS
+
+    define ...... with_nargs <integer>;
+
+Indicates that the integer should be assigned to the PDNARGS of the
+procedure rather than the default number suggested by the number of
+formal input parameters specified in the definition.
+    See HELP *WITH_NARGS.
+
+
+-- Nested procedure definitions ---------------------------------------
+
+Procedure definitions may be nested within other procedure definitions
+or within anonymous procedures defined by PROCEDURE ... ENDPROCEDURE. In
+either case the name of the procedure will be a local identifier. It may
+be lexical or non-lexical, depending on the type specifications used.
+
+It is often convenient to redefine the interrupt procedure *INTERRUPT,
+or the procedure that prints error messages *PRMISHAP as local
+procedures, so that in certain contexts they will not have their normal
+effects. An example of a procedure that re-defines INTERRUPT can be
+found in LIB * POPREADY, documented in HELP *POPREADY
+
+
+-- Making the procedure name a lexical identifier ---------------------
+
+The name may be declared as lexical or non-lexical, the default being
+non-lexical. See HELP *LEXICAL and REF * IDENT. To indicate that a
+lexical identifier is required, follow "define" with one of
+
+    lvars       -   a lexical variable: may be re-assigned
+    lconstant   -   a lexical constant: may not be re-assigned
+
+E.g.
+    define lvars proc(a,b) -> c;
+    define lconstant proc(a,b);
+
+If procedure names defined in a file are declared as lexical, then they
+cannot be accessed except by programs in the same file. This is useful
+for preventing unintended interactions without using *SECTIONS.
+
+
+-- Making the procedure name global to sections -----------------------
+
+If it is required that the procedure should be acessible in all sections
+below the one in which it is being defined (or to which it is exported)
+then the name should be declared as a global identifier. (This is
+meaningless if it is made lexical.)
+
+E.g.
+    define global foo(a,b)
+
+    define global vars foo(a,b)
+
+    global vars foo;
+
+followed later by:
+
+    define foo ....
+
+
+-- Making a procedure name a procedure identifier ---------------------
+
+If foo is an ordinary identifier whose value is a procedure, then an
+instruction to run foo (for instance in another procedure definition)
+compiles into machine code operations that include a check to ensure
+that the value really is a procedure, in case something else has been
+assigned to the identifier. This will detect errors like this.
+
+    define foo(list);
+        lvars list;
+
+        hd(tl(list))
+
+    enddefine;
+
+    define test(list);
+        lvars list;
+        foo(list)
+    enddefine;
+
+    test([a b c]) =>
+    ** b
+
+    999 -> foo;
+
+    test([a b c])=>
+    ;;; MISHAP - ENP: EXECUTING NON-PROCEDURE
+    ;;; INVOLVING:  999
+    ;;; DOING    :  mishap test compile
+
+This "run-time" procedure check can slow programs down. In order to
+avoid it, users can declare certain identifiers to be of type procedure,
+so that the check is done only when a value is assigned to the
+identifier, not when the procdure is run. There are two formats for such
+a declaration.
+
+    vars procedure foo;
+or
+
+    define procedure foo(list);
+        lvars list;
+        hd(tl(list))
+    enddefine;
+
+    define test(list);
+        lvars list;
+        foo(list)
+    enddefine;
+
+    test([a b c]) =>
+    ** b
+
+So far as before. But now
+    999 -> foo;
+    ;;; MISHAP - ASSIGNING NON-PROCEDURE TO PROCEDURE IDENTIFIER
+    ;;; INVOLVING:  999 foo
+    ;;; DOING    :  mishap compile ...
+
+For more on the use of procedure identifiers, see HELP *EFFICIENCY.
+
+Constants and lexical identifiers may also be declared to be of type
+procedure, as in
+
+    define constant procedure foo(...)
+    define lvars procedure foo(...)
+    define lconstant procedure foo(...)
+
+Infix operations, macro names, syntax words, and active identifiers, are
+automatically of type procedure.
+
+Once an identifier has been declared to be of type procedure it cannot
+be re-declared not to be, e.g. using VARS. This is because non-checking
+invocations of the value may already have been compiled, and redefining
+it so as to allow a different type of value will cause problems when
+that compiled code is run.
+
+Before re-defining such a procedure you will either have to leave Pop-11
+and start again, or else first CANCEL the identifier. See HELP * CANCEL
+
+
+-- Making a procedure name a constant ---------------------------------
+
+A procedure identifier may be declared to be a constant. This will save
+an indirection in the procedure call, with a slight speed advantage.
+However, it will not then be possible to trace the procedure.
+
+If a procedure identifier is made a constant, then if it is redefined
+ALL procedure definitions in which it is invoked will have to be
+re-compiled in order to access the new procedure.
+
+Format:
+    constant foo;
+    lconstant foo;
+    define constant foo;
+    define constant procedure foo;
+    define lconstant foo;
+
+-- -- compile_mode
+
+See HELP * COMPILE_MODE for information on how to specify that all
+procedure names are automatically declared to be of type "procedure",
+or all of type "constant".
+
+
+-- Declaring local variables ------------------------------------------
+
+As already indicated, input and output parameters default to non-lexical
+local variables. (Up to Poplog Version 15).
+
+This default can be over-ridden by declaring them locally as lexical,
+using LVARS or DLVARS, often with a gain in efficiency.
+
+However, if a variable X is declared as a lexical local of PROC then no
+procedure defined outside the textual scope of the definition of PROC
+can access X. This means that variables like CUCHAROUT, PRMISHAP,
+POPPROMPT, which may have to be accessible by other procedures must not
+be declared lexical locals. They can be localised using "dlocal", as
+described in HELP * DLOCAL.
+
+Generally local loop counters and other temporary information stores can
+be made lexical locals. The full semantics of lexical identifiers is
+explained in detail in REF *VMCODE in the section on 'Implementation of
+Lexical Scoping'. That is likely to be too advanced for most readers.
+See also HELP * LVARS, HELP * LEXICAL
+
+
+-- Restrictions on the use of lexical locals ------------------------
+
+- Their values cannot be accessed during a break, e.g. if *POPREADY is
+    called.
+    (Mechanisms may be provided to overcome this later. See
+        HELP * DEBUGGER )
+
+- Their values cannot be accessed or updated via calls of VALOF.
+    E.g. if W is a variable of any kind whose value is the word
+    "popprompt" then
+        valof(w)
+    can always be used to access or update the value of "popprompt", a
+    non-lexical POP-11 identifier. E.g.
+        vars promptword;
+        "popprompt" -> promptword;
+        ** :
+        'More : ' -> valof(promptword); valof(promptword) =>
+        ** More :
+
+    In general this sort of thing is not possible with lexical
+    variables.
+
+- Lexical variables previously could not be used as settable pattern
+    variables with MATCHES and procedures that invoke MATCHES, for
+    example PRESENT, LOOKUP, REMOVE, FOREACH.
+    See HELP *MATCHES, HELP *DATABASE
+
+    However, since Poplog Version 15.0 a change has been available via
+    the operator "!" (at Birmingham) which can be used as a pattern
+    prefix to overcome these problems. See HELP * READPATTERN
+
+    Previously lexical identifiers could occur after "^" and "^^" in
+    lists, but not after "?" and "??", which prefix settable variables.
+    However if "!" occurs to the left of the pattern this restriction
+    is overcome.
+
+For more on this see TEACH * VARS_AND_LVARS
+
+
+-- Extending the define ... enddefine syntax, using define_form -------
+
+It is possible for users to specify extensions to the syntax:
+
+    define ... enddefine
+
+in order to use a format like
+
+    define :myproctype .... enddefine
+
+Doing this first involves introducing the keyword "define_myproctype" as
+the name of a new form, as described in HELP * DEFINE_FORM. This would
+be introduced via the syntax form:
+
+    define :define_form myproctype ...
+
+The help file explains the generic mechanism. It is used to specify
+several define_forms used in the Poplog libraries, e.g.
+
+    define :for_extension       (HELP * FOR_FORM)
+    define :inline              (HELP * INLINE)
+    define :prolog              (HELP * DEFINE_PROLOG)
+    define :runtime_action      (LIB  * DEFINE_RUNTIME_ACTION)
+        See REF * sys_runtime_apply
+    define :ved_runtime_action  (LIB  * DEFINE_VED_RUNTIME_ACTION)
+        See REF * ved_runtime_apply
+
+The following may be available in your Poplog library
+
+    define :class           (HELP * OBJECTCLASS)
+    define :ruleset         (HELP * POPRULEBASE (supersedes NEWPSYS))
+
+
+-- Alternative formats for procedure definitions ----------------------
+
+For reasons of compatibility with earlier POP11 or POP2 systems, there
+are several formats for defining procedures. Some of the older formats
+may eventually be phased out. The recommended form for the header-line
+of a normal procedure with no results is:
+
+    define foo(<argument-list>);
+
+The argument-list is a sequence of variable names separated by commas,
+for example:
+
+    define foo(x, y, z);
+
+The arguments are automatically declared as local variables of the
+procedure.
+
+
+-- Archaic forms ------------------------------------------------------
+
+POP-11 has several archaic forms of header-line maintained for
+compatibility with older dialects of POP (such as POP-2, POP-10, WPOP).
+
+It is not necessary to put any commas or parentheses in the header-line of
+the archaic form of a normal procedure. That is:
+
+    define foo x y;
+
+is equivalent to:
+
+    define foo(x, y);
+
+Similarly,
+
+    define foo x y => z;
+
+has two arguments and produces one result;
+
+
+-- LIB POP2 -----------------------------------------------------------
+Makes available some syntactic forms and procedures that were previously
+available in POP2.
+
+In particular, after the library has been loaded, the word FUNCTION may
+be substitued for DEFINE and the word END may be substituted for
+ENDDEFINE. See HELP *POP2.
+
+-- Archaic form for output locals -------------------------------------
+
+The symbol '=>' may be used in place of '->' in the specification of
+result variables. Also, if there are several result variables and they
+are separated by commas or spaces then they are stacked in the order
+given. That is:
+
+    define foo() -> (x, y);
+
+is equivalent to:
+
+    define foo() => y, x;
+or
+    define foo => x y;
+
+
+-- RELATED DOCUMENTATION ----------------------------------------------
+
+The following HELP files provide more information on procedures and
+procedure definitions.
+
+*OPERATION, *MACRO, *SYNTAX,
+    - types of procedure identifiers
+*UPDATER, *UPDATEROF
+    - on the form and use of procedure updaters
+*PROCEDURE
+    - for use of POP-11 syntax words PROCEDURE ... ENDPROCEDURE
+*PDPROPS
+    - information associated with the procedure
+*PDNARGS
+    - the number of arguments required
+*DLOCAL
+    - local variables and dynamically local expressions
+*VARS,
+    - Use and declaration of dynamically scoped variables
+*LVARS, *LEXICAL REF *SYNTAX/lconstant
+    - for use and declaration of lexically scoped variables and
+      constants
+*CONSTANT,  REF * SYNTAX/lconstant
+    - use of constant identifiers
+
+See also:
+
+REF * PROCEDURE for information about the form of procedure records and
+procedures which operate on procedures.
+
+TEACH * PRIMER
+
+Some more advanced features for controlling the mode of compilation.
+    REF * POPCOMPILE/pop11_define_declare
+    HELP * COMPILE_MODE
+
+
+Original file:
+  --- C.all/help/define ----------------------------------------------
+  --- Copyright University of Sussex 1987. All rights reserved. ------
+
+--- $poplocal/local/help/define
+--- Copyright University of Birmingham 1997. All rights reserved. ------

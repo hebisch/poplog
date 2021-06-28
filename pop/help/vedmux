@@ -1,0 +1,144 @@
+HELP VEDMUX                                        R.Evans December 1986
+
+LIB VEDMUX provides an interface between LIB *MUX and VED. It redefines
+RAWCHARIN to monitor a variety of other (user definable) input channels
+as well as the keyboard. This allows POPLOG to deal with data from
+another source asynchronously to (apparently in parallel with) normal
+VED keyboard interaction. See, for example, LIB VSH.
+
+See also *MUX *VSH
+
+NB: LIB VEDMUX is supported only on Unix systems which provide the
+    BSD 4.2 version of select(2). Loading the library on other systems
+    will cause a mishap.
+
+[This and related bsd facilities referred to below are unsupported, and
+therefore included in the $usepop/pop/lib/lib/ directory.
+    See DOC * SYSSPEC.
+
+It is therefore necessary to compile VEDMUX explicitly e.g. with one of
+the following commands
+    uses vedmux
+    lib vedmux
+The latter will print a warning message.
+
+It is hoped that although the facility is unsupported it will serve as
+a useful programming example.]
+
+-- <enter> MUX --------------------------------------------------------
+
+The command <enter> mux (or equivalently a call to the procedure
+ved_mux) turns on multiplexing of VED keyboard input with other input
+sources (it does nothing if multiplexing is already turned on). To the
+user, it apparently does nothing, except that there might be a very
+slight slow-down in VED's response to keys. The user can continue
+editing as normal. However, when multiplexing is on, other sources of
+input can also be monitored, so that if data arrives between keystrokes,
+they can be dealt with on the spot.
+
+
+-- <enter> NOMUX ------------------------------------------------------
+
+The command <enter> nomux (or equivalently a call to the procedure
+ved_nomux) turns multiplexing off. It does nothing if multiplexing if
+already off.
+
+
+-- Adding New Input Sources -------------------------------------------
+
+VEDMUX uses lib MUX, and in particular the procedure MUX_ENTRY to define
+input sources other than the keyboard. An input source is simply a
+device opened for reading (as returned by *SYSOPEN, *SYSPIPE or
+*PTYFORK). To multiplex on such a source, one assigns a procedure to the
+MUX_ENTRY for the device, thus:
+
+    myproc -> mux_entry(d);
+
+The procedure is called (inside RAWCHARIN) with no arguments, whenever
+input is available on the specified device. When it returns, the system
+continues waiting for keyboard input or one of the other input sources.
+When input arrives from the keyboard, it is returned to VED which
+normally processes it, and then invokes RAWCHARIN again, at which point
+monitoring of all input sources resumes.
+
+To disable a particular input source, d, do the following:
+
+    false -> mux_entry(d);
+
+If you want your input handling procedure to return characters to VED
+(as though they had been typed at the keyboard), you can do this by
+assigning to the variable MUX_CHAR, which is the value returned by
+RAWCHARIN. Note you can only return one character at a time.
+
+-- An Example ---------------------------------------------------------
+
+As a relatively simple example, the following routines define a command
+<enter> du which puts the output of the Unix 'du' command into a
+temporary file. Because output is asynchronous, the command just creates
+the buffer and then return. you can carry on editing and when the 'du'
+output is available it gets put into your buffer for you.
+
+This command tends to produce all its output in one go - for a more
+interactive application, see LIB VSH.
+
+
+    uses vedmux
+    vars buff = inits(512);     /* a buffer for reading input from DU */
+
+    /* the procedure to handle DU output when it arrives */
+    define show_output(dev);
+        lvars old n;
+        /* save the current ved buffer */
+        vedcurrentfile -> old;
+        /* read in all the data available on data source */
+        repeat;
+            sysread(dev,buff,512) -> n;
+            if n == 0 then
+                /* end of file - must have finished */
+                syswait();  /* wait for child to die */
+                /* turn of multplexing on this device, then close it */
+                false -> mux_entry(dev);
+                sysclose(dev);
+                quitloop();
+            else
+                /* more data put it into temporary buffer */
+                vedselect('du.tmp');
+                vedendfile();
+                vedinsertstring(substring(1,n,buff));
+                /* if we didn't fill the buffer, there's no more ready yet
+                   so return control to VED */
+                quitif(n /== 512);
+            endif;
+        endrepeat;
+        /* go back to old buffer before returning to VED */             
+        vedselect(old);
+    enddefine;
+
+    /* the DU command itself */
+    define ved_du;
+        lvars p_in p_out old;
+        /* create a pipe to return the DU output through */
+        syspipe(true) -> p_in -> p_out;
+
+        /* fork a child and execute the'DU' command in it */
+        unless sysfork() then
+            sysclose(p_in);
+            p_out -> popdevout;
+            sysexecute('/bin/du',['du'],false);
+            sysexit();
+        endunless;
+
+        /* close the child's end of the pipe (or it will never die!) */
+        sysclose(p_out);
+        /* set up input handler in multiplexer table */
+        show_output(%p_in%) -> mux_entry(p_in);
+        /* create the output buffer, then come back */
+        vedcurrentfile -> old;
+        vededitor(vedhelpdefaults,'du.tmp');
+        vedselect(old);
+        /* turn on multiplexing */
+        ved_mux();
+    enddefine;
+
+--- C.unix/help/vedmux
+--- Copyright University of Sussex 1992. All rights reserved. ----------

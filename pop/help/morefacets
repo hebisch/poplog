@@ -1,0 +1,320 @@
+HELP MOREFACETS                                           R. Evans, June 1983
+
+This help file describes the full range of features offered in LIB FACETS.
+Note, however, that I assume the reader to be familiar with the basic HELP
+*FACETS file; i.e. the basic notion of FACETS and their use will not be
+described here. In particular, this file describes LIB FACETS as a
+free-standing system, rather than as a 'bolt on' extra for LIB GRAMMAR.
+
+The main difference between FACETS as described here and the FACETS in
+HELP FACETS is that here the semantic rules are considered as independent of
+any grammar. The DEFGRAM and DEFLEX macros described in HELP FACETS
+serve to bind semantic rules to particular grammatical or lexical rules in
+LIB GRAMMAR, but the more general semantic rules are not explicitly bound to
+anything. How then are they activated? In the LIB GRAMMAR application
+semantic rules are run when a program needs to work out the value of a facet
+for a particular parse tree. So typically a call might be
+
+    colour(subject)
+
+Here COLOUR is a facet and SUBJECT is a variable which contains a parse
+tree, probably for a noun phrase. In fact, using LIB GRAMMAR, the tree might
+be
+    [np [det the]
+        [snp [adj brown]
+        [noun dog] ] ]
+
+The important point is that the FACETS package uses a parse tree which looks
+something like this one whenever it tries to work out a facet value. A
+particular semantic rule is used only if it matches the parse tree given. So
+for example there might be a rule for finding the COLOUR facet of an NP
+which says:
+
+    "if the tree is [np [det ... ] [snp ...]] then the answer is whatever
+     the COLOUR facet of the [snp ...] bit is"
+
+Another rule might say:
+
+    "if the tree is [snp [adj ...] ...] then the colour is whatever the
+     COLOUR facet of the [adj ...] bit is"
+
+And finally a third might say:
+
+    "if the tree is [adj ...] and the ... bit is a colour, then that colour
+     is the value of the COLOUR facet."
+
+To find the colour of the noun phrase above, the first rule would be used,
+but what it effectively says is "try the second rule on this bit of the tree"
+and what the second one says is "try the third rule on this bit of the tree".
+The third rule knows how to get the actual answer!
+
+If you are familiar with MATCHES (see HELP *MATCHES) then you might guess that
+the first bit of all these rules can be done in POP-11 using MATCHES and a
+pattern. If we have a parse tree called SUBJECT then the test "if the tree
+is [np [det ... ] [snp ... ]]" would look like:
+
+    if subject matches [np [det ==] [snp ==]] then ...
+
+All the semantic rules have to do a test like this to decide whether they
+should be used. In the HELP FACETS version, the pattern is provided
+automatically - it is based on the grammar rule to which the semantic rule is
+attached. In the free-standing FACETS system you have to provide the pattern
+yourself. The only other extra thing you have to provide is a name for each
+rule. This is the name to use for tracing the facet rule (using FTRACE - see
+HELP *FACETS) and if there is a mishap while one of the rules is in use, then
+its name is printed out in the 'DOING' part of the mishap message to help you
+trace the problem.
+
+So free-standing semantic rules look like this:
+
+    semrule rulename pattern
+           .
+           .
+        rule_body
+           .
+           .
+    endsemrule;
+
+'rulename'  is the name of the rule - a single word.
+'pattern'   is the pattern used for matching with parse trees, the rule
+            will only be used if the tree matches the pattern. You can use
+            all the usual things in the pattern (?x,??x,=,== etc) and any
+            'query' variables (ie ?x or ??x) can be used in the body of
+            the rule (they are local variables in the rule).
+'rule_body' is the POP-11 code, just as in the LIB GRAMMAR semantic rules.
+
+-- AN EXAMPLE ---------------------------------------------------------------
+
+The three rules we saw in English above would come out like this:
+
+    semrule nprule  [np [det ==]  ?x ]
+        ;;; x is the 'snp bit'
+        colour(x) -> colour(self);
+    endsemrule;
+
+(Remember 'self' from HELP FACETS. Alternatively, we could have written
+ x gives colour; )
+
+    semrule snprule [snp ?adj ==]
+        colour(adj) -> colour(self);
+    endsemrule;
+
+    semrule adjrule [adj ?word]
+        if isacolour(word) then
+            word -> colour(self);
+        else
+            ;;; what should we do if the adjective isn't a colour?
+        endif;
+    endsemrule;
+
+The rules given in this example are dangerously incomplete - what if, in
+the first rule, X is not a parse tree for an SNP? What SHOULD we do if the
+ADJ is not a colour?  In a few moments we shall discuss some extra features
+which help to answer these questions. First, however, we need to think about
+how semantic rules are loaded and used.
+
+-- Loading Semantic rules ---------------------------------------------------
+
+It is easy to tell POP-11 about a semantic rule - you just type it in or load
+it from a file. But suppose there are two rules which could be used on some
+tree (because both their patterns fit), or suppose you load a rule twice
+(perhaps accidentally or because you have corrected an error). What happens?
+The answer to the first question is easy - the rules are loaded in a
+particular order, and that is the order in which they are tried. The FIRST one
+whose pattern matches the tree being processed will be run, any others will be
+ignored (BUT - see TRY_NEXT_RULE and USEDFOR below). This suggests an
+unsatisfactory answer to the second question. If you reload a rule, it will be
+the first version which takes precedence. To cope with this there is a
+procedure which you can call which causes the FACETS system to forget ALL its
+current rules. Just do
+
+    resetFACETS();
+
+Then you can reload the new versions of all your semantic rules.
+
+-- Using Semantic Rules -----------------------------------------------------
+
+The rules are used in the same way as in HELP FACETS, when a program asks for
+a facet value to be calculated. Note that the argument provided in the call
+(eg SUBJECT in "colour(subject)" ) must be a parse tree which will match
+against the patterns you have provided - maybe generated by LIB GRAMMAR or by
+some other parser etc. If none of the patterns matches it then a mishap will
+be generated ('No interpretation rule given for tree').
+
+The FACETS system remembers all the trees and facet values you ever ask it to
+work out (so that it doesn't have to work them out again if they are asked
+for). However it is quite likely that you will know when in your program you
+have completely finished with all the data currently held (for example, if you
+keep inputting sentences and processing them, then every time you get a new
+one you might want to forget about the old one). The system provides a
+procedure to let you forget all the information stored for a facet. Just do:
+
+    clearfacet(colour);
+
+and all the COLOUR information currently stored is lost. (The semantic rules
+themselves are not affected by this procedure.)
+
+-- ADDITIONAL FEATURES ------------------------------------------------------
+
+USEDFOR - Immediately following the pattern in a rule (or at the very beginning
+of a rule when using DEFGRAM etc) you can put a statement
+
+    usedfor <procedure name>
+or
+    usedfor [ <list of facets> ]
+
+If you do this, you are providing an extra test for the applicability of the
+rule. In the first case, the procedure given is run with one argument, the
+facet being calculated, and it should return true or false according to
+whether the rule is to be used. In the second case, if the facet is a member
+of the list given then the rule may be used, otherwise not. In both cases, if
+the test succeeds, the tree must match the pattern AS WELL. NOTE: it is the
+NAME of the facet (i.e. a word) not the facet itself (a procedure) which is
+passed to any testing procedure.
+
+TRY_NEXT_RULE - Normally, once the tests for a semantic rule have succeeded
+you are committed to that rule. If, however, you put
+
+    try_next_rule
+
+in the body of the rule, when it is encountered the rule will be finished as
+though the tests had failed and the search for another suitable rule will
+continue. Note: TRY_NEXT_RULE might cause slightly confusing trace messages
+since two messages will be printed for one tree/facet pair and the indentation
+might go wrong.
+
+CATEGORY - The category macro makes it easier to define and test for syntactic
+categories. It looks like a 'vars' statement, but instead of declaring its
+arguments as variables, it defines testing procedures for parse trees. If you
+do
+
+    category verb, np, vp;
+
+then CATEGORY defines procedures 'isverb', 'isnp' and 'isvp'. These test a
+parse tree to see if it is of the appropriate category. Thus ISVERB(X) tests
+whether X is [verb ... ], ISNP(X) tests whether X is [np ... ] etc. These are
+particularly useful in pattern tests.
+
+LITERAL - The literal macro is just like the category macro, except the test
+procedures it defines merely test for the presence of the specified word. So
+if you do
+
+    literal foo;
+
+it is as though you had done:
+
+    define isfoo(X);
+        X == "foo";
+    enddefine;
+
+This test is appropriate for literal words in patterns, rather than
+categories. Normally, of course, you would just use the word itself in a
+pattern, but the literal macro does have one important application for use
+with DEFGRAM. Since DEFGRAM builds its own patterns and puts restriction
+procedures on everything, there is no way of putting a literal word into a
+pattern. The restriction procedures used by DEFGRAM default to  CATEGORY
+procedures, but if you specify them as LITERAL (or anything else!) the default
+is overridden; so without LITERAL, a rule like
+
+    [s  [if s then s] semrule ... endsemrule]
+
+would need 'if' and 'then' to be categories, but the stipulation
+
+    literal if then;
+
+will correct this.
+
+FACET - This is described in HELP FACETS. It is necessary to declare all
+variables which are used as FACETS with a statement like
+
+    facet colour, gender;
+
+ISFACET - This procedure is provided to test for FACETS - returns true or
+false.
+
+IS, GIVES - Two operators are provided to make assignment of facet values in
+rules a bit easier:
+
+    FACET is VAL;          ;;; is equivalent to  VAL -> FACET(self);
+
+    CAT gives FACET;       ;;; is equivalent to  FACET(CAT) -> FACET(self);
+
+-- PACKETS ------------------------------------------------------------------
+
+An additional feature provided by LIB FACETS allows you to have several
+different sets of facet rules for different purposes; thus, for example, you
+may have a special set of rules for analysing noun-phrases. It is more
+efficient to keep these separarately from, say, sentence rules, since less
+rule searching is involved for a facet if you only have to look through half
+the rules. LIB FACETS provided this facility by using the PACKET/ENDPACKET
+brackets. In outline these are used as follows:
+
+    packet foo;
+        <pop11 code>
+    endpacket;
+
+FOO is the name of the packet, and is also automatically declared as a
+variable (in fact, the variable used to store the rules for the packet).
+Inside the brackets, any semantic rules declared are added to the list for the
+packet ONLY, and it is only rules in this list which are used for facet
+evaluation (inside the brackets). You can go in and out of packets as much as
+you like in a program; typically
+
+    packet foo;
+        ... load semantic rules for foo
+    endpacket;
+
+    packet baz;
+        ... load semantic rules for baz
+    endpacket;
+
+    etc.
+
+and at other points in the program you would re-enter the packet to evaluate,
+using its rules:
+
+    packet foo;
+        referent(np1) -> subject(s);
+    endpacket;
+
+or even:
+
+    [^(packet foo; referent(np1) endpacket)
+     ^^(packet baz; meaning(vp1) endpacket)] -> meaning(s);
+
+-- THE EXAMPLE REVISITED ----------------------------------------------------
+
+Now we can put right some of the problems we had in our earlier example. A
+better version would be:
+
+    category np, snp, det, adj, noun;   ;;; now we can use isnp, issnp etc
+
+    semrule nprule  [np [det ==]  ?x ]
+        ;;; x is the 'snp bit'
+        colour(x) -> colour(self);
+    endsemrule;
+
+
+    semrule snprule [snp ?adj ==]
+        colour(adj) -> colour(self);
+    endsemrule;
+
+    semrule adjrule [adj ?word]
+        word -> colour(self);
+    endsemrule;
+
+An alternative to the last rule:
+
+    semrule adjrule [adj ?word]
+        ;;; we must write isacolour ourselves
+        if  isacolour(word) then
+            word -> colour(self);
+        else
+            try_next_rule
+        endif;
+    endsemrule;
+
+See also
+HELP *FACETS   - for a more basic explanation of the FACETS package
+HELP *GRAMMAR  - for references to GRAMMAR packages
+TEACH *GRAMMAR - for an introduction to LIB GRAMMAR

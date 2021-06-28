@@ -1,0 +1,114 @@
+HELP PDNARGS                             Jonathan Laventhol, 13 May 1985
+                                             Updated: A.Sloman, Nov 1990
+                                        Updated: Adrian Howard, Sep 1992
+
+    pdnargs(P) -> INT
+    INT -> pdnargs(P)
+
+This procedure returns (or updates) information about the number of
+arguments INT expected by the procedure P which is its argument.  If the
+procedure was created using "define", then this is the number of
+arguments given in its definition. For example:
+
+    define foo(a, b, c);
+    enddefine;
+
+    pdnargs(foo) =>
+    ** 3
+
+Note:  Normally, the -pdnargs- of a procedure is the number of items it
+will remove from the stack.  But some procedures do explicit
+manipulation of the stack, and the number returned by -pdnargs- may
+therefore be  misleading. In particular, some procedures take a variable
+number of arguments (for example, -printf-, -newarray-, -consvector-).
+These procedures still have a fixed -pdnargs-, which is the number of
+formal arguments in their definition.  This will be the minimum number
+of arguments that they take.
+
+
+-- CLOSURES -----------------------------------------------------------
+
+If the argument procedure is a closure, then the result is the number of
+arguments of the base procedure minus the number of frozen values (see
+HELP *CLOSURES, *PARTAPPLY). For example:
+
+    vars new_foo = foo(% [hello] %);
+    pdnargs(new_foo) =>
+    ** 2
+
+Note: Closures of procedures which take a variable number of arguments
+may have a -pdnargs- that doesn't correspond to actual usage. E.g:
+
+    vars make_a = consstring(%`\A`, 1%);
+
+assigns to -make_a- a procedure of 0 arguments that creates a string
+containing only the character `A` whenever it is called. However,
+
+    pdnargs(make_a) =>
+    ** -1
+
+The -pdnargs- of a closure is defined to be
+
+    pdnargs(pdpart(closure)) - datalength(closure)
+    ;;; (See HELP *PDPART, HELP *DATALENGTH)
+
+Example: -consvector- takes a single argument, which is the number of
+items from the stack to make a vector out of.  So the -pdnargs- is 1.
+
+    vars maketriple;
+    consvector(% 3 %) -> maketriple;
+    pdnargs(maketriple) =>
+    ** 0
+
+But -maketriple- will remove three items from the stack.
+
+
+-- COMPOSITE PROCEDURES -----------------------------------------------
+
+The -pdnargs- of a composite procedure is simply defined as the
+-pdnargs- of the first procedure, so:
+
+    pdnargs(P1 <> P2) == pdnargs(P1)
+
+
+-- ARRAYS -------------------------------------------------------------
+
+If the procedure is an array, the number of arguments is the number of
+dimensions of the array. For example:
+
+    vars array = newarray([1 10], false);
+    pdnargs(array) =>
+    ** 1
+
+The above also applies to sparse arrays.
+
+
+-- PROPERTIES ---------------------------------------------------------
+
+The -pdnargs- of a property is always equal to 1. For example:
+
+    vars prop = newassoc([]);
+    pdnargs(prop)=>
+    ** 1
+
+
+-- RELATED DOCUMENTATION ----------------------------------------------
+
+See also:
+
+REF *PROCEDURE  --- for more detailed information on procedures and
+                    closures
+
+HELP *CLOSURES      --- the construction and use of closures
+HELP *ARRAYS        --- the construction and use of arrays
+HELP *PROPERTIES    --- the construction and use of properties
+HELP *PARTAPPLY     --- produces a closure of an existing procedure
+HELP *FROZVAL       --- accesses values frozen into procedure closures
+HELP *PDPROPS       --- stores information about a procedure (its name
+                        etc.)
+HELP *DATALENGTH    --- returns the number of elements in a data
+                        structure
+
+
+--- C.all/help/pdnargs
+--- Copyright University of Sussex 1992. All rights reserved. ----------

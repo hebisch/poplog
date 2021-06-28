@@ -1,0 +1,86 @@
+HELP PRMISHAP                                        Steven Hardy, March 1982
+
+    prmishap(<string>, <list of items>)
+
+This is a user-assignable procedure variable with default value *SYSPRMISHAP.
+The procedure it contains is used by *MISHAP to print a mishap message: it
+should be able to take the arguments that SYSPRMISHAP takes (see HELP
+*SYSPRMISHAP).
+
+By altering PRMISHAP, locally or globally, users can vary the format of
+error messages. In addition, by using procedures like *CHAIN, *EXITTO,
+*EXITFROM and *CHAINTO, PRMISHAP can be redefined to return to a higher
+level procedure, thus avoiding the call of *INTERRUPT.
+
+-- AN EXAMPLE ---------------------------------------------------------------
+
+Here is an example of the use of a locally redefined version of PRMISHAP.
+The procedure ISELEMENT takes an item and a list and returns true if the item
+is in the list, otherwise false. If the second argument is not a list, it
+should produce an error. The program uses SUB_ELEMENT to search down the list,
+comparing the item with successive *HD's. SUB_ELEMENT does not check that it is
+actually given a non-empty list, relying on HD to do that. HD calls the error
+procedure if it is given anything but a non-empty list. If the 'culprit' is
+the empty list, the error is trapped by the re-defined PRMISHAP, which chains
+back out of ISELEMENT, leaving FALSE on the stack to be the result of
+ISELEMENT. Otherwise an error message is produced.
+
+    define iselement(item,list);
+        ;;; re-define the error procedure locally
+        define prmishap(string,list);
+            if issubstring('NON-EMPTY LIST NEEDED',1,string) and list = [[]]
+            then
+                false;
+                exitfrom(iselement)
+            else sysprmishap(string,list)
+            endif;
+        enddefine;
+
+        sub_element(item,list)      ;;; this does the real work
+    enddefine;
+
+    define sub_element(item,list);
+        if hd(list) = item then true        ;;; HD could cause an error
+        else sub_element(item,tl(list))
+        endif
+    enddefine;
+
+    trace iselement,sub_element;
+
+    iselement(2, [1 2 3])=>
+    >iselement 2 [1 2 3]
+    !>sub_element 2 [1 2 3]
+    !!>sub_element 2 [2 3]
+    !!<sub_element <true>
+    !<sub_element <true>
+    <iselement <true>
+    ** <true>
+
+    iselement(4, [1 2 3]) =>
+    >iselement 4 [1 2 3]
+    !>sub_element 4 [1 2 3]
+    !!>sub_element 4 [2 3]
+    !!!>sub_element 4 [3]
+    !!!!>sub_element 4 []
+    <iselement <false>
+    ** <false>
+
+    iselement(4, 44) =>
+    >iselement 4 44
+    !>sub_element 4 44
+
+    ;;; MISHAP - LIST NEEDED
+    ;;; INVOLVING:  44
+    ;;; DOING    :  prmishap mishap sub_element iselement compile
+
+NOTE: The test 'if hd(list) = item' could not have been done in the reverse
+order. It is important that HD is called before ITEM is put on the stack for
+the equality test, so that if the error procedure causes EXITFROM to be called
+then the value of ITEM is not left on the stack.
+
+See HELP
+    *MISHAP      - POP-11 error procedures
+    *SYSPRMISHAP - prints error messages
+    *INTERRUPT   - On POP-11 interrupt procedures
+    *SETPOP      - Resets the POP-11 system
+    *POPSYSCALL  - controls inclusion in mishap messages of systems procedures

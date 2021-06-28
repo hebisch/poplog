@@ -1,0 +1,885 @@
+HELP V13_6.CHANGES                                     A.Sloman Oct 1988
+
+This file lists the main changes for POPLOG Version 13.6. This version
+is an intermediate release providing some new facililities, adaptation
+for SunOS V4.0 and VMS V5.0 and a range of bug fixes. The next major
+release will be Version 14 including an interface to X windows Version
+11, and other major new features.
+
+HELP * NEWS has the information presented below, but in chronological
+order, and in some cases with more detail. This file uses a more
+structured organisation.
+
+HELP * LISPNEWS and HELP * PLOGNEWS provide details for Prolog and
+Common Lisp. However, it should be noted that changes to POP-11 (e.g.
+new data types or new primitive operations on them) are available to
+users of Poplog Lisp or Prolog via calls to Pop-11.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Ports to new machines
+ -- Standard ML
+ -- Re-building Poplog
+ -- Access to operating system
+ -- Store Manager and Garbage Collector
+ -- External load and LIB EXTERNAL
+ -- Lisp Changes
+ -- Prolog Changes
+ -- Pop-11 syntax
+ -- New procedures, data-types, global variables, etc
+ -- Words, identifiers and sections
+ -- Documentation changes
+ -- Errors and tracing
+ -- New virtual machine instructions
+ -- VMS only
+ -- UNIX only
+ -- LIB FLAVOURS
+ -- Changes to the editor, VED
+ -- Poplog Window Manager (PWM)
+ -- KEATS - the knowledge engineering apprentice tool system
+ -- Miscellaneous
+ -- NOTE ON FILENAMES
+
+-- Ports to new machines ----------------------------------------------
+
+Poplog is now available on SUN-4 (SPARC)
+
+Poplog is now available on Sequent Symmetry computers (multiple 80386
+    machines running a version of Berkeley Unix).
+
+    Both provide the new "mmap" system call mentioned in conection
+    with SunOS-4. This allows saved images (e.g. prolog lisp) to be
+    shared between processes.
+
+    The port to Sun386i will shortly be complete.
+
+Poplog on MC68020 systems (i.e. Sun-3 and Bobcat) now uses the extended
+arithmetic facilities of that processor. This implies a general speedup
+in both simple and big integer multiplication and division operations.
+
+Poplog now runs on Orion 1/05 (Clipper processor plus Unix 4.2 Bsd),
+but is not a fully supported product. It is available only direct
+from Sussex University. Whether it becomes fully supported will
+depend on demand.
+
+-- Standard ML --------------------------------------------------------
+
+PML is an implementation of Standard ML version 1 that is available
+as an optional extra in Poplog. An implementation of the new standard
+may be available later.  The current version is being used in a number
+of computer science departments for teaching and research.
+
+If you need PML please consult your Poplog supplier or Sussex
+University. (See HELP * POPLOG)
+
+-- Re-building Poplog -------------------------------------------------
+
+For system administrators:-
+
+As a step towards the provision of a fully fledged "delivery" mechanism,
+the process of linking poplog has been changed. Instead of large numbers
+of object files the system comes with more compact object libraries.
+However, this change should make no difference to users.
+
+Anyone intended to re-link poplog is advised to examine the newpop
+command file (newpop.com on VMS) in the directory $usepop/pop/src
+
+Please also see the Poplog Installation Guide and the Poplog
+Administartor's Guide.
+
+-- Access to operating system -----------------------------------------
+
+A new general interrupt handling (signal handling) facility
+is now available, documented in REF *SIGNALS. The user can control the
+handling of most of the asynchronous interrupts ('signals' in Unix
+terminology) defined by the operating system (how many, and exactly
+which, varies from system to system - see REF *SIGNALS) and add new
+synchronous interrupts. Principal new procedures are:
+
+        sys_signal_handler  -   access to handler procedures for signals
+        sys_signal_flag     -   access to enable flags for signals
+        sys_raise_signal    -   invoking a signal handler
+        sys_signal_queue    -   queue of yet to be handled signals
+        sys_max_signal      -   largest currently defined signal
+
+A user library LIB SIGDEFS defines constants for the operating-
+system-defined signals available in the current system.
+
+A new library LIB SYSDEFS defines constants useful for identifying local
+system dependencies in #_IF control statements. (eg UNIX, VMS as used in
+#_IF DEF UNIX). See HELP *SYSDEFS, HELP *DEF
+
+New procedures -sys_file_move- and -sys_file_copy-. See REF *SYSUTIL
+
+Sun Poplog:- availability of new "mmap" system call in SunOS-4
+means that the constant parts of Poplog saved images created with
+-sys_lock_system- can be shared among all users (e.g. implies that most
+of the Common LISP and PROLOG images will be shared). This facility
+has been available on VMS for several years.
+
+This "mmap" facility is available on Sequent Poplog also.
+
+Three new active variables added to make it possible to access standard
+I/O channels more easily: -pop_charin_device- -pop_charout_device-
+-pop_charerr_device- See REF * SYSIO/pop_charin_device
+
+In the interests of greater flexibility (and in particular the
+requirements of a PWM for VMS Poplog), -popdevraw- has now been replaced
+with two active variables containing separate read and write devices:
+-poprawdevin- and -poprawdevout- (when neither standard input nor output
+is a terminal, they both contain undef records). -popdevraw- is now just
+an autoloadable synonym for -poprawdevin-, but to maintain upward
+compatibility, output operations with -syswrite- and -sysflush- done on
+the device in -poprawdevin- will be automatically redirected to the
+device in -poprawdevout- (however, existing programs should be changed
+so as not to rely on this kludge).
+
+    Also to maintain compatibility in Unix systems, a new procedure
+-sys_link_tty_params- is run on the two devices to make them share
+terminal characteristics, so that existing calls of -sys_io_control- on
+-popdevraw- will affect both devices simultaneously. See REF * SYSIO
+
+The procedure -sys_purge_terminal- is now an autoloadable synonym for
+the new, more general, procedure -sys_clear_input-. See REF *SYSIO.
+
+
+Changes to the handling of O/S process arguments by Poplog
+    (see REF *SYSTEM for full details):
+
+        1. A new variable -poparglist0- contains a complete list of the
+    arguments passed to Poplog, starting with the name under which the
+    process was invoked. -poparglist- is effectively unchanged, but will
+    now be a trailing sublist of -poparglist0- (i.e. excluding those
+    arguments processed by the system on startup).
+
+        2. The character `+` can now be used to flag a saved image to
+    restore, in both Unix and VMS systems. The characters `-` in Unix
+    and `/` in VMS are recognised as before, but not AFTER `+` has been
+    used, i.e.
+
+                pop11 -prolog -mysave
+                pop11 -prolog +mysave
+                pop11 +prolog +mysave
+
+    will all restore "prolog" and then "mysave", but
+
+                pop11 +prolog -mysave
+
+    will only restore "prolog". This allows programs based on saved
+    images to take Unix-style arguments beginning with `-`.
+
+        3. (VMS only) The translation of the DCL foreign command line to
+    arguments in -poparglist0- is now the same to that performed by VMS
+    C programs (see REF *SYSTEM). In particular, arguments containing
+    uppercase letters, spaces etc can be quoted with double quotes ",
+    which are then stripped off. For this reason, " at the beginning of
+    the first argument to flag POP-11 code to compile is now replaced by
+    : (colon) as in Unix. Note that since DCL recognises : immediately
+    after the command name as flagging a label, this will normally need
+    quoting (also as in Unix), e.g.
+
+                pop11 ":3+4=>"
+
+
+-- Store Manager and Garbage Collector --------------------------------
+
+From Version 13.1 POPLOG Unix systems have had the segmented heap and
+garbage collector already in Version 13.0 of VMS POPLOG. This means that
+the system now copes with the segmentation of its heap space that
+results when external procedures allocate dynamic memory at run-time
+(e.g. through -sbrk- or -malloc- etc).
+
+External procedures can now allocate memory freely, and no prior
+provision need be made for this (as a result, the optional 4th argument
+to -external_load- that previously specified the amount of memory
+required is now redundant -- and, if given, is ignored).
+
+
+The garbage collector now has an alternate algorithm, which comes into
+play when there is insufficient memory for the normal copying algorithm
+to operate (and which can also be selected explicitly by assigning false
+to -pop_gc_copy-). As a result, the system can no longer die with the
+mishap 'CANNOT ALLOCATE GC WORKSPACE', and -popmemlim- can be set as
+large as desired. (There is also now a clear distinction in mishap
+messages between merely exceeding -popmemlim- and actually running out
+of memory -- the latter can still happen, of course.) See REF *SYSTEM.
+
+A new integer variable -popminmemlim- controls the minimum number of
+words at which the system should maintain the combined heap/user stack
+memory area (cf -popmemlim- for the maximum value).
+    See REF *SYSTEM for details.
+
+For Lisp users
+    New module, "storeutils", added. This provides a Lisp interface
+    to POPLOG Storeage Management facilities. See HELP * STOREUTILS.
+    Note: the variable *GC-TIME* is now part of the "storeutils" module;
+    it is only defined if this module has been loaded. Also, the macro
+    TIME will only print GC time statistics if "storeutils" is loaded.
+
+
+-- External load and LIB EXTERNAL -------------------------------------
+
+LIB EXTERNAL now returns a ddecimal when given a ddecimal in
+call-by-references using an identifier.
+
+New 'external-type' keys allow the creation of 'external class' data
+objects, containing references to external (non-Poplog) data structures
+and treated specially by -external_apply-.
+        See REF *EXTERNAL, REF *KEYS, HELP *RECORDCLASS
+
+The LIB EXTERNAL package is intended to simplify the use of
+external_load. The package has been extended to cope with more of
+the syntax of Fortran 77. For the moment the extended version and the
+old version are both provided in case there are problems of upward
+compatibility. From V14 he old version will be withdrawn.
+
+The new version is LIB *NEWEXTERNAL documented in HELP *NEWEXTERNAL and
+associated with LIB * NEWFORTRAN_DEC.
+
+To use the new version it is necessary to do
+            lib newexternal
+or
+            uses newexternal
+
+explicitly before using the "external" commands described in the help
+file.
+
+
+
+-- Lisp Changes -------------------------------------------------------
+
+See HELP *LISPNEWS
+There are several new facilities including improved support for Lisp
+in the editor VED and some useful new modules. Lisp performance has
+been improved.
+
+See also HELP *POPLISP
+
+-- Prolog Changes -----------------------------------------------------
+
+
+Improvements have been made to the database handling mechanism. The
+predicates assert/1, retract/1 and clause/2 (and their derivatives) now
+all work substantially faster than previously. Certain inconsistencies
+in behaviour have also been removed.
+
+There have also been improvements in the error handler, several minor
+bug fixes, and a number of new utilities (e.g. new predicte
+declarations) improved VED support for Prolog, and improved
+documentation.
+
+See HELP *PLOGNEWS for information about additional changes.
+
+
+-- Pop-11 syntax ------------------------------------------------------
+
+A new macro
+
+        #_INCLUDE 'filename'
+
+enables the stream of items from a file to be 'included' in (spliced
+into) the current -proglist-. See REF * PROGLIST.
+
+Improved facilities for defining new syntactic forms. The syntax for
+"define" has been extended to allow users to define new syntactic forms
+enclosed by "define" and "enddefine", e.g.
+    define :class name ...
+    enddefine;
+
+Using define and enddefine as openers and closers enables a collection
+of standard VED utilities to be used without change, e.g. ved_mcp,
+ved_lcp, ved_gsp. For full details see HELP * DEFINE_FORM.
+
+REF * POPSYNTAX has not yet been updated to accommodate the new syntax.
+
+HELP * DEFINE had seriously misleading information about definitions
+specifying negative precedence. This has been corrected.
+
+New POP-11 syntax -fast_repeat- speeds up loops of the form
+
+    fast_repeat <expression> times
+        <actions>
+    endfast_repeat      ;;; or endrepeat
+
+New syntax words -returnif- and -returnunless- added.
+    See REF * SYNTAX and REF * POPSYNTAX
+
+
+The quoted word syntax has been extended to allow a string between the
+word quotes. Thus the following are now legal Pop-11:
+
+        vars s1 = "'a string !!'";
+
+        if pdprops(proc) == "'foo/3'" then
+
+The syntax words that can occur between "define" and a procedure name
+have been listed in the list -define_headers-, and those which can occur
+after the procedure call pattern in the header are in the list
+-define_terminators-. Both are used by ved_f and the former by
+-ved_tidy-.
+
+-- New procedures, data-types, global variables, etc ------------------
+
+Short (16 bit signed) vectors ("shortvec") added to complement "intvec".
+See REF *INTVEC.
+
+A set of ``fast'' procedures for accessing integer vectors in a
+consistent way has been added - see REF *FASTPROCS.
+
+-newanyarray- now checks that the arrayvector is big enough for the
+maximum arrayvector bound. -arrayvector- now has an updater
+
+pop11_comp_procedure(CLOSER, P_NAME, PROPS) -> P;
+    Compiles a procedure from just before the argument list up to
+    CLOSER (a word or list of words e.g. "end" "enddefine"
+    "endprocedure"). P_NAME is the name of the procedure or false,
+
+-radix_apply- allows printing with a new radix. E.g. to print N in octal
+    radix_apply(N,pr,8)
+
+See REF * LISTS /sysconslist_onto
+
+A bug in -newanyarray- has been fixed - it is now possible to create
+0-dimensional arrays by specifying an empty -boundslist-. However, this
+means that is no longer possible to directly specify -nil- as the
+initial element of an array, because -nil- will now be interpreted as a
+-boundslist-.
+
+New facility -sys_destroy_action- allows users to assign a procedure to
+be run when a data object becomes garbage. This enables tidying up
+to be done (e.g. notifying a remote window manager that a certain
+window is no longer needed). See REF *PROPS
+
+The procedure sys_= now returns true for two closures if their pdparts
+are =, they have the same number of frozvals, and their corresponding
+frozvals are =. See REF * KEYS
+
+
+ISSUBSTRING has been altered: the second argument (integer) is now
+optional and defaults to 1.
+
+Two new string procedures in library * ISMIDSTRING(s1,s2),
+        * HASMIDSTRING(s2,s1). See REF * STRINGS
+
+The procedure * ISSTARTSTRING has been moved from the library into the
+system and re-defined to be more efficient.
+
+* HASSUBSTRING has been modified so that it accepts an optional integer
+argument analogous to * ISSUBSTRING
+
+The new procedure -consclosure- constructs closures without requiring
+the frozvals to be in a list. Format is
+
+        consclosure(P, FROZ_1, FROZ_2, ..., FROZ_N, N)
+
+-partapply- has been moved out of the system to the autoloadable
+library; it is now just:  consclosure(P, destlist(FROZ_LIST))
+See REF * PROCEDURE
+
+Added -fast_frozval-, non-checking version of -frozval-.
+
+
+A new procedure -property_active- allows the active default procedure
+for a property to be accessed or updated (in particular, the updater can
+be used to give an active default to a property constructed with
+-newproperty-). See REF * PROPS
+
+The library procedure -datafile- can now save ordinary -newproperty-
+style properties. See HELP * DATAFILE.
+
+A new procedure -ident_declare- declares permanent variables. This is
+basically the same as -sysSYNTAX- (with the same arguments), except that
+-ident_declare- has no interaction with lexical declarations.
+    See REF * IDENT, REF * VMCODE.
+
+The fast arithmetic operators -fi_div- and -fi_rem- are now in the core
+system rather than the autoloadable library. See REF * FASTPROCS
+
+The standard empty string previously called -vednullstring- is now
+called -nullstring- (the old name remains as an autoloadable synonym).
+
+New procedures that operate on lists added: -fast_subscrl- and -initl-.
+Also, -fast_ncdelete- moved from library to system.
+    See REF * LISTS, REF * FASTPROCS
+
+The new (active) variable -pop_pr_level- controls the depth to which
+components of datastructures are printed. See REF *PRINT.
+
+
+The variables -popfilename- and -poplinenum- are now set correctly
+during non-interactive compilation from a VED buffer. This means that
+error messages resulting from 'lmr' compilation will now display source
+file name and line number.
+
+
+The macro -uses- now plants a call to a new procedure -useslib-, rather
+than executing immediately. See REF * LIBRARY/uses
+
+
+Discovered and fixed a serious (and ancient) bug in concatenating words
+with the <> operator. When one or other word was empty (i.e. 0 length),
+the result returned was garbage, and the heap was corrupted.
+
+New procedure match_wordswith described in HELP * WORDSWITH.
+-match_wordswith- takes a string and matching procedure, or else a
+string pattern and returns a sorted list of all matching words in the
+Poplog dictionary. (Used in a new VED facility)
+
+
+LIB NCREV speeded up by a factor of about 4 on non-dynamic lists.
+    See HELP NCREV
+
+-- Words, identifiers and sections ------------------------------------
+
+The procedure -section_pathname- returns the full pathname of a section,
+as a string. See REF *SECTIONS.
+
+The procedure -identof- now has an updater, enabling (permanent)
+identifiers to be attached directly to words. -Syssynonym- can now
+be defined simply as
+
+            identof(word2) -> identof(word1)
+
+Enhancements and bug fixes to the section mechanism (see REF *SECTIONS):
+
+        1. Imports and exports specified in a -section- statement now
+    take effect in all intermediate sections specified in a pathname,
+    e.g.
+
+            section $-tom$-dick$-harry xxx => yyy;
+                ...
+            endsection
+
+    imports  -xxx- from  top-level down  through -tom-  and -dick-  into
+    -harry-, and exports -yyy- from -harry- up through them to top-level
+
+        2. -word_identifier- has been enhanced so that it can return
+    'undeclared' word identifiers
+
+            word_identifier(WORD, SECT, "undef") -> WORD_ID
+
+    when WORD is not currently declared in SECT. The WORD_ID returned
+    then will act as a vehicle for declaring WORD in SECT, in the sense
+    that any later attachment of  an identifier to WORD_ID (e.g. with
+    -sysSYNTAX-, -syssynonym-, etc), will simultaneously attach that
+    identifier to WORD in section SECT (conversely, a later declaration
+    of WORD in SECT will cause the new identifier to become attached to
+    WORD_ID also).
+        The new facility is now used by the procedure that reads
+    identifier pathnames in POP-11 (-sys_read_path-), and this means
+    that new sectioned identifiers can be declared or defined by
+    pathname reference alone. For example,
+
+        define $-foo$-xxx(); ... enddefine;
+
+    previously produced a mishap unless -xxx- was already declared in
+    section -foo-, but works in the new system (but note however that
+    this mechanism will NOT create new sections -- any sections involved
+    must have been created first by a -section- statement).
+        The -cancel- syntax word now also uses -sys_read_path-, and so
+    can be used to cancel sectioned identifiers.
+
+-- Documentation changes ----------------------------------------------
+
+HELP * LISPNEWS and HELP * PLOGNEWS have been updated.
+
+There have been a number of improvements to old documentation (e.g.
+some of the teach files improved), and a considerable amount of
+new documentation, e.g. HELP * DICTIONARY explaining some aspects
+of the structure and function of the Poplog dictionary, and REF * SYSTEM
+describing system startup and reset, exit, interrupts, etc.
+
+A number of HELP and TEACH files have been improved, with cross
+references brought up to date:
+
+ HELP *DEVICE *DEVNAME *HELPFILES *INPUT *INPUTOUT *IO *NEXTCHAR
+      *OUTPUT *POPDEVRAW *POPRAWDEVIN *POPRAWDEVOUT *RAWOUTFLUSH
+      *SYSTRMDEV *FILL *DL *EXPLODE
+
+      HELP * DOCUMENTATION, * VEDSYSFILE, * VEDGETSYSFILE
+
+      TEACH * PERCENT, HELP * PARTAPPLY, * PERCENT, * CLOSURES
+
+
+HELP * VEDVARS substantially improved. Broken down into different
+    sections, with clearer information for anyone tailoring VED to a
+    new terminal.
+
+HELP * VEDCOMMS reorganised and clarified. Now includes information on
+VED command line processing.
+
+
+New versions of the following TEACH files have been installed.
+        BUFFERS  DATABASE  DEFINE  LMR   MARK   MATCHES   MOREVED
+        RESPOND  SWITCHWINDOW   TEACH   TEACHFILES   VARS   VED  VEDPOP
+
+The main change is that these files are now TERMINAL INDEPENDENT: It is
+assumed that the learner has a keyboard map and VED keys are referred to
+by logical names as in the VED User Guide. In addition The files make
+use of "load marked range" rather than <ENTER> x (i.e all compilation is
+now done from the edit buffer). The recommended initial teaching
+sequence is therefore:
+        TEACH, WINDOW, MARK, SWITCHWINDOW, BUFFERS, LMR, VEDPOP, RIVER,
+        MATCHES, RESPOND, DEFINE, VARS, MOREMATCHES, DATABASE, MOREVED.
+
+Online HELP and VED_?? documentation on *FILL, *DL and *EXPLODE did not
+mention that FILL could take records as well as vectors, and that DL and
+EXPLODE now have updaters. Now fixed.
+
+
+A new PWM help file *PWMWINIO has been added, discussing how to achieve
+character-stream I/O on PWM user windows.
+
+
+-- Errors and tracing -------------------------------------------------
+
+Tracing facilities extended as follows.
+    1. Trace output is printed even if the procedure is entered or
+    exitted in an 'abnormal' fashion. These abnormal entry/exit statuses
+    are indicated by replacing the `>` and `<` that occur in normal
+    trace output by one of the following characters:
+        R       entry due to process resume
+        S       exit due to process suspend
+        X       any other abnormal exit
+
+    2. The new variable POPMAXTRACEINDENT (default 40) controls whether
+    trace printing uses rows of exclamation marks to indicate depth of
+    procedure calls or a number in brackets. The latter can be forced in
+    all contexts by assigning 0 to POPMAXTRACEINDENT, producing trace
+    printing of the form:
+        [   3]> addup 1         ;;; depth of recursive call is 3
+        [   4]> addup 0         ;;; depth is 4
+        [   4]< addup 0         ;;; exiting call of depth 4
+        [   3]< addup 1
+
+    For full details see HELP * TRACE.
+
+NOTE
+    Abnormal exits due to -setpop- are not displayed
+    Abnormal exit tracing can be turned on/off
+
+-- New virtual machine instructions -----------------------------------
+
+New VM instructions sysSUBSCR and sysUSUBSCR for planting fast in-line
+vector subscriptor code (for arbitrary vector types). Also
+sysEXT_FIELDVAL, sysUEXT_FIELD_VAL, sysEXT_SUBSCR, sysUEXT_SUBSCR, for
+planting accesses to data pointed to by external class data objects.
+        See REF *VMCODE, REF *EXTERNAL
+
+POPLOG VM procedures that previously had updaters that were not
+alterable by users have been changed to call the corresponding
+user-definable procedures. So the updater of sysPUSH now calls sysPOP,
+the updater of sysCALLQ calls sysUCALLQ the updater of sysCALL calls
+sysUCALL, the updater of sysCALLS calls sysUCALLS, the updater of
+sysPASSIGN calls sysUPASSIGN. See REF* VMCODE
+
+New VM flag -VM_NO_CHECK_GO_ON_INT- added. See REF * VMCODE/sysGO_ON
+
+
+-- VMS only -----------------------------------------------------------
+
+Conversion to VMS version 5.0
+
+
+-- UNIX only ----------------------------------------------------------
+There are new handlers for the 'suspend' and 'continue' signals, and
+as a result VED's default behaviour on suspension is more sensible.
+See HELP * STOP, REF*SIGNALS
+
+The -syssleep- procedure now exits only in response to the timer or
+ctrl-C interrupts, not other signals.
+
+A collection of utilities for multiplexing and communication between
+Poplog and sub-processes via pseudo-teletypes has been added to the
+unsupported library. This includes a more sophisticated
+'shell-in-ved-buffer' interface - like IMCSH only more useful as it can
+be used for interactive programs.
+See HELP *PTYFORK, HELP *MUX, HELP *VSH.
+
+
+A new collection of autoloadable facilities for running Unix commands
+and reading the output back through a pipe includes VED commands for
+running processes and reading the output into a temporary VED buffer.
+See HELP * PIPEUTILS for an overview.
+The new procedures and VED commands include:
+
+    pipein(C,A,B) -> R
+        run a command with specified arguments and return a device or
+        repeater to access the pipe.
+    vedpipein(C,A,F,P,B,H)
+        run a command and read the output into a temporary ved file F
+        with header and formatting controlled by P, B, and H.
+    vedgenshell(C,H)
+        Run a shell command, read output into a VED file with header H.
+    <ENTER> sh <command>
+    <ENTER> csh <command>
+    <ENTER> rsh <machine> <command>
+    <ENTER> rved <machine> <file>
+
+
+Compile and run C or Fortran programs using <ENTER> ccomp and
+<ENTER> fcomp. See HELP CCOMP, HELP FCOMP
+
+The procedure -sysfileparse-, on Unix POPLOG systems only, can be given
+an optional second argument specifying the host name delimiter
+character. See HELP * SYSFILEPARSE
+
+-- LIB FLAVOURS -------------------------------------------------------
+
+
+Various bug fixes to this object oriented programming library are
+recorded in HELP NEWS.
+
+
+-- Changes to the editor, VED -----------------------------------------
+
+LIB * VEDEMACS has been extensively revised, as described in
+HELP * VEDEMACS. The main changes are
+    a. A useable version is available for VMS with alternatives to the
+    control characters ^S, ^Q, ^Y
+    b. Several discrepancies between LIB VEDEMACS and standard UNIX
+    EMACS have been removed. E.g. capitalisation of initial letter of
+    words, tracking end of line, etc. work. Other discrepancies remain,
+    however. Other changes are listed in the HELP file.
+
+Unix only: There is also a "dired" -like extension to VED partly
+inspired by the EMACS dired. ved_dired enables you to read a directory
+listing into a VED buffer then very easily delete, copy, rename, or edit
+individual files. If one of the files is itself a directory dired can be
+used to read in a listing for that directory. The facility is extendable
+by users, who can define new dired options to operate on the file named
+in the line containing the VED cursor. See HELP * DIRED for full
+details.
+
+Improved VED support for Lisp users is described in HELP*LISPNEWS
+
+Added -ved_capword- for convenient invocation in VED
+    <ENTER> capword N  will capitalise N words.
+    See HELP * VEDEMACS/Capitalise, HELP * VEDPROCS/vedcapword,
+        HELP * VEDCOMMS/ved_capword
+
+LIB * VEDCONVERTWORD fixed so that it can move to left or to right
+(changing case). So <ENTER> ucw, and <ENTER> lcw can now be given
+negative arguments. E.g. to convert last three words to upper case, do
+        <ENTER> ucw -3
+
+User-definable procedure -vedvedquitfile- which is called when a
+a VED file is quit.
+
+VED's strategy for deciding what file to edit after a quit has been
+simplified - it now simply goes back to the previous file edited
+instead of trying to be clever about selecting the last file of the
+same type (e.g. TEACH, HELP, etc).
+
+VED_W (<ENTER> w) and VEDWRITEFILES altered so that empty VED files will
+be written if they already exist on disk.
+
+-vedstatusbufferlimit- (default 60) is now user assignable, to allow
+more <ENTER> commands to be stored in the VED status buffer.
+
+There are new VED commands for manipulating list expressions in the
+editor.
+
+Various bugs have been fixed in the search mechanism, and it can now
+handle patterns and non-embedded during backward search as well as
+forward. In particular
+
+        <ENTER> `string`
+
+will search backwards for non-embedded occurrences of 'string'.
+
+VED re-search for previous string generalised.
+    <ESC> \  and <ESC> /
+now no longer merely remember the last search string used, they also
+remember whether the search was embedded or not.
+
+The full state of the last search is represented by the following global
+variables.
+    vvedanywhere
+        - search not constrained to item boundaries
+    vvedoldsrchdisplay
+        - original search string, including patterns etc.
+    vvedsrchstring
+        - copy of vvedoldsrchdisplay modified for efficient
+        matching
+    vvedsrchsize
+        - length of vvedoldsrchdisplay
+
+<ENTER> s  no longer inserts leading spaces when lines become
+        too long. I.e. it behaves like <ENTER> gs.
+
+<ENTER> s no longer calls -vedscreenbell- at the end of the
+        search.
+
+Some bugs concerned with searches including patterns and starting beyond
+the end of the file have been fixed.
+
+The help file, HELP * VEDSEARCH has been updated and clarified.
+
+
+-ved_f- now uses the two lists -define_headers- and -define_terminators-
+It also now copes with section pathnames in procedure headers, e.g.
+       <ENTER> f grum
+will now find
+       define $-foo$-baz$-grum(x,y);
+
+    It also now works with new "define:" formats, e.g.
+        define : <type> name
+
+-ved_mep- (mark to end of procedure) now works if called in the middle
+of a procedure.
+
+Finding words in the dictionary (apropos)
+
+    <ENTER> wordswith <string or string pattern>
+
+Prints into a VED buffer all words in the dictionary that contain the
+string or match the pattern. See HELP * WORDSWITH
+
+New procedure -vedteststartsearch- takes a string and searches for line
+in current VED buffer starting with the string. Returns line number or
+false.
+
+ved_indexify and ved_g both use -vedteststartsearch- so that users can
+be less restricted in choice of ved_g_string. See HELP * ENTER_G.
+
+
+There are new facilities for appending the marked range to a disk
+file without reading the file into the editor. They are therefore
+faster than ved_to and ved_mo.
+        <ENTER> wappr <file>
+            Write and append current range to file. Much faster than
+            ved_mo or ved_to, since it uses discappend and not VED.
+        <ENTER> wappdr <file>
+            Writes the range, appending it to file, and deletes it from
+            the current file.
+
+    See HELP * VEDCOMMS/ved_wappr
+
+The standard empty string previously called -vednullstring- is now
+called -nullstring- (the old name remains as an autoloadable synonym).
+
+Some internal VED procedures for refreshing parts of the screen
+are documented in HELP VEDCOMMS and made available to users.
+    vedrefreshtail(boolean, wline, wcol, index, string)
+        Refresh line to right of window line wline column wcol
+            For details see HELP * VEDCOMMS/vedrefreshtail
+
+    vedrefreshline(boolean, wline, string, <boolean or char>)
+        Refresh whole of window line wline
+            For details see HELP * VEDCOMMS/vedrefreshline
+
+    vedrefreshstatus()
+        Refresh status line
+
+
+The new procedure -is_ved_lmr_stream- recognises character repeaters
+given to -popcompiler- by -ved_lmr-.
+
+
+<ENTER> @ options extended to allow all the following, described
+        in HELP * VEDCOMMS
+        <argument>  <line to go to>
+          a         first line of file
+          z         last line of file
+          m         marked range start
+          e         end of marked range
+        <integer>   go to line number <integer>
+        +<integer>  go forward by <integer> lines
+        -<integer>  go back by <integer> lines
+
+
+Bug in -vedappfiles- fixed: it now correctly restores the original VED
+environment if an error occurs during execution.
+
+VEDEXPAND file name option modified. ^f will now expand to file name
+EXCLUDING trailing comma or period. See TEACH * VEDEXPAND
+
+VED debugging aid * VEDDEBUG altered so that it makes the cursor wiggle
+at the current line and column, and if popready is invoked it now
+restores the screen properly.
+
+
+VEDWRITERANGE can now accept a device instead of a file name.
+
+Tab conversion (with VEDNOTABS false) is now done for all VED files read
+or written, whether a disk file is involved or some other device.
+   See HELP * VEDPROCS/vedwriterange *VEDVARS/vedreadintabs
+
+<ENTER> ??
+    with no argument, no longer puts the default argument (next
+    item in VED buffer) onto the command line. Instead it puts the
+    expanded command on the previous line in the command line
+    buffer. See HELP * VED_WHAT
+
+
+New VED procedure VEDENDRANGE jumps to end of marked range, just as
+VEDMARKFIND jumps to beginning. SHOWLIB * VEDENDRANGE
+
+When VED reads in files it now sets -popmemlim- locally to
+    popmemused + 1000000.
+This should largely cure the problem of running out of memory while
+reading in a large file.
+
+
+-- Poplog Window Manager (PWM) ----------------------------------------
+
+Most of the work has been consolidation and bug fixing, as the major
+effort has gone into work to provide support for the X Windows System
+Version 11. The X-11 extensions to Poplog will be made available
+later, and a PWM compatibility package provided.
+
+A new PWM help file *PWMWINIO has been added, discussing how to achieve
+character-stream I/O on PWM user windows.
+
+-pwm_window_label- and -pwm_icon_label- now update internal
+representations of label (used by event printing routines etc.)
+
+DOC *PWM has been updated.
+
+
+-- KEATS - the knowledge engineering apprentice tool system -----------
+
+This is a system developed originally by the Open University and British
+Telecom on a symbolics computer. Part of KEATS has been ported to Sun
+Poplog running under the X Window System Version 10.4. This will be made
+available initially only to UK academic institutions. However, if there
+is sufficient demand it may be made more widely available. Please
+consult your Poplog supplier.
+
+
+-- Miscellaneous ------------------------------------------------------
+
+LIB SHOWTREE no longer calls vedsetup if it is being compiled by
+a non-interactive process.
+
+The structure browser LIB INSPECT now defines -inspect1-, a procedure
+that displays an object in the standard -inspect- format, without
+entering an interactive loop. See HELP * INSPECT
+
+LIB SHOWARRAY for easy printing of arrays as tables of values or blocks
+of 'grey-level' characters, and LIB READARRAY to allow files of
+characters or turtle pictures such as LIB GREYPIC to be read into
+ordinary arrays.
+    See TEACH * SHOWARRAY and TEACH * READARRAY.
+
+The Unix LIB VED_SEND facilities have been extended. SEE HELP * SEND
+
+
+-- NOTE ON FILENAMES --------------------------------------------------
+
+In some of the examples in this file and elsewhere, UNIX file name
+format is used. VMS users should do the corresponding translation. E.g.
+
+        UNIX version                    VMS version
+        ------------                    -----------
+   $usepop/pop/lib/psv/eliza.psv    USEPOP:[POP.LIB.PSV]ELIZA.PSV
+   $usepop/pop/com/poplog           USEPOP:[POP.COM]POPLOG.COM
+
+The addition of ".COM" is required only for command files. Apart
+from this, the UNIX format may be used in VMS POPLOG programs. They will
+automatically be translated. See the section on "File Specifications" in
+DOC * SYSSPEC
+
+--- C.all/help/v13_6.changes
+--- Copyright University of Sussex 1988. All rights reserved. ----------

@@ -1,0 +1,331 @@
+HELP MATH                                           A. Sloman March 1987
+                                                        Updated Dec 1990
+
+MATHEMATICAL OPERATIONS AND PROCEDURES IN POP-11
+
+Full details are provided in REF * NUMBERS. REF * DATA describes
+the data-types available in POPLOG, including various types of numbers.
+This much shorter overview file summarises available facilities.
+
+In many cases the command:
+    <ENTER> ?? <name>
+
+can be used to obtain more information about the particular procedure or
+variable mentioned below without explanation. This is normally quicker
+than searching through REF * NUMBERS
+
+CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Types of numbers available in POP-11
+ -- Recogniser procedures
+ -- Arithmetical operators
+ -- Comparison procedures (predicates)
+ -- Operations on Ratios
+ -- Operations on Complex numbers
+ -- Bitwise operations
+ -- Floating point utilities
+ -- Trigonometric and other utilities
+ -- Representation and efficiency
+ -- Fast integer procedures
+ -- Global variables and constants
+ -- LIB FLOAT_PARAMETERS
+ -- LIB INT_PARAMETERS
+ -- See also
+
+
+-- Types of numbers available in POP-11 -------------------------------
+
+  BIGINTEGER
+    Arbitrary-precision integer e.g. 123456789123456789123456789
+  COMPLEX
+    Complex number e.g. 4.5_+:9.94987  (<real>_+:<imaginary>)
+  DDECIMAL
+    Double Floating Point e.g. 99.6123456789
+  DECIMAL
+    Single Floating Point (one machine long word) e.g. 99.6123
+  INTEGER
+    Integer (one machine long word) e.g. 123456789
+  RATIO
+    Ratio of two integers e.g. 3_/4
+
+Integers and decimals are "simple" items, recognised by issimple.
+All others are compound and are represented by records in the POPLOG
+heap area.
+
+See
+REF * ITEMISE for information on input formats for numbers.
+REF * DATA for information on other data types
+REF * NUMBERS for full information on available numeric operations
+HELP *EFFICIENCY for tips on optimising programs using numbers
+
+
+-- Recogniser procedures ----------------------------------------------
+Recogniser procedures are available, each taking an item and returning a
+boolean result:
+
+    isinteger   isbiginteger    isintegral  isratio     isrational
+    isdecimal   isddecimal      isreal      iscomplex   isnumber
+
+Also:
+    issimple    iscompound
+
+
+-- Arithmetical operators --------------------------------------------
+A range of infix operators is provided for manipulating all the above
+types of numbers, e.g.
+    X + Y   add two numbers
+    X - Y   subtract two numbers
+    - X     negate one number
+    X * Y   multiply two numbers
+    X ** Y  raise X to the power Y
+    X / Y   divide first number by second   (SEE Note below)
+    X // Y  divide X by Y and return remainder and quotient.
+    X div Y returns just the quotient.
+    X rem Y returns the remainder on dividing X by Y
+    X mod Y returns the modulus
+
+The difference between REM and MOD is that REM always returns a result
+with the same sign as X while MOD returns a result with the same sign
+as Y. See HELP * MOD, HELP * REM.
+
+
+-- Note on "/" and ratios ---------------------------------------------
+Since the introduction of ratios the divide operator "/" has been
+capable of returning a ratio when given two integers. E.g.
+
+    12 / 3 =>
+    ** 4
+
+    10 / 3 =>
+    ** 10_/3
+
+You can prevent the production of a ratio by making one of the arguments
+a decimal number
+
+    10 / 3.0 =>
+    ** 3.33333
+
+Whether the result is a single precision decimal or double precision
+ddecimal will depend on whether POPDPRECISION is TRUE or FALSE.
+(See Global variables and constants, below).
+
+Alternatively you can cause ratios to print out like decimals by setting
+pop_pr_ratios FALSE:
+    false -> pop_pr_ratios;
+    10 / 3 =>
+    ** 3.333333
+
+The result is still a ratio: only the printing format is altered.
+
+Programs which use of ratios or ddecimals can generate more garbage
+collections than expected because these numbers are compound entities,
+i.e allocated on the heap. See Representation and efficiency, below.
+
+
+-- Comparison procedures (predicates) ---------------------------------
+    X >  Y   TRUE if X greater than Y
+    X <  Y   TRUE if X less than Y
+    X >= Y   TRUE if X greater than or equal to Y
+    X <= Y   TRUE if X less than or equal to Y
+    X == Y   TRUE if X is identical with Y
+    X /== Y  TRUE if X is not identical with Y
+    X =  Y   TRUE if X is equal in value to Y
+    X /= Y   TRUE if X is not equal in value to Y
+    X ==# Y  TRUE if X == Y or the numbers are of the same type and
+                numeric value.
+
+See REF * NUMBERS for the differences btween "=", "==#" and "=="
+
+WARNING: comparisons between numbers can give counter-intuitive results
+if either or both are decimals or ddecimals. Read HELP * EQUAL for more
+information. The precise definitions are in REF * NUMBERS/Comparisons
+
+
+-- Operations on Ratios -----------------------------------------------
+destratio(RAT)   -> DENOMINATOR -> NUMERATOR
+numerator(RAT)   -> NUMERATOR
+denominator(RAT) -> DENOMINATOR
+
+
+-- Operations on Complex numbers --------------------------------------
+(For full details see REF * NUMBERS)
+ NUM1  +:  NUM2  ->  NUM3
+ NUM1  -:  NUM2  ->  NUM3
+ +: NUM1  ->  NUM2
+ -: NUM1  ->  NUM2
+ unary_+:(NUM1)  ->  NUM2
+ unary_-:(NUM1)  ->  NUM2
+ conjugate(NUM1) -> NUM2
+ destcomplex(NUM) -> IMAGPART -> REALPART
+ realpart(NUM)    -> REALPART
+ imagpart(NUM)    -> IMAGPART
+
+
+-- Bitwise operations -------------------------------------------------
+
+INT1  &&  INT2 -> INT3
+    - logical and
+INT1  &&~~  INT2 -> INT3
+    - logical and_not
+INT1  ||  INT2 -> INT3
+    - logical or
+INT1  ||/&  INT2 -> INT3
+    - logical exclusive or
+~~ INT1 -> INT2
+    - logical complement
+INT1  <<  N -> INT2
+    - shift INT1 left N bits
+INT1  >>  N -> INT2
+    - shift INT1 right N bits
+INT1  &&/=_0  INT2  ->  BOOL
+    - logical and and test /== 0
+INT1  &&=_0   INT2  ->  BOOL
+    - logical and and test == 0
+testbit(INT, N) -> BOOL
+    - test Nth bit of INT
+BOOL -> testbit(INT, N) -> NEWINT
+    - set Nth bit of INT
+integer_leastbit(INT) -> N
+    - return position of lowest bit
+integer_length(INT) -> N
+    - return position of highest bit
+integer_bitcount(INT) -> N
+    - count 1 bits if INT positive, or 0 bits if INT negative
+integer_field(SIZE, POSITION) -> ACCESS_PDR
+    - create accessing and updating procedures for sub-bitfields
+
+
+-- Floating point utilities -------------------------------------------
+These enable machine independent procedures for manipulating floating
+point numbers to be created.
+ float_decode(FLOAT, INT_MANTISSA) -> FLOAT_SIGN -> INT_EXPO -> MANTISSA
+ float_scale(FLOAT1, INT_EXPO) -> FLOAT2
+ float_sign(FLOAT_SIGN, FLOAT1) -> FLOAT2
+ float_digits(FLOAT) -> DIGITS
+ float_precision(FLOAT) -> SIGDIGITS
+
+See REF * NUMMBERS for full details.
+
+
+-- Trigonometric and other utilities ----------------------------------
+
+The following are provided. See REF * NUMBERS for full descriptions.
+
+abs             arccos          arccosh             arcsin
+arcsinh         arctan          arctan2             arctanh
+cis             cos             cosh                exp
+fracof          gcd_n           intof               lcm_n
+log             log10           max                 min
+negate          number_coerce   phase               random
+random0         round           sign                sin
+sinh            sqrt            tan                 tanh
+
+Further information is available in REF * NUMBERS. A summary account of
+any procedure or operation can be obtained by means of the
+    <ENTER> ?? <name>
+
+command. Alternatively put the cursor to the left of the name and simply
+type
+    <ENTER> ??
+
+Some of these have individual neop files giving more information, e.g.
+HELP * INTOF, * FRACOF
+
+
+-- Representation and efficiency --------------------------------------
+
+Integers and Decimals occupy one machine longword (32 bits), though 2
+bits are used for type information, so only 30 bits are available (on 32
+bit processors) for the number. These are the only "simple" data-types
+in POP-11.
+
+All the other number types are "compount" and require the construction
+of a record taking two or more words. Consequently operations producing
+them can cause garbage collections. Ratios especially can be constructed
+inadvertently by using "/" with two integer arguments, and this can lead
+to excessive garbage collection. For tips on avoiding this see
+    HELP * EFFICIENCY
+
+
+-- Fast integer procedures --------------------------------------------
+Since the arithmetical operations are defined over all the numeric
+data-types, they often have to check the nature of their arguments at
+run time. In order to speed up processing of integers there are several
+operations which assume their arguments are integers (not bigintegers)
+and do not do any checking. They are listed in REF * FASTPROCS.
+
+Since operations on decimals are slower than on integers it is sometimes
+useful to employ integers instead of decimals, then transform the
+results back to decimals at the end.
+
+
+-- Global variables and constants -------------------------------------
+pi
+    - (constant) best ddecimal approximation to "pi"
+pop_float_radix
+    - radix of floating point representation. Currently = 2.
+popdprecision
+    - controls default conversion of ddecimals to decimals. Default
+    is false, so results of arithmetic operators are decimals.
+popradians
+    - controls whether trigonometric functions use radians or degrees.
+pop_pr_ratios
+    - controls whether ratios print using "_/" or decimal notation.
+ranseed
+    - controls, and is changed by, random. See HELP * RANDOM
+
+
+-- LIB FLOAT_PARAMETERS -----------------------------------------------
+
+This library makes available a range of global implementation specific
+constants contained in the structure pop_float_parameters
+
+  pop_most_positive_decimal
+  pop_least_positive_decimal
+  pop_least_negative_decimal
+  pop_most_negative_decimal
+  pop_most_positive_ddecimal
+  pop_least_positive_ddecimal
+  pop_least_negative_ddecimal
+  pop_most_negative_ddecimal
+  pop_plus_epsilon_decimal
+  pop_plus_epsilon_ddecimal
+    These two are the smallest positive  numbers in each format which
+    when added to 1.0 of the same format  produce a value not equal to
+    1.0.
+  pop_minus_epsilon_decimal
+  pop_minus_epsilon_ddecimal
+
+
+-- LIB INT_PARAMETERS -----------------------------------------------
+
+This library defines the following parameter constants, whose values
+relate to the particular implementation of POPLOG in use:
+  pop_max_int
+    The largest (i.e. most positive) integer value represented in
+    immediate format (as an integer)
+  pop_min_int
+    The smallest (i.e. most negative) integer value represented in
+    immediate format (as an integer)
+
+
+-- See also -----------------------------------------------------------
+
+REF  * DATA         describes range of data types available in POP-11.
+HELP * NUMBERS      describes number data types in POP-11
+HELP * EQUAL        describes equailty tests in POP-11
+HELP * INTOF
+HELP * FRACOF
+REF  * NUMBERS      describes available arithmetic procedures
+REF  * ITEMISE      gives information about input formats
+HELP * RANDOM       describes available random number generators
+REF  * INTVEC       describes an integer vector type
+HELP * EFFICIENCY   gives information on efficiency issues
+REF  * FASTPROCS    fast, non-checking, procedures
+HELP * PRNUM        for printing integers and decimals
+HELP * PRINTF       more general formatted printing
+HELP * FORMAT_PRINT describes a large number of facilities for formatted
+                    printing.
+
+--- C.all/help/math ----------------------------------------------------
+--- Copyright University of Sussex 1991. All rights reserved. ----------

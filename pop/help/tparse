@@ -1,0 +1,180 @@
+HELP TPARSE                                       Aaron Sloman, May 1986
+
+    lib tparse;
+
+This is a variant of LIB GRAMMAR which is somewhat more general in that
+it will find all the parses of a list of words corresponding to a
+non-terminal. In order to do this it makes use of the POP-11 process
+mechanism. (See HELP * PROCESS).
+
+See HELP * GRAMMAR for a brief summary of LIB * GRAMMAR, TEACH * GRAMMAR
+gives more details.
+
+LIB TPARSE assumes that a grammar and a lexicon have been set up, as for
+LIB GRAMMAR.
+
+E.g.
+
+    vars grammar lexicon;
+    [
+        [s  [np vp]   ]
+        [vp [v np] [v np prep np]    ]
+        [np [pn] [det noun] [np and np] [np prep np]]
+    ] -> grammar;
+
+    [
+        [noun   cat dog mouse man girl boy book tree]
+        [pn     fred aaron steve john sharon]
+        [v      liked killed thanked bought ate put]
+        [prep   on over in at under]
+        [det    each every the a some]
+    ] -> lexicon;
+
+The procedure setup makes these the grammar and lexicon for use by the
+program:
+
+    setup(grammar,lexicon);
+
+Several procedures are available. showparses takes a non-terminal symbol
+and a list of words, and prints out all possible parses of initial
+segments of the list, and the corresponding unused words. E.g.
+
+    showparses("s", [the man ate the dog ]);
+    ** [s [np [det the] [noun man]] [vp [v ate] [np [det the] [noun dog]]]]
+    ** [unused []]
+    ** [no more parses]
+
+    showparses("s", [the man ate the dog and the mouse]);
+    ** [s [np [det the] [noun man]] [vp [v ate] [np [det the] [noun dog]]]]
+    ** [unused [and the mouse]]
+    ** [s [np [det the] [noun man]]
+          [vp [v ate]
+              [np [np [det the] [noun dog]] and [np [det the] [noun mouse]]]]]
+    ** [unused []]
+    ** [no more parses]
+
+listallparses is similar, except that it makes a list of two element
+lists, each containing a parse tree and a list of unused words, e.g.
+
+    listallparses("s", [the man ate the dog and the mouse])==>
+
+    ** [[[s [np [det the] [noun man]] [vp [v ate] [np [det the] [noun dog]]]]
+         [and the mouse]]
+        [[s [np [det the] [noun man]]
+            [vp [v ate]
+               [np [np [det the] [noun dog]] and [np [det the] [noun mouse]]]]]
+         []]]
+
+Whereas listparses makes a list of parse trees for the whole list of
+words: e.g.
+
+    listparses("s", [the man ate the dog and the mouse])==>
+
+    ** [[s [np [det the] [noun man]]
+           [vp [v ate]
+               [np [np [det the] [noun dog]] and [np [det the] [noun mouse]]]]]]
+
+Not that this list contains just one parse tree:
+ (Warning - this may take a minute or two to complete)
+
+    listparses("s", [the man put the cat on the book in the tree]) ==>
+    ** [[s [np [det the] [noun man]]
+           [vp [v put]
+               [np [np [det the] [noun cat]]
+                   [prep on]
+                   [np [np [det the] [noun book]]
+                       [prep in]
+                       [np [det the] [noun tree]]]]]]
+        [s [np [det the] [noun man]]
+           [vp [v put]
+               [np [np [np [det the] [noun cat]]
+                       [prep on]
+                       [np [det the] [noun book]]]
+                   [prep in]
+                   [np [det the] [noun tree]]]]]
+        [s [np [det the] [noun man]]
+           [vp [v put]
+               [np [det the] [noun cat]]
+               [prep on]
+               [np [np [det the] [noun book]]
+                   [prep in]
+                   [np [det the] [noun tree]]]]]
+        [s [np [det the] [noun man]]
+           [vp [v put]
+               [np [np [det the] [noun cat]]
+                   [prep on]
+                   [np [det the] [noun book]]]
+               [prep in]
+               [np [det the] [noun tree]]]]]
+
+    listallparses("s", [the man put the cat on the book in the tree]) ==>
+    ** [[[s [np [det the] [noun man]] [vp [v put] [np [det the] [noun cat]]]]
+         [on the book in the tree]]
+        [[s [np [det the] [noun man]]
+            [vp [v put]
+                [np [np [det the] [noun cat]]
+                    [prep on]
+                    [np [det the] [noun book]]]]]
+         [in the tree]]
+        [[s [np [det the] [noun man]]
+            [vp [v put]
+                [np [np [det the] [noun cat]]
+                    [prep on]
+                    [np [np [det the] [noun book]]
+                        [prep in]
+                        [np [det the] [noun tree]]]]]]
+         []]
+        [[s [np [det the] [noun man]]
+            [vp [v put]
+                [np [np [np [det the] [noun cat]]
+                        [prep on]
+                        [np [det the] [noun book]]]
+                    [prep in]
+                    [np [det the] [noun tree]]]]]
+         []]
+        [[s [np [det the] [noun man]]
+            [vp [v put]
+                [np [det the] [noun cat]]
+                [prep on]
+                [np [det the] [noun book]]]]
+         [in the tree]]
+        [[s [np [det the] [noun man]]
+            [vp [v put]
+                [np [det the] [noun cat]]
+                [prep on]
+                [np [np [det the] [noun book]]
+                    [prep in]
+                    [np [det the] [noun tree]]]]]
+         []]
+        [[s [np [det the] [noun man]]
+            [vp [v put]
+                [np [np [det the] [noun cat]]
+                    [prep on]
+                    [np [det the] [noun book]]]
+                [prep in]
+                [np [det the] [noun tree]]]]
+         []]]
+
+
+The basic procedure is called appparses:
+
+    appparses(symbol, list of words, procedure);
+
+i.e. for every initial segment of list which is an instance of symbol,
+the procedure is applied to the parse-tree and the list of unused words.
+
+Thus this could be used to define listparses as follows:
+
+    define listparses(symbol,wordlist);
+        [%
+          appparses(symbol,
+                    wordlist,
+                    procedure(tree,wordlist);
+                        if null(wordlist) then tree endif
+                    endprocedure)
+        %]
+    enddefine;
+
+
+--- C.all/help/tparse
+--- Copyright University of Sussex 1996. All rights reserved.

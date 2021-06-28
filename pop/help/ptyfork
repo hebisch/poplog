@@ -1,0 +1,114 @@
+HELP PTYFORK                                       R.Evans December 1986
+
+LIB PTYFORK provides two utilities for communicating with UNIX
+subprocesses through a 'pseudotty' (see Unix MAN (4) pty). A pseudotty
+has the advantage over a pair of pipes that the child process actually
+thinks it is talking to a terminal (some programs behave differently, or
+misbehave if they think they are not talking to a terminal).
+
+See *VSH for an example of use.
+
+NB: PTYFORK is currently only available for Berkeley 4.2 systems, and
+    systems derived therefrom. Using the library on any other system is
+    likely to generate a mishap.
+
+[This and related bsd facilities referred to herein are unsupported, and
+therefore included in the $usepop/pop/lib/lib/ directory.
+    See DOC * SYSSPEC.
+
+It is therefore necessary to compile PTYFORK explicitly e.g. with one of
+the following commands
+    uses ptyfork
+    lib ptyfork
+The latter will print a warning message.
+
+It is hoped that although the facility is unsupported it will serve as
+a useful programming example.]
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- PTYFORK
+ -- GET_PTY_PAIR
+ -- SLAVE TTY CONFIGURATION
+
+-- PTYFORK ------------------------------------------------------------
+
+ptyfork(file,args,env) -> slave ( -> masterdev )
+
+The procedure PTYFORK takes three arguments identical to those taken by
+*SYSEXECUTE, namely, the name of a file containing an executable image,
+a list of strings to pass as arguments (including arg 0), and an
+environment list (or false, in which case *POPENVLIST is used), and
+returns one or two arguments. It attempts to allocate a pseudotty
+pair (master and slave), and if successful, it spawns a subprocess in
+which it runs SYSEXECUTE with the arguments given, first reassigning
+standard input output and error to the slave side of the pseudotty. It
+returns FALSE if it fails, and the name of the slave and the master
+device (opened for input and output), if it succeeds.
+
+For example the call:
+
+    ptyfork('/bin/csh',['csh'],false) -> s -> md;
+
+will create a CSH subprocess using the same environment as the POPLOG
+process and return a device MD for communicating with it. Any output
+produced by the CSH process can be read from MD (see *SYSREAD), and
+anything written to MD (see *SYSWRITE) will appear to the CSH process as
+though it had been typed to the 'tty' it is connected to. S will contain
+the name of this tty (eg '/dev/ttyp3').    
+
+Notes
+-----
+
+PTYFORK does a 'double fork' which means that you do not have to worry
+about 'waiting' for the subprocess (see *SYSUTIL/SYSWAIT), when you have
+finished with it, just close the device (see *SYSCLOSE).
+
+PTYFORK currently only knows about the first 48 pseudottys, so even if
+your system is configured to have more, it will not find them.
+
+
+-- GET_PTY_PAIR -------------------------------------------------------
+
+PTYFORK uses a utility routine, GET_PTY_PAIR, which is also available to
+the user. GET_PTY_PAIR tries to locate a pseudotty pair which is free
+for use. It takes no argument and returns either FALSE (meaning it
+failed to locate a pseudotty pair), or a string (the name of the slave
+tty) and a device (the master device allocated):
+
+    get_pty_pair() -> slave -> masterdev;
+
+The master is opened (for input and output) to ensure the pair is
+allocated properly to this process - otherwise some other process may
+open it, thus effectively denying this process use of the pair (only one
+process may have a master open at a time).
+
+
+-- SLAVE TTY CONFIGURATION --------------------------------------------
+
+For advanced users only:
+
+When PTYFORK creates the subprocess, it carries out various
+configuration operations on the slave side of the pseudotty, using
+*SYS_IO_CONTROL.
+
+First of all, it makes the pseudotty the 'controlling tty' (see Unix Man
+(4) tty) for the subprocess (it would otherwise inherit the same
+controlling tty as the POPLOG process). This means that you can control
+the subprocess by sending characters to it through the master (sending
+ctrl C will interrupt it, ctrl Z will do end_of_file etc.). Then it
+copies the terminal modes of the POPLOG process (specifically, those of
+POPDEVOUT) onto the slave tty. Thus the slave will have the same 'stty'
+settings (for interrupt, end-of-file etc.) as POPLOG has. The 'tchars'
+and 'ltchars' structures (6-character string) it uses are available as
+the global constants PTY_TCHARS and PTY_LTCHARS - they can be used by a
+program to discover what the control characters for the child process
+are. Finally, it sets some of the tty mode flags explicitly, in effect
+it does:
+
+    % stty -echo -cbreak -raw nl
+
+(see Unix MAN (1) stty).
+
+--- C.unix/help/ptyfork
+--- Copyright University of Sussex 1992. All rights reserved. ----------

@@ -1,0 +1,50 @@
+HELP XptDeferApply                                   A.Sloman March 1992
+
+This is a temporary help file.
+
+From rogere@cogs.susx.ac.uk Wed Apr  1 11:38:41 1992
+From: Roger Evans <rogere@cogs.susx.ac.uk>
+Date: Wed, 1 Apr 92 11:41:49 +0100
+To: A.Sloman
+Subject: Re: information please
+Cc: xpop@cogs.susx.ac.uk
+
+
+XptDeferApply and XptSetXtWakeup
+
+(I didn't see any earlier response - sorry if I missed it
+
+When poplog isn't doing anything in particular (eg when its waiting for
+input, or hibernating), it passes control over the the toolkit event
+handlers, (because otherwise some events don't get handled properly).
+All poplog activity in this state occurs via callbacks procedures
+previously registered, and control only returns to 'top-level' poplog if
+there's an interrupt, or input on a relevant device etc.. However, what
+you can/should actually do in a callback is fairly restricted - toolkit
+event handling is not permitted (because the toolkit handlers rean't
+re-entrant, and you're already inside one), and staying in a callback
+for a significant length of time is frowned upon. So often in a callback
+you want to specify that something be done after the callback has
+'returned'. This is what XptDeferApply is for - it takes a single
+procedure argument, and adds it to a list of deferred procedures which
+will get run as soon as it is 'safe' to do so, ie when we're back
+outside in top-level poplog. But just deferring some procedure call in
+this way isn't always enough, because it doesn't actually force control
+to return to poplog - we stay in the toolkit code until we see an
+interrupt or input. This is what -XptSetXtWakeup- (which takes no
+arguments) is for - it tells the toolkit that poplog wants control back,
+and control is returned at the next convenient point (ie after all the
+callbacks etc associated with the event currently being processed have
+been run). So typically in a callback you might do:
+
+    define my_callback(...);
+        define lconstant top_level_response();
+            ....
+        enddefine;
+
+        XptDeferApply(top_level_response);
+        XptSetXtWakeup();
+    enddefine;
+
+
+roger

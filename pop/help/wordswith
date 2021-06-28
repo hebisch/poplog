@@ -1,0 +1,285 @@
+HELP WORDSWITH                                       A.Sloman, July 1988
+                                       Updated Jonathan Meyer, Sept 1993
+
+Facilities for finding words in the current Poplog word dictionary which
+contain a given string or string pattern.
+
+WORDSWITH
+    wordswith(<string | word>) -> <list of words>
+    (String patterns are not allowed).
+
+MATCH_WORDSWITH
+    match_wordswith(<string|word>:S>,<procedure:P>) -> <list>
+
+        Returns a sorted list of all words W such that P(S,W).
+
+    match_wordswith(<string-pattern:S>) -> <list>
+
+        Returns a list of all the words W that match S
+
+VED_WORDSWITH
+    <ENTER> wordswith <string-pattern>
+        Displays matching words in a temporary VED buffer, using a format
+        controlled by wordswith_spacer, which is an integer or procedure.
+
+
+The <string-patterns> used can contain special pattern elements, as
+explained below.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Overview
+  2   wordswith(<string | word>) -> <list>
+  3   String patterns for match_wordswith or <ENTER> wordswith
+  4   wordswith VS match_wordswith
+  5   Displaying matching words in a VED buffer
+  6   Displaying ALL words in the dictionary
+  7   Controlling format: wordswith_spacer
+  8   Related documentation
+
+
+
+-----------------------------------------------------------------------
+1  Overview
+-----------------------------------------------------------------------
+This collection of facilities can be used to find out what words are in
+the current Poplog dictionary, shared by POP-11 and Prolog.
+
+Some of the procedures simply produce an alphabetically sorted list of
+words matching their argument, while others display the words in a VED
+buffer.
+
+(See REF * WORDS and HELP * APPDIC for more information on words and the
+POP-11 dictionary. Note that words that are in the dictionary need not
+be identifiers in the current section. See REF * SECTIONS)
+
+
+
+-----------------------------------------------------------------------
+2  wordswith(<string | word>) -> <list>
+-----------------------------------------------------------------------
+This is the most primitive of the facilities provided. The argument for
+the Pop-11 library procedure wordswith is a word or string that is taken
+literally.
+
+wordswith just returns an alphabetically ordered list of all the words
+in the dictionary containing the string or word. E.g.
+
+    wordswith('integer') =>
+    ** [biginteger integer integer_bitcount integer_field
+        integer_leastbit integer_length isbiginteger isinteger
+        vedvt100screeninteger]
+
+
+
+-----------------------------------------------------------------------
+3  String patterns for match_wordswith or <ENTER> wordswith
+-----------------------------------------------------------------------
+The procedure match_wordswith and the VED command <ENTER> wordswith are
+more flexible than wordswith as they allow the use of string patterns
+which can be used to control the match with words in the dictionary.
+
+A string pattern is a POP-11 string which is to be matched against words
+in the dictionary in order to select a subset of them. These patterns
+are Poplog 'regular expressions'. The following table summarises the
+patterns that are available:
+
+    Pattern     Meaning
+    -------     -------
+    @. or @?    match any single character
+    @*          match zero or more occurrences of the previous character
+    @^ or @a    constrains a match to the start of the line
+    @$ or @z    constrains a match to the end of the line
+    @<          constrains match to the start of a word boundary
+    @>          constrains match to the end of a word boundary
+    @{N@}       matches N occurrences of previous character, where N is
+                a positive integer.
+    @{N,@}      matches N or more occurences of the previous character
+    @{N,M@}     match at least N, at most M occurrences of previous
+                character, where N and M are positive integers
+    @[...@]     match any character between the brackets, where ... is
+                any characters e.g. abc or range of characters e.g. A-Z
+    @[^...@]    match any character except those between the brackets
+    @(...@)     denotes a sub-expression for use with @N
+    @N          match a repeat of the N'th sub-expression where N is
+                a number 1-9
+    @C          match C where C is the search delimeter or `@'
+    @i          turns off case sensitivity for subsequent letters
+    @c          turns on case sensitivity for subsequent letters
+
+See TEACH * REGEXP for examples using these patterns, and REF * REGEXP
+for a more detailed discussion of regular expressions. You may also want
+to read TEACH * VEDSEARCH which gives examples of using these patterns
+in VED.
+
+
+
+-----------------------------------------------------------------------
+4  wordswith VS match_wordswith
+-----------------------------------------------------------------------
+The two procedures wordswith and match_wordswith return alphabetically
+sorted lists of words from the dictionary matching their argument. The
+difference is that wordswith can take either a word or a string simply
+selects all the words containing the word or string anywhere, whereas
+match_wordswith takes only strings as input and is sensitive to strings
+containing pattern elements as described above.
+
+These procedures can be used independently of VED.
+
+E.g.
+
+    match_wordswith('@ainteger') =>
+    ** [integer integer_bitcount integer_field integer_leastbit
+        integer_length]
+
+    match_wordswith('integer@z') =>
+    ** [biginteger integer isbiginteger isinteger vedvt100screeninteger]
+
+    match_wordswith('@?integer@?') =>
+    ** []
+
+If either wordswith or match_wordswith is given an empty string as
+argument it will return a sorted list of all the words in the
+dictionary.
+
+Instead of a string pattern, match_wordswith can be given two arguments,
+the first a word or string S, and the second a procedure for matching S
+against words in the dictionary. E.g.
+
+    match_wordswith("cat",isstartstring) ==>
+    ** [cat catches]
+
+    match_wordswith("cat",hassubstring) ==>
+    ** [c cat]
+
+
+
+-----------------------------------------------------------------------
+5  Displaying matching words in a VED buffer
+-----------------------------------------------------------------------
+The command
+    <ENTER> wordswith <string-pattern>
+
+is probably the most convenient interface for finding out about words
+currently in the dictionary, though a program would probably use one of
+wordswith or match_wordswith or to make a list of matching words.
+
+The VED command
+    <ENTER> wordswith <string-pattern>
+
+can take any of the string pattern formats listed above and described in
+detail in REF * REGEXP.
+
+All words in the current POP-11 dictionary matching the pattern will
+then be displayed in a temporary VED buffer. For example,
+
+    <ENTER> wordswith @aword
+
+would produce all words starting with 'word', thus:
+
+    word             word_dict_status word_identifier  word_string
+    wordright        wordswith        wordswith_spacer
+
+Whereas
+
+    <ENTER> wordswith @?word@?
+
+produces only the words containing 'word' as an embedded string, e.g.:
+
+    Lisp_keyword_package fast_word_string     match_words
+    match_wordswith      matchwords           ved_wordswith
+    vedvarskeywords      vedwordleft          vedwordleftdelete
+
+The format produced can be controlled as described below, using
+wordswith_spacer
+
+If no argument is given, <ENTER> wordswith will show ALL the words in
+the dictionary.
+
+
+
+-----------------------------------------------------------------------
+6  Displaying ALL words in the dictionary
+-----------------------------------------------------------------------
+If the argument for match_wordswith is an empty string, then a list of
+ALL the words in the dictionary will be returned.
+
+Similarly if if <ENTER> wordswith is used with no argument, then ALL the
+words in the dictionary will be displayed in a VED buffer, including
+some unprintable ones, whose characters can be inspected in VED using
+the <ENTER> cc (describe current character) command.
+
+
+
+-----------------------------------------------------------------------
+7  Controlling format: wordswith_spacer
+-----------------------------------------------------------------------
+Matching words found by <ENTER> wordswith are displayed in a temporary
+VED file, using the user-assignable format controller held in the
+variable wordswith_spacer which can be an integer or a procedure. It
+defaults to the procedure vedtabright which causes the words to be
+printed neatly in columns.
+
+If wordswith_spacer is an integer N, then N spaces are left between the
+words when they are displayed in the file. If the words are of varying
+length this can look untidy, but will generally be more compact than a
+column display.
+
+The VED variable vedbreak is ignored, but vedlinemax is used to control
+the width of the display.
+
+If wordswith_spacer is a procedure, then the procedure is run after
+every word is inserted in the file, to find the location to start the
+next word.
+
+The most commonly used value for wordswith_spacer is likely to be
+vedtabright, which will display the words in columns. To ensure that
+this works, the procedure ved_wordswith locally changes vedindentstep to
+be one more than the length of the longest word found.
+
+
+For example:
+
+Using the default vedtabright, the command
+
+    <ENTER> wordswith integer
+
+produces a VED buffer containing:
+
+  biginteger            integer               integer_bitcount
+  integer_field         integer_leastbit      integer_length
+  isbiginteger          isinteger             vedvt100screeninteger
+
+
+Whereas if the command is preceded by
+
+    2 -> wordswith_spacer;
+
+it produces the more compact but less tidy format:
+
+  biginteger  integer  integer_bitcount  integer_field  integer_leastbit
+  integer_length  isbiginteger  isinteger  vedvt100screeninteger
+
+
+
+-----------------------------------------------------------------------
+8  Related documentation
+-----------------------------------------------------------------------
+See also:
+
+HELP * ISSUBSTRING * ISENDSTRING * ISSTARTSTRING * ISMIDSTRING
+    String matching routines
+
+HELP * APPDIC     - applies procedure to words in the dictionary
+
+REF * REGEXP      - regular expression matching
+REF * STRINGS     - overview of information on strings
+REF * WORDS       - information about words and the dictionary
+REF * VEDSEARCH   - searching and substituting in VED
+
+SHOWLIB * match_wordswith * ved_wordswith
+    For details of the procedures used.
+
+
+--- C.all/help/wordswith
+--- Copyright University of Sussex 1988. All rights reserved.

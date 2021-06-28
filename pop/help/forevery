@@ -1,0 +1,65 @@
+HELP FOREVERY                                           AS JLC, July 1982
+
+This is used for selective iteration over a database. The formats of
+FOREVERY are:
+
+    forevery <list of patterns> do <actions> endforevery;
+    forevery <list of patterns> in <database> do <actions> endforevery;
+
+When 'in <database>' is omitted, then the value of the POP-11 variable
+DATABASE is used as the database (see HELP *DATABASE).
+
+FOREVERY is a generalization of *FOREACH. FOREVERY is to *ALLPRESENT as
+FOREACH is to *PRESENT.
+
+FOREVERY tries to find (almost) every possible way of matching (see HELP
+*MATCHES) the list of patterns against the database. For each such match,
+FOREVERY produces an instantiation of the list of <patterns> and assigns it
+to the variable THEM, which may be used inside <actions>. Here is a simple
+example of the use of FOREVERY:
+
+     vars database;
+     [
+       [1 ison 2] [2 ison 3]
+       [a ison b][b ison c] [d ison e] [e ison f] [g ison h] [a ison i]
+     ]
+         -> database;
+
+     vars x,y,z;
+
+     forevery [[?x ison ?y:isword][?y ison ?z]] do
+         them =>
+         [^x is above ^z] =>
+     endforevery;
+
+     ** [[a ison b] [b ison c]]
+     ** [a is above c]
+     ** [[d ison e] [e ison f]]
+     ** [d is above f]
+
+     forevery [[??x ison ?y:isword][?y ison ??z]] do
+         them =>
+         [^x is above ^z] =>
+     endforevery;
+     ** [[a ison b] [b ison c]]
+     ** [[a] is above [c]]
+     ** [[d ison e] [e ison f]]
+     ** [[d] is above [f]]
+
+Warning: if the list of patterns contains a pattern with ??, capable of
+matching the same database item in different ways, then FOREVERY will only
+find one way of matching the pattern with that item. E.g.
+
+    [[c a b b a g e]] -> database;
+    forevery [[??x b ??y]] do ....
+
+This will not first match the "b" in the pattern to the first "b" in the
+database, then match it to the second "b" (though the matcher may one day be
+extended to allow this).
+
+See HELP
+    *DATABASE - for use of the POP-11 database
+    *FOR      - Iteration over lists and integers
+    *FOREACH  - Selective iteration over a database by matching a pattern
+    *WHICH    - uses FOREVERY to instantiate variables from a database
+    *LOOPS    - for other types of iteration

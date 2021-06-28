@@ -1,0 +1,297 @@
+HELP MATCHES                                       A. Sloman, March 1982
+                                                    Modified 29 Jun 2009
+
+
+    <list> matches <list with pattern elements> -> <boolean>;
+    <list> --> <list with pattern elements>;
+
+For a tutorial introduction to the POP-11 matcher see the following
+TEACH files:
+
+    TEACH *MATCHES
+    TEACH *MATCHES2
+    TEACH *MOREMATCH
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- THE POP-11 MATCHER
+ -- PATTERN ELEMENTS WITH ADDITIONAL RESTRICTIONS
+ -- THE MATCHER ARROW
+ -- Note on "!" with patterns
+
+-- THE POP-11 MATCHER --------------------------------------------------
+
+MATCHES is an infix operator which takes two arguments, returns a
+boolean result (TRUE or FALSE), and as a side effect can bind variables.
+The first argument is any list, and the second argument is a list which
+may contain pattern elements.
+
+MATCHES works by attempting to find a match between the two lists;
+ordinary list elements must be identical, but list elements in the first
+list may match pattern elements in the second. These elements make
+certain restrictions on what can be in that position in the list.
+Pattern elements may be:
+
+    =               match one item
+    ==              match an arbitrary number of items
+    ?<variable>     match one item and bind it to the variable
+    ??<variable>    match any number of items (possibly none), make a
+                    list of them, and bind the list (possibly []) to the
+                    variable.
+
+(Note: MATCHES can also be used with vectors as arguments, but
+?<variable> and ??<variable> do not work on vectors; MATCHES simply
+behaves like = under these circumstances.)
+
+
+-- PATTERN ELEMENTS WITH ADDITIONAL RESTRICTIONS -----------------------
+
+    ??<variable>:integer    e.g. ??x:3
+                    Restrict the variable to match the given number of
+                    items.
+
+    ?<variable>:<procedure name>    e.g. ?x:isword
+    ?<variable>:<procedure>         e.g. ?x: % ismorethan(%0%) %
+                    Before allowing the match, apply the procedure to
+                    the matching item. If the result is FALSE, don't
+                    allow the match to succeed. If the result is TRUE,
+                    allow it. If the result is anything else, allow the
+                    match, but bind the result to the variable.
+
+    ??<variable>:<procedure name>   e.g. ??x:noun_prhase
+    ??<variable>:<procedure>        e.g. ??x: % refersto(%item%) %
+
+Other elements of patterns are compared with corresponding elements of
+the list, using the equality test = rather than strict equality ==, so
+that two lists, strings or vectors with the same elements will match.
+
+-- -- Examples of the matcher at work:
+
+    vars list x y;
+    [a b c d e] -> list;
+
+    list matches [a b c d e] =>
+    ** <true>
+
+    list matches [ a == e] =>
+    ** <true>
+
+    list matches [ a = c = e] =>
+    ** <true>
+
+    list matches [ a = d = e ] =>
+    ** <false>
+
+-- -- Examples with variable binding:
+
+    list matches [?x b c d e] =>
+    ** <true>
+
+    x=>
+    ** a
+
+    list matches [?x d e] =>
+    ** <false>
+
+    list matches [??x d e] =>
+    ** <true>
+
+    x =>
+    ** [a b c]
+
+    list matches [??x c ??y] =>
+    ** <true>
+
+    x=>
+    ** [a b]
+
+    y=>
+    ** [d e]
+
+    list matches [??x ??y] =>
+    ** <true>
+
+    x=>
+    ** []
+
+    y=>
+    ** [a b c d e]
+
+-- -- Repeated Variables:
+
+If the same variable is used more than once in the pattern, the match
+will succeed only if it is matched against the same thing in all its
+occurrences. Thus:
+
+    [a b c a b c] matches [??x ??x] =>
+    ** true
+
+    x=>
+    [a b c]
+
+    [a b c c b a] matches [??x ??x]=>
+    ** false
+
+-- -- Examples with restrictions on matches:
+
+    list matches [??x:3 ??y] =>
+    ** <true>
+
+    x =>
+    ** [a b c]
+
+    y=>
+    ** [d e]
+
+    list matches [?x:isinteger ??y] =>
+    ** <false>
+
+    list matches [?x:isword ??y] =>
+    ** <true>
+
+    x=>
+    ** a
+
+    y=>
+    ** [b c d e]
+
+    list matches [??x:length d e] =>
+    ** <true>
+
+    x=>
+    ** 3
+
+    define value(item);
+        if item == "a" then 10
+        elseif item == "b" then 20
+        else false
+        endif
+    enddefine;
+
+    list matches [?x:value == ] =>
+    ** <true>
+
+    x=>
+    ** 10
+
+    list matches [== ?x:value] =>
+    ** <false>
+
+    list matches [??x:value d e] =>
+    ** <false>
+
+    [a 3 ] matches [a ?x: %nonop>(%0%)%] =>
+    ** <true>
+
+    x=>
+    ** 3
+
+
+-- THE MATCHER ARROW ---------------------------------------------------
+
+The infix operator --> calls MATCHES, but instead of producing a boolean
+result it produces no result, but causes an error if the arguments don't
+match. It can therefore function as a multiple assignment, e.g.
+
+    list --> [?x ?y ?z]
+
+will assign the three elements of LIST to X, Y and Z.
+
+-- -- WARNING:
+    If a match fails, variables in the pattern have undefined values.
+    I.e. the value can be altered by either a successful or an
+    unsuccessful match.
+
+-- Note on "!" with patterns ------------------------------------------
+
+An extension to Pop-11 produced at Birmingham allows patterns to be
+preceded by "!" which has the effect that if the pattern is used inside
+a procedure, then the pattern variables preceded by "?" or "??" can be
+made "lvars", so that they do not need to be declared as "vars".
+
+    SEE TEACH * VARS_AND_LVARS
+
+This reduces bugs in programs due to unintended interactions between
+global variables, and also allows variables declared as "lvars" to be
+used in patterns. Example:
+
+define next_after(item, list) -> next;
+    ;;; given item and list, return the first thing after item in list
+    ;;; or false if there isn't one.
+    ;;; Note: input and output variables (item, list and next) are
+    ;;;  automatically declared as lvars.
+
+    lvars found;    ;;; the pattern variable
+    if list matches ! [ == ^item ?found == ] then
+        found -> next
+    else
+        false -> next
+    endif
+enddefine;
+
+/*
+;;; Test that:
+
+next_after(3, [1 2 3 4 5]) =>
+** 4
+
+next_after(6, [1 2 3 4 5]) =>
+** <false>
+
+next_after("cat", [the cat [did sit] on mat] ) =>
+** [did sit]
+
+*/
+
+That procedure would not work without the "!" list prefix. The space
+between "!" and "[" is not required. It was inserted for clarity.
+
+Strictly speaking, preceding a pattern with "!" inside a procedure does
+TWO things. First it treats all the pattern variables in the list,
+i.e. all those following "?" or "??", as lvars local to the current
+procedure. If you have not declared those variables as lvars you will
+get a warning message. Try removing the lvars declaration from the above
+procedure and recompiling it.
+
+Secondly it changes the pattern so that instead of words following "?"
+or "??" it contains identifier records, which the pattern matcher can
+use to "communicate with" the local lvars in the procedure. This is
+possible only since Poplog Version 15.0
+
+The change to the pattern contents may show up if you use the Pop-11
+tracer. This is how patterns print out without and with "!".
+
+    [ == cat ?next == ] =>
+    ** [== cat ? next ==]
+
+    ! [ == cat ?next == ] =>
+    ** [== cat ? <ID next <undef next>> ==]
+
+The <ID ...> tells you that a word has been replaced with an identifier,
+and the <undef next> tells you that this is an undefined global
+variable.
+
+If you give the identifier a value, its value shows when the pattern is
+printed out:
+    "dog" -> next;
+    ! [ == cat ?next == ] =>
+    ** [== cat ? <ID next dog> ==]
+
+Inside a procedure, the default undefined value is likely to be 0,
+though that depends on the implementation.
+
+See also HELP
+    *MATCHESONEOF - takes a list of patterns and tries to find one match
+    *MATCHESALLOF - takes a list of patterns, all of which must match
+    *DATABASE     - use of the POP-11 DATABASE
+    *AREIN        - matches a list of patterns against list elements
+    *ISIN         - matches a single pattern against list elements
+
+
+    *FMATCHES     - a version of the matcher that can use lexical
+        variables, work in sections, and solve some matching problems
+        that -matches- cannot. This is now redundant because of "!"
+
+--- C.all/help/matches
+--- Copyright University of Sussex 1990. All rights reserved. ----------

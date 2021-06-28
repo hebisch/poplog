@@ -1,0 +1,344 @@
+HELP CCOMP (Unix only)                                 A.Sloman Aug 1988
+
+    <ENTER> ccomp
+    <ENTER> ccomp <file>
+    <ENTER> ccomp <file1> <file2> <file3> ..
+
+Compile and run C programs from a Ved buffer, and read output into a
+temporary Ved file.
+
+Optional flags:
+    -i          run program interactively (output not saved in Ved)
+    -c          compile only to object files
+    -S          produce assembler output
+    -lm         use the math library (for sqrt, sin, cos, etc)
+    -o <name>   use <name> for the executable file
+
+Other options described in MAN * CC may also be used.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Overview
+  2   Compiling and running a single file
+  3   Multiple file names
+  4   Optional flags: -i, -c, -o, -S
+  5   Specifying the executable image using -o
+  6   Default executable image name
+  7   Producing only object files using the -c flag
+  8   Use of maths library, with -lm
+  9   Running your progam interactively using -i
+ 10   Linking a set of .o files
+ 11   Renaming of image files
+ 12   User assignable defaults: ccomp_command, ccomp_pre, and ccomp_post
+ 13   Use a sub-directory
+ 14   Related Poplog documentation
+ 15   Related Unix "man" files
+
+
+-----------------------------------------------------------------------
+1  Overview
+-----------------------------------------------------------------------
+
+    <ENTER> ccomp
+
+This command will compile and run a C program, and if it is non-
+interactive, will then read the output (if there is any) into a Ved
+buffer. It makes use of the Unix cc command, to invoke the C
+preprocessor, compiler, and if necessary the linker ld.
+
+Interactive programs need the -i flag and are treated differently.
+
+As with the Unix cc command, <ENTER> ccomp provides the option, using
+the -c flag, to compile C programs to object files only without linking
+them into executable images; and the option, using the -S flag, to
+translate to Unix assembler.
+
+It also provides the option to take object files, or a mixture of source
+files and object files, and invoke the linker to produce an executable
+image.
+
+There is a similar facility for Fortran (f77) programs, <ENTER> fcomp,
+described in HELP * FCOMP.
+
+
+-----------------------------------------------------------------------
+2  Compiling and running a single file
+-----------------------------------------------------------------------
+
+<ENTER> ccomp can be given as argument a file whose name ends in .c and
+contains a C program.
+
+If no argument is given the current file is assumed, which should be a C
+program file (with suffix .c).
+
+Unless the -i flag is provided, any output, including compiler error
+messages, will be put into a temporary Ved file.
+
+
+-----------------------------------------------------------------------
+3  Multiple file names
+-----------------------------------------------------------------------
+
+If several file names ending in .c are present they are all compiled.
+
+Whether they are linked or not will depend on whether the -c flag is
+present.
+
+Files with names ending in .c are taken to be C program files. Files
+with names ending in .o are taken to be object files (which may have
+been produced by other compilers).
+
+
+-----------------------------------------------------------------------
+4  Optional flags: -i, -c, -o, -S
+-----------------------------------------------------------------------
+
+The following optional flags may be included among the arguments:
+
+    -i      means that an interactive program will be produced, so
+            that Ved can't just run it and store the output in a
+            file.
+
+    -c      means that only object files (.o files) should be
+            produced, without being linked into an executable image.
+
+    -o followed by a file name, indicates the name of the
+            the executable image, i.e. the output of the linker.
+
+    -S      translate to assmbler file, with name ending in .s.
+
+
+Note: the -c and -S flags are incompatible with the -i flag and the -o
+flag, since they both require the linker to produce a runnable image,
+whereas the -c and -S flags suppress this.
+
+
+-----------------------------------------------------------------------
+5  Specifying the executable image using -o
+-----------------------------------------------------------------------
+
+Normally, if an executable image is created, the default name given by
+the linker is a.out. However, <ENTER> ccomp, like the Unix cc command,
+allows the user to specify the name of the output file via the -o flag.
+
+If part of the argument line is of the form:
+
+    -o <file>
+
+Then <file> is taken as the name of the output file, i.e. the executable
+file produced. E.g.
+
+    <ENTER> ccomp -i foo.c -o runfoo
+
+Will compile foo.c, creating the executable file runfoo, which will then
+be run in "interactive" mode. (See below).
+
+
+-----------------------------------------------------------------------
+6  Default executable image name
+-----------------------------------------------------------------------
+
+If the -o flag is not used, then <ENTER> ccomp will try to work out a
+suitable name for the executable image, as follows.
+
+If there is only one file name given, then that name less the suffix .c,
+or if no file name is given then the name of the current file less the
+suffix .c is used for the output file. (If the only file name given ends
+in .o then that less the suffix will be used.)
+
+If several file names to be compiled are given, and the -o flag is not
+used to indicate the output name, then if an executable image is
+produced it will be called a.out - the Unix default name.
+
+
+-----------------------------------------------------------------------
+7  Producing only object files using the -c flag
+-----------------------------------------------------------------------
+
+<ENTER> ccomp -c
+    If the current file is called foo.c, this will compile an object
+    file called foo.o
+
+<ENTER> ccomp -c foo.c
+    This will do the same.
+
+<ENTER> ccomp -c foo.c baz.c grum.c
+    Compiles all three files, producing foo.o, baz.o, grum.o
+
+The .o files may later be linked together, as explained below.
+
+<ENTER> ccomp -c *.c
+    Compiles all .c files in the current directory, producing
+    corresponding .o files.
+
+If the -c flag is not included, then <ENTER> ccomp will attempt to link
+the program and run it, with output going into a Ved file.
+
+
+-----------------------------------------------------------------------
+8  Use of maths library, with -lm
+-----------------------------------------------------------------------
+
+There are several mathematical functions (e.g. sin, cos, sqrt, exp, log,
+etc.) provided in the maths library /usr/lib/libm.a. For a full list see
+the Unix manual page man -s3m intro.
+
+These functions can be used only if the compiler is given the -lm flag,
+to the RIGHT of the name of the .c or .o file that accesses the
+functions, e.g. the following will work:
+
+    <ENTER> ccomp myprog.c -lm
+    <ENTER> ccomp *.c -lm -o myprog
+    <ENTER> ccomp *.c -o myprog -lm
+
+The following will not work:
+
+    <ENTER> ccomp -lm myprog.c
+
+Every .c file using these functions should have, at the top:
+
+    #include <math.h>
+
+so that the relevant identifiers are declared.
+
+If you wish to see what declarations are given, use Ved to look at the
+file /usr/include/math.h
+
+
+-----------------------------------------------------------------------
+9  Running your progam interactively using -i
+-----------------------------------------------------------------------
+
+If the flag -i occurs in the argument, then the file is assumed to
+define an interactive program, and when the program is run the screen is
+re-set, and output is not read back into Ved.
+
+The cursor is put at the bottom of the screen, and the interaction
+continues till the program finishes. After that Ved will as usual say
+"VED HERE: PRESS RETURN TO CONTINUE:".
+
+WARNING: If you write an interactive program, and compile and link it
+using <ENTER> ccomp, without giving the -i flag, then when the program
+is run it will sit and wait for input which cannot be provided, and you
+will have to use the interrupt key.
+
+
+Note if you produce an interactive program and want to run it and keep a
+log file with the interaction, then you can use the Unix script
+facility, described in MAN * SCRIPT.
+
+
+-----------------------------------------------------------------------
+10  Linking a set of .o files
+-----------------------------------------------------------------------
+
+<ENTER> ccomp foo.o baz.o grum.o -o runnit
+
+This will link the (previously compiled) files foo.o, baz.o and grum.o
+into an executable file called runnit, and then will run the program,
+saving any output in a Ved file. If it is an interactive program then
+the -i flag must be included, e.g.
+
+<ENTER> -i ccomp foo.o baz.o grum.o -o runnit
+
+As before, except that the program is run interactively, and output goes
+to the terminal, not a Ved file.
+
+In the above formats it is possible to include one or more .c files.
+they will be compiled as needed, and the resulting object files linked
+to the pre-existing object files to create a runnable image.
+
+
+-----------------------------------------------------------------------
+11  Renaming of image files
+-----------------------------------------------------------------------
+
+WARNING: If the output file is to be called test and there is already an
+old file of that name, it is re-named as test-. The program prints a
+warning, in case the file needs to be saved. If you run <ENTER> ccomp
+again, the most recent output file will be named test- and any earlier
+version will be lost forever.
+
+For this reason the program pauses for two seconds to warn you that the
+file is being renamed. You can interrupt during that time if you want to
+save the file.
+
+This warning and pause can be suppressed by doing:
+
+    false -> ccomp_chatty;
+
+
+-----------------------------------------------------------------------
+12  User assignable defaults: ccomp_command, ccomp_pre, and ccomp_post
+-----------------------------------------------------------------------
+
+The user-assignable variable ccomp_command specifies the name of the C
+compiler to run. Its default value is 'cc'. If, for example, you want
+<ENTER> ccomp to use the GNU C compiler, do:
+
+    'gcc' -> ccomp_command;
+
+before (auto)loading LIB * VED_CCOMP.
+
+The variables ccomp_pre and ccomp_post may be used to specify extra
+options to be inserted into the command given to the C compiler. The
+following specifications apply only if the identifiers are not false,
+and hold strings:
+
+ccomp_pre   The contents of this string will be inserted after the
+            value of ccomp_command and before all the other arguments.
+
+ccomp_post  The contents of this string will be inserted after all the
+            other arguments to the C compiler.
+
+So, for example if you always want to include one of your .o files
+defining various utilities, always use the M68881 floating point
+co-procoessor, and always want to use the C maths library you could do
+the following:
+
+    '-fM68881 mylib.o' -> ccomp_pre;
+    '-lm' -> ccomp_post;
+
+The output file created by <ENTER> ccomp will show the effect, since it
+includes the command string created.
+
+
+-----------------------------------------------------------------------
+13  Use a sub-directory
+-----------------------------------------------------------------------
+
+A good way to reduce the risk of output files created by <ENTER> ccomp
+(and 'cc') overwriting other files, is to develop all your C programs in
+a special sub-directory.
+
+
+-----------------------------------------------------------------------
+14  Related Poplog documentation
+-----------------------------------------------------------------------
+
+HELP * FCOMP
+    - describes a similar mechanism for compiling and running fortran
+    (f77) programs from Ved.
+
+HELP * PIPEUTILS
+    - explains the use of vedpipein and pipein, used to define ved_ccomp
+    and ved_fcomp.
+
+HELP * IMCSH, * IMSH
+    - "immediate mode" interaction with csh or sh via a Ved buffer. For
+    experienced users this may be more convenient than using ved_ccomp
+    or ved_fcomp.
+
+To examine the source code: SHOWLIB * VED_CCOMP.
+
+
+-----------------------------------------------------------------------
+15  Related Unix "man" files
+-----------------------------------------------------------------------
+
+MAN * CC, MAN * CPP, MAN * LD.
+
+
+--- C.unix/help/ccomp
+--- Copyright University of Sussex 1988. All rights reserved.

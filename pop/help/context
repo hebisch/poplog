@@ -1,0 +1,69 @@
+HELP CONTEXT                                   Allan Ramsay, 31 October 1983.
+
+    lib context;
+
+LIB CONTEXT provides facilities for saving and restoring the values of a
+set of global variables so that the state of a computation may be saved
+and later resumed. The following procedures are provided:
+
+--- REGISTERS <var1> ... <varN> ; --------------------------------------
+
+declares a set of global variables whose values may be saved to be
+reinstated later. These "variables" are in fact 0-ary operators, so that
+whilst you can assign to them and access their values just as if they were
+ordinary variables, you CANNOT use them as local variables in procedure
+definitions.
+
+--- FORK; --------------------------------------------------------------
+
+saves a copy of the current context (i.e. the values of all the registers
+you have defined) on a stack of such contexts. You can carry on working,
+using the current context, until you find that you are not getting
+anywhere, at which point
+
+--- REINSTATE; ---------------------------------------------------------
+
+will reset the registers to have the values they had at the last FORK.
+FORK and REINSTATE between them provide chronological backtracking, in
+that the context that gets restored when you reach a failure is always the
+last one that was saved. If you want to be able to make informed decisions
+about what to restore after a failure you should use SPLIT and RESTART.
+
+--- SPLIT -> X; --------------------------------------------------------
+
+will put a copy of the current context in X, for you to save for later,
+e.g. in a table of [<pattern> <context>] pairs. Then when you subsequently
+get a failure you can look at your saved contexts, choose one, and use
+
+--- RESTART(<context>); ------------------------------------------------
+
+to reset the registers as they were when the context was saved.
+
+--- NEW_STATES; --------------------------------------------------------
+
+will clear the stack of saved contexts and reset all the registers to be
+"undef". This MUST be done before the first time you attempt to access or
+assign to any registers, or you will get a MISHAP.
+
+You may find that you want to inspect the value of a register in some
+context other then the current one, e.g. in an ATN parser you may need to
+inspect the value of some register in the context that you used for
+constructing a subtree. You can do this with
+
+<context> @ <register> ;
+
+Thus
+
+    registers category parent;   ;;; declares category and parent as registers
+    "S" -> category;             ;;; sets value of category
+    split -> parent;             ;;; saves current state as value of parent
+    "NP" -> category;            ;;; resets value of category
+    category =>                  ;;; what's its value in the current context ?
+    ** NP
+    parent @ category =>         ;;; what's its value in the previous context ?
+    ** S
+    restart(parent);             ;;; reinstate previous context
+    category =>                  ;;; value of category ?
+    ** S
+    parent =>                    ;;; original value of parent ?
+    ** undef

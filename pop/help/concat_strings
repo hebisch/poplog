@@ -1,0 +1,150 @@
+HELP CONCAT_STRINGS                                  A.Sloman Nov 1992
+
+
+concat_strings(LIST_or_VEC) -> STRING;
+
+Takes a list or vector of strings, ascii character codes, or other
+"explodeable" structures containing characters, and then creates a
+single string (byte-vector) containing all the characters.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+ -- Examples
+ -- -- A list of strings
+ -- -- A vector of words and strings
+ -- -- A list of strings separated by the word space:
+ -- -- A vector of strings separated by tabs
+ -- -- A variable-length vector of words and strings
+ -- -- A vector of words strings and numbers
+ -- concat_strings causes fewer garbage collections than ><
+ -- Problems with pop_pr_quotes are avoided
+ -- Reducing garbage collections by re-using a vector
+ -- Comparing concat_strings with sprintf
+ -- See also
+
+-- Examples -----------------------------------------------------------
+
+-- -- A list of strings
+    concat_strings(['the' 'cat' 'sat']) =>
+    ** thecatsat
+
+-- -- A vector of words and strings
+    concat_strings({the black cat ' sat ' 'on the mat'}) =>
+    ** theblackcat sat on the mat
+
+-- -- A list of strings separated by the word space:
+    concat_strings(['the' ^space 'cat' ^space 'sat']) =>
+    ** the cat sat
+
+-- -- A vector of strings separated by tabs
+    concat_strings({'the' ^tab 'cat' ^tab 'sat'}) =>
+    ** the  cat sat
+
+-- -- A variable-length vector of words and strings
+
+    concat_strings(
+        {'The persons were '
+            %repeat 4 times gensym("person"), space endrepeat%
+         'and no others'}) =>
+    ** The persons were person1 person2 person3 person4 and no others
+
+NB the item produced here is a single string, despite appearances.
+
+-- -- A vector of words strings and numbers
+
+    vars n1 = 32, n2 = 5;
+    concat_strings(
+        {'cat' ^n1 ^space and ' dog' ^n2 ' fought for ' 37.25
+            ' seconds'}) =>
+    ** cat32 and dog5 fought for 37.25 seconds
+
+
+-- concat_strings causes fewer garbage collections than >< ------------
+
+Because concat_strings uses one vector to hold the items to be
+concatenated, and uses the pop-11 stack to pile up the characters to go
+into the resultant string, it can be slightly more efficient than
+repeated uses of ><, such as
+
+    'the' >< 'cat' >< 'sat' >< prep >< object
+
+as the latter creates temporary strings and then discards them whereas a
+typical call to concat_strings needs to construct only ONE temporary
+structure, the vector containing the things to be concatenated into a
+string.
+
+This replaces SEVERAL calls to the store allocation routines with ONE
+call of consstring, and can reduce garbage collections, especially if
+the same vector is re-used each time.
+
+
+-- Problems with pop_pr_quotes are avoided ----------------------------
+
+If pop_pr_quotes is set true then the string concatenator >< will
+produce strings (including temporary, intermediate, strings) with
+embedded string quotes, which is usually not desired, e.g.
+
+    true -> pop_pr_quotes;
+
+    'the' >< space >< 'cat' >< space >< 'sat' =>
+    ** '''''the' ''cat'' ''sat''
+
+This does not happen with <>, but that cannot be used with a mixture of
+words and strings. So it becomes necessary to replace calls of >< with
+sys_><, which can reduce readability of code. E.g.
+
+Compare
+    'the' sys_>< space sys_>< 'cat' sys_>< space sys_>< 'sat' =>
+    ** 'the cat sat'
+with
+    concat_strings({'the' ^space 'cat' ^space 'sat'}) =>
+    ** 'the cat sat'
+
+concat_strings is not sensitive to pop_pr_quotes, as it simply takes
+account of the characters actually provided.
+
+Perhaps the main benefit of concat_strings is improved readability (and
+therefore maintainability) of code when the strings are long.
+
+
+-- Reducing garbage collections by re-using a vector ------------------
+
+In order to minimise garbage collections by re-using a vector with
+concat_strings, first put the items to be concatenated onto the stack,
+then use the procedure fill to "suck" them into the vector (which must
+be of the right length) and apply concat_strings to the result, e.g.
+
+    constant vec = {1 2 3 4 5};
+
+    concat_strings('the',space,'cat',space,'slept',fill(vec)) =>
+    ** the cat slept
+
+This creates only ONE new item. (Inside a procedure use lconstant, to
+ensure that vec is created only once.) It would be possible to improve
+that syntax by defining a macro that worked out the size of the vector
+at compile time and planted code something like the above.
+
+
+-- Comparing concat_strings with sprintf ------------------------------
+
+It is similar in spirit to sprintf, but a little easier to use, as one
+does not need to remember the codes for the formatting directives, and
+in some contexts concat_strings is more efficient.
+
+
+-- See also -----------------------------------------------------------
+
+    HELP * SPRINTF
+    REF * SPRINTF
+
+    REF * ><
+
+    REF * sys_><
+
+    REF * <>
+
+    HELP * fill
+
+
+--- $poplocal/local/help/concat_strings
+--- Copyright University of Birmingham 1992. All rights reserved. ------

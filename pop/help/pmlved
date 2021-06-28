@@ -1,0 +1,312 @@
+HELP MLVED                                     Robert Duncan, Sept. 1987
+                                                      Revised March 1990
+                                                    Revised October 1994
+
+Using the Poplog editor Ved with PML.
+
+This file assumes a familiarity with the basic editor commands and an
+understanding of the load-marked-range facility; for more introductory
+information see HELP * VED, TEACH * VED and HELP * LMR.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Calling Ved from PML
+
+  2   Compiling a file in Ved
+
+  3   Compiling part of a file
+
+  4   Compiling a single ML declaration
+
+  5   Immediate mode evaluation
+
+  6   Locating a particular definition
+
+  7   Calling PML commands from Ved
+
+
+-----------------------------------------------------------------------
+1  Calling Ved from PML
+-----------------------------------------------------------------------
+
+The command
+
+    ved <filename>
+
+typed to the PML top-level prompt will bring up the Ved editor on the
+named file. If the filename argument is omitted from the command, Ved
+will return to the last file edited or loaded, or failing that, to a
+default file called "temp.ml".
+
+Once inside Ved, the command
+
+    <ENTER> pml
+
+will return you to the PML top-level.
+
+Ved is a general purpose editor, so that any kind of file may be edited
+from PML. However, filenames with particular file extensions are assumed
+by Ved to contain ML source code, in which case the compilation
+facilities described below become available. The default file extensions
+which Ved recognises are ".ml" (for most program files) and ".sig" for
+signature definitions. You can use different extensions if you prefer --
+".sml" for example -- by setting the appropriate compiler variables
+described in HELP * COMPILE.
+
+
+-----------------------------------------------------------------------
+2  Compiling a file in Ved
+-----------------------------------------------------------------------
+
+When using the editor on an ML program file, the command
+
+    <ENTER> l1
+
+(for "load-one-file") can be used to compile it. This will compile the
+contents of the current file as they are in the editor buffer,
+regardless of how recently the file has been written out to disk. Any
+bindings resulting from the compilation are added into the global
+environment just as if they had been typed in to the top-level prompt
+(so there is no concept of any local environment associated with the
+current file).
+
+Output from the compilation -- the display of bindings plus any syntax
+or type error messages -- is directed into Ved's current output file.
+This is by default the file "output.ml", but it can be changed by using
+the command
+
+    <ENTER> output <filename>
+
+See HELP * LMR for details.
+
+
+-----------------------------------------------------------------------
+3  Compiling part of a file
+-----------------------------------------------------------------------
+
+By using the editor keys MARKLO and MARKHI you can mark out a range of
+lines within the file being edited: exactly how to do this is described
+in HELP * MARK. If the file is an ML program file, this marked portion
+of the code can then be compiled independently of the rest of the file
+with the command
+
+    <ENTER> lmr
+
+(for "load-marked-range"). On most keyboards this command will be bound
+to the key sequence CTRL-D, but see HELP * LMR for more information.
+
+As with the L1 command described above, all the bindings resulting from
+an LMR command are added into the global environment. This means that
+whenever a file is changed, it is only necessary to recompile those
+declarations in the file which come after the change, as any preceding
+definitions will still be visible. To compile all code from the current
+cursor position to the end of the file, use the command sequence
+
+    MARKLO          (* marks the current cursor position *)
+    <ENTER> mef     (* marks the end of the file *)
+    <ENTER> lmr     (* or CTRL-D: compiles the marked range *)
+
+
+-----------------------------------------------------------------------
+4  Compiling a single ML declaration
+-----------------------------------------------------------------------
+
+The command
+
+    <ENTER> mcp
+
+can be used to mark a single declaration in an ML program file.
+
+The abbreviation MCP stands for "mark-current-procedure", a relic of
+Ved's original association with the language Pop-11; in PML, MCP should
+be interpreted as meaning "mark-current-declaration". The word
+"declaration" here is restricted to meaning a top-level declaration
+starting with one of the declaration keywords (such as val, fun,
+datatype, etc.) and ending with a terminating semicolon; "current"
+implies the declaration surrounding the current cursor position.
+
+By marking out a single declaration with this command and then using the
+LMR feature to compile the range, single declarations can be compiled
+incrementally as they are added into a file. A single command
+
+    <ENTER> lcp
+
+(for "load-current-procedure") will do both these actions at once, and
+with the added advantage of not disturbing any existing range markers.
+This command is usually bound to the simpler key sequence
+
+    <ESC> c
+
+Ved is not a syntax-directed editor and so can only try to determine the
+extent of the current declaration at the time the command is issued. It
+does so with the following heuristic: starting at the current cursor
+position, it searches backwards through the file until it finds a line
+which has a declaration keyword beginning in column 1; that line is
+marked as the start of the range. From there, it searches forwards to
+find a line containing a matching semicolon and marks that as the end of
+the range. To make proper use of this feature then, all top-level
+declarations must start in column 1 of the file, while any local
+declarations must be indented (and "local" here includes declarations
+inside structures and abstypes as well as those in let and local
+blocks).
+
+Remember though that if you are changing an ML declaration (rather than
+adding a new one), it is not always sufficient to recompile only the
+declaration which has changed. Other definitions which have already been
+compiled, and which reference the original version of the declaration,
+will not see the change and will continue to use the earlier version
+(this follows from the strict "define before use" semantics of ML). To
+see the true effect of a changed declaration, you must also recompile
+everything which uses it.
+
+
+-----------------------------------------------------------------------
+5  Immediate mode evaluation
+-----------------------------------------------------------------------
+
+Ved's "immediate mode" provides a feature whereby you can interact with
+the PML top-level from inside an editor file. The command
+
+    <ENTER> im
+
+is used to start up an immediate mode window on a file. By default,
+Ved's current output file "output.ml" is used, but you can give an
+argument to the IM command to override this if you wish, as in:
+
+    <ENTER> im <filename>
+
+Immediate mode files should, like program files, have the extension
+".ml" so that Ved will know which compiler to use for them.
+
+Immediate mode files behave much like ordinary files in that all the
+normal editing functions are available for them, but for one substantial
+difference: each immediate mode file has a PML top-level process
+attached to it, and the <RETURN> key, instead of breaking the current
+line as it would in an ordinary file, is interpreted as a signal to send
+the contents of the current line to the waiting process. This means that
+you can type into an immediate mode window just as you would outside of
+the editor and have each line consumed by the PML compiler as you hit
+<RETURN>; output from the compiler (including prompts) is inserted in
+the file as it is produced.
+
+At its simplest then, IM provides a complete logging facility for an
+interactive session. However, because all the normal cursor movement
+functions are available and because the <RETURN> key will enter *any*
+line (not just the last line typed) you can move freely around the file
+editing and re-entering lines which have been used previously. The mark
+and load commands described above also work in immediate mode files, so
+that larger blocks of text can be interleaved with the single lines
+input by <RETURN>. Finally, because the file is attached to a separate
+PML process which is independent of whatever else the editor is doing,
+you can move into another file to work without disturbing the state of
+the IM process, even if it is left in the middle of reading a
+declaration; you can resume from the point at which it was left whenever
+you return to that file.
+
+Quitting from an immediate mode file kills off the compiler process
+attached to it. It is also possible just to kill off the process but
+leave the file in the editor as an ordinary file with the command
+
+    <ENTER> end_im
+
+This has the effect of sending an end-of-file character to the compiler
+process.
+
+All the bindings evaluated by IM are, like those evaluated by LMR, added
+into the single global environment. This means that both forms of input
+can be freely mixed, even when arising from different files. A
+productive method of working is to use the LMR and LCP commands to
+incrementally compile declarations from a program file, and to have an
+immediate mode window running in parallel for testing each definition as
+it is loaded.
+
+
+-----------------------------------------------------------------------
+6  Locating a particular definition
+-----------------------------------------------------------------------
+
+You can use the command
+
+    <ENTER> f <function-name>
+
+(for "find") to locate the definition of a named function within an ML
+program file.
+
+For example, if the current file defines an ML function called sort,
+then
+
+    <ENTER> f sort
+
+will move the cursor to the start of the line where the definition
+begins. This works regardless of whether the definition is at top-level,
+or is local to a let expression or similar construct.
+
+This command will actually search for any function whose name starts
+with sort, so will also find names likes sort', sort_pairs, sorted, etc.
+Searching always starts from the current position within the file, so if
+you don't get the name you're looking for first time, use the REDO key
+to reexecute the command and move the cursor onto the next matching
+definition. By repeatedly pressing REDO you can cycle through all the
+functions which have the same prefix.
+
+Alternatively, you can force an exact match on the name by giving the
+option -x:
+
+    <ENTER> f -x sort
+
+This will show you the function sort and nothing else.
+
+Unless directed otherwise, <ENTER> f will only search for a function
+name; strictly, a name bound by a fun declaration. If you want to look
+for a different kind of name, such as a type constructor, you can
+precede the name with an appropriate keyword from the following set:
+
+    val
+    type
+    exception
+    structure
+    signature
+    functor
+
+So to find the definition of the type constructor graph, use the command
+
+    <ENTER> f type graph
+
+The type keyword covers type, datatype and abstype declarations, while
+the val keyword covers both val and fun declarations (providing a
+superset of the default behaviour).
+
+If you want to specify a keyword and force an exact match, the -x option
+must come first:
+
+    <ENTER> f -x type graph
+
+The search mechanism does not parse the file, but uses simple rules for
+recognising declarations and extracting the bound names. These rules are
+not always accurate -- particularly when searching val declarations --
+and are easily confused by syntax errors.
+
+
+-----------------------------------------------------------------------
+7  Calling PML commands from Ved
+-----------------------------------------------------------------------
+
+All the PML top-level commands described in HELP * COMMANDS are also
+available from inside Ved: use the <ENTER> key to get to the command
+line, and then type the command as you would to the PML prompt. For
+example, try
+
+    <ENTER> help commands
+
+Where a command produces output, this is sometimes presented in a
+different way when called from inside Ved. For example, the command
+
+    <ENTER> showdef +
+
+will display its output in a separate temporary file to keep it distinct
+from that produced by the compiler.
+
+
+--- C.all/pml/help/mlved
+--- Copyright University of Sussex 1994. All rights reserved.

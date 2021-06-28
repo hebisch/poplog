@@ -1,0 +1,497 @@
+HELP V55 and AUTOV55                               A. Sloman June 1985
+
+    lib v55;
+
+This command will load a library file to convert VED to work with the
+Visual 55 VDU.
+
+A preliminary set of mappings from keys to functions has been
+implemented. This may be revised in the light of comments from users.
+For exact information on the current state of the package do
+
+    SHOWLIB * V55
+
+The package includes a procedure ved_v55 which, if invoked, re-programs
+the function keys on the Visual 55 in the manner required for this
+package. This will change F1 to F12 each to generate a sequence of the
+form:
+
+        <ESC> ? <character>
+
+Since the unshifted programmable function keys F1 to F12 are
+re-programmed to be totally different from the other keys and the keys
+used on the Visual 200, users who are accustomed to typing some of the
+V200 escape sequences directly, or use them in their procedures may
+still do so.
+
+The keys may be re-programmed to their normal setting by giving the
+command:
+
+    lib setv55keys.
+
+The basic mode of operation is very similar to the use of the VISUAL200
+terminal with VED. Function Key mappings are described at the end of
+this file.
+
+For an introduction to using the VISUAL 200 terminal see
+
+    TEACH * TEACH, *VED, *MOREVED, *VEDPOP
+
+-- AUTOMATIC RECOGNITION OF VISUAL 55 ---------------------------------------
+                                            Tom Khabaza 12th October 1984
+                                            Modified A. Sloman March 1985
+
+    lib autov55;
+
+This library file helps you keep sane if you sometimes use a Visual 200
+VDU and sometimes a Visual 55 on the same terminal port.
+
+A Visual 55 (V55) terminal, when emulating a Visual 200/210 produces the
+same terminal ID code as the Visual 200 (V200), which is the same as the
+VT52.  So this code cannot be used to identify it as a V55.
+
+Since the V55 requires a different VED configuration from the V200, as
+provided by LIB V55, you can use LIB AUTOV55 to ensure that VED will
+detect that a V55 is being used, and automatically load LIB V55 when
+starting up.
+
+LIB AUTOV55 is used by putting the line:
+
+    uses autov55;
+
+in your vedinit.p file.
+
+-- How AUTOV55 works ---------------------------------------------------
+
+Lib autov55 uses the V55's "answerback" facility to distinguish it from
+a V200, since this can be used to transmit a message distinct from the
+terminal ID. (The 'answerback' is transmitted in response to CTRL-E.)
+The V55 needs to be programmed to respond appropriatly.  This
+programming need be done only once for a new V55, since the answerback
+sequence can be stored permanently in the terminal's non-volatile
+memory.
+
+The following key sequence programs the V55:
+
+    <SET UP> <shift A> / <ESC> [ 5 5 V / <shift S>
+
+This programs the V55 to send the string '\^[[55V' as its 'answerback',
+and leaves the terminal in normal (non-setup) mode.
+
+To see how LIB AUTOV55 works, do SHOWLIB * AUTOV55.
+
+    LIB AUTOV55 allows users to define two procedures
+    - vedv55init - to be run if terminal is recognised as a V55
+        The default version merely loads lib v55. You could, for instance
+        make it restore a saved image with lib v55 and other facilities
+        loaded. (See HELP * INITIAL)
+    - vedvt52default - to be run if the terminal is not recognised - so it's
+        a different vt52 emulator, e.g. V200, or some other.
+        The default version does nothing, which is adequate for a V200,
+        though you could define it to compile a file which alters default
+        settings for a V200, or restores a saved image, etc.
+
+-- V55 FUNCTION KEYS --------------------------------------------------------
+
+The rest of this file indicates the use of special keys on the VISUAL55.
+For a summary which may be printed out see HELP *V55KEYS
+
+             THE KEYPAD AND FUNCTION KEYS ON A VISUAL 55 TERMINAL
+                    =======================================
+
+The function keys are on the top row. The keypad keys are on the right.
+
+The NUMERIC keypad keys work as on the Visual 200 - moving the cursor in
+8 directions, except for key 5, which puts the cursor on the middle of
+the current line.
+
+Remaining keypad keys:
+    ENTER key -- go to command line, and clear it
+    "-"   key -- redo command on command line
+    "'"   key -- switch between command line and edit window
+    "0"   key -- move cursor a word to left
+    "."   key -- move cursor a word to right
+
+-- ARROW AND 'HOME' KEYS --------------------------------------------------
+
+The HOME key is always followed by another key.  Pressing it twice will
+cause the screen to be refreshed.  The following table shows how it
+affects the arrow keys and what they do on their own.
+
+  ARROW keys:                                HOME
+         left      right    up      down     KEY       Ignore AUX and XMIT
+        _____________________________________________
+  with  | TEXT   | SCREEN | TOP OF | END OF | REFRESH|
+  HOME  | LEFT   | RIGHT  | FILE   | FILE   | WINDOW |
+        |--------|--------|--------|--------|--------|
+        | SCREEN |  TEXT  | SCREEN | SCREEN |NOTHING |
+        |__LEFT__|_RIGHT__|___UP___|__DOWN__|________|
+
+The SCREEN LEFT button moves the cursor to the left of the SCREEN, but
+the TEXT RIGHT button moves to the right of the TEXT, on the current
+line.
+
+The arrow keys may also be modified by preceding them with ESC. (This is
+provisional, and may be changed.) ESC then left arrow key inserts a line
+above current line; ESC right arrow inserts a line below.
+
+ESC up arrow moves the marked range (see below) to immediately above
+current line. ESC down arrow moves it below current line (duplicating
+key F9).
+
+--KEYPAD KEYS ---------------------------------------------------------
+
+These move the cursor in the direction indicated. If the FUNCTION key is
+pressed simultaneously, some of the keys cause bigger cursor moves,
+namely 1,2,3,4,6,7,8. Key 5 may be used with FUNCTION to cause a bigger
+movement UP the window.
+                  ________________________________________
+                  |   7   *|   8   *|   9   *|-MARK FIRST|
+                  |   UP   |   UP   |   UP   |   ------  |
+                  |  LEFT  |        | RIGHT  |  REDO     |
+                  |________|________|________|___________|
+                  |   4   *|   5   *|   6   *|, MARK LAST|
+                  |  LEFT  | CENTRE | RIGHT  |  -------  |
+                  |        |        |        |CHANGE MODE|
+                  |________|________|________|___________|
+                  |   1   *|   2   *|   3   *|           |
+                  |  DOWN  |  DOWN  |  DOWN  |           |
+                  |  LEFT  |        | RIGHT  |           |
+                  |________|________|________|           |
+                  | 0 DELETE WD LEFT|.D WD RT| ENTER     |
+                  |  -------------  |  ----  | COMMAND   |
+                  |   MOVE WORD LEFT|MV WD RT| MODE      |
+                  |_________________|________|___________|
+
+
+Where a rectangle has two entries, the UPPER is the result of preceding
+the key with ESC. E.g. the "-" keypad key on its own will re-do the last
+ENTER command. If preceded by ESC it will mark the current line as the
+first of the marked range. (See HELP * MARK for more information).
+
+Similarly, the "," keypad key will either change mode, (i.e. alternately
+put the cursor on the command line, or move it back into the edit
+window), or, if preceded by ESC will make the current line the last of
+the marked range. (The last two ESC key facilities duplicate function
+keys F7 and F8, and may be removed.)
+
+The ENTER key causes the command line to be cleared, and the cursor left
+on the command line.
+
+The keypad '0' key moves the cursor left one word, '.' moves it right
+one word. However if preceded by ESC, the word to left or to right is
+deleted.
+
+NB: ESC v  on the V200 VDU causes the screen to be refreshed. This
+sequence is taken over by a key on V55, so to refresh screen press HOME
+twice.
+
+-- USING 'HOME' TO MODIFY KEYPAD KEYS ---------------------------------
+
+    HOME 8  - move cursor up a third of a window, then move the
+        window down the file until the cursor is in the middle of the
+        window.
+    HOME 5  - move the window up or down until the current cursor line
+        is in the middle.
+    HOME 2  - move cursor down a third of a window, then move the window
+        up the file until the cursor is in the middle of the window.
+
+-- OTHER SPECIAL KEYS ----------------------------------------------
+
+The ESC key is used to precede certain special sequences, as above. The
+TAB key inserts a tab into the file. SHIFT TAB switches 'hard tab' mode
+on and off.  (Only relevant if * VEDNOTABS is false.)
+
+    BACK-SPACE      moves cursor left one space.
+    ESC BACK-SPACE  scrolls the 'other' file up one window
+    DEL             delete character to left of cursor
+    LINE-FEED       move to beginning of next line of file
+    ESC LINE-FEED   scroll the 'other' file down one window
+
+
+-- FUNCTION KEYS ON TOP ROW: --------------------------------------------
+
+If pressed alone:
+
+    F1  = delete character under cursor
+    F2  = delete line to left of cursor
+    F3  = delete whole of current line
+    F4  = delete line to right of cursor (including character under cursor)
+    F5  = delete word to left of cursor
+    F6  = delete word to right of cursor
+    F7  = mark current line as beginning of range
+    F8  = mark current line as end of range
+    F9  = move marked range to after current line
+    F10 = push current position onto position stack
+    F11 = Justify current paragraph, or tidy current procedure.
+    F12 = insert new blank line above current line
+
+The function keys send different codes if pressed with SHIFT, or with
+CTRL or with the 'FUNCTION' key, or with SHIFT and CTRL. The following
+settings are provisional and liable to change.
+
+    CTRL F1 = swap two characters to left of cursor (ved_sw)
+    CTRL F2 = re-insert last word or part line deleted
+    CTRL F3 = re-insert last line deleted (above current line)
+    CTRL F4 = re-insert last word or part lne deleted
+    CTRL F5 = re-insert last word or part lne deleted
+    CTRL F6 = re-insert last word or part lne deleted
+    CTRL F7 = go to beginning of marked range
+    CTRL F8 = go to end of marked range
+    CTRL F9 = Copy marked range to after current line
+    CTRL F10= POP position stack - move cursor.
+    CTRL F11= ved_fill(). Text-justify marked range.
+    CTRL F12= insert line below current line
+
+
+    CTRL-SHIFT F1  = Re-program keys on visual 55 to suit VED
+    CTRL-SHIFT F3  = CLEAR current file.
+    CTRL-SHIFT F4  = Delete to end of current file.
+    CTRL-SHIFT F5  = swap the two words to left of cursor
+    CTRL-SHIFT F6  = swap the two words to right of cursor
+    CTRL-SHIFT F7  = transcribe marked range into current file (ved_ti)
+    CTRL-SHIFT F8  = move marked range out of current file (ved_mo)
+    CTRL-SHIFT F9  = move marked range into current file (ved_mi)
+    CTRL-SHIFT F10 = clear the position stack
+    CTRL-SHIFT F11 = TIDY the marked range, i.e. format as program.
+    CTRL-SHIFT F12 = unassigned
+
+    SHIFT-F5  = invoke * VEDFILESELECT, to see names of current files and
+                move to one.
+    SHIFT-F7  = Transcribe marked range IN from other file : (ved_ti)
+    SHIFT-F8  = Find helpfile for word to right of cursor(= ESC H).
+    SHIFT-F10 = Exchange current position with top of position stack.
+    SHIFT-F11 = justify and right-align current paragraph (ved_jjp).
+    SHIFT-F12 = rotate files in the buffer (ved_rb).
+
+    The next sequence indicates what happens if a function key  on the top
+    row is pressed while the FUNCTION key at the bottom is held down.
+
+    FUNCTION-F4 =  current current line to lower case (ved_lcl).
+    FUNCTION-F5 =  current current word to upper case (ved_ucw).
+    FUNCTION-F6 =  current current word to lower case (ved_lcw).
+    FUNCTION-F9 =  duplicate the current line.
+    FUNCTION-F12=  switch static mode on or off.
+
+--- OTHER KEY SEQUENCES ----------------------------------------------
+
+There are alternatives to using the function keys. Many of the
+operations can be performed equivalently by typing control characters or
+key sequences.
+
+You can find which procedure is currently mapped onto a key or key
+sequence by VED if you give the command
+    <ENTER> hk
+
+This will ask you to press the key or key sequence. If there is a
+corresponding procedure its name will be printed on the command line. If
+nothing is printed then you have started the beginning of a key sequence
+which is not complete. You can try completing the sequence in various
+ways.
+
+
+-- CONTROL CHARACTERS ----------------------------------------------------
+
+Some of the VED functions can be achieved by control characters, i.e.
+hold down the CTRL button and press a key. (CTRL-A is represented below
+as ^A)
+
+    ^A  Move to beginning of line. VEDSCREENLEFT
+    ^B  ^B Move back a word. VEDWORDLEFT (N.B. single ^B will not work.)
+    ^C  Interrupt
+    ^D  Load marked range (for program files). VED_LMR. (See HELP LMR)
+    ^E  Delete to end of line. VEDCLEARTAIL
+    ^F  Move forward a word. VEDWORDRIGHT
+    ^G  Like CHANGE mode key. VEDSTATUSSWITCH
+    ^H  Back space. Like BS key. Move cursor left one character. VEDCHARLEFT
+    ^I  TAB, like TAB key. Insert suitable number of spaces, or tabs,
+        depending whether VEDNOTABS is true or false See HELP *VEDNOTABS
+    ^J  Like LF button. Move to beginning of next line. VEDNEXTLINE.
+        (Position of cursor is controlled by VEDLEFTMARGIN.)
+    ^K  Move to top of screen. VEDSCREENUP
+    ^L  Move to bottom of screen. VEDSCREENDOWN
+    ^M  Same as RETURN. Insert new line
+    ^N  Change case of character under cursor, from upper to lower or
+        vice versa VEDCHANGECASE
+    ^O  unused
+    ^P  Delete character at cursor Position. VEDDOTDELETE
+    ^Q  unused
+    ^R  Delete WORD to RIGHT of cursor. VEDWORDRIGHTDELETE.
+    ^S  unused
+    ^T  Move up a line. Like keypad 8.  VEDCHARUP
+    ^U  Delete line to left of cursor. VEDCLEARHEAD
+    ^V  Move down a line. Like keypad 2. VEDCHARDOWN
+    ^W  Delete Word to left of cursor. VEDWORDLEFTDELETE
+    ^X  VMS turns this into ^U
+    ^Y  Interrupt and abort POP11. You'll lose your work.
+    ^Z  Move to right of current line. VEDTEXTRIGHT
+            (NOT available to Unix users who use ^Z as the suspend
+             character)
+    ^]  Delete current line. VEDLINEDELETE
+    ^_  (CTRL and DEL button) REDO last command. VEDREDOCOMMAND
+    ^^  (CTRL and "^" button). Not used yet
+    ^\  (CTRL and "\"). Not used yet
+    ^@  Null character. Ignored by VED because some terminals send spurious
+        nulls.
+
+
+-- ESCAPE SEQUENCES -----------------------------------------------------
+
+Several commands may be given by typing the <ESC> key followed by
+another key. These look arbitrary. The sequences are in fact mostly
+those produced by function keys. But you can also type them directly
+yourself. Note that the upper case letters, e.g. <ESC> H need the SHIFT
+key to be pressed.
+
+Some of the sequences marked 'unused' may be used by your keyboard by
+the time you read this. You can always check with the ENTER HK command,
+as described above.
+
+-- <ESC> followed by a letter -----------------------------------------------
+
+Some of these look very arbitary. That is because they are sequences
+which have been chosen to fit function keys on the V55.
+
+    <ESC> a     (temporary) Move left a quarter window. VEDCHARLEFTLOTS
+    <ESC> b     Go to bottom of file. VEDENDFILE
+    <ESC> c     Compile current procedure. VED_LCP
+    <ESC> d     unused
+    <ESC> e     unused
+    <ESC> f     Move left a quarter window. VEDCHARLEFTLOTS
+    <ESC> g     Same as SHIFT-F7
+    <ESC> h     Get help file for word to right of cursor. VEDHELPFOR
+    <ESC> i     Move up left a quarter of a screen.  VEDCHARUPLEFTLOTS
+    <ESC> j     same as SHIFT-F10.
+    <ESC> k     same as SHIFT F-11
+    <ESC> l     same as SHIFT F-12.
+    <ESC> m     unused
+    <ESC> n     Search for next isolated asterisk- used in help files for
+                cross reference to others. VEDNEXTHELP
+    <ESC> o     unused
+    <ESC> p     Exchange current position with top of position stack.
+                VEDEXCHANGEPOSITION
+    <ESC> q     Quit current file. VED_Q
+    <ESC> r     Delete word to right of cursor. VEDWORDRIGHTDELETE
+    <ESC> s     Move right a quarter of a screen. VEDCHARRIGHTLOTS
+    <ESC> t     Go to top of file. VEDTOPFILE
+    <ESC> u     unused
+    <ESC> v     Move cursor down a quarter window. VEDCHARDOWNLOTS
+    <ESC> w     enlarge or contract window size. VEDSETWINDOW
+    <ESC> x     swap from current edit window to the other one.
+                VEDSWAPFILES.
+    <ESC> y     unused
+    <ESC> z     Switch 'hard tabs' mode on or off. (Alters VEDHARDTABS)
+
+    <ESC> A     VEDSCREENUP - like up arrow button
+    <ESC> B     VEDSCREENDOWN - like down arrow button
+    <ESC> C     VEDTEXTRIGHT - like right arrow button
+    <ESC> D     VEDSCREENLEFT - like left arrow button
+    <ESC> E     unused
+    <ESC> F     unused
+    <ESC> G     unused
+    <ESC> H     Go to end of file. VEDENDFILE
+    <ESC> I     unused
+    <ESC> J     Go right a quarter screen. VEDCHARRIGHTLOTS
+    <ESC> K     Go up a quarter screen. VEDCHARUPLOTS
+    <ESC> L     Go down and left several lines. VEDCHARDOWNLEFTLOTS
+    <ESC> M     Go down and right a quarter screen. VEDCHARDOWNRIGHTLOTS
+    <ESC> O     Go up and right a quarter screen. VEDCHARUPRIGHTLOTS
+    <ESC> P     Delete character under cursor. VEDDOTDELETE
+    <ESC> Q     Delete line to left of cursor. VEDCLEARHEAD
+    <ESC> R     Delete whole line. VEDLINEDELETE
+    <ESC> S     unused
+    <ESC> T     unused
+    <ESC> U     unused
+    <ESC> V     unused
+    <ESC> W     unused
+    <ESC> X     unused
+    <ESC> Y     unused
+    <ESC> Z     unused
+
+-- <ESC> followed by a control character ------------------------------------
+
+Here ^A means CTRL-A:
+    <ESC> ^A    go to top of window VEDSCREENUP
+    <ESC> ^B
+    <ESC> ^C
+    <ESC> ^D
+    <ESC> ^E
+    <ESC> ^F
+    <ESC> ^G
+    <ESC> BS    (use back space button or ^H) scroll the other window up
+                a page. VED_XUP.
+    <ESC> TAB   (use TAB key or ^I). Move cursor right to next tab position.
+                VEDTABRIGHT.
+    <ESC> LF    (use LF button or ^J) scroll the other window down a page.
+                VED_XDN.
+    <ESC> ^K    unused
+    <ESC> ^L    unused
+    <ESC> RETURN  (or ^M) unused
+    <ESC> ^N    unused
+    <ESC> ^O    unused
+    <ESC> ^P    unused
+    <ESC> ^Q    unsed
+    <ESC> ^R    unused
+    <ESC> ^S    unused
+    <ESC> ^T    unused
+    <ESC> ^U    unused
+    <ESC> ^V    unused
+    <ESC> ^W    unused
+    <ESC> ^X    VMS turns ^X into ^U
+    <ESC> ^Y    not available. ^Y causes process to abort.
+    <ESC> ^Z    go to bottom of window. VEDSCREENDOWN.
+                    (NOT available to Unix users who use ^Z as the
+                     suspend character)
+
+-- <ESC> followed by other symbols ------------------------------------------
+
+    <ESC> 1     Move up and right several lines. VEDCHARUPLOTS
+    <ESC> 2     Move right a quarter screen. VEDCHARRIGHTLOTS
+    <ESC> 3     unused.
+    <ESC> 4     same as FUNCTION F4
+    <ESC> 5     same as FUNCTION F5
+    <ESC> 6     same as FUNCTION F6
+    <ESC> 7     same as FUNCTION F7
+    <ESC> 8     same as FUNCTION F8
+    <ESC> 9     same as FUNCTION F9
+    <ESC> :     same as FUNCTION F10
+    <ESC> ;     same as FUNCTION F11
+    <ESC> <     same as FUNCTION F12
+
+    <ESC> !     Delete word to left. VEDWORDLEFTDELETE
+    <ESC> "     Delete word to right. VEDWORDRIGHTDELETE
+    <ESC> #     Go into or out of static mode. VEDSETSTATIC
+    <ESC> $     Mark current line as beginning of marked range. VEDMARKLO
+    <ESC> %     Mark current line as end of range. VEDMARKHI
+    <ESC> &     Move marked range to after current line. VED_M
+    <ESC> '     Push current position onto VEDPOSITIONSTACK.
+    <ESC> (     Pop current position off VEDPOSITIONSTACK (jump to that
+                position)
+    <ESC> )     Insert line above current line. VEDLINEABOVE
+    <ESC> =     unused
+    <ESC> ~     unused
+    <ESC> ^     Go to first non-space character in line. VEDTEXTLEFT
+    <ESC> |     unused
+    <ESC> \     Search back for last search string
+    <ESC> `     unused
+    <ESC> @     unused
+    <ESC> {     unused
+    <ESC> }     unused
+    <ESC> _     unused
+    <ESC> DEL   Delete character under cursor.
+    <ESC> [     Go to first non-space character in line. VEDTEXTLEFT
+    <ESC> ]     Go to right hand edge of screen. VEDSCREENRIGHT
+    <ESC> *     Insert line below current line. VEDLINEBELOW
+    <ESC> +     PUSH current position onto position stack. VEDPUSHKEY
+    <ESC> -     POP position on position stack. VEDPOPKEY
+                (Compare <ESC> p)
+    <ESC> >     unused
+    <ESC> ,     unused
+    <ESC> .     unused
+    <ESC> ?     used to initiate special sequences produced by "VT52" keypad
+    <ESC> /     Search for next occurrence of last string searched for.
+                    VED_RE_SEARCH
+
+
+--- C.all/help/v55
+--- Copyright University of Sussex 1992. All rights reserved. ----------

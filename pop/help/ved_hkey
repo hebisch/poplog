@@ -1,0 +1,146 @@
+HELP VED_HKEY                                   Aled Morris, August 1986
+
+    <ENTER> hkey
+    <ENTER> hkey -i
+
+Used for discovering the role of some key (or key sequence) in VED.
+
+CONTENTS -
+    (Use <ENTER> g to access desired section. See HELP *ENTER_G)
+
+ -- Introduction
+ -- The VED key mapping process
+ -- Altering key map tables
+ -- See also
+
+-- Introduction -------------------------------------------------------
+
+Typing '<ENTER> hkey' will prompt the user to press a key, and (if that
+key has a defined action) will attempt to display information about the
+key's action.
+
+An example of the use of '<ENTER> hkey' is to be reminded of the
+function of any particular key.  It has a variety of other (associated!)
+uses, such as for investigating an unusual terminal, when the key
+mappings may be unknown, or for discovering if a key sequence is
+available for the user to redefine.
+
+When the user has typed a key (or sequence), then -ved_hkey- uses the
+*QUERY mechanism to look up information on the function associated with
+the given code(s).  -ved_hkey- also displays the codes which it
+received, and the function associated with the key, on the command line.
+
+The option '-i' is discussed under 'Altering key map tables', and stands
+for 'insert the key codes as a string'.
+
+-- The VED key mapping process ----------------------------------------
+
+All keys on the terminal keyboard transmit some code (an ASCII code)
+to the host computer when they are depressed.  The function keys found
+on most terminals are distinguished from normal keys by the fact that
+they transmit more than one code to the computer.  For example, pressing
+the keypad <ENTER> key on a Visual 200 terminal causes the sequence of
+codes
+
+    27 63 77
+
+to be transmitted.  These codes are standard ASCII codes (for details of
+the ASCII character set, see HELP *ASCII), the 27 (known as Escape) being
+especially notable since on the Visual 200 terminal, this indicates the
+start of a code sequence, while the 63 indicates a key-pad code follows.
+The final code in this sequence is a 77, indicating the <ENTER> key.
+
+In order to interpret all these codes properly, VED maintains a number
+of tables, mapping character codes which it expects against procedures
+which are executed when the said codes are received.   The primary table
+is called -vednormaltable-, which is a vector containing one entry for
+each ASCII code (ie 127 entries).  The entries in this table can be one
+of the following:
+
+    procedure       The procedure is run immediately
+
+    word            The word is assumed to be a variable whose value is
+                    taken, and re-evaluated (ie should be a procedure,
+                    a string, undef or a vector)
+
+    string          Characters are read from the string as if they had
+                    originated at the keyboard (when the string is
+                    empty, normal reading of the keyboard resumes)
+
+    undef           The word "undef" in the table indicates that the
+                    ASCII code has no associated function (VED will
+                    sound the terminal bell to indicate this)
+
+    vector          See below
+
+For example, the entry for the ASCII code for `A` (the uppercase
+character, code 65) is -vedinsertvedchar-, a procedure which inserts
+a character into the current file at the cursor position.  This is
+the same for all "normal" printing characters.  The entry for <RETURN>
+(ASCII code 13) is -veddocr-, the procedure which causes a new line to
+be started (as might be expected).
+
+The presence of a vector in the table indicates that further codes are
+to be read in order to complete the read-process.  The entry for the
+Escape character is such a table (called -vedescapetable-), which maps
+the characters expected after an Escape to their procedures (words,
+strings or undef, or even a further nested lookup table).
+
+Tables like -vednormaltable- which map ASCII codes recieved onto
+procedures (etc) are known as key map tables ("key maps").
+
+So the function key marked F0 (on a Visual 200) which is the DOTDELETE
+key, transmits the codes:
+
+    27 80
+
+This means that entry 27 in -vednormaltable- is a table (vector), in
+which entry 80 holds the procedure -veddotdelete-.
+
+As a further example, take the <ENTER> key on a Visual 200. The codes
+transmitted by this key are
+
+    27 63 77
+
+and corresepond to entry 27 in -vednormaltable- being a vector in which
+entry 63 is a vector in which entry 77 is the procedure -vedenter-.
+
+-- Altering key map tables --------------------------------------------
+
+Key map tables are not easily manipulated in their "raw" form, however a
+procedure is provided which enables users to set up any particular key
+(or key sequence).  The procedure is -vedsetkey-, and details are in
+HELP *VEDSETKEY.  There is also an interactive form for defining keys,
+details of which are in HELP *DK.
+
+Notice that the procedure -vedsetkey- can accept a string of character
+codes for which it builds the appropriate nested key map tables.  A
+convenient form of specifying a string of character codes is to use some
+of the more esoteric POP-11 string notations, such as the backslash,
+which allows any ASCII code to be inserted into a string. Full details
+are in HELP *STRINGS.  "<ENTER> hkey" prints (on the command line) the
+string of characters which were received, in a manner suitable for
+directly inserting into a piece of POP-11 code (say, a call to
+-vedsetkey-).
+
+The option '-i' on -ved_hkey- causes the string representation of the
+codes received to be inserted into the current file at the cursor
+position.
+
+
+-- See also -----------------------------------------------------------
+
+HELP * QUERY        Mechanism for describing built-in procedures
+REF * VEDCOMMS      VED <ENTER> commands
+REF * VEDPROCS      VED system procedures
+
+LIB * VED_HK        Terse equivalent of -ved_hkey-
+LIB * VED_HKEYS     Displays "picture" of current key mapping
+
+HELP * DK           Interactive command for defining key mappings
+HELP * VEDSET       Convenient syntax for defining key mappings
+HELP * VEDSETKEY    Core procedure for defining key mappings
+
+
+--- C.all/help/ved_hkey
+--- Copyright University of Sussex 1991. All rights reserved. ----------

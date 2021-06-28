@@ -1,0 +1,99 @@
+HELP FORM                               Allan Ramsay, October 1983
+
+The library program LIB *FORM allows the use of forms, which provide a
+simple means for defining new syntax words. A form definition consists
+of a pattern, describing the situation in which the form is to be
+expanded, and a body which specifies how the expansion is to be done.
+
+A form pattern consists of key words and placeholders. A key word is
+simply a word which is used to punctuate the input text, in the way that
+THEN breaks up the input stream when it occurs while a conditional
+expression is being read. Placeholders prescribe the sort of construct
+which is expected at any given point, and provide a means of referring
+to that construct when the form is expanded.
+
+A form body is simply a skeleton fragment of code. When the pattern for
+a form is matched, all occurrences of the placeholders are replaced by
+the code which was read at the appropriate point, and the resulting list
+of items is spliced into the input stream.
+
+To see what is going on, consider the following definition:
+
+    form repeat impseq:action till expr:test endrepeat;
+        repeat action; if test then quitloop endif; endrepeat;
+    endform;
+
+The first line is the pattern. It says that this form should be expanded
+if the input stream contains the word *REPEAT, followed by an imperative
+sequence, followed by the word *TILL, followed by an expression,
+followed by the word *ENDREPEAT. Thus if we now type in
+
+    repeat list => list.tl -> list till list == nil endrepeat;
+
+the imperative sequence LIST => LIST.TL -> LIST will be read and
+associated with the placeholder ACTION, TILL will be read, the
+expression LIST == NIL will be read and associated with the placeholder
+TEST, and ENDREPEAT will be read. So the header of the form has been
+matched, and its body should be expanded.
+
+This is done by splicing in the code associated with the placeholders
+wherever they appear in the body. So in this case the expansion of the
+body produces the list
+
+    [   repeat  list =>
+                list.tl -> list;
+                if list == nil then quitloop endif;
+        endrepeat; ]
+
+This list is appended to the front of the input stream for the system to
+parse again. The form is again activated, since the first word in the
+input stream is REPEAT, but this time its pattern is not matched, so the
+system falls back on its normal meaning for REPEAT and runs the code
+using that.
+
+NOTE that
+1) placeholders are specified in the patterns of forms by
+
+    <category> : <name>
+
+At the time the form definition is read, there must already be a
+function called <category>READ which reads a list of items which make up
+an object of type <category>, e.g. in the example above we had two
+placeholders, introduced by IMPSEQ:ACTION and EXPR:TEST. These two would
+require there to be functions IMPSEQREAD and EXPRREAD, which read and
+return an imperative sequence and an expression respectively. LIB FORMS
+contains definitions of EXPRREAD, IMPREAD, IMPSEQREAD and VARREAD - if
+you want to use any others you will have to define them. The reading
+functions may return either a list or a single item. If they return a
+list, it is assumed to be a list of items to be spliced into the input
+stream. If you have declared a placeholder to be of type "list", you do
+NOT want the value to be appended to the input stream, as would happen
+if *LISTREAD were used to read it. The package specifically checks for
+placeholders which are of type "list", and uses a version of LISTREAD
+which wraps its result up inside another list to achieve the desired
+effect.
+
+2) you can define any number of forms with the same name. The package
+has been defined to deal with variant forms with very little
+backtracking, so you needn't feel guilty about the amount of work
+required to deal with them. You can define forms to have the same names
+as existing syntax words (as in the example). These WILL cause your
+compilations to slow down, since the new versions will be tried out
+before the standard ones, and will thus cause cases where you want the
+standard version to be used to take longer than usual to compile.
+
+3) if you want to use labels and *GOTO s in a form body, or if you want
+to use variables which are "local" to the form, they should be declared
+as FORMVARS immediately after the form pattern. Anything which is
+declared as a FORMVAR is substituted by a new unique identifier every
+time the form body is expanded.
+
+See SHOWLIB *FORM for the code used by LIB FORM.
+
+See also HELP
+    *SYNTAX     - for an alternative method of defining new syntax words
+    *EXPRSTA    - expressions and statements in POP-11
+    *POP        - overview of documentation on POP-11
+
+--- C.all/help/form ----------------------------------------------------
+--- Copyright University of Sussex 1987. All rights reserved. ----------

@@ -1,0 +1,112 @@
+HELP TERMIO                                 Mark Rubinstein  January 1986
+
+Interface to the System V TERMIO ioctl calls.
+
+    lib termio;
+
+This file describes a library which provides procedures, structure
+definitions and keyword constants for use with -sys_io_control-.  Calls
+of -sys_io_control- may then have the same form as the "ioctl" calls
+described in section termio(7) of the Unix Programmers manual.
+
+See REF * SYSIO for full details of -sys_io_control-.
+
+The primary calls of the Unix system V terminal io interface use a
+structure defined in the Unix manual termio(7) as:
+
+        #define     NCC 8
+        struct termio {
+            unsigned short  c_iflag;        /* input modes */
+            unsigned short  c_oflag;        /* output modes */
+            unsigned short  c_cflag;        /* control modes */
+            unsigned short  c_lflag;        /* local modes */
+            char            c_line;         /* line discipline */
+            unsigned char   c_cc[NCC];      /* control characters */
+        };
+
+From POPLOG you can use the 'termio_struct' defined in the library as:
+
+    recordclass global termio_struct
+        termio_dummy1:full          /* dummy word */
+        termio_iflag:16             /* input modes */
+        termio_oflag:16             /* output modes */
+        termio_cflag:16             /* control modes */
+        termio_lflag:16             /* local modes */
+        termio_line:8               /* line discipline */
+            termio_vintr:8          /* interrupt */
+            termio_vquit:8          /* quit */
+            termio_verase:8         /* erase <DEL> */
+            termio_vkill:8          /* kill (line) */
+            termio_veof:8           /* end-of-file */
+            termio_veol:8           /* end-of-line delimiter */
+            termio_dummy2:8         /* reserved */
+            termio_switch:8         /* switch, used for job control */
+    ;
+
+-sys_io_control- is used as follows (see REF * SYSIO for full details).
+
+    sys_io_control(<device>, <request>, <struct:arg>) -> boolean;
+
+Where the structure is a termio_struct as above and the request is an
+integer.
+
+The 'termio' library defines constants for 6 'ioctl' requests. These
+are:
+
+    TCGETA  Get the parameters associated with the terminal and store in
+            the termio structure referenced by arg.
+
+    TCSETA  Set the parameters associated with the terminal from the
+            structure referenced by arg.  The change is immediate.
+
+    TCSETAW Wait for the output to drain before setting the new
+            parameters.  This form should be used when changing
+            parameters that will affect output.
+
+    TCSETAF Wait for the output to drain, then flush the input queue and
+            set the new parameters.
+
+    TCSBRK  Wait for the output to drain.  If arg is 0, then send a
+            break (zero bits for 0.25 seconds).
+
+    TCXONC  Start/stop control.  If arg is 0, suspend output; if 1,
+            restart suspended output.
+
+    TCFLSH  If arg is 0, flush the input queue; if 1, flush the output
+            queue; if 2, flush both the input and output queues.
+
+The 'termio' library also defines the masks for the input, output,
+control and local mode flags.  For full details see LIB * TERMIO.
+
+For example suppose you wish to make control-G the interrupt character
+and disable start/stop output control for the device used by ved
+(poprawdevin):
+
+    uses termio;
+
+    ;;; make a termio_struct
+    vars tstruct = constermio_struct(0,0,0,0,0,0,0,0,0,0,0,0,0,0);
+
+    ;;; get the parameters for poprawdevin
+    unless sys_io_control(poprawdevin, TCGETA, tstruct) then
+        mishap('SYS_IO_CONTROL error (using TCGETA)', []);
+    endunless;
+
+    ;;; make ^G interrupt character
+    `\^G` -> termio_vintr(tstruct);
+
+    ;;; mask out the IXON (enable start/stop output control) flag bits
+    termio_iflag(tstruct) &&~~ IXON -> termio_iflag(tstruct);
+
+    ;;; set the parameters for poprawdevin
+    unless sys_io_control(poprawdevin, TCSETA, tstruct) then
+        mishap('SYS_IO_CONTROL error (using TCSETA)', []);
+    endunless;
+
+
+See also HELP * IOCTL for definitions relating to the BSD 4.2 TTY
+interface.
+
+
+--- C.unix/help/termio
+--- Copyright University of Sussex 1992. All rights reserved. ----------

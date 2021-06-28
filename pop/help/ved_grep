@@ -1,0 +1,207 @@
+HELP VED_GREP (Unix Only)                      Aaron Sloman October 1990
+                               Revised (Birmingham version) October 1995
+
+LIB * VED_GREP
+
+Provides a facility for searching a set of files for a specified
+string, and reading the result into a VED buffer. The name "grep" comes
+from the name of the corresponding Unix search library, and is derived
+from the concept of a Generalised Rexgular EXPression matcher.
+(VED now also includes such a matcher. See REF * VEDSEARCH.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Introduction
+ -- The <flags> argument
+ -- -- Example: searching the TEACH directory
+ -- Use "man" to find out about options avilable
+ -- Getting the <search-string> from the VED buffer
+ -- Getting ALL the arguments from the VED buffer
+ -- Removing colons after file names
+ -- Specifying which search program to use
+ -- Using <ENTER> getit, to read in a file found
+
+-- Introduction -------------------------------------------------------
+
+The formats available for invoking ved_grep are as follows:
+
+<ENTER> grep [<flags>] <search-string> file1, file2 ...
+<ENTER> grep [<flags>] <search-string> <file-pattern>
+<ENTER> grep [<flags>] <file-pattern>
+<ENTER> grep [<flags>]
+
+These formats are explained below.
+
+The <ENTER> grep command takes the <search-string> (if provided,
+otherwise a string obtained from the VED buffer) and searches through
+all the files specified, looking for occurrences of the string.
+
+The flags, if provided, specify how the searching should be done, e.g.
+whether it should be caseless, and the format of the output, e.g.
+whether line numbers should be shown, etc. as described in MAN * EGREP
+
+If no files or <file-pattern> are provided on the command line then the
+files to be searched are specified on the current line in the VED
+buffer.
+
+All output goes goes into a temporary file in VED. The program uses
+-vedgenshell- and -pipein- for this purpose. (See HELP * PIPEUTILS)
+
+There are several ways the user can control how the search is done
+or what information is printed out.
+
+
+-- The <flags> argument -----------------------------------------------
+
+The optional <flags> argument consists of one or more substrings
+starting with '-'. Exactly which flags are available to control
+the search will depend on which search command is used.
+
+Often the <flags> argument is not provided. Commonly used flags are
+
+    -v
+        InVert the search. I.e. report only lines NOT containing the
+        search string.
+
+    -l
+        List the files containing the string, but don't report every
+        occurrence. Only the file names are listed.
+
+
+-- -- Example: searching the TEACH directory
+
+To find every occurrence in the TEACH directory of the string 'grammar'
+in upper or lower case, do
+
+    <ENTER> grep -i grammar $usepop/pop/teach/*
+
+This runs a Unix file searching command (default egrep) with the
+argument
+
+        -i grammar $usepop/pop/teach/*
+
+The "-i" flag tells the search command to ignore case of letters.
+
+The user can specify which Unix search command to use, as there are
+sometimes faster versions available than "egrep".
+
+
+
+-- Use "man" to find out about options avilable -----------------------
+
+The Unix "man" command will provide information on flags availble and
+the forms of string patterns that can be in the <search-string>. E.g.
+
+    <ENTER> man egrep
+
+if you use the "egrep" option, or
+
+    <ENTER> man ggrep
+
+if you use "ggrep" etc.
+
+See below on how to specify which search command is used.
+
+
+-- Getting the <search-string> from the VED buffer --------------------
+
+If no <search-string> argument is provided and the <file-pattern>
+contains no spaces (e.g. <ENTER> grep -l *.p) then the item to the right
+of the cursor in the VED buffer is taken as the <search-string>, where
+the item is delimited on the right by any of the following
+characters:
+
+        space tab newline ( ) ; , [ ] { } | > < ~ & * ? ` ' "
+
+and a trailing . or , is ignored.
+
+For example, if the cursor is just to the right of the arrow on the next
+line
+    -> prmishap,
+
+then the command
+
+    <ENTER> grep $popautolib/*
+
+is equivalent to
+
+    <ENTER> grep prmishap $popautolib/*
+
+and will print out information about all files in $popautolib that
+contain the string 'prmishap'.
+
+
+-- Getting ALL the arguments from the VED buffer ----------------------
+
+If no <search-string> or <file-pattern)> is given, then it uses the
+whole of the current VED line as argument. Thus the above commands would
+be equivalent to simply giving the command
+
+    <ENTER> grep
+
+while the VED cursor is on a line containing nothing but
+
+    prmishap $popautolib/*
+
+
+-- Removing colons after file names -----------------------------------
+
+Normally the output of commands like "grep" includes a colon immediately
+after each file name. This can be inconvenient if you wish to use the
+"^f" option described in HELP * VEDEXPAND to give a command using the
+file name. So by default, ved_grep removes the first colon in each
+line.
+
+This can be suppressed by putting the following command in your
+vedinit.p file:
+
+    global vars grep_leave_colons = true;
+
+The default is false: i.e. colons are removed.
+
+
+-- Specifying which search program to use -----------------------------
+
+The file-searching command is specified by assigning a string to the
+variable -grep_search_command-.
+
+E.g. depending on what is available on your machine, you could put one
+of these in your vedinit.p if desired.
+
+    vars grep_search_command = 'ggrep';
+or
+    vars grep_search_command = 'ngrep';
+
+Otherwise the command name defaults to 'egrep', because that allows
+flexible patterns.
+
+Usually if the Free Software Foundation's GNU grep is available
+(sometimes called "ggrep") it is the fastest search program to use.
+Otherwise if 'bm' is available it is fastest. Otherwise try 'egrep' and
+'grep' and decide which is faster. Note that 'grep' usually allows fewer
+options in the search string.
+
+The corresponding 'man' file (e.g. MAN * EGREP) should tell which flags
+are available to control the search, and what search patterns can be
+used in the <search-string>.
+
+-- Using <ENTER> getit, to read in a file found -----------------------
+
+If you have this in your vedinit.p file, then
+
+    global vars grep_leave_colons = true;
+
+<ENTER> grep will leave colons after filenames in its output file.
+
+You can then use the <ENTER> getit command to go to the file found and
+the line found. See HELP * VED_GETIT. (Available at Birmingham.)
+
+
+
+Originally
+--- C.unix/help/ved_grep
+--- Copyright University of Sussex 1990. All rights reserved. ----------
+
+--- $poplocal/local/help/ved_grep
+--- The University of Birmingham 1995.  --------------------------------

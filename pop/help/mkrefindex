@@ -1,0 +1,212 @@
+HELP MKREFINDEX                                  John Williams, Oct 1990
+
+A tool for creating an index to the identifiers described in a set of
+REF files.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+  2   Using LIB MKREFINDEX
+  3   Index Format
+  4   Index Utilities
+  5   REF File Format
+  6   Tailoring LIB MKREFINDEX for other documentation formats
+      6.1   Method 1
+      6.2   Method 2
+  7   See Also
+
+
+-----------------------------------------------------------------------
+1  Introduction
+-----------------------------------------------------------------------
+
+LIB * MKREFINDEX is a tool for indexing a set of documentation files, in
+order that they may be accessed via the VED <ENTER> commands ? and ??
+(described in HELP * QUERY).
+
+LIB MKREFINDEX makes the following broad assumptions:
+
+    1.  The set of files to be indexed all live in one directory.
+
+    2.  That directory has a sub-directory named "doc_index".
+
+    3.  Each file is made up of a mixture of discursory text and
+        descriptions of individual named items.
+
+    4.  Each named description can be divided into two parts - header
+        and text.  The text part may be empty.
+
+LIB MKREFINDEX reads through the set of files, and creates an index (in
+the "doc_index" sub-directory) that records the locations of all the
+descriptions found in the set of files.
+
+The name "MKREFINDEX" derives from the fact that, by default, LIB
+MKREFINDEX assumes that the documention files are formatted in the style
+of Pop-11 REF files. However, it is possible to tailor LIB MKREFINDEX
+for use with other formats, as explained below.
+
+
+-----------------------------------------------------------------------
+2  Using LIB MKREFINDEX
+-----------------------------------------------------------------------
+
+To use LIB MKREFINDEX from Pop-11, do
+
+    lib mkrefindex;
+    mkrefindex(dir);
+
+This indexes the directory dir. An error is signalled if dir does not
+have a sub-directory named "doc_index".
+
+LIB MKREFINDEX may also be invoked from the shell (Unix) or DCL (VMS),
+like this:
+
+    pop11 mkrefindex dir
+
+
+-----------------------------------------------------------------------
+3  Index Format
+-----------------------------------------------------------------------
+
+A "doc_index" directory consists of 26 files, named "a", "b", "c" to
+"z". Each file consists of a number of index entries. An entry records
+the location of the description of an item whose name begins with the
+same letter as the name of the index file. The index is not
+case-sensitive, so (for example) the items "ARRAY" and "abs" would both
+be listed in the index file "a". Names beginning with a non-alphabetic
+character (e.g. "==>") are listed in the file "z".
+
+Each index entry occupies a separate line of an index file. Entries
+consist of five fields, separated by spaces. These fields are:
+
+    1.  description name
+    2.  name of the file that contains the description
+    3.  the line number of the start of the description
+    4.  the line number of the end of the header part of the description
+    5.  the line number of the end of the description
+
+Field 2 should contain the name of a file, not a full pathname. Fields
+3, 4, and 5 may be the same.
+
+Within each index file, the entries are arranged such that their first
+fields are in alphabetical order.
+
+For an example of an index file, examine $usepop/pop/ref/doc_index/a.
+
+
+-----------------------------------------------------------------------
+4  Index Utilities
+-----------------------------------------------------------------------
+
+The header file INCLUDE * DOC_INDEX defines a number of constants that
+are useful to programs that manipulate indexes.
+
+Also, the following two procedures are provided:
+
+    sys_search_doc_index(name, dir, exact) -> n
+
+This searches the index associated with dir for entries listed under
+name. Returns the number of matching entries (n), followed by the
+entries themselves. Each entry is a five-element vector, of the type
+produced by sys_parse_doc_index_entry.
+
+
+    sys_parse_doc_index_entry(string) -> vec
+
+This converts a string (normally a line from an index file) into a
+five-element vector, containing the five components of an index entry.
+string should consist of five space-separated text items.
+
+
+-----------------------------------------------------------------------
+5  REF File Format
+-----------------------------------------------------------------------
+
+By default, LIB MKREFINDEX expects files to use the standard Pop-11 REF
+file format. This is discussed in detail in REF * REFFORM.
+
+Briefly, the rules used by LIB MKREFINDEX are:
+
+1.  Descriptions commence with a line whose first character is not
+    a space, and whose last character is `]`.
+
+2.  The header part of a description is terminated by a line whose
+    first non-whitespace character occurs in column 9.
+
+3.  The text part of a description is terminated by 2 successive
+    blank lines.
+
+The name under which a description is indexed is determined by parsing
+the first line of the description header into Pop-11 text items. The
+description name is the first text item that is not italicised (formal
+parameter names are depicted in italics).
+
+
+-----------------------------------------------------------------------
+6  Tailoring LIB MKREFINDEX for other documentation formats
+-----------------------------------------------------------------------
+
+You can use LIB MKREFINDEX to index documentation that doesn't use the
+standard REF file format. There are two ways of doing this:
+
+
+6.1  Method 1
+-------------
+
+The procedures called by mkrefindex to determine where a description
+starts and ends can be redefined. These procedures are:
+
+    description_hdr_start(line) -> bool
+
+    description_hdr_end(line) -> bool
+
+    description_hdr_name(line) -> string
+
+
+The first, description_hdr_start, should return true if the line of text
+line commences a description.
+
+The second, description_hdr_end should return true if line terminates
+the header part of a description. (Also, by definition, true if line
+commences the text part of a description).
+
+Finally, description_hdr_name, given the first line of a description,
+should return the name (as a string) under which the description is to
+be indexed.
+
+Note: it is not possible to specify how descriptions are terminated. In
+other words, descriptions can only be terminated by two blank lines.
+
+For an example, examine the file $usepop/pop/lisp/mklisprefindex.p, in
+which the procedure description_hdr_name is redefined to recognise Lisp
+function names.
+
+
+6.2  Method 2
+-------------
+
+Alternatively, you can redefine the procedure that mkrefindex uses to
+parse each document. This procedure is:
+
+    mkrefindex1(filename) -> (vec_1, vec_2, ..., vec_n, n)
+
+filename is the name of the document. Each result vec is a five-element
+vector of the type produced by sys_parse_doc_index_entry (see above),
+and n is the total number of these vectors.
+
+The standard version of mkrefindex1 uses description_hdr_start,
+description_hdr_end, and description_hdr_name to parse the document.
+
+
+-----------------------------------------------------------------------
+7  See Also
+-----------------------------------------------------------------------
+
+    HELP * REF              - for examining REF files
+    HELP * QUERY            - for details on <ENTER> ? and ??
+    REF * REFFORM           - specification of standard REF file format
+
+
+--- C.all/help/mkrefindex
+--- Copyright University of Sussex 1991. All rights reserved.

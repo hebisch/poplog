@@ -1,0 +1,203 @@
+HELP LEXICAL                               Revised A.Sloman June 1990
+
+lvars, lconstant, dlvars, lblock, define lvars, define lconstant
+
+The POPLOG virtual machine provides a range of facilities for lexically
+scoped identifiers, used in POP-11, Common Lisp and ML.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Introduction
+ -- Lexical identifiers have a textually defined scope
+ -- Using #_INCLUDE or include to extend lexical scope
+ -- Syntax words for declaring lexical identifiers
+ -- Use of lexicals to avoid creating sections
+ -- Using lblock ... endlblock to define lexical blocks
+ -- Related Documentation
+
+-- Introduction -------------------------------------------------------
+
+Some languages, e.g. PASCAL, C, SCHEME, ML provide only lexically scoped
+identifiers, whereas POP-11 and Common Lisp provide both lexical and
+non-lexical identifiers. Lexical identifiers are sometimes known as
+"static" and non-lexical ones as "dynamic". Poplog REF files refer to
+the latter as "permanent" rather than "dynamic", since once declared
+they can be accessible forever (unless cancelled using * syscancel),
+whereas lexically scoped identifiers can be accessed only while a
+particular portion of program is being compiled: the scope of the
+lexical identifier.
+
+HELP * LVARS includes an explanation of the advantages of using lexical
+variables local to a file or procedure, including some examples, and
+discussions of efficiency issues.
+
+-- Lexical identifiers have a textually defined scope -----------------
+
+Lexically scoped identifiers are declared within a portion of text that
+defines their scope, and are accessible only by procedures defined
+within that portion of text, known as the "scope" of the variable.
+
+The scope of a lexical declaration can be either a procedure, or a file,
+or a compilation stream, or a lexical block defined using
+
+    lblock ..... endlblock
+
+If L is a lexical identifier declared with a certain text scope then
+after compilation of that portion of text is complete, no procedures
+compiled subsequently can access L. (This can make debugging awkward,
+and special tools will be provided to overcome this.)
+
+Permanent identifiers once created exist until cancelled. Lexical
+identifiers exist only within the scope of compilation of the relevant
+text block or file or compilation stream.
+
+
+-- Using #_INCLUDE or include to extend lexical scope -----------------
+
+Normally if a file F1 includes a command to compile another file F2,
+using "compile", "loadlib", "lib" or "uses", then no procedure defined
+in F2 can access any identifier declared as lexically scoped in F1.
+However, if the file F2 is compiled using the command
+
+    #_INCLUDE F2
+
+then it is spliced into the compilation stream of F1 (i.e. no new
+proglist is created). In that case F2 shares the lexical environment
+of F1 and can access lexically scoped identifiers declared at top
+level in F1. (See REF * PROGLIST/#_INCLUDE)
+
+A collection of files for "inclusion" in this way can be found in
+
+    $usepop/pop/lib/include/*.ph    UNIX
+    usepop:[pop.lib.include]*.ph    VMS
+
+It is generally more convenient not to have to specify the full pathname
+for the file to be included. The macro -include- and the search list
+-popincludelist- make this possible. E.g. the command
+
+    include foo
+
+will look for a file called foo.ph in a directory in the list
+-popincludelist-, and will then #_INCLUDE that file. For details see the
+files HELP * INCLUDE, LIB * INCLUDE
+
+
+-- Syntax words for declaring lexical identifiers ---------------------
+
+Lexical declarations are made by using:
+
+    lvars
+    lconstant
+    dlvars (only local to a procedure)
+    define (followed by  lvars or lconstant)
+
+By contrast, permanent (non-lexical) identifiers are declared using:
+
+    vars
+    constant
+    define (with no following modifier).
+
+(Note that the word "global", indicating that an identifier should be
+imported into lower level sections cannot be used in declarations of
+lexical identifiers, since they are not part of the section mechanism.
+See HELP * SECTIONS)
+
+
+-- Use of lexicals to avoid creating sections -------------------------
+
+Since lexical identifiers are not accessible by procedures defined
+outside their scope, it follows that library files, for example, that
+use LVARS or LCONSTANT for global variables or procedure definitions,
+need not use the section mechanism to prevent clashes with identifiers
+declared in other files. (See HELP * SECTIONS)
+
+Using DLOCAL to make a variable local to a procedure works whether it is
+a permanent or a lexical variable. (See HELP * DLOCAL). Thus if L is
+declared as lexically scoped outside any procedure within a file, then
+all procedures in the file can access it, and further, by using DLOCAL
+they can ensure that any changes they may make will be undone on exit,
+just as happens with "permanent" dynamically scoped identifiers. For
+examples of the use of DLOCAL with lexical identifiers see HELP * LVARS
+and SHOWLIB * SYSSORT.
+
+Local lexical variables are allocated on the procedure call stack, which
+can make procedure exit faster than when permanent (dynamic) variables
+are used. On most machines at least the first two lexical variables
+declared as local to a POP-11 procedure are allocated to fast registers.
+(See HELP * EFFICIENCY)
+
+The use of lexical scoping is often an alternative to "partial
+application" as a way of enabling a procedure P1 to create another
+procedure P2 that accesses some of the environment of P1. An example
+is given in HELP * LVARS. Several different types of cases, and their
+implementation are discussed in detail in REF * VMCODE/Lexical. (The
+REF file explains that three kinds of lexical variables have to be
+distinguished, with different implementation requirements.)
+
+
+-- Using lblock ... endlblock to define lexical blocks ----------------
+
+In a complex procedure it is sometimes convenient to define a portion
+of the procedure as providing the scope of a lexical declaration so
+as to ensure that use of a variable in one part of the procedure will
+not interact with its use elsewhere. This could be done by using
+additional local variables with unique names but extra local variables
+will slow down procedure entry and require extra space on the procedure
+call stack. The answer is to use lexical blocks.
+
+The syntax is
+
+    lblock <statement seqquence> endlblock
+
+Lexical blocks can be used (nested to any depth), either inside
+procedures or at execute level, e.g. in
+
+    define foo();
+        lvars x;
+        lblock
+            lvars y;
+            ...
+        endlblock
+        lblock
+            lvars z;
+            ...
+        endlblock
+    enddefine;
+
+the variables -y- and -z- are accessible only inside their respective
+blocks (whereas -x- is accessible everywhere in the procedure);
+moreover, the resources utilised for -y- in the first block are freed
+for reuse in the second block, etc.
+
+In the Poplog virtual machine this facility is represented by two
+pseudo-instructions -sysLBLOCK- and -sysENDLBLOCK-.
+
+See REF * VMCODE/Lexical for full details.
+
+
+-- Related Documentation ----------------------------------------------
+
+HELP *VARIABLES  - range and nature of POP-11 variables
+HELP *LVARS      - for more on lexical scoping and its uses
+HELP *DLOCAL     - dynamic local expressions
+HELP *INCLUDE    - extending the current compilation stream
+
+HELP *EFFICIENCY - using lexical variables for efficiency
+HELP *VARS       - dynamic variable declarations
+HELP *CONSTANT   - constant declarations
+HELP *CANCEL     - cancelling words including constants
+HELP *SYSCANCEL
+
+REF  *IDENT      - nature of POP-11 identifiers
+HELP *IDENTIFIERS- introduction to the nature of POP-11 identifiers
+
+REF  *VMCODE     - details of the mechanisms
+REF  *POPSYNTAX  - describes the syntax of POP-11
+REF  *POPCOMPILE - describes the POP-11 compiler
+REF  *PROGLIST/#_INCLUDE  - extending POP-11 compilation stream
+
+HELP *STANDARDS/lexical
+    Advice on using lexical scoping in libraries, etc.
+
+--- C.all/help/lexical
+--- Copyright University of Sussex 1989. All rights reserved. ----------

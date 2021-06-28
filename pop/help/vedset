@@ -1,0 +1,526 @@
+HELP VEDSET                                           A.Sloman July 1989
+                                            Revised John Gibson Jan 1997
+
+The syntax word vedset is provided to facilitate tailoring Ved to
+different terminals or personalising the Ved key mappings, without
+having to learn Pop-11 syntax for strings, etc. as required by
+* vedsetkey, for instance.
+
+There are three vedset formats, one for setting the screen control
+variables, one for altering the effects of key sequences or function
+keys, and one for assigning codes to special character variables.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+  2   vedset screen
+  3   vedset keys
+  4   vedset chars
+  5   Warning: Using vedset in vedinit.p
+  6   Format of character-sequence or character
+  7   Logical Names for Characters
+  8   Extra Characters for vedset chars
+  9   End-of-line Comments
+ 10   More Examples
+ 11   Warning: Change in Screen Control Variables
+ 12   How vedset Works
+ 13   XVed and vedset
+ 14   See Also
+
+
+-----------------------------------------------------------------------
+1  Introduction
+-----------------------------------------------------------------------
+
+The different formats are defined in the following sections, and
+examples are provided in later sections.
+
+All the formats described here can occur inside Pop-11 procedure
+definitions. Examples of the use of vedset can be found in the files in
+$usepop/pop/ved/term ($usepop:[pop.ved.term] on VMS), e.g. the files
+
+    vedsunkeys.p
+    vedsunscreen.p
+    vedtvi925screen.p
+    etc.
+
+
+-----------------------------------------------------------------------
+2  vedset screen
+-----------------------------------------------------------------------
+
+Ved has a number of variables containing strings of characters which are
+sent to the terminal to perform various operations, e.g. move the
+cursor, blank the end of a line, etc.
+
+The format for setting screen control variables is:
+
+    vedset screen
+        varname = character-sequence
+        varname = character-sequence
+        .....
+    endvedset;
+
+where character-sequence is described below.
+
+Note that the actual names of the Ved screen control variables all begin
+with the prefix 'vvedscreen-', but this is omitted in varname, e.g.
+
+    vedset screen
+        charleft  = esc [ D   ;;; Move cursor left
+        charright = esc [ C   ;;; Move cursor right
+    endvedset
+
+would set vvedscreencharleft and vvedscreencharright.
+
+For a minimal list of screen control variables to be set for a new VDU
+see the sections on screen control in
+
+    REF * VEDTERMINALS
+        Search for identifiers starting "vvedscreen ..."
+
+    HELP * TERMINAL
+        This gives more detailed explanations.
+
+
+-----------------------------------------------------------------------
+3  vedset keys
+-----------------------------------------------------------------------
+
+This type of vedset allows input key sequences to Ved to be mapped to
+Ved functions. Its format is
+
+    vedset keys [from_defaults]
+        function = character-sequence
+        function = character-sequence
+        ....
+    endvedset;
+
+where character-sequence is described below.
+
+If the word from_defaults is present, vedset resets the key mappings to
+their default state before interpreting the following vedset commands.
+
+function is an expression specifying a Ved procedure name, or ENTER
+command. In the case of a procedure name, the prefix 'ved-' is omitted,
+thus
+
+    vedset keys
+        charup   = esc A
+        chardown = esc B
+    endvedset
+
+would map the key sequences to the procedures vedcharup and vedchardown.
+
+function can also map a Ved ENTER command onto a key sequence using
+the format
+
+    ENTER command = character-sequence
+
+For example,
+
+    vedset keys
+        ENTER yankl = ^B space  ;;; Ctrl-B space retrieves deleted line
+    endvedset
+
+(Note that in this case, the corresponding Ved procedure name is 'ved_'
+prefixed to command, i.e. the above example will map Ctrl-B followed
+by a space to ved_yankl.)
+
+It is also possible to give a function specification that is a
+concatenation of functions, using the operator <>, as in the following
+examples:
+
+    vedset keys
+        nextline <> linedelete = character-sequence
+        linedelete <> nextline <> ENTER yankl = character-sequence
+    endvedset
+
+etc.
+
+The function arguments can also be prefixed by ident or enclosed in
+word quotes, e.g.
+
+        ident endrange = character-sequence
+        "endrange"     = character-sequence
+
+Where the procedure to be run is a variable, using ident will ensure
+that the current value of the corresponding identifier is always used
+(rather than freezing in a particular value at the time of the
+vedset.)
+
+On the other hand, using word quotes is useful for autoloadable library
+procedures, and will ensure that they are loaded only when they are
+required.  Note that single function names are enclosed in quotes
+normally as above;  functions that would normally be prefixed with the
+word "ENTER" are given thus:
+
+        ident ENTER smr = character-sequence
+        "ENTER smr"     = character-sequence
+
+where for the quote case, both ENTER and the function name are within
+the quotes.  When concatenating functions each function name is
+separately prefixed by ident or enclosed in separate word quotes, e.g:
+
+        ident nexthelp <> ident ENTER help = character-sequence
+        "nexthelp" <> "ENTER help"         = character-sequence
+
+For a collection of available procedures that can be invoked by input
+key sequences see
+
+    REF * VEDPROCS
+    REF * VEDCOMMS
+        (The latter can be used only if they don't require an argument)
+
+User-defined procedures can also be used.
+
+For a collection of default key mappings see
+
+    HELP * VEDKEYS
+    HELP * VEDSUN
+    HELP * V200
+    HELP * VT100
+    HELP * VEDEMACS
+
+Other terminal types for which Ved key mappings are provided are listed
+in HELP * VED/bindings.
+
+
+-----------------------------------------------------------------------
+4  vedset chars
+-----------------------------------------------------------------------
+
+Ved has a set of variables which contain special characters used to
+display the status line, marked ranges, etc. These are described in
+REF * VEDVARS, Special Character Variables.
+
+The format for setting Ved special character variables is
+
+    vedset chars
+        varname = character
+        varname = character
+        ....
+    endvedset;
+
+where varname is the name of the relevant variable with the prefix
+'vedscreen-' omitted, and character is described below.
+
+For example,
+
+    vedset chars
+        status_-|_mark = [b]Grt
+        status_|-_mark = [b]Glt
+        status_-_mark  = [b]G-
+    endvedset;
+
+would set vedscreenstatus_-|_mark, vedscreenstatus_|-_mark and
+vedscreenstatus_-_mark.
+
+
+-----------------------------------------------------------------------
+5  Warning: Using vedset in vedinit.p
+-----------------------------------------------------------------------
+
+The new Ved startup mechanisms in use since Poplog V13.7 imply that in
+some cases the terminal customisation procedures are not run until after
+the vedinit.p file has been compiled. In some cases this can over-ride
+key bindings or screen control definitions set up in your vedinit.p file
+using vedset or vedsetkey (See HELP * VEDSETKEY).
+
+In order to avoid this you should put such commands inside a definition
+of a procedure called vedinit. E.g.
+
+    define vedinit();
+        ....
+        vedset keys
+            ....
+        endvedset;
+
+        vedset screen
+            ....
+        endvedset;
+        ....
+
+        identfn -> vedinit;   ;;; Reclaim space taken by this procedure
+    enddefine;
+
+(See also HELP * INITIAL, REF * VEDTERMINALS)
+
+
+-----------------------------------------------------------------------
+6  Format of character-sequence or character
+-----------------------------------------------------------------------
+
+Each command in a vedset screen or vedset keys takes a character-
+sequence following the =. The = and the character-sequence must
+occur on one line (i.e. if a line break is required it should be just
+before =), as the end of the line is used to delimit the end of
+character-sequence.
+
+The character-sequence can take two forms, namely
+
+    (1) A Pop-11 string, delimited by single quotes '...' (which must
+        not run over the end of the line), e.g.
+
+            screendown = '\e[325z'
+
+        Various special and control characters can be represented in
+        strings by sequences beginning with backslash (e.g. \s for
+        space, \t for tab, or \e for escape as in the example). See
+        Backslash in Strings & Character Constants in REF * ITEMISE for
+        more details.
+
+    (2) A sequence of space-separated logical names for characters to go
+        into the string, e.g.
+
+            screendown = esc [ 3 2 5 z
+
+        is the same sequence as in (1). The possible logical names for
+        characters are described in the next section.
+
+In the case of vedset chars, a single character must follow the
+"=", where this is a logical name for a character (i.e. the Pop-11
+string format is not allowed).
+
+
+-----------------------------------------------------------------------
+7  Logical Names for Characters
+-----------------------------------------------------------------------
+
+The logical names that can be used for characters in a character-
+sequence are as follows:
+
+Any single character represents itself. E.g. the sequence
+
+    [ Y e s t e r d a y 9 9 ] ; .
+
+represents a string containing all the characters shown.
+
+Non-printing codes are represented as follows
+
+    (1) Control characters can use any of these formats:
+
+        ctrl a ctrl b ctrl c ctrl d ....
+        ctrl A ctrl B ctrl C ctrl D ....
+        CTRL A CTRL B CTRL C CTRL D ....
+        ^a     ^b     ^c     ^d     ....
+        ^A     ^B     ^C     ^D     .... etc.
+
+    (2) Other special codes recognised (upper or lower case)
+
+        Accepted Code
+        Form(s)                 Interpretation      ASCII decimal
+        -------------           --------------      -------------
+        bs  \b  ^H              Backspace = CTRL H        8
+        tab \t  ^I              Tab       = CTRL I        9
+        lf  \n  ^J              Linefeed  = CTRL J       10
+        cr  \r  ^M              Return    = CTRL M       13
+        esc     ^[              <ESC>     = CTRL [       27
+        sp  \s  space           Space                    32
+        del                     <DEL>                   127
+
+Note that BS and bs are equivalent, similarly TAB and tab, etc.
+
+
+-----------------------------------------------------------------------
+8  Extra Characters for vedset chars
+-----------------------------------------------------------------------
+
+For vedset chars, character is a single logical name as above.
+However, it may also be the name of a Ved graphics character beginning
+with "G", e.g.
+
+    vedset chars
+        status_-|_mark = Grt
+        status_|-_mark = Glt
+        status_-_mark  = G-
+    endvedset;
+
+See Graphics  Characters  in REF * VEDPROCS  for  a description  of  the
+available graphics characters. Note that  this describes them as  Pop-11
+string/character constant  sequences beginning  with "\G"  -- when  used
+with vedset chars, you omit the backslash.
+
+Also for vedset chars, character may include attributes like 'bold',
+or a colour number, etc. These are specified by preceding the character
+name with attribute letters in square brackets (with no intervening
+space), e.g.
+
+    vedset chars
+        status_-|_mark = [b]Grt
+        status_|-_mark = [b]Glt
+        status_-_mark  = [b]G-
+    endvedset;
+
+sets the same characters but in bold. (Once again, this notation is the
+same as for Pop-11 character constants, but with the backslash omitted
+-- see Backslash in Strings & Character Constants in REF * ITEMISE for
+full details.)  A list of the available attributes also appears in
+Changing Character Attributes in REF * VEDCOMMS.
+
+(Note that changing the attributes on characters is generally the main
+reason for using vedset chars at all. It is unlikely that you will want
+to use characters other than the standard graphics characters for things
+like the status line and marked range, but may (for example) prefer them
+in bold, or in different colours, etc.)
+
+
+-----------------------------------------------------------------------
+9  End-of-line Comments
+-----------------------------------------------------------------------
+
+As shown in examples above, Pop-11 style end-of-line comments may be
+used after the character-sequence on a line, e.g.
+
+    dotdelete = esc ? A    ;;; function key f1
+
+
+-----------------------------------------------------------------------
+10  More Examples
+-----------------------------------------------------------------------
+
+Suppose you wanted to set <ESC> RETURN to be the equivalent of <ENTER>
+and wanted to use various sequences beginning with CTRL-b to set key
+mappings. You could do the following
+
+    vedset keys
+        enter        = esc cr   ;;; <ESC> <RETURN> invokes vedenter
+        markfind     = ^b a     ;;; CTRL-B a       invokes vedmarkfind
+        endrange     = ^b z     ;;; CTRL-B z       invokes vedendrange
+        ENTER define = 'DEF'    ;;; typing DEF     invokes ved_define
+    endvedset
+
+Here are examples of some definitions of screen control sequences for
+ANSI type terminals (e.g. Sun console and VT100), showing two different
+permitted formats, one with mnemonic codes, and one using Pop-11 strings
+(please see WARNING below):
+
+    vedset screen
+        ;;; assign string '\^[[D' to vvedscreencharleft
+        charleft  = esc [ D     ;;; Move cursor left
+        charright = esc [ C     ;;; Move cursor right
+        charup    = '\^[[A'     ;;; Move cursor up
+        cleartail = '\^[[K'     ;;; is optional after a string
+    endvedset
+
+This is how you might define ESC ESC RETURN to be the equivalent of
+exchanging the next two lines then taking you back to the beginning of
+the (new) first one.
+
+    vedset keys
+        linedelete <> nextline <> ENTER yankl <> charup <> screenleft
+            = esc esc cr
+    endvedset
+
+A newline can occur immediately before or after <>, i.e.
+
+    vedset keys
+        linedelete <> nextline <> nextline <>
+        ENTER yankl <> charup <> screenleft
+            = esc esc lf
+    endvedset
+
+
+-----------------------------------------------------------------------
+11  Warning: Change in Screen Control Variables
+-----------------------------------------------------------------------
+
+The vedset screen example above assigns strings that start with the
+<ESC> (ascii 27) character. In Poplog versions prior to 13.7 the
+relevant Ved variables (e.g. vvedscreencleartail) did not all have
+strings as values, and did not need to include the escape character
+because that was transmitted by the procedure vedscreenescape.
+
+From Ved version 13.7 this is no longer be the case, in order to make
+Ved easier to tailor automatically according to termcap entries, and
+in order to make the mechanisms more uniform. I.e. all the vvedscreen...
+variables will have strings as values containing all the characters to
+be transmitted.
+
+The procedure vedscreenescape will remain available for users.
+However, the system facilities will use
+
+    vedscreencontrol(string_or_procedure).
+
+
+-----------------------------------------------------------------------
+12  How vedset Works
+-----------------------------------------------------------------------
+
+The syntax construct
+
+    vedset <screen | chars | keys | mouse | xved> [from_defaults]
+        vedset-commands
+    endvedset
+
+first decides which type of vedset  is being used (screen, keys,  chars,
+mouse or xved). If it is  of type keys, and from_defaults is  present, a
+call to  the  procedure veddefaultkeys  is  planted. Commands  are  then
+repeatedly read in, until endvedset is encountered.
+
+For each command, the function or variable name is expanded to generate
+the name of an identifier (see below), and the code sequence is built in
+a string. For vedset keys, a call to vedsetkey is planted; for screen or
+chars, the character sequence or character is assigned to the
+identifier.
+
+
+-----------------------------------------------------------------------
+13  XVed and vedset
+-----------------------------------------------------------------------
+
+When XVed is loaded (see HELP * XVED), vedset is extended in three ways:
+
+    # Keys can be referred to by their logical KeySym names;
+    # Procedures can be bound to mouse buttons with vedset mouse ... ;
+    # XVed resources can be set with vedset xved ....
+
+For full details of these additions see REF * XVED.
+
+
+-----------------------------------------------------------------------
+14  See Also
+-----------------------------------------------------------------------
+
+HELP * VED
+    For an overview of documentation on Ved.
+
+HELP * INITIAL
+    For information about initialisation and tailoring of Poplog
+
+REF * VEDVARS
+    Overview of Ved's global variables
+
+REF * VEDPROCS
+    defines many of the procedures referred to above
+
+REF * VEDCOMMS
+    Overview of Ved ENTER commands
+
+HELP * LOGICAL_KEYS
+    Defines Ved's logical names for keys.
+
+HELP * TERMINAL
+    Overview of Ved customisation
+
+REF * VEDTERMINALS
+    Explains Ved's terminal recognition mechanism and documents
+    the underlying procedures.
+
+HELP * VEDKEYS
+    The default Ved key bindings
+
+HELP * DK
+    An interactive procedure for defining key bindings
+
+HELP * VEDSETKEY
+    A more primitive mechanism for setting key bindings
+
+HELP * ASCII
+HELP * STRINGS
+
+
+
+
+--- C.all/help/vedset
+--- Copyright University of Sussex 1997. All rights reserved.

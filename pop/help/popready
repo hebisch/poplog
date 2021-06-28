@@ -1,0 +1,132 @@
+HELP POPREADY                                  Steven Hardy, March 1982
+                                               Updated A.Sloman Nov 1986
+    popready();
+
+This procedure, which takes no arguments, invokes the POP-11 compiler
+recursively. When it is invoked, input is read from the user's terminal
+and obeyed until the user types the "end of file" character (usually
+CTRL-D on Unix machines; CTRL-Z on VMS), when the call of POPREADY
+exits. Thus calling POPREADY in a procedure is a way of setting a kind
+of 'break point'.
+
+    NOTE: When POPREADY is invoked in VED you should use the command
+    <ENTER> END_IM to leave POPREADY.  DO NOT type "end of file".
+
+During a call of POPREADY any action can be performed; for example the
+values of variables can be examined and changed. Typically, one might
+put a call of POPREADY into a procedure that is being debugged. Here is
+a simple example:
+
+    define twice(x) -> r;
+        popready();
+        2 * x -> r;
+    enddefine;
+
+    twice(4) =>         ;;; call TWICE and print result
+
+    Popready            ;;; TWICE has called POPREADY
+    :1: x =>            ;;; Look at value of argument of TWICE
+    ** 4                ;;; It is 4
+    :1: 5 -> x;         ;;; Change it to 5
+    :1: <EOF>           ;;; end of file (CTRL-D on Unix; CTRL-Z on VMS)
+    ** 10               ;;; Result of TWICE
+
+A procedure that locally assigns POPREADY to INTERRUPT has the effect of
+changing the way POP-11 responds to the interrupt KEY (often CTRL-C), or
+to errors, while that procedure is running. Errors cause INTERRUPT to be
+invoked after the error message has been printed out. The default effect
+of INTERRUPT is to call * SETPOP, which aborts current procedures and
+resets POP-11.
+
+If POPREADY has been assigned to INTERRUPT, then an error or interrupt
+key press, would invoke POPREADY, which may often be useful for
+investigating the context of the interrupt or error, before the system
+is reset.
+
+Using *EXITFROM, it is even possible to correct the error and continue
+the computation. For example:
+
+    popready -> interrupt;    ;;; Make POPREADY the INTERRUPT procedure
+
+    define twice(x) -> r;     ;;; Erroneous defintion of TWICE
+        x * "two" -> r          ;;; This causes a run time error
+    enddefine;
+
+    twice(4) =>               ;;; call TWICE and print result
+
+    ;;; MISHAP - NON NUMBERS FOR *
+    ;;; INVOLVING 4 TWO
+    ;;; DOING TWICE              ;;; The MISHAP message
+
+    Popready                     ;;; POPREADY announces itself
+    :1: exitfrom(8, twice);      ;;; Tell POP-11 to exit from TWICE
+                                 ;;;         with result 8
+    ** 8                         ;;; Result is printed
+
+POPREADY in fact redefines INTERRUPT within itself; consequently if the
+first thing you type after the entry into POPREADY is the interrupt KEY,
+POPREADY returns to a previous level of POPREADY, or does SETPOP() if
+there isn't a previous level.
+
+If anything else is typed before the interrupt key, or if an error
+occurs, then a new POPREADY level is started. The level is indicated by
+a number occurring in the prompt, e.g. ':3: ' is the prompt for level 3.
+
+A simple definition of POPREADY might be:
+
+    define popready();
+        pr('popready\n');
+        compile(charin);
+    enddefine;
+
+This definition is over-simple, however. For example, this does not
+*POPPROMPT from ': ' to a string containing a digit bewteen two colons.
+e.g. ':1:', as the actual POPREADY does.
+
+The actual POPREADY also sets the interrupt procedure so that on an
+interrupt during a call of POPREADY, a new call of POPREADY is restarted
+UNLESS CTRL-C is the very first character typed to POPREADY (in which
+case POPREADY goes up a level).
+
+POPREADY also saves the stack on entry so that the call of
+COMPILE(CHARIN) (see HELP *COMPILE) runs with an empty stack. The saved
+stack is in a vector in the variable POPREADY_STACK. On exit, POPREADY
+restores the stack and adds any items left by the call of POPREADY
+itself. Thus, POPREADY can have a result; for example:
+
+    define area_of_rectangle(x, y) -> result;
+        [please tell me the area of rectangle
+         whose height is ^x and whose width is ^y] =>
+        popready() -> result;
+        [thank you] =>
+    enddefine;
+
+    area_of_rectangle(5, 6) + area_of_rectangle(10, 20) =>
+    ** [please tell me the area of a rectangle whose height is 5 and
+            whose width is 6]
+
+    Popready
+    :1: 5 * 6
+    :1: <EOF>   ;;; end of file (CTRL-D on Unix; CTRL-Z on VMS).
+    ** [thank you]
+    ** [please tell me the area of a rectangle whose height is 10 and
+            whose width is 20]
+
+    Popready
+    :1: 200
+    :1: <EOF>   ;;; end of file (CTRL-D on Unix; CTRL-Z on VMS).
+    ** [thank you]
+    ** 230
+
+The following related documentation may be of interest:
+
+    LIB * POPREADY      - the source code for POPREADY
+    HELP * INTERRUPT    - POP-11 interrupt procedures
+    HELP * MISHAP       - POP-11 error procedures
+    HELP * PRMISHAP     - Prints error messages; user-redefinable
+    HELP * SETPOP       - Resets the POP-11 system
+    HELP * VEDPOPREADY  - Similar to POPREADY, for use within VED
+
+
+--- C.all/help/popready
+--- Copyright University of Sussex 1992. All rights reserved. ----------

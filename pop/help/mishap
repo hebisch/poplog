@@ -1,0 +1,188 @@
+HELP MISHAP                                     Steven Hardy, March 1982
+                                              Adrian Howard, August 1990
+                                                   Aaron Sloman Oct 1990
+
+    mishap(<string>, <list-of-culprits>);
+        General error handler
+
+    vederror(<string>)
+        Error handler for relatively simple VED errors
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Introduction
+ -- vederror(<string>)
+ -- The procedure mishap
+ -- mishap(<args>, <integer>, <string>)
+ -- mishap(<string>, <list of args>)
+ -- What -mishap- does
+ -- Redefining prmishap
+ -- Using pop_default_prmishap to prevent prmishap being overridden
+ -- Safety measures in -mishap-
+ -- POPSYSCALL and the calling chain
+ -- Error code abbreviations
+ -- Further reading
+
+-- Introduction -------------------------------------------------------
+
+One of these procedures is called by the system whenever some error
+condition is detected. The user can, except in certain limited
+situations, alter the behaviour of default error handlers.
+
+
+-- vederror(<string>) -------------------------------------------------
+
+This procedure handles simple editing errors for which -mishap- would be
+overkill, such as search string not found.
+
+It is definable by users, and has a default defined thus
+
+    define vars vederror(string);
+        lvars string;
+        if vedediting and iscaller(vedprocess) then
+            vedputmessage(string);
+            vedscreenbell();
+            vedinterrupt();
+        else
+            mishap(0,string)
+        endif
+    enddefine;
+
+
+-- The procedure mishap ----------------------------------------------
+
+This procedure is more complex. It has two forms of invocation
+
+-- mishap(<args>, <integer>, <string>)
+-- mishap(<string>, <list of args>)
+
+These are equivalent provided that the number of arguments in the
+list is the same as <integer>. In particular
+
+    mishap(0, <string>)
+
+is equivalent to
+
+    mishap(<string>, [])
+
+The <args> are used by -prmishap- (described below) to create the
+"INVOLVING" line in standard error message formats.
+
+
+-- What -mishap- does -------------------------------------------------
+
+It first prints information about the error, using -prmishap- and then
+aborts current processing, using -interrupt-. More precisely it
+
+    (a) calls *PRMISHAP to print a mishap message (see HELP *SYSPRMISHAP)
+
+    (b) calls the procedure held in the variable *INTERRUPT (which
+        defaults to SETPOP, but is user-definable, and in VED is
+        given the value -veddointerrupt- so that interrupting does
+        not terminate VED)
+and finally
+    (c) calls *SETPOP, in case something has gone wrong with the
+        call of INTERRUP. Normally the call of SETPOP never occurs
+        because INTERRUPT has aborted the call of MISHAP.
+
+-- Redefining prmishap ------------------------------------------------
+
+-prmishap- is user definable, and should be assumed to be given
+arguments thus
+
+    prmishap(<string>, <list of culprits>)
+
+The <string> will normally be the same as the string given to -mishap-
+and the <list of culprits> will be derived from the other arguments
+given to -mishap-. (See REF * MISHAPS)
+
+The default value of -prmishap- is normally -sysprmishap-, except inside
+VED, where it may be given the value -vedprmishap- (See below).
+
+Users can define -prmishap- to print information in a form that is found
+more convenient or appropriate.
+
+In particular, a user-defined -prmishap- can prevent the call of
+-interrupt- being effective, by itself using some other procedure to do
+an abnormal exit to a preferred context, e.g. using exittto, or chainto.
+See HELP * CONTROL/Abnormal
+
+
+-- Using pop_default_prmishap to prevent prmishap being overridden ----
+
+Inside VED, -prmishap- is given different standard values depending on
+whether VED is currently obeying a "marked range" (see HELP * MARK/lmr),
+or is in "immediate mode" (as described in HELP *IM). These values will
+override a user-defined value of prmishap, unless the user assigns the
+required procedure to -pop_default_prmishap- (e.g. in vedinit.p, or
+init.p).
+
+E.g. in your init.p do
+
+    define pop_default_prmishap(string, list);
+        ....
+    enddefine;
+
+    pop_default_prmishap -> prmishap;
+
+
+-- Safety measures in -mishap- ----------------------------------------
+
+User defined versions of -mishap- or -interrupt- can sometimes cause
+errors, and this will lead to infinite error loops.
+
+So if while invoking the user's -prmishap-, -mishap- is triggered again,
+it locally sets the value of -prmishap- to be -sysprmishap-.
+
+Similarly, -mishap- temporarily changes the values of other
+user-assignable variables, like -cucharout- and -interrupt- for safety
+reasons.
+
+In some situations the user's prmishap is not given a chance as there is
+too great a risk of store being corrupted or infinite error loops, e.g.
+when there is call stack overflow, or there is no more heap space
+available, etc. In that case -sysprmishap- is run directly.
+
+
+-- POPSYSCALL and the calling chain -----------------------------------
+
+The default version of prmishap prints out the currently active
+procedures in a line starting with 'DOING:'. However, it does not
+print any procedure whose pdprops (normally holding the name of the
+procedure) is -false-, or starts with 'sys' or starts with 'ved'.
+
+This can be controlled by the variable -popsyscall-, whose default
+value is false. If it is made TRUE, then procedures whose names
+start with 'sys' or 'ved' will be included in the DOING list. If
+the value is anything else, e.g. "1", then additional information
+about nameless system procedures is printed out, but this will normally
+be useless to ordinary users.
+
+-- Error code abbreviations -------------------------------------------
+
+Some mishap messages start with a string of letters representing a code
+for the error. e.g. *ENP *ICA *IEAA *MSEP etc. By using the REF command
+(in or out of VED), followed by the code, you can read an explanatory
+file, which may help to make the error message clearer. E.g.
+
+    REF MSW
+
+-- Further reading ----------------------------------------------------
+
+See also
+
+HELP
+    *POPMISHAPS - variable holding a summary of error messages
+    *PRMISHAP   - Prints error messages; user-redefinable
+    *INTERRUPT  - On POP-11 interrupt procedures
+    *SETPOP     - Resets the POP-11 system
+    *POPSYSCALL  - controls inclusion in mishap messages of systems
+                   procedures
+
+
+REF * MISHAPS
+    Detailed information about the error handler
+
+--- C.all/help/mishap --------------------------------------------------
+--- Copyright University of Sussex 1990. All rights reserved. ----------

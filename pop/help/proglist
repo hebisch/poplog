@@ -1,0 +1,63 @@
+HELP PROGLIST                               updated A.Sloman DEC 1986
+
+This variable has as its value a list of POPLOG items providing input
+for the compiler. Usually it is a dynamic list (see *PDTOLIST) in which
+items are created from a character repeater.
+
+When the compiler wants an item from PROGLIST it calls the procedure
+*READITEM, which could be defined as:
+
+    define readitem() -> result;
+        if null(proglist) then
+            termin -> result;
+        else
+            hd(proglist) -> result;
+            tl(proglist) -> proglist;
+        endif
+    enddefine;
+
+Notice that items can be 'CONSed' onto the *FRONT of PROGLIST; for
+example, the following assignment causes the string 'hello there' to be
+printed out at the terminal:
+
+    ['hello there' =>] <> proglist -> proglist;
+    ** hello there
+
+This facility is made use of by macro procedures (see HELP * MACROS)
+which read in items from PROGLIST and put something different back ont
+the front of PROGLIST for the compiler to see. To achieve this some
+identifiers are of type "macro", and their values are procedures which
+are run when they are read in. Hence instead of using READITEM the
+compiler will use ITEMREAD, defined roughly thus:
+
+    define itemread -> item;
+        lvars item;
+        readitem() -> item;
+        while isword(item) and identprops(item) == "macro" do
+            valof(item)();       ;;; run the corresponding procedure
+            readitem() -> item;  ;;; now look at first item on proglist
+        endwhile
+    enddefine;
+
+
+PROGLIST is usually initialized thus:
+
+    pdtolist(incharitem(charin)) -> proglist;
+
+See also
+REF *LISTS      - for more detailed information on dynamic lists.
+REF *PROGLIST   - for details of the use of PROGLIST
+REF *POPCOMPILE - for procedures used during POP-11 compilation
+
+See also HELP
+    *COMPILE     - brief summary of COMPILE procedure
+    *INCHARITEM  - converts character repeater procedure into item repeater
+    *ITEMREAD    - reads in items from input stream; expands macros, autoloads
+    *MACRO       - defining macros in POP_11
+    *NEXTCHAR    - for altering the internal buffers of repeaters
+    *NEXTITEM    - reads in items from input stream without removing them
+    *PDTOLIST    - creates a dynamic list from a procedure
+    *POPVAL      - evaluates list items as POP-11 code
+    *READITEM    - reads in items from input stream; no expansion or autoload
+
+-----<Copyright University of Sussex 1986.  All rights reserved.>-------

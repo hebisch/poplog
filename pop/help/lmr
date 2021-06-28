@@ -1,0 +1,213 @@
+HELP LMR                                              A. Sloman May 1982
+                                                        Revised Jan 1990
+
+    <ENTER> lmr
+
+Load Marked Range - compiles the code in the marked range. This command
+can be invoked using the DOIT key or key sequence.
+
+
+    CONTENTS - (Use <ENTER> g to access sections)
+
+ -- Introduction
+ -- Selecting a compiler
+ -- Program results
+ -- Controlling output
+ -- Marked range in an output file
+ -- Error messages
+ -- Compiling one line: vedloadline
+ -- Immediate mode: <ENTER> im
+ -- See also
+
+
+-- Introduction -------------------------------------------------------
+
+The TEACH * LMR file gives an introduction to this facility. This file
+is more complete (but more condensed). It is assumed that you will know
+how to mark a range in a VED file. For details see HELP * MARK.
+
+The marked range of the current file is compiled by the -ved_lmr-
+command or by pressing the "DOIT" key. If there is no marked range, the
+current line is compiled.
+
+By default VED maps the procedure -ved_lmr- to CTRL-D. (For information
+on altering the mapping see HELP * VEDSETKEY.)
+
+
+-- Selecting a compiler -----------------------------------------------
+
+The procedure used to compile the marked range is determined by the
+value of the variable -subsystem-. This variable is local to each file,
+its value being set when the file is first edited according to the file
+type. The default mapping from file types to language subsystems is as
+follows:
+
+    .p          Pop-11
+    .pl         Prolog
+    .lsp        Common Lisp     (also '.l', '.lisp', '.cl')
+    .ml         Standard ML     (also '.sig')
+
+You can override or extend this mapping with the mechanism described in
+HELP * VEDFILETYPES.
+
+
+-- Program results ----------------------------------------------------
+
+Program output can be directed to one of three places:
+
+    1   To the screen
+    2   To a named file
+    3   To the current file
+
+In the first case, output from the program is not recorded in any way -
+it merely appears on the terminal screen and is lost when VED is
+restarted after the VED HERE: PRESS RETURN TO CONTINUE prompt.
+
+The second case is the default - printing is directed into an "output"
+file so that a record of all activity is maintained for later
+inspection. The default output file name is one of 'output.p',
+'output.pl', 'output.lsp' etc. depending on the initial language being
+used.
+
+Finally, output can be sent to the current file.  This means that output
+will appear directly below the line in the marked range being compiled.
+This is useful for debugging, as a sequence of print-arrow statements
+can be compiled, and their results will appear with them, for example,
+compiling the following sequence of statements:
+
+    vars a = 16;
+    a =>
+    a * a =>
+    sqrt(a) =>
+
+should produce (IF OUTPUT IS BEING SENT TO THE CURRENT FILE!) :
+
+    vars a = 16;
+    a =>
+    ** 16
+    a * a =>
+    ** 256
+    sqrt(a) =>
+    ** 4.0
+
+Output is controlled by the variable -vedlmr_print_in_file-, which can
+take one of three values:
+
+    1   -false-
+    2   a filename (as a string)
+    3   -true-
+
+These correspond to the three types of output listed above.
+
+
+-- Controlling output -------------------------------------------------
+
+The command <ENTER> output can be used to alter the value of
+-vedlmr_print_in_file-, as follows:
+
+    <ENTER> output foo.p
+
+will make the file called 'foo.p' the output file. i.e. all printout
+will go there.
+
+    <ENTER> output .
+
+will make the current file the output file, by making the value of
+-vedlmr_print_in_file- to be -true-.
+
+    <ENTER> output ^
+
+will make output go onto the screen without going into any file, by
+making the value of -vedlmr_print_in_file- to be -false-.
+
+    <ENTER> output
+
+will print out the current value of vedlmr_print_in_file.
+
+
+-- Marked range in an output file -------------------------------------
+
+Under certain circumstances, the range mark will be repositioned after a
+successful invocation of ved_lmr. If output is being directed to the
+current file (or to the screen), the mark is automatically moved to the
+next line of the file after compilation.  This makes interactive
+debugging easier in an output file, since commands can be typed-in and
+run one at a time. Program segments remain marked after compilation in
+non-output files.
+
+
+-- Error messages -----------------------------------------------------
+
+Compiler mishaps (usually syntax errors) will be trapped, and instead of
+a full error message, a short message will be displayed on the command
+line. The cursor is left at the point the compiler had read to.
+
+The error message is stored in the command line, and can be examined by
+putting the cursor on the command line and moving down one line. For
+details see TEACH * LMR.
+
+Run-time mishaps (or warnings of undeclared variables) will cause a
+normal mishap message to be printed.  Error messages are sent to the
+same place as normal printing output will occur - that is, if
+-vedlmr_print_in_file- is -false- or the name of a file, then mishap
+messages will go to the screeen (in the first instance) or to the named
+file (in the second).  When -vedlmr_print_in_file- is -true-, however,
+error messages are not automatiocally sent to the current file.
+Instead, a variable named -vedlmr_errs_in_file- is consulted.  Its value
+should be a boolean:
+
+    -false-     messages to screen only
+    -true-      messages to the current file
+
+When set -false-, mishaps are printed on the screen without any record
+being kept.  This is the default case.   When -true-, then mishaps are
+included in the current file along with any output. The combination
+-vedlmr_print_in_file- and -vedlmr_errs_in_file- both set -true- is
+convenient for preparing a record of a full interactive session,
+including all error messages.
+
+The command
+
+    <ENTER> errs
+
+is used to switch (ie toggle) the value of -vedlmr_errs_in_file-.
+
+If a mishap messages is put into the current file, it is automatically
+marked, so that they can be deleted with <ENTER> d. Warning messages
+about undeclared variables are inserted as comments, so they can be
+deleted or left in the file.
+
+The symbol '^' should appear above the error message to show how far the
+compiler had got before it complained (although the actual bug may not
+be at that exact point - it will be earlier in the marked range).
+
+
+-- Compiling one line: vedloadline ------------------------------------
+
+The procedure -vedloadline- can be used to compile just one line, the
+line containing the cursor. By default this is mapped onto the key
+sequence <ESC> d, in VED, though this may be changed in some VED
+terminal configurations. See HELP * VEDSETKEY for information on
+altering the mapping.
+
+
+-- Immediate mode: <ENTER> im -----------------------------------------
+
+VED provides a convenient mode for treating a particular file as an
+interactive file, with each press of the RETURN key handing the current
+line to the compiler. This facility is described in HELP * IM.
+
+
+-- See also -----------------------------------------------------------
+
+HELP * POPWARNINGS      for information about warning or mishap messages
+     * POPMISHAPS
+     * MARK             details of marking a range
+TEACH * LMR             tutorial on compiling (with examples)
+
+HELP * VEDSETKEY        altering VED key mappings
+HELP * IM               Use of VED in "immediate mode"
+
+
+--- C.all/help/lmr
+--- Copyright University of Sussex 1991. All rights reserved. ----------

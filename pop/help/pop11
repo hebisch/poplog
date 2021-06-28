@@ -1,0 +1,386 @@
+HELP POP-11                                      Robert Duncan, May 1995
+
+An introduction to the Poplog Pop-11 subsystem.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   The Pop-11 Language
+
+  2   Running Pop-11
+
+  3   Writing a Program
+
+  4   Initialisation and Libraries
+
+  5   Command Line Arguments
+
+  6   Additional Information
+
+
+-----------------------------------------------------------------------
+1  The Pop-11 Language
+-----------------------------------------------------------------------
+
+Pop-11 is the core language of the Poplog system. Most of Poplog itself
+is written in Pop-11, including all the subsystem compilers, the editor
+and the X interface. For this reason alone, it is worthwhile for all
+Poplog users -- whatever their primary language -- to have some
+familiarity with Pop-11, since there are inevitably some features of
+Poplog which can most easily (or perhaps only) be accessed through
+Pop-11 by means of mixed-language calls.
+
+Pop-11 has evolved from a long line of Pop languages, developed
+primarily for applications in Artificial Intelligence. Unsurprisingly,
+then, it shares many features with modern Lisp languages, features which
+emphasise the importance of symbolic programming, data abstraction,
+convenience of use and language extensibility. But, as with Lisp, the
+usefulness of Pop-11 extends far beyond the traditional AI domain: those
+same features which make the language suitable for tackling the complex
+problems posed by AI also make it a powerful tool for solving hard
+problems in all kinds of application areas. The use of Pop-11 within
+Poplog serves as an immediate example of its general applicability.
+
+Characteristic features common to the Pop-11/Lisp style include:
+
+  # built-in support for a varied range of datatypes. Types built in to
+    Poplog Pop-11 include: strings, words (symbols), booleans, a rich
+    set of numeric types, aggregates (lists, vectors and arrays),
+    generic mappings (properties) and various system types including I/O
+    devices and ``lightweight'' processes
+
+  # the ability to add new, user-defined types with the same status as
+    those built-in
+
+  # first-class procedures with a choice of lexical or dynamic scoping
+    of variables
+
+  # a dynamic (run-time) type system
+
+  # automatic storage management (garbage collection)
+
+  # an interactive programming environment
+
+  # an extensive collection of library procedures
+
+  # extensible syntax
+
+But the Pop tradition has always rejected Lisp-style syntax in favour of
+a more conventional, structured style. By way of example, here is the
+definition of a Pop-11 procedure which computes the value of a
+polynomial of arbitrary degree, given a list of coefficients and a value
+x:
+
+    define polynomial(x, coefficients) -> y;
+        lvars c, y = 0;
+        for c in coefficients do
+            y * x + c -> y;
+        endfor;
+    enddefine;
+
+    ;;; print the value of 11x^3 + 4x^2 - 5 for x = 7
+    polynomial(7, [11 4 0 -5]) =>
+
+Most newcomers to the language find this core syntax straightforward
+both to read and write and can move on quickly to developing significant
+programs, concentrating on semantic issues without being distracted by
+syntactic details. Experienced programmers can build upon the core
+syntax, using its extensibility to define new forms tailored to their
+own problem domains. This extensibility also allows Pop-11 to develop
+incrementally over time as experimental features become accepted and
+integrated into the mainstream language.
+
+A second aspect of Pop-11 which distinguishes it from Lisp is its
+explicitly stack-based evaluation semantics. This makes Pop-11
+programming a distinctly novel experience for many users, and can
+provide some elegant programming solutions. Here, for example, is a
+simple procedure which selects interesting items from a list:
+
+    define select(list, interesting) -> selected;
+        lvars selected = [%
+            lvars item;
+            for item in list do
+                if interesting(item) then item endif;
+            endfor;
+        %];
+    enddefine;
+
+If we define as ``interesting'' numbers which are integral, then the
+statement
+
+    select([6 13 5 27.42 31 9.45 31.24], isintegral) =>
+
+will display the list
+
+    [6 13 5 31]
+
+It is the implicit use of the stack in select which allows the
+evaluating list brackets ([%%]) to collect an arbitrary number of
+results. As an aside, this example also demonstrates the regular
+treatment of procedure values in Pop-11 -- as in Scheme and other
+functional languages -- exemplified here by the binding of the formal
+parameter interesting to the built-in procedure isintegral.
+
+Use of the stack is often transparent, and it's possible to write Pop-11
+in a very clean, functional style. Some users, however, choose to use
+the stack aggressively, adopting a style not unlike that of Forth. This
+is merely an example of how the richness of Pop-11's syntax and
+semantics can support a variety of programming paradigms which in other
+contexts might appear to be in conflict. Its extensibility means it can
+be continually adapting to new modes and styles of programming, most
+recently -- in line with current trends -- towards an object-oriented
+style.
+
+The Pop-11 language is regrettably less well-known than it ought to be.
+Anyone wishing to begin experimenting with the language should start by
+reading TEACH * PRIMER which gives an overview of many of the language
+features.
+
+
+-----------------------------------------------------------------------
+2  Running Pop-11
+-----------------------------------------------------------------------
+
+From the operating system prompt, the pop11 command will take you into
+the interactive top-level; your terminal screen should look something
+like the following:
+
+    Sussex Poplog (Version 15.03 Thu Jun 20 16:20:20 BST 1996)
+    Copyright (c) 1982-1996 University of Sussex. All rights reserved.
+
+    Setpop
+    :
+
+The Setpop message is printed whenever the Pop-11 compiler is started:
+here for the first time and subsequently after an error or interrupt.
+The colon (:) is the Pop-11 prompt, and indicates that the compiler is
+ready for input: you can type any Pop-11 expression or command here,
+such as those copied from above. A good starting point is to use the
+immediate-mode command:
+
+    : im
+
+which will start an interactive session within an editor window. This
+works just like the top-level interaction, but you can use editor
+commands to edit and re-enter input and format output for easier
+reading, or to save a record of the interaction to a file.
+
+Other useful commands to try are:
+
+    : help topic
+        Displays documentation on the given topic
+
+    : load file
+        Compiles a file
+
+    : ved file
+        Edits a file
+
+    : bye
+        Terminates the interaction: at top-level, this will exit from
+        the pop11 command
+
+You can use all these commands from inside the editor too, by using the
+<ENTER> key to take you to the editor command line.
+
+X users should start pop11 with the %x command-line argument: in a
+standard system this will pop up a ``control panel'' window from which
+you can invoke common Poplog functions. Browse through the Help menu to
+find information about using the control panel and the editor or choose
+the Interaction option from the File menu to start an interactive
+window.
+
+
+-----------------------------------------------------------------------
+3  Writing a Program
+-----------------------------------------------------------------------
+
+Use the ved command to open a program file or choose Open from the
+control panel File menu. By convention, Pop-11 program files have an
+extension of '.p'. If you conform to this, Poplog will recognise your
+program files and assign to them the correct compiler. A program can
+contain a mixture of definitions and execute-level evaluations: you
+could copy exactly the program fragments shown above, for example.
+
+You can compile a program from within the editor by using the
+
+    <ENTER> l1
+
+command, where l1 means ``load one file''. This compiles directly from
+the current editor buffer, so you don't need to save the file first. Any
+output or errors will be sent to an editor output window.
+
+To compile a named file, use the load command, either at the interactive
+prompt or from the editor command-line. Alternatively, use the Compile
+option from the control panel File menu.
+
+The Pop-11 compiler is incremental. This means that regardless of which
+files you compile or how you compile them, all the definitions they
+contain -- unless you have explicitly chosen to restrict their scope --
+are added to a global environment shared by all other program files and
+interactive windows. So you can break a program across multiple files as
+convenient and test out individual procedures interactively. Modifying
+and recompiling a file updates the environment to reflect any new or
+changed definitions, allowing you to switch quickly between writing and
+testing code, and to build up a complete program in incremental steps.
+As your files get larger, you can use editor commands to compile just
+part of a file, omitting those sections that aren't yet completed or
+which have been compiled once and not since modified: TEACH * LMR and
+TEACH * LCP tell you how to do this. This leads to a highly productive
+method of working.
+
+
+-----------------------------------------------------------------------
+4  Initialisation and Libraries
+-----------------------------------------------------------------------
+
+When starting in interactive mode, pop11 will compile an initialisation
+file called "init.p" if it exists in your poplib directory. By default,
+this directory is assumed to be your home (login) directory. You can
+choose a different location by setting poplib as an environment variable
+(logical name) before starting pop11; this is most conveniently done in
+your ".login", ".profile" or "login.com" file.
+
+The "init.p" file is a standard Pop-11 program file, so can contain any
+code you like for customising your working environment. Clearly, the
+more you put in here the longer it takes to compile, increasing the time
+it takes to get to the interactive prompt. As you develop a collection
+of frequently-used procedures to which you want ready access, rather
+than define them all in your "init.p" file, you should consider making
+them into libraries which you can load explicitly as needed.
+
+This is easy to do. First, create a library directory. The pathname
+
+    ~/pop11/lib
+
+will do as an example; VMS users might prefer to write this as
+
+    sys$login:[.pop11.lib]
+
+but Poplog will convert automatically from the Unix form to maximise
+portability.
+
+Define your procedures in one or more '.p' files in this directory, e.g.
+
+    ~/pop11/lib/useful.p
+
+and add the line
+
+    '~/pop11/lib/' :: popuseslist -> popuseslist;
+
+into your "init.p" file. This adds the library directory to the library
+search path; to load the useful procedures, you need only type
+
+    lib useful;
+
+More sophisticated effects are possible with the uses syntax and
+autoloadable identifiers: see REF * LIBRARY for details.
+
+The %noinit command-line option prevents compilation of the "init.p"
+file. This is useful for quick startup, or when your init file contains
+some kind of error.
+
+
+-----------------------------------------------------------------------
+5  Command Line Arguments
+-----------------------------------------------------------------------
+
+To summarise the command-line syntax discussed in this file: the general
+form of the pop11 command is
+
+    pop11 [%args] [vedcommand] [file]
+
+All arguments are optional. The %args control system startup behaviour:
+
+    %x
+    %x ( X Toolkit options )
+        Initiates a connection with the X server by calling *sysxsetup.
+        You can supply standard X Toolkit options by placing them in
+        parentheses after the %x.
+
+    %noinit
+        Suppresses compilation of the "init.p" file and any init files
+        used by Ved or other subsystems.
+
+A vedcommand argument causes Poplog to go straight into the editor, and
+can be any of the following:
+
+    ved
+    im
+    help
+    ref
+    teach
+
+Used in conjunction with a vedcommand argument, a trailing file name is
+given as argument to that command. Otherwise, if there is no Ved
+command, the file is compiled as a Pop-11 program file; in this case,
+your "init.p" file is not compiled, regardless of whether %noinit was
+specified.
+
+Instead of a file, you can give an argument
+
+    :expression
+
+in which case the expression is evaluated by the Pop-11 compiler.
+
+Examples:
+
+    pop11 %x im
+        Starts up Pop-11 with an X connection, displaying the user-
+        interface control panel and an immediate-mode XVed window
+
+    pop11 ref library
+        Starts up Pop-11 with a Ved window displaying REF * LIBRARY
+
+    pop11 ":popversion=>"
+        Prints the Pop-11 version string
+
+Full details of the command line are given in REF * SYSTEM.
+
+
+-----------------------------------------------------------------------
+6  Additional Information
+-----------------------------------------------------------------------
+
+On the Pop-11 language:
+
+    TEACH * PRIMER
+        An introduction to Pop-11 with many examples
+
+    REF * ITEMISE * POPSYNTAX * SYNTAX
+        Itemisation and syntax rules
+
+    REF * ARRAYS * DATA * LISTS * NUMBERS * PROCEDURE * PROCESS
+    REF * PROPS * RECORDS * STRINGS * VECTORS * WORDS
+        Built-in types
+
+    HELP * EQUAL
+        Equality and pattern matching
+
+    REF * OBJECTCLASS
+        Object-oriented extensions
+
+    REF * CHARIO * SYSIO * PRINT
+        Input and output
+
+    REF * ASYNC * DEFSTRUCT * EXCEPTION * EXTERNAL * IDENT * KEYS
+    REF * POPCOMPILE * PROGLIST * SECTIONS * TIMES * STACK * SYSUTIL
+        Advanced features
+
+On Poplog in general:
+
+    REF * SYSTEM
+        Startup and exit, saved images, storage management, etc.
+
+    REF * SUBSYSTEM * LIBRARY
+        Subsystems and libraries
+
+    HELP * POPVARS
+        Variables controlling system behaviour
+
+    HELP * POPREFS
+        Other literature relevant to the Poplog languages
+
+
+--- C.all/help/pop11
+--- Copyright University of Sussex 1996. All rights reserved.

@@ -1,0 +1,87 @@
+HELP MUX                                           R.Evans December 1986
+
+Lib MUX provides a simple interface to the 'SELECT' Unix system call
+(see Unix MAN (2) select), allowing POPLOG to monitor (MUltipleX)
+several devices simultaneously for input. See LIB *VEDMUX for an example
+of use.
+
+See also *VEDMUX  *VSH
+
+NB: LIB MUX is supported only on Unix systems which provide the BSD 4.2
+    version of select(2). Loading the library on other systems will
+    cause a mishap.
+
+[This and related bsd facilities referred to herein are unsupported, and
+therefore included in the $usepop/pop/lib/lib/ directory.
+    See DOC * SYSSPEC.
+
+It is therefore necessary to compile MUX explicitly e.g. with one of
+the following commands
+    uses mux
+    lib mux
+The latter will print a warning message.
+
+It is hoped that although the facility is unsupported it will serve as
+a useful programming example.]
+
+         CONTENTS - (Use <ENTER> g to access sections)
+
+ -- MUX_SELECT
+ -- MUX_INPUT and MUX_ENTRY
+
+
+-- MUX_SELECT ---------------------------------------------------------
+
+    mux_select(mask,table) -> entries;
+
+The procedure MUX_SELECT provides the basic interface to the 'select'
+Unix system call. It takes two arguments, a mask which is an integer in
+which bits are set corresponding to the descriptors of input devices
+that you want to monitor, and a table of arbitrary pop objects, each
+corresponding to a given device (indexed on descriptor). MUX_SELECT
+monitors all the devices specified simultaneously until characters are
+available for reading from one or more of them, or until a signal (eg
+alarm) is received. It returns a list of table entries corresponding
+to the devices with characters available for reading - usually only one
+device. If interrupted by a signal, it returns [].
+
+In order to use MUX_SELECT, you need to know the Unix file descriptor (a
+number) corresponding to a pop11 device. To obtain this, the system procedure
+DEVICE_OS_CHANNEL may be used:
+
+    device_os_channel(dev) -> n;
+
+This takes an open device and returns its descriptor. It is this
+descriptor which is used to identify the device in the mask and table
+given to MUX_SELECT.
+
+NB: MUX_SELECT does not actually read characters from any device, it
+    merely tells you which device chacarters can be read from, thus
+    avoiding the need for polling, or hanging up on a particular device
+    waiting for input.
+
+
+-- MUX_INPUT and MUX_ENTRY --------------------------------------------
+
+MUX_SELECT requires a certain amount of specialist knowledge. The
+procedure MUX_INPUT and MUX_ENTRY provide a simpler interface, relieving
+the user from the need to know about file descriptors, masks etc.
+
+    entry -> mux_entry(dev);
+    mux_entry(dev) -> entry;
+
+MUX_ENTRY and its updater allow you to access and define table entries
+for pop11 devices in a standard table (stored in the variable
+MUX_TABLE). An entry of FALSE means the device is not to be monitored
+for input. As well as allowing access to the table, MUX_ENTRY maintains
+a mask suitable for use with MUX_SELECT (although normally used via
+MUX_INPUT).
+
+    mux_input() -> entries;
+
+MUX_INPUT executes a call of MUX_SELECT on the standard table and mask
+maintained by MUX_ENTRY, and returns a list of table entries for devices
+ready for reading.
+
+--- C.unix/help/mux
+--- Copyright University of Sussex 1992. All rights reserved. ----------

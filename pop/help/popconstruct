@@ -1,0 +1,105 @@
+HELP POPCONSTRUCT                       Updated Aaron Sloman, Jan 1991
+
+This mechanism is strictly obsolete and replaced by the more general
+and powerful facilities described in
+
+        REF *POPCOMPILE/pop_pop11_flags
+        SHOWLIB *COMPILE_MODE.
+
+However, for the sake of backward compatibility an autolodable version
+of -popconstruct- is still provided in the library. (It actually loads
+LIB * POPDEFINEPROCEDURE, which is also obsolete but provided for
+backward compatibility.)
+
+popconstruct -> BOOL
+BOOL -> popconstruct
+
+If POPCONSTRUCT is set to TRUE then list or vector expressions (not
+containing '%' or '^' or '^^') are compiled as constants (CONstant
+STRUCTures). This produces more compact procedures, and also prevents
+frequent re-construction of lists, e.g. for patterns used with the
+matcher. (See HELP *MATCHES)
+
+However, the danger in using POPCONSTRUCT is that the program code is
+made ambiguous: the same procedure definition can produce two very
+different kinds of behaviour, depending on whether POPCONSTRUCT is true
+or false at the time of compilation. It is therefore better to use the
+more recently introduced syntactic form
+
+    #_< .................. >_#
+
+in cases where structures are to be created at compile time, and leave
+POPCONSTRUCT set to FALSE, its default value. (See HELP * HASH_)
+
+However, these brackets are used, it is important to ensure that the
+list does not include uses of "^", "^^", or "%" that were intended
+to indicate run time construction of part of the list or vector.
+
+
+-- Example of the effect of making POPCONSTRUCT TRUE ------------------
+
+After setting it to TRUE, if you update an element of a list created in
+a procedure, then that can alter future runs of the procedure, e.g. when
+the following procedure is run for the second time, it apparently
+ignores the instruction to reset the value of LIST to [0]:
+
+    true -> popconstruct;
+    define counter() -> result;
+        vars list;
+        [0] -> list;               ;;; List built at compile time
+        list(1) -> result;
+        result + 1 -> list(1);     ;;; alters the list in the procedure
+    enddefine;
+
+    counter() =>
+    ** 0
+
+    counter()=>
+    ** 1
+
+Compare the following
+
+    false -> popconstruct;
+
+    define counter() -> result;
+        vars list;
+        [0] -> list;               ;;; now rebuilt on each run
+        list(1) -> result;
+        result + 1 -> list(1);
+    enddefine;
+
+    counter() =>
+    ** 0
+
+    counter()=>
+    ** 0
+
+Now compare the use of #_<...>_#
+
+    false -> popconstruct;
+
+    define counter() -> result;
+        vars list;
+        #_< [0] >_# -> list;        ;;; List built at compile time
+        list(1) -> result;
+        result + 1 -> list(1);
+    enddefine;
+
+    counter() =>
+    ** 0
+
+    counter()=>
+    ** 1
+
+See also
+REF * POPCOMPILE/pop11_comp_constructor
+REF * OBSOLETE  - lists other related obsolete facilities
+REF * LISTS     - for more information on lists
+HELP * VECTORS  - for more information on vectors
+HELP * CONSTANT - information on constant identifiers
+TEACH * ARROW   - on the use of "^" and "^^" in lists
+REF * SYNTAX
+HELP * MATCHES
+
+--- C.all/help/popconstruct
+--- Copyright University of Sussex 1991. All rights reserved. ----------

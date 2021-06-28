@@ -1,0 +1,544 @@
+HELP FACETS                                               R. Evans, June 1983
+                                               Revised by Fran Evelyn, Aug 85
+
+This help file describes the FACETS package, a facility for the semantic
+interpretation of sentences for use with LIB GRAMMAR. The package is loaded by
+typing LIB FACETS (in addition to LIB GRAMMAR - but the order doesn't matter).
+The package allows you to define FACETS of meaning of sentences and phrases,
+and is best described by way of an example. Suppose you have the following
+simple phrase structure grammar, which you are going to use with LIB GRAMMAR:
+
+    s -> np + vp
+    np -> det + noun | det + adj + noun | propn
+    vp -> vi | vt + np
+
+    det -> A | AN | THE
+    noun -> MAN | WOMAN | BLOCK
+    adj -> RED | BLUE | GREEN
+    propn -> JOHN | MARY
+    vi -> RUNS | SMILES
+    vt -> LIKES | TOUCHES
+
+The normal way of coding this grammar for LIB GRAMMAR to use is as follows:
+
+    lib grammar;
+    vars grammar, lexicon;
+
+    [   [s [np vp] ]
+        [np [det noun] [det adj noun] [propn] ]
+        [vp [vi] [vt np] ]
+    ] -> grammar;
+
+    [   [det a an the]
+        [noun man woman block]
+        [adj red blue green]
+        [propn john mary]
+        [vi runs smiles]
+        [vt likes touches]
+    ] -> lexicon;
+
+    setup(grammar, lexicon);
+
+
+Having done this we can ask for syntax trees of sentences and other phrases
+(eg noun phrases, transitive verbs etc) to be printed out. Now we add some
+semantics - what sort of things would we like to know about various parts of
+the sentence? Well, for a start we might want to know what the SUBJECT and
+OBJECT (if any) are, and what ACTION the sentence describes. But we might also
+want to know things about parts of the sentence - for any noun phrase we could
+ask what GENDER it is, and also what COLOUR it is. (More likely we would mean
+the gender and colour of the referent of the noun phrase - but this is a
+distinction we shall ignore here). In fact there are lots of other things we
+might add - what sort of object a noun phrase is, when the event described
+happened, what mood the people in it are in etc etc, but for this example
+let's stick to the five given above.
+
+First of all (but after typing LIB FACETS) we tell the system that they are
+names of facets. To do this we use the 'facet' statement which is like a
+'vars' statement. So we say :
+
+    facet subject, object, action, colour, gender;
+
+NOTE: once a variable name has been used as a facet, it cannot be used as an
+ordinary variable as well.
+
+Now we can talk about the facet values of phrases - that is, of subtrees of
+the syntax trees produced by LIB GRAMMAR. The simplest thing we can do is
+assign and print out values for the facets. So we could say:
+
+    "blue" -> colour(np([the block]));
+or
+    colour(np([the block]))=>
+
+If you try this, you will get a mishap message following the second command -
+the system seems to have forgotten about your first statement! In fact what
+has happened is that LIB FACETS thinks of these two noun phrases as different
+objects because they were parsed separately. Every time you parse something
+the facet values for it start afresh. If you want it to remember a noun phrase
+you must save it in a variable like this :
+
+    vars x;
+    np([the block]) -> x;
+
+    "blue" -> colour(x);
+    colour(x)=>
+
+That works. Now if you try
+
+    gender(x)=>
+
+you get a mishap message - the same one as before. This is because the system
+doesn't know the answer and you haven't specified a way to work it out. So
+now let's move on to specifying SEMANTIC RULES.
+
+Think about how you might get the colour of a noun phrase like THE RED BLOCK.
+It's pretty easy - you just use the colour specified by the adjective. How
+about THE BLOCK WHICH IS RED ? Again, it's the colour of the adjective, but it
+will be in a different place in the syntax tree. Clearly, how to find a facet
+for a phrase depends on what syntactic structure that phrase has. So the
+sensible place to put rules for working out the facet values is with the
+syntax rules.
+
+In a moment we shall see how we do this. First of all we have another question
+- where does the information come from ultimately? The answer to this is - THE
+WORDS THEMSELVES, i.e. the lexicon. So we can begin to get an idea of the way
+we construct facets - we specify values for facets for words in the lexicon,
+and then with each grammar rule, we specify how to combine the facet values of
+the subcategories to get the values for the main category. So we see that we
+must add semantic rules, assignments, etc. to each syntactic rule and lexicon
+entry.
+
+-- ADDING THE SEMANTIC RULES ------------------------------------------------
+
+Before looking at some actual semantic rules, let us see how we specify the
+new grammar. The grammar set out below is the same grammar as that given
+above, but with a slightly different layout to accomodate the new bits:
+
+    lib grammar;
+    lib facets;
+    vars grammar, lexicon
+    facet colour, gender, action, subject, object;
+
+    defgram
+        [s  [np vp]         semrule ...(pop11 code)... endsemrule
+        ]
+        [np [det noun]      semrule ...(pop11 code)... endsemrule
+            [det adj noun]  semrule ...(pop11 code)... endsemrule
+            [propn]         semrule ...(pop11 code)... endsemrule
+        ]
+        [vp [vi]            semrule ...(pop11 code)... endsemrule
+            [vt np]         semrule ...(pop11 code)... endsemrule
+        ]
+    endgram -> grammar;
+
+    deflex
+        [det a              semrule ...(pop11 code)... endsemrule
+             an             semrule ...(pop11 code)... endsemrule
+             the            semrule ...(pop11 code)... endsemrule
+        ]
+        [noun man           semrule ...(pop11 code)... endsemrule
+              woman         semrule ...(pop11 code)... endsemrule
+              block         semrule ...(pop11 code)... endsemrule
+        ]
+         .
+         .(etc)
+         .
+        [vt likes           semrule ...(pop11 code)... endsemrule
+            touches         semrule ...(pop11 code)... endsemrule
+        ]
+    endlex -> lexicon;
+
+    setup(grammar, lexicon);
+
+NOTES:
+-----
+The outermost list brackets in the definition of grammar and lexicon have been
+replaced by DEFGRAM and ENDGRAM, DEFLEX and ENDLEX respectively.
+
+Each alternative decomposition in the grammar rules, and each word in the
+lexicon, has been extended by adding a semantic rule, which is bracketed by
+semantic rule brackets (i.e. SEMRULE and ENDSEMRULE).
+
+-- SEMANTIC RULES -----------------------------------------------------------
+
+The body of a semantic rule is a piece of POP-11 code - just like a procedure.
+This code specifies how to determine the values of any facets associated with
+the grammar rule it is paired with. So for example, if we have a facet
+COLOUR for a noun phrase, then our semantic rules for noun phrases might
+look like this :
+
+    [np [det noun]      semrule  colour is "dont_know"; endsemrule
+        [det adj noun]  semrule  adj1 gives colour;     endsemrule
+        [propn]         semrule  colour is "dont_know"; endsemrule
+    ]
+
+In this example, colour is given by the adjective. If there is no adjective,
+then the colour facet is set to 'dont_know'; otherwise, you get the colour of
+the noun phrase from the colour of the adjective.
+
+Notice the following features of the rules:
+
+LIB FACETS provides two special operators IS and GIVES to make defining
+rules easier. If you write
+
+    <facet> is <value>;
+
+this is shorthand for assigning the <value> to the <facet>; i.e. it is like
+
+    <value> -> <facet> (<the bit of tree matching the rule-pattern>);
+
+If you write
+
+    <category> gives <facet>;
+
+this is shorthand for "the value of this facet for the bit of tree matching
+the rule pattern is the same as the value of the facet for this constituent
+category"; i.e. it is like
+
+    <facet> (<category>) -> <facet> (<the bit of tree matching the
+                                                               rule-pattern>);
+
+In fact, for more complicated code, these two operations might not be
+sufficient, in which case you might want to use <the bit of the tree matching
+the rule-pattern> itself; and so it is contained in a special variable SELF.
+Also each syntax rule gives a decomposition in terms of subcategories, and for
+each of these there is a subtree. To access these subtrees, you have variables
+like ADJ1, DET1, ADJ2 etc. which contain them. Thus in the first rule of the
+example above
+
+    [np [det noun]      semrule  colour is "dont_know"; endsemrule
+        [det adj noun]  semrule  adj1 gives colour;     endsemrule
+        [propn]         semrule  colour is "dont_know"; endsemrule
+    ]
+
+we have the following relations:
+
+    self = [np ^det1  ^noun1]
+    det1 = [det .....]
+    noun1= [noun ......]
+
+If a syntax rule has more than one instance of a particular category, the
+instances are counted from left to right; e.g. the syntax rule
+
+        [vp [v np np]]
+
+would have the following variables in its semantic rule:
+
+    self = [vp ^v1 ^np1 ^np2]
+    v1   = [v  .......]
+    np1  = [np .......]
+    np2  = [np .......]
+
+Finally, notice what happens in the second semantic rule given above. When
+the system executes
+
+    adj1 gives colour;
+
+it first has to find out what 'colour(adj1)' is. To do this, it uses the
+semantic rule provided for adjectives
+
+    adj1 has the value [adj .....]
+
+which gets matched against a syntax rule, and the appropriate semantic rule is
+run. So we might have rules in the lexicon like:
+
+    [adj red    semrule colour is "red";  endsemrule
+         blue   semrule colour is "blue"; endsemrule
+         big    semrule colour is "dont_know";  endsemrule
+    ]
+
+In the last case, the adjective doesn't tell you the colour, so you have to
+return 'don't_know'. In general, if your semantic rule does not specify what
+the value of some facet is, then the value returned is 'undef'.
+
+Thus there are three ways to signal that the information required is not
+available. Firstly, if there is no semantic rule to apply, a mishap occurs;
+secondly, you can choose some value to return, e.g. 'dont_know'; and thirdly,
+when there is a rule but it doesn't provide a value, the value remains
+'undef'.
+
+When it has found the colour of the adjective, the original rule can use it
+in any way it wishes - in the example, it just passes it up as the value of
+the colour facet of the noun phrase (using GIVES).
+
+Armed with these facts, we can write the semantic rules for our example
+system :
+
+    lib grammar;
+    lib facets;
+    vars grammar, lexicon;
+    facet colour, gender, action, subject, object;
+    defgram
+        [s  [np vp]         semrule subject is np1;
+                                    vp1 gives action;
+                                    vp1 gives object;
+                            endsemrule
+        ]
+        [np [det noun]      semrule colour is "dont_know";
+                                    noun1 gives gender;
+                            endsemrule
+            [det adj noun]  semrule adj1 gives colour;
+                                    noun1 gives gender;
+                            endsemrule
+            [propn]         semrule colour is "dont_know";
+                                    propn1 gives gender;
+                            endsemrule
+        ]
+        [vp [vi]            semrule vi1 gives action; endsemrule
+            [vt np]         semrule vt1 gives action;
+                                    object is np1;
+                            endsemrule
+        ]
+    endgram -> grammar;
+
+    deflex
+        [det a              ;;; our simple system doesn't have rules for
+             an             ;;; determiners - so we just leave them out.
+             the
+        ]
+        [noun man           semrule gender is "male"   endsemrule
+              woman         semrule gender is "female" endsemrule
+              block         semrule gender is "neuter" endsemrule
+        ]
+        [adj  red           semrule colour is "red";   endsemrule
+              blue          semrule colour is "blue";  endsemrule
+              green         semrule colour is "green"; endsemrule
+        ]
+        [propn john         semrule gender is "male";  endsemrule
+               mary         semrule gender is "female";endsemrule
+        ]
+        [vi runs            semrule action is "run";   endsemrule
+            smiles          semrule action is "smile"; endsemrule
+        ]
+        [vt likes           semrule action is "like";  endsemrule
+            touches         semrule action is "touch"; endsemrule
+        ]
+    endlex -> lexicon;
+
+    setup(grammar, lexicon);
+
+Try loading all that (mark it as a range and then do ENTER lmr) and then try
+the following :
+
+    vars x;
+    s([john touches a red block]) -> x;
+
+    ;;; x now has the syntax tree for the sentence
+
+    colour(subject(x)) =>
+    colour(object(x)) =>
+    gender(object(x)) =>
+    gender(x) =>
+
+You should get the following results:
+
+    ** dont_know   ;;; this is the value we assigned for noun phrases whose
+                   ;;; colour we don't know
+    ** red
+    ** neuter
+    ** undef       ;;; x is a sentence and we didn't specify how to work out
+                   ;;; the gender of a sentence
+
+The difference between questions which produce 'don't_know' and questions
+which produce 'undef' demonstrated above allows us to distinguish between
+"silly questions" (e.g. 'what is the gender of a sentence?') and "questions
+which are sensible but to which we don't know the answer" (e.g. 'what colour
+is John?').
+
+-- CLEARING DOWN THE FACET DATA ---------------------------------------------
+
+There are two ways of making the FACETS package forget things, one working
+through the semantic rules and one through the facet values:
+
+    resetfacets()       - This causes all the semantic rules to be forgotten,
+                          and should be used when you want to reload your
+                          grammar - otherwise any old rules left over from an
+                          earlier load might interfere with the new ones.
+
+    clearfacet(<facet>) - clear down all the values stored for <facet>. This
+                          is probably rarely necessary, but might result in
+                          greater speed in some cases.
+
+-- FURTHER POSSIBILITIES ----------------------------------------------------
+
+The grammar system above is, of course, very simple. Here are a few
+suggestions of ways it could be extended:
+
+(1) Adding DEFAULT values. For example, some nouns have default colours (e.g.
+    grass, the sun etc). This colour could be included in the semantic rule for
+    the noun itself. Then the rule for NP's with adjectives could be modified
+    so that if an attempt to get the colour from the adjective produces
+    "dont_know", we use the default colour given by the noun, e.g.
+
+       semrule
+            vars clr;
+            colour(adj1) -> clr;
+            if clr ="dont_know" then colour(noun1) else clr endif
+                -> colour(self);
+        endsemrule
+
+    Notice the use of SELF here instead of IS - both work equally well. Of
+    course, to see this work properly you must add some non-colour adjectives
+    to the lexicon!
+
+(2) Turning sentences into assertions in the database. Try writing a routine
+    which inputs and parses a sentence, and then adds assertions about it to
+    the database. For example, from the sentence
+
+        [john touches a red block]
+
+    we might get
+
+    [touch john block] [colour block red] [gender block neuter]
+    [gender john male]
+
+(3) Giving names to noun phrases. The data from (2) would be better if it
+    gave a different name to each block it encountered, e.g.
+
+        [a red block touches a green block]
+
+    gives
+
+        [touch block block] [colour block red] [colour block green] ...
+
+    which is not very helpful. To improve things, add another facet
+    'name' which returns the name of an np. If the name is a proper noun
+    then it should be the person's name; if an ordinary noun then
+    *GENSYM could be used to produce a new unique name for
+    it.
+
+(4) Once you have names, you might like to introduce pronouns. A pronoun
+    specifies a few facets (e.g. GENDER) which could be turned into database
+    assertions with an 'unknown' in them (eg [gender ?obj male]). Then you
+    could match this with the assertions actually in the database (from
+    earlier sentences) to get a value for OBJ (the referent of the pronoun)
+    and then use its name facet where you would have used the pronoun.
+
+(5) Add some facets for the determiners which give you information about
+    quantifiers etc. For example with the determiner 'the' you might
+    want to do some database matching (as for pronouns) to find out which
+    object is referred to, while for 'a' you might generate a new object (with
+    a new name - see (3) above) and return a structure like
+
+        [exists block3 *]
+
+    which is then processed by the SENTENCE semantic rule - for instance it
+    might look for the '*' and replace it with assertions about block3 from
+    other parts of the sentence. For example, the sentence
+
+        [a red block smiles]
+
+    could generate
+
+    [exists block1 *]    ... from the np
+    smile                ... action from the vp
+
+    [exists block1 [smile block1]] ...the sentence rule puts them together.
+
+-- TRACING SEMANTIC RULES ---------------------------------------------------
+
+LIB FACETS provides four commands for tracing semantic rules:
+
+    ftrace  unftrace  ftraceall  unftraceall
+
+You use these just like trace, untrace, untraceall (there's no traceall!) -
+for the first two you supply names of semantic rules to be traced (see below)
+and the last two refer to ALL the semantic rules (i.e. trace them all or
+untrace them all).
+
+Each semantic rule you specify has a name of the following form. Names of rules
+in the GRAMMAR start with "g_", names of rules in the LEXICON start with "l_".
+Then comes the category name on the left hand side of the rule, followed by a
+number to distinguish it from other rules for the same category.
+
+(Note: this is when you use DEFGRAM and DEFLEX only - freestanding rules as
+ described in *MOREFACETS have their name as part of the definition of the
+ rule.)
+
+So, for example, the three semantic rules in the NP grammar rule from above
+are named as follows:
+
+    [np [det noun]      semrule ... endsemrule  -   g_np1
+        [det adj noun]  semrule ... endsemrule  -   g_np2
+        [propn]         semrule ... endsemrule  -   g_np3
+    ]
+
+and the lexicon rules for NOUN are named:
+
+    [noun man           semrule ... endsemrule  -   l_noun1
+          woman         semrule ... endsemrule  -   l_noun2
+          block         semrule ... endsemrule  -   l_noun3
+    ]
+
+Note: rules for the same category are numbered from top to bottom. These names
+do not normally appear anywhere except in the trace messages discussed above,
+and sometimes in mishap messages, but you use them in FTRACE and UNFTRACE
+commands to refer to the rules. For example, if you type:
+
+    ftrace g_np1 l_noun1;
+
+then you will get trace messages only for those rules. If you then type
+
+    unftrace l_noun1;
+
+you will be left with only the rule named g_np1 traced. (You can specify as
+many rule names as you like in these two statements). To trace some more rules
+(in addition to those traced already), you just give another FTRACE command
+with more rule names, and similarly you can untrace any of the rules which are
+currently traced.
+
+When a rule is being traced, it produces tracing messages (just like TRACE)
+whenever it runs (i.e. whenever its pattern successfully matches a bit of
+tree). These look just like procedure calls with two arguments (the tree and
+the name of the facet) and one output (the facet value if specified).
+
+So if you FTRACE g_np2 above (the rule [np [det adj noun]]) and ask for
+
+    colour(np([the red block]));
+
+you would get tracing messages:
+
+    > g_np2 [np [det the] [adj red] [noun block]] colour
+    < g_np2 red
+
+
+-- TRACING FACETS THEMSELVES ------------------------------------------------
+
+The actual facets (eg COLOUR) can be traced by using TRACE in the normal
+way, e.g.
+
+   trace colour;
+
+Two sorts of trace messages will appear. If your program looks up the value of
+a facet (for example,
+
+    adj1 gives colour;
+
+causes colour(adj1) to be looked up) then the trace message will look like
+
+    > colour [adj green]
+    < colour green
+
+But if you SET the value of a facet, you will also get a tracing message -
+e.g. if you do
+
+    colour is "green";
+
+(which causes "green" -> colour(self)) you get
+
+    > colour green [adj green]
+    < colour
+
+This may look a bit confusing at first - you have been warned! - for those
+interested HELP *UPDATER will explain what's going on, although it is not
+important for the use of FACETS.
+
+
+See also
+HELP  *MOREFACETS - for a more detailed discussion of the FACETS package
+HELP  *GRAMMAR    - for references to GRAMMAR packages
+TEACH *GRAMMAR    - for an introduction to LIB GRAMMAR
+
+
+--- C.all/help/facets
+--- Copyright University of Sussex 1992. All rights reserved. ----------

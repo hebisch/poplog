@@ -1,0 +1,688 @@
+HELP V14_2.CHANGES                               John Williams, Jul 1992
+                                        Updated: Adrian Howard, Aug 1992
+
+This file provides a brief overview of some of the more important new
+facilities provided in POPLOG Version 14.2. This file is organised by
+topic, unlike HELP *NEWS, which is organised by date (latest first) and
+includes most of the information presented below, sometimes with more
+detail.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- The "startup" Saved Image
+ -- POP-11
+ -- ... Display Strings
+ -- ... Properties
+ -- ... Improvements To POP-11 Printing Procedures
+ -- ... Improvements To LIB *DEBUGGER
+ -- ... Miscellaneous
+ -- LISP
+ -- Prolog
+ -- VED
+ -- ... General New VED Facilities
+ -- ... New Graphics Facilities In VED
+ -- Changes To The POPLOG/X Interface
+ -- ... General Improvements To The X Interface
+ -- ... XVed
+ -- ... The POPLOG User Interface
+ -- Changes To The POPLOG/Operating System Interface
+ -- New Documentation
+
+
+
+-- The "startup" Saved Image ------------------------------------------
+
+The "startup" saved image (included in the standard language commands
+"pop11",  "prolog", "clisp",  etc) now has the POPLOG User Interface
+(PUI) loaded by default. For information on the PUI see HELP *POPLOG_UI.
+
+If you don't wish it to be invoked when -sysxsetup- is called (e.g. by
+pop11 %x), you can assign false to the variable -poplog_ui_enabled-
+(e.g. in your init.p, etc).
+
+The "startup" image also has XVed loaded with its OPEN LOOK or Motif
+interface parts by default. For information on XVed see HELP *XVED. To
+enable it to be run in "vanilla" mode (i.e no scrollbars, menus, dialogs
+etc), the application resource "Vanilla" can be set false (in your
+.Xdefaults, or in your -vedinit- procedure, etc).
+
+
+
+-- POP-11 -------------------------------------------------------------
+
+-- ... Display Strings ------------------------------------------------
+
+# To enable VED to represent attributes in buffer strings, integer
+character  values have been  extended to  24 bits, and a new datatype
+has been introduced to allow display characters (i.e. characters with
+attributes) to be stored and retrieved -- this is the 'dstring' (Display
+string). See the sections 'Overview' and 'Display Strings' in
+REF *STRINGS for more information. Also see the section on 'VED' later
+in this file.
+
+
+-- ... Properties -----------------------------------------------------
+
+# New destroy property added -sys_process_destroy_action- which is
+cleared in the child process after a -sysfork-. This enables destroy
+actions to be process specific. See *SYS_PROCESS_DESTROY_ACTION.
+
+# New procedure -clear_prop_entries- added. It is functionally the same
+as  -clearproperty- with the  addition of clearing  the contents of the
+individual  "property entry" data structures  in the property. This is
+only relevant if you use -fast_get_prop_entry-  to access the internal
+structure of a property.
+
+
+-- ... Improvements To POP-11 Printing Procedures ---------------------
+
+# LIB *FORMAT_PRINT bug fixes: the ~E, ~F, ~G, and ~$ directives no
+longer go into infinite recursion if a line-break occurs within the
+printed representation of a number. Also, the ~D, ~B, ~O, and ~X
+directives now work properly if called from the procedure
+-format_string- (they used to print their argument in reverse if the
+colon modifier was specified).
+
+# The pretty-printer has been improved so that it now runs considerably
+faster on large structures, and takes account of -pop_pr_level- for
+controlling maximum printing depth (which means it can be used on
+circular structures). Also, it no longer produces spurious blank lines
+when printing to -charout-.
+
+# A bug in -sprintf- which caused it to behave differently from -printf-
+in certain situations has been removed.
+
+# LIB *SHOWTREE now works correctly when -pop_pr_quotes- is -true-.
+
+
+-- ... Improvements To LIB *DEBUGGER ----------------------------------
+
+The following improvements have been made to the Pop-11 source code
+debugger, LIB *DEBUGGER.
+
+    # A "quit" command has been added, which quits the debugger
+    command loop, returning to either a previous invocation of the
+    debugger or to the Pop11 top level. This works even if the
+    debugger was invoked via the syntax work -debugger- (i.e., you
+    are no longer forced to supply a matching -enddebugger-).
+
+    # The new "inspect" command invokes the Pop11 structure browser
+    on the value of a given variable (see HELP *INSPECT).
+
+    # When a breakpoint is encountered, the debugger now prints
+    location information (file name and line number).
+
+    # A bug has been fixed which caused problems when a saved image
+    containing the debugger was made with -sys_lock_system-.
+
+    # The "skip" and "next" commands now work correctly in all
+    circumstances.
+
+    # The "print" command now takes multiple arguments.
+
+    # Finally, the "where" command has been made more informative
+    when used outside of VED.
+
+
+-- ... Miscellaneous --------------------------------------------------
+
+# Improvement to LIB * FMATCHES: it is now possible to specify
+restriction procedures whose names are either local to the current
+section, or lexically scoped.
+
+# The procedure -sys_parse_string- now takes an optional boolean
+argument which controls whether numbers are converted with -strnumber-.
+
+# New procedure -sys_parse_poparglist- added, for parsing Unix-style
+command line arguments to POPLOG. See REF *SYSTEM.
+
+# New variable -poparg1- added. See REF *poparg1.
+
+# LIB *NEWC_DEC no longer leaves imported procedures on the stack.
+
+# A standard vector class with element  type "exptr" is provided for.
+This has dataword "exptrvec", and is defined simply by
+
+        defclass exptrvec :exptr;
+
+which gives all the usual procedures for a vector class. See
+REF *EXTERNAL_DATA
+
+# The key of external pointers is now contained in -external_ptr_key-.
+
+# The procedure -sys_timer- now takes an additional flag to allow a
+timer to repeat automatically. See REF *sys_timer.
+
+# The variable -popmemlim- can now have <false> assigned to it; this is
+the same as assigning the largest simple integer.
+
+# DEFV now words with section pathnames.
+
+# The -class_attribute- procedure can now take a single key as an
+argument, returning a list of attributes which when given to -conskey-
+would reproduce the key.
+
+# New procedure -set_subvector- which sets N components of a given
+vector to a given POP-11 item.
+
+# New library LIB *ARRAYFILE added. This enables integer arrays to be
+stored on disk in a compact form. See HELP *ARRAYFILE.
+
+# Two new autoloadable procedures installed: -libwarning- and
+-syslibwarning-, for printing standard "LOADING LIB" messages. See
+REF *LIBRARY.
+
+# The procedure -copydata- now copies arrays, as well as records and
+vectors.
+
+# LIB *MAKE_INDEXES added --- a facility for automatically producing
+indexes for a POPLOG directory tree. See HELP *MAKE_INDEXES
+
+# LIB *MKREFINDEX has been modified so that it is possible to re-define
+the procedure used to process each REF file. This facility may later be
+used to provide an indexing program for POP-11 source files. See HELP *
+MKREFINDEX.
+
+
+
+-- LISP ---------------------------------------------------------------
+
+# New VED key binding: the key sequence <ESC> ) closes off all
+outstanding opening brackets at the end of a Lisp expression. See HELP
+*LISPVED.
+
+# New module PROFILE added. This provides a Lisp interface to the POPLOG
+profiling tool.  See HELP * PROFILE for details.
+
+# The Lisp compiler now recognises (but does not yet act upon) (OPTIMISE
+COMPILATION-SPEED) declarations.
+
+# New accurate version of ISQRT. The previous version made some
+intermediate floating point calculations.
+
+# FORMAT bug fix: the ~E, ~F, ~G, and ~$ directives no longer go into
+infinite recursion if a line-break occurs within the printed
+representation of a number.
+
+# Bug in DECODE-UNIVERSAL-TIME fixed: it used to produce dates like
+March 32nd, April 31st, etc.
+
+# The #b, #o, and #x reader macros now interpret signed numbers
+correctly.
+
+
+
+-- Prolog -------------------------------------------------------------
+
+# A new library LIBRARY * HIGHER_ORDER has been added. This library
+defines some higher-order predicates which operate on lists and on the
+arguments of terms. In particular, it defines the useful maplist/2 and
+maplist/3.
+
+For practical purposes, a higher-order predicate is one which takes as
+arguments a predicate and some structured data, and applies the
+predicate to each component of the data.
+
+These higher-order predicates are efficient as they have been defined in
+terms of the new call/N family of predicates (see below).
+
+See PLOGHELP * HIGHER_ORDER for details.
+
+# The call/1 built-in predicate has been augmented by a whole family of
+predicates call/N (for all N > 0). In general, call/N invokes a goal
+formed from its arguments: the first argument is either an atom standing
+for a predicate name or a term representing a "closure" (i.e., a
+predicate with one or more "frozen" arguments), and this is applied to
+the remaining N - 1 arguments.
+
+The practical benefit is that a term representing the goal to be called
+does not have to be constructed, which is the case when only call/1 is
+available.
+
+The call/N family is implemented efficiently: there is an almost
+negligible overhead in using them, compared with invoking a goal
+directly in the body of a clause. There is thus no longer any efficiency
+barrier to defining and using "higher-order" predicates, such as
+maplist/2 and maplist/3, providing they are defined in terms of the
+appropriate call/N predicate.
+
+See PLOGHELP * CALL for details.
+
+# New predicates format/1 and format/2 can be used for formatting
+output. See PLOGHELP * FORMAT.
+
+# setof/3 and bagof/3 have been extended to allow existential
+quantification anywhere within the goal being evaluated. So for example,
+the following two goals are now equivalent:
+
+            ?- setof(X, (Y^p(X,Y), Z^q(X,Z)), S).
+            ?- setof(X, Y^Z^(p(X,Y), q(X,Z)), S).
+
+As a consequence, the existential quantifier ^/2 is now evaluable in its
+own right, with the interpretation:
+
+            _ ^ G :- G .
+
+# findall/3 has been built in to the system, making the findall library
+redundant. See PLOGHELP * FINDALL.
+
+# fast_bagof/3 has been redefined in terms of findall/3, as follows:
+
+            fast_bagof(X, P, B) :-
+                findall(X, P, B),
+                B \== [].
+
+This does cause a change in behaviour: any solutions in B will be in the
+natural (database) order where previously they were returned in
+*reverse* order. This was always a mistake: the change means that now
+findall/3, bagof/3 and fast_bagof/3 all return solutions in the same
+order.
+
+Given the trivial nature of the above definition, and the equally
+trivial:
+
+            fast_setof(X, P, S) :-
+                findall(X, P, B),
+                B \== [],
+                sort(B, S).
+
+use of these highly non-standard predicates is deprecated in favour of
+the standard findall/3.
+
+# It is no longer necessary for prolog_error/2 to have a final
+"catch-all" clause which traps any error: errors not catered for
+explicitly now get passed automatically to prolog_syserror/2. See
+PLOGHELP * PROLOG_ERROR for details.
+
+# Run-time error-handling is now disabled during calls to prolog_error/2
+to avoid problems with infinite error loops. A new predicate
+prolog_error_handling/1 allows explicit re-enabling of the error handler
+where necessary.
+
+See PLOGHELP * PROLOG_ERROR for details.
+
+# New predicates spy_action/1 and spy_action/2 can be used to change the
+behaviour of the spy debugger: see PLOGHELP * SPY_ACTION. leash/1 and
+unleash/1 are now defined in terms of these.
+
+# New VED commands:
+
+        <ENTER> spy [spec]
+        <ENTER> nospy [spec]
+
+allow for adding and removing spy-points from the command line. The
+optional argument has the same form as that expected by the
+corresponding predicates spy/1 and nospy/1.
+
+# spy/0 no longer places spy-points on predicates whose names begin
+'prolog_'. Such predicates can still be spied, but must be named
+explicitly.
+
+# LIB *SLOWPROCS has been fixed so it no longer alters the behaviour of
+programs which use fast_setof/3 and fast_bagof/3
+
+
+
+-- VED ----------------------------------------------------------------
+
+-- ... General New VED Facilities -------------------------------------
+
+# New VED command <ENTER> SHOWLIBS added. See HELP *SHOWLIBS.
+
+# VED's family of global search and replace commands has been extended
+with another "silent" one, i.e. LIB *VED_SGSR. It does not report
+progress on the status line. See REF *ved_sgsr and compare *ved_sgs and
+*ved_gsr.
+
+# New procedure *vedclosebrackets added.
+
+# The procedure *vedgetsysfile (normally assigned to the VED key
+sequence ESC-h) now ignores hyphens around an identifier (e.g. -hd-).
+
+# New procedures -vedconvertline- and -vedconvertrange- which operate
+line -vedconvertword- on sequences of lines and marked ranges.
+
+# New procedure -veddrawline- for drawing lines between two points in a
+VED buffer.
+
+# It is now possible to use the "Home" and "End" keys on an NCD X
+terminal running (ordinary) VED.  See HELP * VEDXTERM (the section
+entitled 'Special notes for NCD X terminal users') and HELP *
+NCDXTERMKEYS.
+
+# LIB * VED_SOURCEFILE now classes files as "lib" or "src"
+appropriately.  Also, new user-assignable procedure -vedsrcfiledefaults-
+defined by LIB * VED_SOURCEFILE.
+
+
+-- ... New Graphics Facilities In VED ---------------------------------
+
+# VED is now able to represent a set of mutually-independent display
+attributes for each character in the buffer. These are
+
+        Bold font
+        Underline
+        Alternative font (intended for italic)
+        Blink (i.e. flashing)
+        Colour number, 0 - 7
+
+The command
+
+        ENTER chat
+
+(CHange ATtributes) is provided to set and change attributes; this
+operates on either the current character, word, line or marked range.
+See 'Changing Character Attributes' in REF *VEDCOMMS.
+
+# To enable VED to represent attributes in buffer strings, integer
+character  values have been  extended to  24 bits, and a new datatype
+has been introduced to allow display characters (i.e. characters with
+attributes) to be stored and retrieved -- this is the 'dstring' (Display
+string). See the sections 'Overview' and 'Display Strings' in
+REF *STRINGS.
+
+# The new standard codes can instead be noted as 'backslash' sequences
+in Pop-11 character constants and strings (see 'Backslash in Strings &
+Character Constants' in REF *ITEMISE). In addition, the VED command
+
+    ENTER ic
+
+can be used to insert graphics characters directly into a VED buffer
+(see REF *ved_ic).
+
+# A further benefit of this scheme over the old one is that it frees up
+the character-code range 16:A0 - 16:FF, allowing use of the 8-bit ISO
+Latin 1 character set. There is now direct support for this in the
+procedures -isuppercode-, -islowercode-, -uppertolower-, etc which will
+all recognise alphabetic characters from Latin 1 when the variable
+-pop_character_set- has the value (ASCII character) `1`. (See 'Character
+Sets' in REF *STRINGS.)
+
+# VED is now able to cope properly with files containing trailing spaces
+at the end of lines. If -vedreadintrailspaces- is true, then when read
+in, an end-of-line space is substituted with a 'trailing space'
+character. Such a character can also be inserted manually into a buffer
+with ENTER ic, and when written to a file is translated back to an
+ordinary space. See 'VED Special Space Characters' in REF *VEDPROCS.
+
+# In addition, VED no longer strips trailing tabs from lines when
+writing a file. (However, ENTER tabify can now take a '-strip' argument
+to say strip trailing tabs/spaces from each line). See HELP *TABIFY.
+
+# Two new procedures, -vedfile_line_repeater- and
+-vedfile_line_consumer-, have been introduced to allow flexible
+processing of VED-format files. These use the new variables
+-vedreadinplain- and -vedwriteoutplain- respectively, which control
+their default actions in respect of the control characters used to
+represent attributes in files, etc. See REF *VEDPROCS.
+
+# The introduction of VED character attributes and graphics characters
+has one unfortunate side-effect: it will represent a problem for users
+who wish to use editors other than VED to examine POPLOG files.
+
+As mentioned above, when written to a file, VED translates both
+attributes and graphics characters to sequences containing non-printing
+control characters. However, when read into another editor, these extra
+control characters will not only not receive their VED interpretation,
+they will be explicitly displayed. Thus files containing these will come
+out looking rather unpleasant.
+
+(As of this moment, there is no use of either attributes or graphics
+characters in any POPLOG files, but this situation will soon change:
+documentation (and probably comments in program files) will gradually
+begin to make use of them.)
+
+To allow some way for other editors to access sensible (if impoverished)
+versions of files, a library program -stripvedfile- is therefore
+provided; this can be run as shell/DCL command
+
+    pop11 stripvedfile [ -o <outfile> ] <file>
+
+etc. It reads a VED file <file> and outputs it as plain text (with all
+extra control characters removed) to the standard output (or <outfile>
+if -o supplied). See LIB *STRIPVEDFILE.
+
+NOTE that, in an X environment, it is perfectly possible to run XVed in
+tandem with another editor. Thus even if you don't wish to use XVed for
+your general editing, you still have the option of using it for the more
+limited purpose of viewing POPLOG documentation, etc.
+
+# The variable -vedstatusheader- is no longer used by VED. This string
+was formerly  used as the start  of the status  line (including space
+for the line number of the current file). VED now creates the status
+line display directly from the variables -vedscreenstatus_-_mark- et al
+(see 'Special Character Variables' in REF *VEDVARS).
+
+However,  -vedstatusheader- remains  as an  autoloadable file which
+creates a  string of  the appropriate  length, providing upward
+compatibility for programs that use
+
+        datalength(vedstatusheader)
+
+to get the length (which is always 9).
+
+# VED search and substitute strings can now contain all backslash
+recognised in Pop-11 strings (see REF *ITEMISE). E.g.
+
+    <ENTER> gs/\St/ /
+
+would substitute all 'trailing space' characters in a file with ordinary
+spaces.
+
+You can use character attribute specifications in the substitute string
+(but note that in the search string they are ignored, i.e. you can't
+make the search dependent on attributes). E.g.
+
+    <ENTER> s"foo"\{b}baz"
+
+would substitute occurrences of word "foo" with "baz" in bold.
+
+"@&" in the substitute string is treated as a single character, and is
+replaced by the matched string with any attributes that currently has,
+plus any new ones specified on the @& 'character' itself. E.g.
+
+    <ENTER> s"foo"\[b]@&"
+
+would add bold to occurrences of "foo". To enable the matched string to
+be got without its current attributes, "@%" has also been introduced.
+Thus
+
+    <ENTER> s"foo"\[b]@%"
+
+replaces any existing attributes with bold.
+
+
+
+-- Changes To The POPLOG/X Interface ----------------------------------
+
+-- ... General Improvements To The X Interface ------------------------
+
+# The XpwScrollText widget has been extended to support:
+    i)   Direct drawing of the graphic characters used by VED
+    ii)  Support for upto four fonts.
+    iii) Support for upto eight foreground/background combinations on
+    screen at the same time.
+    iv)  Support for bold, underlined, and flashing text.
+For details see REF *XpwScrollText.
+
+# The XpwScrollText widget has a new resource XtNnoGrayScale which
+controls whether GrayScale displays will be treated as StaticGray
+displays.
+
+# LIB *RC_GRAPHIC can now draw rounded rectangles with -rc_draw_oblong-
+
+# The "input" resource of a LIB *RC_GRAPHIC window is now controlled by
+the -rc_wm_input- variable (see HELP *RC_GRAPHIC.)
+
+# Support for multiple Toolkit versions has been added via the variable
+-XLINK_VERSION-. See HELP *X and HELP *NEWPOP.
+
+# Support for OpenWindows 3.0 has been added.
+
+# New keyboard handling library LIB *XT_KEYBOARD has been added. See
+REF *XT_KEYBOARD.
+
+# The procedure -XpwStackColorRangeInfo- has been added to the
+XpwGraphic widget library. It fetches the same information as
+-XpwColorRangeInfo- without creating a vector. See
+REF *XpwStackColorRangeInfo for more information.
+
+# The procedure -XptCheckWindowedWidget-, which checks if a widget has
+an associated window, has been added to LIB *XPT_TYPECHECK. For details
+see REF *XptCheckWindowedWidget.
+
+# The procedure -XGetGCValues- has been added to LIB *XGraphicsContext.
+See REF *XGetGCValues for details.
+
+# The procedure -XCloseDisplay- has been added to LIB *XHouseKeeping.
+See REF *XCloseDisplay for details.
+
+# The X interface now behaves reasonably after a -sysfork-. All the
+displays and application contexts in the child process are closed. X
+processing can only continue in the same process a display was opened
+in.
+
+# Non-POPLOG callbacks can now be removed with -(fast_)XtRemoveCallback-
+and -(fast_)XptRemoveCallbackList-.
+
+# In LIB *PROPSHEET -propsheet_show- and -propsheet_hide- now work
+correctly for imported property boxes.
+
+# The procedure -XptDefaultSetup- now behaves correctly if it cannot
+open a display. Also, if -XptDefaultDisplay- contains a string when
+-XptDefaultSetup- is called, the string is used as the name of the
+display to be opened.
+
+# The -(fast_)XptValue- procedures are now re-entrant and can safely be
+used in callback procedures.
+
+# Many minor bugs fixed --- see HELP *XNEWS for full information.
+
+
+-- ... XVed -----------------------------------------------------------
+
+# Several new window settings have been added relating to the new VED
+character attributes. XVed now supports up to four fonts and eight
+simultaneous foreground/background colour combinations. In addition to
+this there is the capability for underlined, bold, and flashing text.
+For more information see REF *XVed
+
+# The XpwScrollText widget used for XVed windows now automatically
+handles drawing of the graphics characters used by VED and
+LIB *SHOWTREE. This means you can use any fixed-width font for XVed,
+regardless of whether it supports graphics characters or not.
+
+# A new XVed application setting BellVolume which allows you to change
+the volume of the beep produced by -vedscreenbell- (if possible.)
+
+# Two new application settings in XVed (DialogBackground and
+DialogForeground) can be used to alter the foreground and background
+colours of XVed specific dialog boxes. See *DialogForeground for more
+information.
+
+# The XVed menubar and scrollbar colours can now be set dynamically from
+within XVed via window settings. See *menubarForeground and
+*scrollbarForeground for more information.
+
+# A new XVed application setting *Vanilla has been added to suppress the
+menubars and scrollbars when using Motif or OPEN LOOK.
+
+# A New XVed application setting *ShowFileName controls whether the
+filename of the current VED buffer is shown on the status line.
+
+# An XVed library compatible with PWM *SUNKEYS_SUNVIEW bindings added.
+See REF *XVED.
+
+# The -xved_value- procedure can now update multiple settings with one
+call by supplying a list of keys.
+
+# Selection of lines in XVed now works correctly when the left margin
+has been changed.
+
+
+-- ... The POPLOG User Interface --------------------------------------
+
+# Motif versions of the Help and Library tools and file selector now
+resize their scrolling lists appropriately when the tools are resized.
+
+# Exit procedures from POPLOG via the control panel are now deferred
+rather than run within the callback (which caused problems under VMS
+when restarting POPLOG).
+
+# HELP *POPLOG_UI moved to the main help directory.
+
+# OPEN LOOK dialogs can be re-parented.
+
+
+
+-- Changes To The POPLOG/Operating System Interface -------------------
+
+# (Unix only) The behaviour of -sys_io_control- when applied to terminal
+devices has been changed. Previously, -sys_io_control- would recognise
+terminal -ioctl- requests specially and interpret them relative to the
+POPLOG device parameters, rather than doing the -ioctl- system call.
+Now, -sys_io_control- always performs the requested -ioctl- call and
+returns <true> or <false> to indicate its success or failure. To keep
+the POPLOG device parameters in step with the terminal settings, the
+terminal state is first set from the stored device parameters before the
+-ioctl- call is made, and then the device parameters are updated from
+the terminal state after the call has returned.
+
+This new behaviour makes it unnecessary to flush the device parameters
+out to the terminal by making an additional call to -sys_io_control-
+with a null last argument: the effect of any such existing calls will
+now be system-dependent, but typically they will return <false> and
+leave the terminal state unchanged. See REF *sys_io_control.
+
+# (Sun-4/SPARC POPLOG Only). A serious bug has been fixed in the
+run-time code generator for Sun-4 POPLOG. For procedures over a certain
+size, it caused incorrect code to be planted for a -sysGO_ON-
+instruction (e.g. as generated by a Pop-11 -go_on- statement). This was
+liable to affect procedures with two or more dlocal expressions (e.g.
+two or more dlocal active variables), as the internal code generated for
+this makes use of -sysGO_ON-.
+
+# (Unix only) The autoloadable procedure *DISCAPPEND has been made much
+more efficient on Unix. The improvement is particularly noticeable with
+very large files.
+
+# (Unix only) The -pipeout- procedure can now take a reference
+containing a procedure as its CHAR_SOURCE argument. The procedure will
+be used to write the data to the pipe.
+
+# (Unix only) New procedure -sys_dir_size- added (like Shell 'du'). See
+REF *sys_dir_size.
+
+
+
+-- New Documentation --------------------------------------------------
+
+# New REF files added:
+    REF *DOCUMENTATION
+    REF *ENVIRONMENT_VARIABLES  (Unix only)
+    REF *LOGICAL_NAMES          (VMS only)
+    REF *POP_UI                 (after "uses popxlib" only)
+    REF *XT_KEYBOARD            (after "uses popxlib" only)
+
+    LISP REF *REFFILES
+
+# New HELP files added:
+    HELP *ARRAYFILE
+    HELP *MAKE_INDEXES
+    HELP *NEWS.V14
+    HELP *POPARCHIVE
+    HELP *V14_2.CHANGES
+
+    LISP HELP *PROFILE
+
+    PLOGHELP *FORMAT
+    PLOGHELP *HIGHER_ORDER
+    PLOGHELP *SPY_ACTION
+
+# New TEACH files added:
+    TEACH *PAIRS
+
+
+--- C.all/help/v14_2.changes
+--- Copyright University of Sussex 1992. All rights reserved. ----------

@@ -1,0 +1,356 @@
+HELP INLINE                                    Jonathan Meyer, Sept 1990
+                                               Updated A.Sloman Oct 1990
+
+LIB * DEFINE_INLINE
+
+Declares a new define form (see HELP *DEFINE_FORM) which simplifies the
+task of writing macros which look syntactically like calls to
+procedures, but generate code that is planted inline at compile time.
+
+Please note the WARNING below regarding use of inline macros.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Synopsis
+ -- Writing inline macros
+ -- Declarations
+ -- Inline macros and include files
+ -- Parameters
+ -- Inline expressions
+ -- Use of inline macros
+ -- Example 1: Repeat Loops
+ -- Example 2: Optional Compilation
+ -- Related Documentation
+
+-- Synopsis -----------------------------------------------------------
+
+    define :inline <declarators> <name> (<parameters>, ...);
+        <inline-expression>
+    enddefine;
+
+-- Writing inline macros ----------------------------------------------
+
+LIB *DEFINE_INLINE is very simple to use. Simply add the :inline
+expression to a procedure definition:
+
+    define :inline MYPYTHAG(a,b);
+        sqrt(a**2 + b**2)
+    enddefine;
+
+    MYPYTHAG(4,3) =>
+    ** 5.0
+
+The define :inline works by constructing a new macro called MYPYTHAG
+which reads two comma separated expressions, and the substitutes them
+with a third expression sqrt(<expr1> ** 2 + <expr2> ** 2).
+
+define :inline is similar to the C pre-processor's  '#define'
+directive.
+
+-- Declarations -------------------------------------------------------
+
+Inline macros can be declared with any of the usual procedure
+declaration words:
+
+    define :inline global TEST(a,b);
+        a > b;
+    enddefine;
+
+    define :inline lconstant MIN(a,b);
+        if a < b then a else b endif
+    enddefine;
+
+There is no sense of an updater of an inline macro, so the following
+will produce a mishap:
+
+    define :inline updaterof VAL(a,b);
+        a -> b(1);
+    enddefine;
+
+-- Inline macros and include files ------------------------------------
+
+define_inline works with iconstant, allowing you to do:
+
+    define :inline iconstant BAZ;
+    enddefine;
+
+to define inline macros in include files.
+
+-- Parameters ---------------------------------------------------------
+
+Inline procedures take a variable number of parameters. When declaring a
+new inline macro, it should be noted that you cannot use the same name
+for two different parameters, so the following produces a mishap:
+
+    define :inline SILLY(a,a);
+        a
+    enddefine;
+
+Also, parameters cannot also be declared as syntax words or other
+macros, so the following is illegal:
+
+    define :inline SILLY(if, then);
+        if * 2
+    enddefine;
+
+Inline macros can have 0 or more parameters. Like procedures, a ";"
+can be used to indicate that the inline macro has no parameters:
+
+    define :inline REWRITE;
+        1001
+    enddefine;
+
+By default, parameters are assumed to represent Pop-11 expressions.
+However, you can specify a syntactic 'category' for any parameter, which
+causes the actual value of that parameter to be read with a particular
+procedure. A category is specified with  = <category> following the
+parameter name:
+
+    define :inline QUOTE(name=item);
+        "name"
+    enddefine;
+
+Specifying a category X for a parameter will mean that that parameter's
+actual value will be read with the procedure called "Xread", e.g.
+"itemread", "exprread". Standard categories for which there are
+corresponding autoloadable reader procedures are
+
+        expr        A Pop-11 expression (this is the default)
+        item        A single word, number, string, etc
+        var         An identifier name
+        list        A Pop-11 list expression
+        typespec    A <typespec> as defined in REF * DEFSTRUCT
+
+Note that a category other than the default "expr" should always be used
+where the actual value of a parameter will not be a Pop-11 expression.
+E.g, in the QUOTE example above, if "name" were not specified as
+category "item", then reading the actual value in
+
+        QUOTE(hello)
+
+would cause "hello" to be interpreted as a reference to an identifier
+in an expression (and possibly cause a DECLARING VARIABLE message, etc).
+
+Categories are similiar to those used by LIB * FORM, q.v.
+
+-- Inline expressions -------------------------------------------------
+
+An inline macro's expression is not compiled when the inline macro is
+defined, but instead inserted into the compilation stream when the macro
+is used. At this point, every occurrence of one of the parameters in the
+inline expression will be replaced by the textual items read for that
+parameter with the appropriate reader procedure. The macro is
+effectively a rewrite rule.
+
+This can cause problems. For example:
+
+    define :inline FOO(a);
+        a, a;
+    enddefine;
+
+    vars t = 1;
+    define test();
+        t + 1 ->> t;
+    enddefine;
+
+    FOO(test()) =>
+    ** 2 3
+
+In this situation, the call to test() was planted twice. If a programmer
+wishes to avoid this situation, the inline macro should use an lblock
+and an lvars variable to store the parameter:
+
+    define :inline FOO(a);
+        lblock lvars tmp = a;
+            tmp,tmp;
+        endlblock;
+    enddefine;
+
+This definition will cause problems when you use the macro with:
+
+    vars tmp = true;
+    FOO(tmp) =>
+
+Because FOO has its own definition of tmp, it will not be able to access
+the tmp that you have given as a parameter. The only way to avoid this
+situation is to use names within the macro that are unlikely to be used
+as variables. For example:
+
+    define :inline FOO(a);
+        lblock;
+        lvars __foo_a = a;
+            __foo_a * __foo_a =>
+        endlblock;
+    enddefine;
+
+
+Note that an inline macro is not aware of the meaning of the text in its
+body. So every occurrence of an item which corresponds to a named
+parameter will be replaced:
+
+    define :inline FOO(name=item);
+        [this name is replaced - its read as an item and substituted] =>
+        'Strings aren\'t substituted, so this name won\'t be replaced'=>
+    enddefine;
+    FOO('Jon')
+    ** [this Jon is replaced - its read as an item and substituted]
+    ** Strings aren't substituted, so this name won't be replaced
+
+Inline macro expressions can have many strange side-effects, but if you
+remember that the expression is simply rewritten using the given
+parameters you should avoid trouble.
+
+-- Use of inline macros -----------------------------------------------
+
+Every occurrence of an inline macro will be replaced by a (possibly
+larger) expression in the compilation stream. Using inline macros can
+therefore increase program size. However, because there is some overhead
+in calling a procedure, it can be useful to write some functions as
+inline macros, reducing program execution time. There is therefore a
+tradeoff between program size and speed of execution. It is of course up
+to the programmer to weigh up this tradeoff and decide when inline
+macros should be used.
+
+Inline macros are especially useful for writing functions that evaluate
+some mathematical expression, or access a data structure. They can
+provide an invisible layer of abstraction between a datastructure
+and a program.
+
+Finally, inline macros are useful when you want to add debugging
+statements to a program. As an interesting example, we could define
+two versions of a printing routine, one which was an inline macro that
+did nothing, and another which actually performed some printing:
+
+    #_IF DEF DEBUG
+    define :inline PRINT_STATUS(status);
+        [% caller(0), status %] =>
+    enddefine;
+    #_ELSE
+    define :inline PRINT_STATUS(s);
+    enddefine;
+    #_ENDIF
+
+WARNING: Inline macros look syntactically like calls to procedures, and
+although their use can be convenient and elegant they are potentially a
+source of confusion. Users reading a statement "foo(a,b,c)" will assume
+that foo is a procedure. Inline macros are not procedures, and
+attempting to pass an inline macro as a procedural argument will
+generally cause a mishap.
+
+It is common practice to denote macros and inline macros using an UPPER
+CASE name to reduce this ambiguity (as with all examples in this file).
+
+
+-- Example 1: Repeat Loops --------------------------------------------
+
+Sometimes you want to repeatedly evaluate a simple expression until it
+returns true. In Pop-11, this is usually done using:
+
+    repeat
+        quitif(<expression>)
+    endrepeat
+
+For example, suppose we wanted to descend down a list until we reach the
+last pair in the list. We could do this using:
+
+    vars list = [1 2 3];
+    define last_pair(list);
+        lvars list;
+        repeat
+            quitif((dest(list) -> list ->, tl(list) == []));
+        endrepeat;
+        list;
+    enddefine;
+
+This sort of construct is common enough that it is useful to define an
+inline macro for it. Lets call it REPEATUNTIL:
+
+    define :inline global constant REPEATUNTIL(cond);
+        repeat quitif(cond) endrepeat;
+    enddefine;
+
+Now we can rewrite last_pair as follows:
+
+    define last_pair(list);
+        lvars list;
+        REPEATUNTIL((dest(list) -> list ->, tl(list) == []));
+        list;
+    enddefine;
+
+A similar construct, called REPEATWHILE, can be defined as follows:
+
+    define :inline global constant REPEATWHILE(cond);
+        repeat quitunless(cond) endrepeat;
+    enddefine;
+
+This will repeatedly evaluate the expression while it returns a
+non-false value.
+
+-- Example 2: Optional Compilation ------------------------------------
+
+The debugging macro shown above can be generalised. Here we have a macro
+which will evaluate its parameter only if OPTION_ON is defined:
+
+    define :inline IF_NEEDED(a);
+    #_IF DEF OPTION_ON
+        a
+    #_ENDIF
+    enddefine;
+
+Note that the #_IF ... #_ENDIF expression is not evaluated when the
+inline macro is compiled. Instead, whenever the macro is used it will
+add the #_IF ... #_ENDIF statements to the front of the compiler stream
+(proglist). Try this:
+
+    vars macro OPTION_ON = true;
+    IF_NEEDED(npr('the OPTION_ON macro is on, so this is compiled'));
+
+but:
+
+    syscancel("OPTION_ON");
+    IF_NEEDED('this is now ignored since OPTION_ON is not defined')
+
+Of course, this is useful in any situation where you repeat the same
+conditional compilation. It is worth noting the subtle difference
+between the two macros below:
+
+    uses sysdefs
+    #_IF DEF SUNOS
+    define :inline SUNOS_ONLY(a)
+        a
+    enddefine;
+    #_ELSE
+    define :inline SUNOS_ONLY(a)
+    enddefine
+    #_ENDIF
+
+    define :inline IF_SYS_V(a,b);
+    #_IF DEF SYSTEM_V
+        a
+    #_ELSE
+        b
+    #_ENDIF
+    enddefine;
+
+In the first case, SUNOS_ONLY, the #_IF expression is evaluated when the
+inline macro is made, so future changes to the SUNOS macro will not
+effect the definition of SUNOS_ONLY. In the second case, IF_SYS_V, the
+expression is evaluated not at compile time, but at each usage. Any
+changes to SYSTEM_V will effect the code planted by the IF_SYS_V macro.
+
+
+-- Related Documentation ----------------------------------------------
+
+See also:
+
+    HELP * MACRO        - using Pop-11 macros
+    HELP * DEFINE       - defining new procedures
+    HELP * DEFINE_FORM  - writing new define forms
+    REF  * POPCOMPILE   - Pop-11 compilation procdures
+    REF  * POPSYNTAX    - Pop-11 syntax
+
+
+
+--- C.all/help/inline --------------------------------------------------
+--- Copyright University of Sussex 1990. All rights reserved. ----------

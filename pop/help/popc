@@ -1,0 +1,657 @@
+HELP POPC                                           John Gibson Nov 1993
+
+This file is a user-guide  for the Pop-11 object-module compilation  and
+linking system. It describes how to run Popc, the object-module compiler
+for Pop-11 programs, and the  associated utilities Poplink and  Poplibr.
+See REF * POPC for a  description of the concepts  involved, and how  to
+make Pop-11 programs compile under Popc.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Overview
+      1.1   Program Options in General
+      1.2   Object & Library File Arguments
+      1.3   Standard Libraries in $popobjlib
+  2   Popc
+      2.1   popc.args
+      2.2   W-Libraries for Extracting Declarations
+      2.2   Options
+  3   Poplink
+      3.1   Use of W-Libraries
+      3.2   Additional Files Produced by Poplink
+      3.3   External Startup & Linking
+      3.4   Options
+  4   Poplibr
+      4.1   Options
+
+
+-----------------------------------------------------------------------
+1  Overview
+-----------------------------------------------------------------------
+
+The Pop-11  object-module compilation  and  linking system  consists  of
+three programs: Popc, Poplink, and Poplibr.
+
+Popc compiles Pop-11 program files  to object modules. Each source  file
+name.p is  compiled to  an  ordinary O/S  object  file name.o,  plus  an
+associated file  name.w (called  a w-file).  Together, these  two  files
+comprise a composite 'Pop object file'.
+
+Poplink links  an executable  image from  Pop object  files and  library
+modules. It may be run as a separate program, but (like cc running ld in
+Unix), is normally run automatically by Popc.
+
+Poplibr creates  and maintains  object libraries.  A set  of Pop  object
+files is combined into an ordinary O/S object library libname.olb,  plus
+an associated file libname.wlb (called a w-library). Together, these two
+files comprise a composite 'Pop object library'.
+
+
+1.1  Program Options in General
+-------------------------------
+Program options whose names  end with the suffix  -list may be  either a
+single argument, or  a sequence of  zero or more  arguments enclosed  in
+parentheses (parentheses must be escaped  with \ in Unix). For  example,
+the Popc option
+
+    -include file-list
+
+will allow any of the following:
+
+     -include foo.ph
+     -include ( )
+     -include ( foo.ph )
+     -include ( foo.ph baz.ph )
+
+Individual options may restrict this where necessary (e.g. insist that a
+list be non-empty).
+
+
+1.2  Object & Library File Arguments
+------------------------------------
+With all three programs,  a Pop object file  is always specified by  its
+w-file name, i.e. as name.w. Similarily, a Pop object library is  always
+specified by its w-library  name, i.e. as  libname.wlb. (The O/S  object
+and  library  files  name.o  and  libname.olb  are  never  referred   to
+explicitly.)
+
+A w-library may also be given as a directory pathname dirpath, which  is
+interpreted as follows: if dirpath specifies a directory anywhere in the
+tree
+
+    $usepop/pop/...
+
+then  the  remainder  of  the   path  from  $usepop/pop/  downwards   is
+automatically mapped to a filename in $popobjlib, e.g.
+
+    $usepop/pop/x/ved/src/  -->  $popobjlib/xvedsrc.wlb
+
+Otherwise, if  dirpath is  not a  sub-directory of  $usepop/pop/, it  is
+interpreted as the file
+
+    dirpath/src.wlb
+
+Note that in either case, dirpath must be syntactically recognisable  as
+a directory pathname, that  is end with  `/` in Unix, or  `:` or `]`  in
+VMS.
+
+
+1.3  Standard Libraries in $popobjlib
+-------------------------------------
+In the  normal  Poplog  distribution,  $popobjlib  contains  only  those
+w-libraries needed to link $popsys/basepop11, i.e. corresponding to  the
+core source directories
+
+    src
+    ved/src
+    x/ved/src
+
+Thus to use Popc, you may first need to run the command file
+
+    $popcom/buildobjlib         (Unix)
+    popcom:buildobjlib.com      (VMS)
+
+This creates w-libraries  in $popobjlib for  other library  directories:
+currently, these are
+
+    lib/auto
+    lib/lib
+    lib/ved
+    lib/sun
+    lib/ved/term
+
+    x/pop/auto
+    x/pop/lib
+
+    x/pop/lib/Xpw
+    x/pop/lib/Xm
+    x/pop/lib/Xol
+    x/pop/lib/Xaw
+
+    x/ved/src
+    x/ved/lib
+    x/ved/auto
+
+    x/ui/lib
+
+
+
+-----------------------------------------------------------------------
+2  Popc
+-----------------------------------------------------------------------
+
+Popc compiles  Pop-11  source  files to  object-module  form,  and  then
+(unless the -c option is  present, or compilation errors have  occurred)
+runs Poplink to link the resulting files into an executable image.
+
+The general format of a Popc command is
+
+    popc options files
+
+where files may be any sequence of Pop-11 program files (extension  .p),
+or files to  be input to  Poplink (w-files and  w-libraries). These  may
+occur in any order; each .p file is compiled to its corresponding  .w/.o
+pair, and  then  replaced by  its  w-file name  in  the list  passed  to
+Poplink.
+
+Note that if Poplink is  to be run (i.e. -c  absent), and only a  single
+source file is supplied, then the .w/.o files are created as temporaries
+and deleted afterwards.
+
+The allowable options are described below. options may also include  any
+valid options to Poplink,  which are passed to  that program along  with
+the file arguments.
+
+
+2.1  popc.args
+--------------
+To enable a set of options  to be specified automatically for all  files
+in a given directory, on startup Popc looks for a file called
+
+    popc.args
+
+in the current directory. If this exists, arguments are read from it and
+prepended to the normal argument list. Arguments in popc.args should  be
+whitespace-separated;  end-of-line   comments   flagged   by   ;;;   are
+recognised.
+
+
+2.2  W-Libraries for Extracting Declarations
+--------------------------------------------
+By default, Popc uses  the w-libraries specified  by the directories  in
+popsyslist   for    extracting   permanent    identifier    declarations
+(interpreting the directory names as described by Object & Library  File
+Arguments above). Changes  to popsyslist caused  by compiling  libraries
+which extend it (such as LIB * POPXLIB) are taken into account.
+
+You can also specify  other w-libraries for declaration-extraction  with
+the -wlb and  -wlib options  (which are searched  before any  popsyslist
+ones). The -nosys  option causes  only -wlb  and -wlib  libraries to  be
+searched, i.e. disables the use of popsyslist.
+
+
+2.2  Options
+------------
+
+    -include file-list
+            Causes each file  from file-list  to be  #_INCLUDEed at  the
+            beginning of  every source  file compiled.  (This option  is
+            normally used  to supply  a  .ph file  containing  permanent
+            identifier declarations which are required for Popc, but not
+            for ordinary interactive compilation.)
+
+    -a      Produce assembler output  (.a files) and  w-files only.  (If
+            Poplink is to be run, it is passed the -a option also.)
+
+    -c      Compile source files only, don't run Poplink.
+
+    -createwlib w-library
+            If w-library  does not  already  exist, compiles  the  given
+            source files and then runs
+
+                poplibr -c w-library w-files
+
+            to create  it  from  the  set of  w-files  produced  by  the
+            compilation and/or  supplied explicitly,  all of  which  are
+            deleted afterwards. (Poplink is not run.)
+
+            If w-library exists  already, a warning  message is  printed
+            and Popc exits.
+
+    -g [ name ] source-file-list
+            This option  enables the  group of  source files  given  by
+            source-file-list to be compiled  to a single w/object  file
+            called name.w/.o.
+
+            The  name  argument  is  optional,  and  because  of   this,
+            source-file-list  MUST   be  a   list  (i.e.   enclosed   in
+            parentheses), since this is used  to detect whether name  is
+            present or not.  If name is  absent, the name  of the  first
+            source file is used instead.
+
+    -l      Causes each filename to be  listed as it is compiled.  (This
+            happens anyway, except when compiling a single source file.)
+
+    -m idname=expr-list
+            Define  Pop-11   macro(s).  Each   argument  of   the   form
+            idname=expr is used to define a macro
+
+                constant macro idname = expr;
+
+            in the  top-level section.  (The definition  is compiled  in
+            non-Popc mode, see REF * POPC.)
+
+    -norec
+            Don't recompile any source file for which the  corresponding
+            .w/.o files exist already.
+
+    -nosys
+            Stops popsyslist being included in the list of libraries  to
+            be used  for  extracting permanent  identifier  declarations
+            (see W-Libraries for Extracting Declarations above).
+
+    -od directory
+            Produce output files in  directory (can occur anywhere,  and
+            affects all following source files).
+
+    -u arg-list
+            Use Pop-11  source  libraries:  for each  arg  in  arg-list,
+            compiles
+
+                uses-now arg;
+
+    -wlb w-library-list
+            List of  libraries  to  be  used  for  extracting  permanent
+            identifier  declarations  (see  W-Libraries  for  Extracting
+            Declarations above).  These will  be  used only  for  source
+            files preceding the option (i.e. not for any following it).
+
+    -wlib w-library-list
+            Same as -wlb, except that the specified libraries are put at
+            the end,  i.e.  after  any other  file  arguments  (and  are
+            therefore used for all source files).
+
+
+-----------------------------------------------------------------------
+3  Poplink
+-----------------------------------------------------------------------
+
+Poplink links an  executable image from  a set of  Pop object files  and
+libraries  (i.e.  w-files  and  w-libraries).  It  performs  the  global
+structure linking necessary in a Pop program, and outputs the results as
+additional object files.  Poplink then passes  these, together with  all
+O/S object files/libraries corresponding to the w-files/libraries  used,
+as input to  the O/S  linker. Poplink may  also be  supplied with  other
+object file  or library  arguments  to be  passed  directly to  the  O/S
+linker.
+
+The format of a Poplink command is
+
+    poplink options-and-files
+
+where the options  (described below) generally  appear before any  files
+arguments, although  some  (such  as  -in,  -ex,  -wlb,  -wlbused,  etc)
+actually  specify  input  files  and  should  therefore  occur  at   the
+appropriate place within the file arguments.
+
+Any argument not beginning with `-` is an input file, and must be either
+a w-file or a w-library; these  are processed and incorporated into  the
+link in the order given.
+
+
+3.1  Use of W-Libraries
+-----------------------
+While an input w-file is included unconditionally in the linked program,
+a w-library is used for conditional 'search extraction' of modules, that
+is,  only  those  library  modules  which  provide  initialisations  for
+uninitialised  identifiers  are  extracted.  The  library  is   searched
+repeatedly until no  further identifiers can  be extracted, after  which
+that library is skipped (i.e. Poplink does not go back to it at a  later
+point).
+
+The -wlb option enables a group of libraries to be searched  recursively
+(effectively treating them as a single library). The files in the  group
+are cycled through, each being searched as above, until a complete  pass
+through all of them fails to extract any further identifiers.
+
+If you  wish  to  force library  modules  to  be included  in  the  link
+unconditionally, use the -in or -ex option (see below).
+
+HOWEVER, aside from special uses of -in or -ex, it should normally never
+be necessary to specify any w-libraries, except via the -wlbused option.
+The reason for this is that (as described in REF * POPC), every w-module
+keeps a record of which w-libraries were used for extracting  identifier
+declarations when  it  was  compiled. Thus  each  w-module  knows  which
+w-libraries it needs.
+
+As Poplink  incorporates  w-modules  during  linking,  it  accumulates a
+running list of  the w-libraries  they referenced.  The -wlbused  option
+then represents this list as a group for recursive search extract  (i.e.
+as if specified with -wlb).  Moreover, as further modules are  extracted
+from libraries in the list, any new libraries that those modules in turn
+reference are  added  to the  end  of the  list,  causing it  to  expand
+dynamically.
+
+In other words, linking a program  should normally require no more  than
+specifying a set of w-files followed by -wlbused, i.e.
+
+    poplink foo.w baz.w ...  -wlbused
+
+which will cause all necessary  libraries to be supplied  automatically.
+When Poplink  is run  from Popc,  the -wlbused  option is  added by  the
+latter; thus the above is equivalent to
+
+    popc foo.w baz.w ...
+
+or
+
+    popc foo.p baz.p ...
+
+after source file compilation.
+
+
+3.2  Additional Files Produced by Poplink
+-----------------------------------------
+The linked global  data structures  generated by Poplink  are output  as
+additional object files.  By default, these  are created as  temporaries
+and deleted afterwards. However, specifying the -p option causes them to
+be created as permanent files in  the same directory as the image  being
+linked, where they can be used to  perform a 'quick' relink with the  -q
+option. These files are
+
+    poplink_1.o
+    poplink_2.o
+    poplink_3.o
+    poplink_4.o
+    poplink_dat.o
+    poplink_cmnd
+
+The file poplink_cmnd is  a CShell/DCL command  file containing the  O/S
+link command that was obeyed to link the executable image.
+
+
+3.3  External Startup & Linking
+-------------------------------
+As described in REF * POPC, Embedding  Pop in C, Popc-compiled code  may
+be linked  into and  called from  a  C program.  There are  two  Poplink
+options to enable this: -exmain and -exlink.
+
+On the one  hand, -exmain  simply tells  Poplink that  the program  will
+start up in an external main function. Poplink does not then incorporate
+Pop's own main in the linked code, and one of your C modules from a  -lo
+option must  define it  instead.  Aside from  this, Poplink  behaves  as
+normal.
+
+-exlink, on the other hand, tells Poplink that it is not responsible for
+linking the final  executable image at  all. In this  case, not only  is
+Pop's main function omitted, but poplink_cmnd will simply contain a list
+of the object files and libraries needed by the Pop part of the program;
+this can then be supplied to any required linking command.
+
+For example, in  Unix it  could be incorporated  into a  cc command,  as
+follows:
+
+    % cc foo.o baz.o ... `cat poplink_cmnd`
+
+In VMS, poplink_cmnd  will be linker  options file, which  can be  given
+directly to the linker with a /options qualifier:
+
+    $ link foo.obj baz.obj ... poplink_cmnd./options
+
+
+3.4  Options
+------------
+
+    -a      Produce the files poplink_*.a and poplink_cmnd only (implies
+            -p).
+
+    -e procedure-name
+            Name of  the entry  procedure  to be  called on  startup  --
+            defaults  to  $-Pop$-Main  if   not  specified.  The   entry
+            procedure must be  declared as  'constant procedure'.  (Note
+            that this option is not valid in combination with -exmain or
+            -exlink.)
+
+    -emb    External make base -- causes image-name.stb to be made. (For
+            system use.)
+
+    -exmain
+    -exlink
+            These options specify  external startup,  with -exlink  also
+            specifying external linking. See External Startup &  Linking
+            above; of necessity, the -exlink option also implies -ponly.
+            (Note that these options are  not valid in combination  with
+            -e.)
+
+    -date date
+            Date string to be  given to image, and  which will form  the
+            last part of  popversion in  the linked  image. Defaults  to
+            sysdaytime().
+
+    -defc  idname=expr-list
+    -defv  idname=expr-list
+    -defcm idname=expr-list
+    -defvm idname=expr-list
+            Define (or declare) identifiers in the linked output  (where
+            each idname  may  begin with  a  section pathname,  with  or
+            without the leading $-).
+
+            Constant/variable  and  identprops  are  specified  by   the
+            option:  c  =  constant,  v  =  variable,  and  m  =   macro
+            (identprops default to 0 without m).
+
+            =expr can  be  omitted  to  merely  declare  an  identifier.
+            Otherwise, expr may be a Pop-11 expression consisting of any
+            combination of integers, booleans, strings, words, lists and
+            vectors. It should not reference any Pop identifiers  except
+            true, false and []. (In particular, note that these  options
+            do not  declare identifiers  in the  Pop namespace,  and  so
+            cannot be referred to themselves.)
+
+    -ident integer
+            Image identification value. (System use only.)
+
+    -idexp letters
+            Identifier export:  forces  identifiers  to  appear  in  the
+            run-time  dictionary/section  tree.  letters  is  a   single
+            argument (possibly empty) consisting of any of the following
+            letters:
+
+                w   Export all top-level identifiers whose name has been
+                    used as a quoted word (this is the default).
+
+                s   Export all syntax words.
+
+                m   Export all macros.
+
+    -lf arg-list
+            O/S link  command flags  (these will  be added  to the  link
+            command before  any  object file  arguments  specified  with
+            -lo).
+
+    -lo arg-list
+            Other O/S  object  file  and library  arguments.  These  are
+            merged with any exload  input files resulting from  external
+            loads in program modules (see REF * EXTERNAL), and added  to
+            the link command after the Pop object file arguments.
+
+            As with exload, an argument beginning with == is assumed  to
+            specify  an  environment   variable/logical  name,  and   is
+            replaced by the  list of  strings (i.e.  the exlibs  result)
+            returned by * sys_translate_exlibs applied to it.
+
+            If  in  addition  the  translation  of  any  ==  environment
+            variable specifies an X link type, then this determines  the
+            X link  type for  the program  -- see  Poplog Image  X  Link
+            Specification  in  REF * X.  If  no  such  -lo  argument  is
+            present, and  Poplog modules  containing  X code  have  been
+            incorporated  into  the   program,  the   default  will   be
+            ==POP_XLINK_EXLIBS. (It is an error if the resulting X  link
+            type is  incompatible  with  that  required  by  any  module
+            incorporated in the image.)
+
+            Note that the -x* options are shorthand for specifying
+
+                -lo ==POP_X*_EXLIBS
+
+            (-xlink thus corresponds to the default.)
+
+    -noshare
+            Link image without using shareable libraries.
+
+    -o image-name
+            Name of the executable image  to link. Defaults to a.out  in
+            the current directory.
+
+    -port   (System use only.)  For porting: implies  -a, and stops  the
+            addition of $popexternlib/libpop.olb to the link command.
+
+    -p      Causes  the  files  poplink_*.o   and  poplink_cmnd  to   be
+            generated in the current directory (as described above), for
+            use with a later 'quick' relink with -q.
+
+    -ponly  Do Pop  part  of  link  only; similar  to  -p,  but  doesn't
+            actually obey poplink_cmnd to link the image.
+
+    -q      Following a link with  -p, do a  'quick' relink: instead  of
+            redoing  the  Pop  part  of  the  link,  do  only  the   O/S
+            object-file  link,  using   the  existing  poplink_?.o   and
+            poplink_cmnd  files  (a   new  poplink_dat.o  is   generated
+            however, since  this ensures  that the  image date  will  be
+            different).
+
+            Note that this option can be used ONLY when no changes  have
+            been made to the declarations, initialisations, or locations
+            of any permanent identifiers. (Otherwise, the data contained
+            in the existing poplink_?.o files will be incorrect.)
+
+            (Note that you have  to respecify the  image name with  this
+            option, otherwise it defaults as for an ordinary link.)
+
+    -s section-list
+            Names of sections to be set up at run-time. All  identifiers
+            in each section are exported to the dictionary.
+
+    -tr     Trace loading, i.e. list w-files and w-library modules used.
+            Where a w-library module is conditionally extracted (i.e. by
+            virtue of defining an undefined identifier), the name of the
+            identifier causing the extraction is given in brackets after
+            the module name.
+
+    -uses idname-list
+            Mark the specified identifers  strongly used (forcing  their
+            extraction from libraries,  etc). For each  idname, this  is
+            equivalent to specifying the Pop-11 code
+
+                uses (idname);
+
+            somewhere in one or more program files.
+
+    -ubn idname-list
+            Uses  by  name  --  as  for  uses,  but  also  exports   the
+            identifiers  to  the  dictionary  (like  -idexp).  For  each
+            idname, this is equivalent to specifying the Pop-11 code
+
+                uses-by_name (idname);
+
+            somewhere in one or more program files.
+
+    -unum letters
+            Use number  keys: letters  is  a single  argument  (possibly
+            empty) consisting of any of the following letters:
+
+                b   biginteger_key
+                r   ratio_key
+                f   (d)decimal_key
+                c   complex_key
+
+            Thus -unum br is equivalent to
+
+                -uses ( biginteger_key ratio_key )
+
+            etc.  The  default  is  brf  (i.e.  you  have  to  ask   for
+            complex_key explicitly).
+
+    -wlb w-library-list
+            Group of w-libraries for  recursive search extract. See  Use
+            of W-Libraries above.
+
+    -wlbused
+            Stands for  the set  of w-libraries  used by  all  w-modules
+            incorporated so far, as a -wlb group. See Use of W-Libraries
+            above.
+
+    -x_complete
+            Special used by  the system pglink  command (only  operative
+            for MIPS).
+
+    -x*     Where * is a  sequence of lowercase alphanumeric,  specifies
+            the type of X link, and is the same as supplying the option
+
+                -lo ==POP_X*_EXLIBS
+
+            where X* is the same in uppercase. See -lo above.
+
+    w-library -in module-list
+    w-library -ex module-list
+            Following a  w-library  name,  unconditionally  incorporates
+            modules from that library in the link, where module-list  is
+            a list of module names.
+
+            -in means include only the named modules in the link.
+
+            -ex means include  all modules from  w-library in the  link,
+            excluding the named  ones (thus an  empty list (  ) for  -ex
+            means include all modules).
+
+
+-----------------------------------------------------------------------
+4  Poplibr
+-----------------------------------------------------------------------
+
+Poplibr creates and maintains Pop  object libraries, where each  library
+consists of two files, libname.wlb and libname.olb.
+
+The format of a Poplibr command is
+
+    poplibr option w-library w-files
+
+where option is one of the single options described below.
+
+w-files is a  sequence of w-file  names. For each  of these, the  actual
+file name part (i.e. the sys_fname_name part) is used as the module name
+within the library;  thus the whole  argument is used  by those  options
+requiring an actual file (-c, -r, -x), whereas any directory path on the
+name is ignored by those options  requiring only a module name (-d,  -l,
+etc).
+
+
+4.1  Options
+------------
+
+    -c      Create w-library  from  w-files. w-library  must  not  exist
+            already.
+
+    -d      Delete the modules specified by w-files from w-library.
+
+    -l      List the modules in w-library  specified by w-files (or  all
+            modules if none specified).
+
+    -lcs    For each module  in w-library specified  by w-files (or  all
+            modules  if  none   specified),  list  the   names  of   the
+            corresponding (.p  or .s)  source files  whose last  changed
+            date is later than the module date.
+
+    -ld     As -l, but give module dates.
+
+    -r      Replace (or add) the specified w-files in w-library.
+
+    -x      Extract the modules specified by w-files from w-library  (or
+            all modules if none specified; in this case the w-files  are
+            created in the current directory).
+
+
+
+
+--- C.all/help/popc
+--- Copyright University of Sussex 1993. All rights reserved.

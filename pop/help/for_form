@@ -1,0 +1,616 @@
+HELP FOR_FORM            Ian Rogers, Adrian Howard, David Young Jan 1994
+                                           Revised: John Gibson Jan 1996
+
+For-forms are used to extend the syntax of "for ... endfor" to give more
+varied forms of looping constructs. The user can add new forms.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Overview
+
+  2   Predefined Extended for Forms
+      2.1   in_vectorclass and in_vector
+      2.2   in_string
+      2.3   in_dstring
+      2.4   in_subscripted
+      2.5   with_index
+      2.6   in_list
+      2.7   on_list
+      2.8   in_property
+      2.9   on_property
+      2.10  from_repeater
+      2.11  in_region
+      2.12  in_array
+      2.13  equalto and allequalto
+
+  3   How to Write Extensions
+
+  4   Predefined General Utilities
+      4.1   Using class_subscr_loop to Define New for-forms
+      4.2   Using subscr_loop
+      4.3   Adding with_index Hooks
+
+  5   fast_for Details
+
+
+-----------------------------------------------------------------------
+1  Overview
+-----------------------------------------------------------------------
+
+This provides extensions to the normal looping constructs of the forms
+    for ... in  ... do ... endfor
+    for ... on  ... endfor
+and
+    fast_for ... in ... do ... endfast_for
+    fast_for ... on ... do ... endfast_for
+
+See HELP * FOR, and REF * FAST_FOR
+
+The extended for forms are
+
+    for varlist type expression-list do ... endfor;
+
+    fast_for varlist type expression-list do ... endfast_for;
+
+where type is a syntax word to indicate an extended for iteration
+construct.
+
+
+-----------------------------------------------------------------------
+2  Predefined Extended for Forms
+-----------------------------------------------------------------------
+
+Several frequently required "for ...type" forms are provided.
+Additional forms can be defined by the user, as described below.
+
+Descriptions of the built in forms follow.
+
+
+2.1  in_vectorclass and in_vector
+---------------------------------
+
+    for var1, var2 ... in_vectorclass vector1, vector2, ... do
+
+Each of the variables varN iterates over elements of the corresponding
+vector vectorN. In the case where there is only one variable and one
+vector, this is a more efficient replacement for the tortuous
+
+    for item in vector using_subscriptor subscrv do
+
+using_subscriptor does does not allow iteration through multiple vectors
+simultaneously.
+
+Example:
+
+    vars a,b;
+    for a, b in_vectorclass  'ABC', {ant bat cow}  do [^a ^b] => endfor;
+    ** [65 ant]
+    ** [66 bat]
+    ** [67 cow]
+
+Notice that in this example there are two vectors of different types: a
+character vector and a full vector. Any number of vector expressions
+with any mixture of vector types is permitted (unlike the in_vector
+construct, defined below). The only constraint on this form is that
+there must be a class_fast_subscr present in the system for each type of
+vector used. If something other than a vector type is found, e.g. a
+list, then an error will result.
+
+The number of iterations to be done is determined by the size of the
+smallest vector.
+
+    for a, b in_vectorclass {1 2 3 4 5}, {dog bat ant} do
+        [^a ^b]=>
+    endfor;
+    ** [1 dog]
+    ** [2 bat]
+    ** [3 ant]
+
+fast_for can also be used. In that case it is assumed that the length of
+the first vector will determine the number of iterations. This can lead
+to bizarre results if it is longer than one of the other vectors, e.g.
+
+    fast_for a, b in_vectorclass {1 2 3 4 5}, {dog bat ant} do
+        [^a ^b]=>
+    endfor;
+    ** [1 dog]
+    ** [2 bat]
+    ** [3 ant]
+    ** [4 <SYSTEM_OBJECT 00000016>]
+    ** [5 <key string>]
+
+The in_vector for-form is designed for the special case where all the
+vectors are of the same type, namely standard Pop-11 full vectors.
+
+    vars x,y;
+    for x,y in_vector {1 2 3 4}, {a b c} do [^x ^y] => endfor;
+    ** [1 a]
+    ** [2 b]
+    ** [3 c]
+
+If one of the expressions after in_vector does not evaluate to a
+vector then a run-time error will result. Otherwise this case is
+slightly more efficient (ie. faster) than in_vectorclass.
+
+
+2.2  in_string
+--------------
+
+This is designed for the special case where all the vectors are of the
+same type, namely standard Pop-11 (d)strings.
+
+    vars x,y;
+    for x,y in_string '1234', 'abc' do [^x ^y] => endfor;
+    ** [49 97]
+    ** [50 98]
+    ** [51 99]
+
+If one of the expressions after in_string does not evaluate to a
+(d)string then a run-time error will result. Otherwise this case is
+slightly more efficient (ie. faster) than in_vectorclass.
+
+
+2.3  in_dstring
+---------------
+
+This is the same as in_string when applied to ordinary strings. When
+applied to a dstring the full character, include attributes is returned.
+
+For example:
+
+    vars x,y;
+    for x,y in_dstring '1234', '\{b}abc' do [^x ^y] => endfor;
+    ** [49 1048673]
+    ** [50 1048674]
+    ** [51 1048675]
+
+See REF * STRINGS for more information on dstrings.
+
+
+2.4  in_subscripted
+-------------------
+
+    for var1, var2 ... in_subscripted struct1, struct2, ... do
+
+For structures that have a class_apply that handles numerical
+subscripts, and for which the procedure length produces an appropriate
+result, it is possible to to use the form in_subscripted. This enables
+simultaneous iteration over vectors and lists, as in:
+
+    vars a, b, c;
+    for a,b,c in_subscripted {1 2 3 4}, 'abcd', [ant bat cow ] do
+        [^a ^b ^c] =>
+    endfor;
+    ** [1 97 ant]
+    ** [2 98 bat]
+    ** [3 99 cow]
+
+
+2.5  with_index
+---------------
+
+For any of the above "vector-type" iteration constructs, it is sometimes
+useful to keep a note of the "current index". Ie. the number of the
+current slot (its cardinal number). This can be achieved automatically
+by using with_index in conjunction with any of the above "vector-type"
+constructs.
+
+Eg.
+
+    vars a, b, v = {x y z}
+    for a with_index b in_vector v do
+        [^a ^b] =>
+    endfor;
+    ** [x 1]
+    ** [y 2]
+    ** [z 3]
+
+
+Assigning to the index variable will alter the behaviour of the loop.
+
+See below for details of adding with_index hooks to user defined
+"vector-type" iteration constructs.
+
+
+2.6  in_list
+------------
+
+    for var1, var2, ... in_list list1, list2, ... do
+
+This construct is exactly equivalent to
+
+    for var1, var2, ... in list1, list2, ... do
+
+which can be thought of as syntactic sugar for the former. Also,
+using_subscriptor cannot be used with this form
+
+    vars x, y;
+
+    for x, y in_list [a b c], [A B C] do [^x ^y] => endfor;
+    ** [a A]
+    ** [b B]
+    ** [c C]
+
+The length of the shortest list determines the number of iterations.
+
+fast_for can also be used to increase speed with reduced checking.
+This can lead to unpredictable results if one of this list has a
+non-list tail. fast_for cannot be used with dynamic lists.
+
+
+2.7  on_list
+------------
+
+    for var1, var2, ... on_list list1, list2, ... do
+
+This construct is equivalent to
+
+    for var1, var2, ... on list1, list2, ... do
+
+E.g.
+
+    vars x, y;
+    for x, y on_list [a b c d], [A B C] do [^x ^y] => endfor;
+    ** [[a b c d] [A B C]]
+    ** [[b c d] [B C]]
+    ** [[c d] [C]]
+
+Again, the length of the shortest list determines the number of
+iterations.
+
+fast_for can also be used, with the same caveats as for in_list.
+
+
+2.8  in_property
+----------------
+
+    for key, val in_property property do
+
+This form is used for iterating over key/value pairs in a property (also
+see HELP * PROPERTIES, REF * APPPROPERTY, * PROPS.)
+
+Example
+
+    vars key, value;
+    vars foo = newproperty([[a 1] [b 2] [c 3]], 3, false, true);
+    for key,value in_property foo do
+        [key = ^key , value = ^value] =>
+    endfor
+    ** [key = c , value = 3]
+    ** [key = a , value = 1]
+    ** [key = b , value = 2]
+
+The form:
+
+    for key, val in_property property do
+        .....key....val....
+    endfor
+
+does approximately the same as
+
+    appproperty(
+        property,
+        procedure(key, val); ....key....val....endprocedure
+    )
+
+However, the "for ... in_property.." version is more efficient as there
+is no need to call a procedure on each iteration. quitloop and return
+behave as you would expect for a looping construct.
+
+
+The form
+
+    fast_for key, val in_property property do
+        .....key....val....
+    endfor
+
+does approximately the same as the following
+
+    fast_appproperty(
+        property,
+        procedure (key, val); ....key....val....endprocedure
+    )
+
+and has similar dangers and restrictions (i.e. the loop body should not
+access or update the contents of the property in case a garbage
+collection has occurred and they had to be re-located).
+
+See REF * FAST_APPPROPERTY for more information.
+
+In both cases, the order in which the property entries are bound to the
+two iteration variables is arbitrary.
+
+Therefore, only one property at a time is allowed with this form as it
+is meaningless to consider stepping through two properties in synchrony.
+
+
+2.9  on_property
+----------------
+
+    fast_for entry on_property property do
+
+This is similar to in_property except that, instead of the key and value
+being returned, each time round the loop a full property entry is put
+into entry. This entry is the same as that returned by
+fast_get_prop_entry (REF * FASTPROCS/fast_get_prop_entry)
+
+Example:
+
+Say that nums is a property matching keys against numbers and that you
+want to increment each of these numbers as long as the predicate pred
+returns true when applied to the key. The following loop will do that:
+
+    vars e;
+    fast_for e on_property nums do
+        if pred(fast_prop_entry_arg(e)) then
+            fast_prop_entry_value(e) + 1
+                -> fast_prop_entry_value(e);
+        endif;
+    endfor;
+
+The behaviour of this construct is very rude, and therefore there is no
+slow version. The value of entry is a pointer to the entry cell which
+is still in the property. Therefore, if the property itself is updated
+within the loop, the resulting behaviour of the loop will be undefined.
+
+
+2.10  from_repeater
+-------------------
+
+    for var from_repeater repeater do
+
+This construct can be used with the repeaters returned from, eg., discin
+or incharitem. Each time round the loop var is given the next item
+returned from the repeater. The loop exits, without executing the body
+of the loop, when the repeater returns termin.
+
+
+2.11  in_region
+---------------
+
+    for var in_region list do
+
+This can be used in place of nested numerical for loops, even if the
+depth of nesting is not known at compile-time. See HELP * in_region.
+
+
+2.12  in_array
+--------------
+
+    for var1, var2, ... in_array array1, array2, ... do
+
+This is used for iterating over data in arrays, much as in_vector can be
+used for iterating over data in vectors. The full form is
+
+    for var1, var2, ...
+        with_index ivar
+        in_array array1, array2, ...
+        updating_last n
+        in_region list
+        of_dimension d
+    do
+
+For details, see HELP * in_array.
+
+
+2.13  equalto and allequalto
+----------------------------
+
+    for var equalto pattern [in list] do
+    for var allequalto pattern_list [in list] do
+
+The equalto construct iterates over all the elements of list which are
+equal to the item pattern (i.e. element = pattern). See HELP * equalto.
+
+The allequalto construct iterates over all possible lists of elements
+from list which are equal to the list pattern_list (i.e. element_list =
+pattern_list). See HELP * allequalto.
+
+With both these constructs, list defaults to the value of the variable
+database if the 'in list' clause is omitted.
+
+
+
+-----------------------------------------------------------------------
+3  How to Write Extensions
+-----------------------------------------------------------------------
+
+New extensions can be written using the for_extension define form.
+
+Eg.
+
+    define :for_extension grum(varlist, isfast);
+        ...
+    enddefine;
+
+In this example the extension grum has been declared. Ie. the
+construct:
+
+    for var1, var2, ... varN grum ....
+
+    fast_for var1, var2, ... varN grum ....
+
+Is now valid. The need for the variables varlist and isfast is described
+below, though these are ordinary variables and can be given any name.
+
+Reading in the rest of the loop construct and deciding what Poplog VM
+code to plant is then handled by the code that is in the body of the
+for_extension define form. Autoloading is supported which means that
+these extensions need not take up space until required.
+
+Two arguments are placed on the stack before this code is called:
+
+    varlist a list of the variables following for or fast_for
+
+    isfast a boolean which is true if fast_for was used, false
+    otherwise.
+
+If isfast is true, code that runs quickly without doing normal
+checking may be planted. It is up to the user to ensure that such uses
+involve no serious risks.
+
+(See HELP * SLOWPROCS, REF * FASTPROCS for more information on checking
+and non-checking procedures)
+
+
+For example, at compile time the construct
+
+                               -
+    fast_for item1, item2 grum | struct1, struct2 do
+                               -
+
+invokes the code with the list
+
+    [item1 item2]
+
+and the boolean value
+
+    true
+
+on the stack, with proglist set to the marked position.
+
+It is up to the user to decide whether to make the fast_ version (ie.
+when isfast is true) do anything different.
+
+
+-----------------------------------------------------------------------
+4  Predefined General Utilities
+-----------------------------------------------------------------------
+
+Several keywords are catered for without users having to define them,
+these were described in section 2.
+
+Additional predefined facilities are described below. In particular
+there is a general subscriptor mechanism from which in_vectorclass and
+in_subscripted etc. are derived.
+
+
+4.1  Using class_subscr_loop to Define New for-forms
+----------------------------------------------------
+
+The forms in_vectorclass and in_subscripted described above are
+defined as closures of the more general procedure:
+
+    class_subscr_loop(varlist, isfast, index, subscrpdr);
+
+The first two arguments are as before.
+
+    index is either a word or false. If it is a word then this is
+    taken as the name of the variable to be used as the index
+    counter. This can make the index counter visible to user
+    programs. If it is false then the compiler will use a hidden
+    variable as the counter.
+
+    subscrpdr is the procedure for getting the class subscripting
+    procedure out of the datakey of the vectorclass in question.
+
+Some form of closure of this procedure is all that is needed to form an
+efficient vector-type iteration construct.
+
+The form in_vectorclass can be defined thus:
+
+    uses class_subscr_loop;
+
+    define :for_extension in_vectorclass with_nargs 2;
+        class_subscr_loop(false, class_fast_subscr);
+    enddefine;
+
+and in_subscripted can be defined:
+
+    define :for_extension in_subscripted with_nargs 2;
+        class_subscr_loop(false, class_apply);
+    enddefine;
+
+These two are probably the only instantiations that make sense for
+class_subscr_loop.
+
+If fast_for is used (isfast is therefore true,) then only the length of
+the first vector is considered when finding out how many times to
+iterate, as illustrated previously.
+
+
+4.2  Using subscr_loop
+----------------------
+
+The in_vector form, more efficient than in_vectorclass, is defined using
+a closure of the more general procedure:
+
+    subscr_loop(varlist, isfast, index, subscrpdr, checkpdr)
+
+The first four arguments are as before. checkpdr is a checking procedure
+which must mishap if the data to be subscripted is of the wrong class.
+
+A consequence of this is that the subscripting procedure subscrpdr can
+be of the fast variety.
+
+A closure of this procedure is all that is needed to form a vector-type
+iteration construct which is runs slightly faster than the
+in_vectorclass form.
+
+So in_vector could be defined as:
+
+    uses subscr_loop;
+
+    define lconstant check_vector(item);
+        lvars item;
+        unless isvector(item) then
+            mishap(item, 1, 'VECTOR NEEDED')
+        endunless
+    enddefine;
+
+    define :for_extension in_vector with_nargs 2;
+        subscr_loop(false, fast_subscrv, check_vector);
+    enddefine;
+
+When isfast is true, the checking procedure does not get run, and
+there are the same consequences that applied to class_subscr_loop.
+
+
+4.3  Adding with_index Hooks
+----------------------------
+
+The define form with_index_hook can be used to define hooks for the
+with_index style of vector type iteration.
+
+Eg.
+
+    define :with_index_hook in_vector with_nargs 3;
+        subscr_loop(fast_subscrv, check_vector);
+    enddefine;
+
+is used to define the construct:
+                                       -
+    for vars with_index ivar in_vector | exprs do
+        ...                            -
+    endfor;
+
+Simply the body of the define-form must define a procedure of three
+arguments: varlist, isfast and index.
+
+The functions of these variable are as described above in the
+description of class_subscr_loop. This procedure will be called with
+varlist set to the list of loop variables vars, isfast will be set to
+true or false depending on whether fast_for or for respectively was used
+to open the construct, and index is set to the index variable ivar.
+proglist will be set to the marked position.
+
+
+-----------------------------------------------------------------------
+5  fast_for Details
+-----------------------------------------------------------------------
+
+Using fast_for often gains speed just by switching off checking.
+
+Also, for vector-type iteration, the non-fast forms compare the lengths
+of all the vectors and uses the shortest one to determine the number of
+iterations required. This comparison is avoided if fast_for is used.
+Instead only the length of the first vector is examined.
+
+The rules that apply to fast_appproperty apply to the fast version of
+in_property.
+
+
+
+--- C.all/help/for_form
+--- Copyright University of Sussex 1996. All rights reserved.

@@ -1,0 +1,319 @@
+HELP ACTOR                                           J L Cunningham 1982
+                                              Revised John Gibson Aug 93
+
+------------------------------ NOTE ------------------------------------
+
+  From Version 14.5, a change has been made to LIB * ACTOR which makes
+  it incompatible with previous versions: the new version has all the
+  exported (i.e. top-level) identifiers prefixed by "actor_". In
+  addition, LIB EVENT has been replaced by LIB * ACTOR_EVENT, with
+  a similar renaming of identifiers.
+
+  Thus you should load these facilities with 'uses actor;' or 'uses
+  actor_event;'.
+
+  The old identifier names can be got by loading LIB * OLD_ACTOR or
+  LIB * OLD_EVENT, which require LIB * POPOBSOLETELIB first, i.e.
+
+        uses popobsoletelib, old_actor;
+
+  etc.
+
+------------------------------------------------------------------------
+
+The library ACTOR uses the Pop-11 *PROCESS facility to implement basic
+procedures for a discrete event simulation package. This can be used for
+multi-tasking.
+
+In addition, LIB * ACTOR_EVENT provides an event-handler and associated
+procedures, which are described in this help file.
+
+The main user procedures and variables and the terminology used are
+described now; the end of this file contains a list of all the other
+important global variables and procedures, with a brief description of
+what they do.
+
+ACTIVE      At any one moment of real time, only one ACTOR program can
+            actually be running (since Pop is a serial language.) Here,
+            though, all ACTORs which may become CURRENT without the
+            intervention of another ACTOR are referred to as ACTIVE
+            (this is not quite standard usage). Basically the ACTIVE
+            ACTORs are those that are WAITING plus the CURRENT ACTOR.
+            The other actors (those SLEEPING or waiting for an EVENT
+            (see ACTOR_WAITEVENT) or waiting to ACTOR_RECEIVE a MESSAGE,
+            are not ACTIVE.
+
+ACTOR       When a simulation is started, there will be a number of
+            independent (but possibly communicating) "programs" running,
+            and possibly multiple copies of the same program. These
+            entities are referred to as ACTORS. (An actor is actually
+            represented as a RECORD (see HELP *DEFCLASS), one of whose
+            components is a pop PROCESS.) In order for actors to
+            interact, they each have a name, (see ACTOR_MYNAME) which
+            should be unique to that actor.
+
+actor_apocalypse();
+            This procedure is run as the final EVENT of a simulation at
+            time ACTOR_AEONS. It can be redefined, but there is not much
+            point unless you don't like the message it prints.
+
+actor_askactor(<name>,<question>) -> <answer>;
+            Runs the named actor's ACTOR_ANSWER procedure, to obtain the
+            answer to <question>, but in the context of the <name>d
+            actor. So, e.g., it is possible to ask for the values of
+            variables local to the <name>d actor.
+
+actor_answer(<question>) -> <answer>;
+            This procedure, which should normally be local to individual
+            actors, will be run if the actor is asked a <question> by
+            another actor. It should NOT call ACTOR_DIE, ACTOR_WAIT or
+            ACTOR_SLEEP and it will be unable to ACTOR_ASKACTOR,
+            ACTOR_SEND or ACTOR_KILL the actor asking the <question>.
+            Since ACTOR_RECEIVE may call ACTOR_SLEEP, it should not call
+            ACTOR_RECEIVE unless it knows that there will be a message
+            available (see ACTOR_MYMESSAGEQUEUE). The default value of
+            this procedure is in the global value of ACTOR_ANSWER and
+            always returns the answer 'Dont know', unless the QUESTION
+            is a list whose first element is the word "popval", in which
+            case the rest of the list is *POPVALed to obtain the answer
+            (this is very useful for debugging, see DEBUG.) While
+            running ACTOR_ANSWER, all local variables will be as they
+            were when the actor answering the question became
+            non-CURRENT. Also, CURRENT temporarily becomes the answerer.
+
+actor_aeons
+            This constant corresponds to the end of time. It is a large
+            number. If an ACTOR does
+
+                        actor_wait(actor_aeons);
+
+            it is likely not to be resumed. This is much like
+            ACTOR_SLEEP, but it cannot be woken (but it can still
+            ACTOR_ANSWER questions, cf ACTOR_DIE).
+
+CURRENT     The actor currently running is described as CURRENT.
+
+DEBUG       If the pop procedure *POPREADY is included as one of the
+            actors at ACTOR_GENESIS, then it can be used for debugging
+            purposes. When the POPREADY becomes CURRENT it will prompt
+            the terminal as normal. A call of ACTOR_WAIT at this time
+            will cause the POPREADY to wait the appropriate amount of
+            simulated time before prompting again. Calls of
+            ACTOR_ASKACTOR, ACTOR_KILL, ACTOR_NEWACTOR etc. can be used.
+
+actor_die();
+            The current actor dies. An actor also dies if the procedure
+            which is called when the actor starts returns normally. (If
+            ACTOR_DIE is used the actor could be reincarnated if it had
+            been saved somewhere; however if the current actor's
+            procedure returns normally, it is very dead and cannot be
+            reincarnated.)
+
+actor_diewhen(<event>);
+            This procedure is in LIB ACTOR_EVENT, and can only be used
+            when there is an ACTOR_EVENTHANDLER. It causes the actor
+            which calls it to be KILLed when the named <event> (or one
+            of the events in the list - cf ACTOR_WAITEVENT) occurs.
+
+EVENT       This word has two meanings. Firstly, every time anything
+            occurs, that is an event. Thus, if an actor has WAITed for a
+            period (of simulated time), and then it does something, that
+            something is an event (cf APOCALYPSE). However, there is a
+            more restricted meaning, reserved for particular events
+            notified to the ACTOR_EVENTHANDLER.
+
+actor_event(<eventname>,<message>);
+            This procedure is in LIB ACTOR_EVENT. If the event
+            <eventname> has occurred then this procedure should be
+            called, and the ACTOR_EVENTHANDLER will send the <message>
+            to any other actors waiting for the event <eventname> (see
+            ACTOR_WAITEVENT).
+
+actor_eventhandler();
+            This procedure is in LIB ACTOR_EVENT. If the procedures
+            ACTOR_EVENT and ACTOR_WAITEVENT are to be used, then the
+            word "actor_eventhandler" should be included in the
+            ACTOR_GENESIS argument, so that it will be used for an actor
+            called "eventhandler1".
+
+actor_exists(<name>);
+            Returns true if <name> is NAMEOF an existing actor,
+            excluding the current actor. (i.e. in WAITING or SLEEPING).
+
+actor_genesis(<initial>);
+            This procedure is used to start a simulation. <initial>
+            should be a list of argument lists for ACTOR_NEWACTOR, but
+            if the simplest form of call to ACTOR_NEWACTOR is used (i.e.
+            with a single argument, a procedure), then the name of the
+            procedure (i.e. a Pop variable whose VALOF is the procedure)
+            not enclosed in list brackets may be used, and may also be
+            preceded by an integer repetition count. (In this case,
+            *GENSYM is reset to 1 for that sequence of
+            names.) Integers occurring elsewhere in the INITIAL list are
+            ignored.
+
+actor_gpo(<name>,<message>,<delay>);
+            Defined as
+
+                    actor_newactor(send,[%name,message%],delay)
+
+            This clones the ACTOR_SEND procedure to send the message
+            after a delay. The result when the ACTOR_SEND clone returns
+            will be erased as it dies irrevocably.
+
+actor_kill(<name>);
+            Removes an actor whose NAMEOF is <name> from WAITING or
+            SLEEPING; the actor could be reincarnated (cf ACTOR_DIE).
+
+MESSAGE     A MESSAGE can be any Pop data structure. See ACTOR_SEND,
+            ACTOR_RECEIVE, ACTOR_GPO, ACTOR_EVENT and ACTOR_WAITEVENT.
+            Cf also ACTOR_ASKACTOR and ACTOR_ANSWER.
+
+actor_mymessagequeue
+            This is a queue (local to each actor) of messages for the
+            current actor to ACTOR_RECEIVE (see HELP *NEWQUEUE). The
+            number of messages waiting for the current actor can be
+            found by
+
+                queuelength(actor_mymessagequeue) -> <length>;
+
+            The MESSAGEQUEUE is not accessed via this variable name by
+            the simulation package, so altering it will have no effect
+            (although altering the queue which is its initial value
+            will have an effect).
+
+actor_myname
+            This is a variable which is local to each actor. Its initial
+            value for any actor is the name of that actor. It is useful
+            to know this when there are many actors which are copies of
+            the same procedure, so that MESSAGES may include a NAME to
+            reply to.
+
+actor_myparent
+            This is a variable which is local to each actor. It's intial
+            value for each actor is the NAME of the actor which created
+            that actor, or "eldest" if the actor has no parent (i.e. was
+            created at ACTOR_GENESIS).
+
+NAME        To distinguish ACTORs, they each have a name, which should
+            be unique. See ACTOR_MYNAME.
+
+actor_newactor(<procedure>[,<actorname>][,<arglist>][,<delay>]);
+            ACTOR_NEWACTOR creates a new actor. There are a variety of
+            calling formats, summarised above; the arguments in square
+            brackets are optional, but if present must appear in the
+            order illustrated. <procedure> is the procedure to be run
+            for that actor. The first optional argument is the name of
+            the actor (a word). If this is omitted, a new name will be
+            generated from the *PDPROPS of the procedure, using
+            *GENSYM). The second optional argument is a list
+            of arguments for the  procedure, and  the third an  optional
+            simulation delay before the new actor starts. The list of
+            arguments must be a Pop list if present. For an example, see
+            ACTOR_GPO.
+
+actor_receive() -> <message>;
+            Gets the next message for the current actor. Messages are
+            kept in a queue (see HELP *NEWQUEUE). Messages may be put in
+            the queue by being SENDed. If the queue is empty, then the
+            current actor becomes SLEEPING until there is something in
+            the queue. See also ACTOR_SEND, ACTOR_GPO,
+            ACTOR_MYMESSAGEQUEUE.
+
+actor_say(<something>);
+            Prints <something> on a new line, preceded by the NAMEOF the
+            CURRENT actor, and also the time if ACTOR_SAYTIME is TRUE.
+
+actor_saytime
+            Global variable. If non-false then ACTOR_SAY will print the
+            simulated time.
+
+actor_send(<name>,<message>) -> <boolean>;
+            Adds <message> to <name>d actor's queue of messages, and
+            WAKEs actor. ACTOR_SEND returns TRUE if <message> has been
+            sent successfully, otherwise FALSE (e.g. if no actor exists
+            with the specified <name>). An actor cannot ACTOR_SEND a
+            message to itself. See also ACTOR_RECEIVE,
+            ACTOR_MYMESSAGEQUEUE, ACTOR_GPO.
+
+actor_simtime
+            The value of this variable is the current simulation time;
+            it should not be explicitly altered by actors. (Really, I
+            should make it a procedure without an updater, but I trust
+            you.)
+
+actor_sleep();
+            The current actor falls asleep, i.e. it becomes inactive. It
+            can become active again if WAKEd - cf ACTOR_DIE. Actors
+            which are asleep are stored in a variable called SLEEPING.
+
+actor_wait(<duration>);
+            The current ACTOR waits, i.e. is suspended, for simulated
+            delay given by <duration>. Such actors are stored in a
+            variable called WAITING.
+
+                   actor_wait(0);
+
+            will not change the simulated time, but if any other ACTORs
+            are WAITING to run at this simulated time, then the current
+            actor will be suspended. If more than one ACTOR is due to
+            become CURRENT at the same simulated time, then the one that
+            began waiting at the earliest real time becomes CURRENT.
+
+actor_wake(<name>);
+            Wake, i.e. make ACTIVE, the actor whose name is <name> (it
+            will become CURRENT at the present simulated time, after any
+            other ACTORs at this time). ACTOR_WAKE has no effect if
+            there is no such actor in SLEEPING.
+
+actor_waitevent(<event>) -> <message>;
+            This procedure is in LIB ACTOR_EVENT. When it is called, it
+            tells the ACTOR_EVENTHANDLER that the current actor is now
+            waiting for the <event> (a word) or alternatively any of the
+            events in <event> (a list of words). The procedure returns
+            with the <message> associated with the <event> when it
+            occurs.
+
+-----------------------------------------------------------------------
+
+Some procedures and variables used internally to the simulation package,
+but which might be useful to hackers. They are in section $-actor.
+
+current     current actor
+waiting     the actors active but not current
+sleeping    the actors sleeping
+find(<name>,<chain>);
+            might be useful to a hacker, but look at the source code
+nameof(<actor>);
+waketime(<actor>);
+            the time a waiting actor is due to become current
+nextactor(<actor>);
+            link to next actor when in a chain
+processof(<actor>);
+            might be useful to resume simulation, e.g. by
+              resume(0,processof(<current>))
+practor(<actor>);
+            used to print an actor or chain of actors
+schedule(<time>,<actor>);
+            adds <actor> to WAITING with <time> as its waketime
+parentof(<actor>);
+            the NAMEOF the actor which created the <actor> (which is
+            the argument to PARENTOF), or else "eldest" for actors
+            created at ACTOR_GENESIS
+messagequeue(<actor>);
+            The queue used for storing <actor>'s unprocessed messages
+returnanswer(<question>);
+            This procedure is part of the question answering
+            mechanism, and should not be called by actors.
+
+See also
+HELP *AUTOLOAD - on the automatic compilation of library files
+HELP *NEWQUEUE - library procedure for creating queues
+HELP *PROCESS  - summary of the Pop-11 PROCESS facility
+HELP *POPVAL   - evaluates list items as Pop-11 code
+HELP *POPREADY - invokes compiler recursively. Useful for interrupts
+SHOWLIB *ACTOR - for the program code
+
+
+--- C.all/help/actor
+--- Copyright University of Sussex 1992. All rights reserved. ----------

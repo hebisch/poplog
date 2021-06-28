@@ -1,0 +1,564 @@
+HELP TRACE                                    Aaron Sloman, October 1981
+                                     Updated John Williams, January 1988
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Introduction
+ -- Summary of basic tracing facilities
+ -- trace <procedure names> ;
+ -- Tracing a recursive procedure
+ -- Tracing several procedures
+ -- untrace <procedure names> ;
+ -- Switching all tracing off or on
+ -- Local tracing
+ -- Re-defining traced procedures
+ -- Tracing system procedures
+ -- Tracing of updaters
+ -- Display format for abnormal procedure entry/exit
+ -- The current tracing level: poptraceindent
+ -- Maximum number of ! to print: popmaxtraceindent
+ -- Character consumer for trace printing: cuchartrace
+ -- Summary of more advanced facilities
+ -- systrace(PROC, NAME, TRACEPROC, UPDATER)
+ -- systrace_proc(PROC, NAME, UPDATER)
+ -- systrace_pr(NAME, STATUS, ARGS, UPDATER)
+
+
+-- Introduction --------------------------------------------------------
+
+This file describes the POP11 'trace' mechanism - a tool for monitoring
+procedure execution. The facilities available include:
+
+    Tracing named procedures
+    Ceasing to trace (untracing) named procedures
+    Switching all trace output on/off
+    Re-directing trace output (eg to a disk file)
+    Changing the format of trace output
+
+Essentially, tracing a procedure involves modifying it so that
+information about its arguments and results is printed whenever the
+procedure is invoked.
+
+The first part of this file explains the simple default facilities
+provided by the syntax words -trace- and -untrace-, and the variable
+-tracing-. TEACH * TRACE goes into more detail on simple uses.
+
+The second part describes the tracing mechanism in more detail, and
+explains how users can adapt it for their own use.
+
+The provision of "active variables" in POPLOG Version 13 implies that
+new tracing facilities for variables could be provided. When that
+happens this file will be updated.
+
+
+-- Summary of basic tracing facilities ---------------------------------
+
+trace <names of procedures> ;
+    Enables tracing of the named procedures.
+
+untrace <names of procedures>;
+    Disables tracing of the named procedures.
+
+<true|false|1> -> tracing;
+    Resumes/Suspends trace printing of all traced procedures.
+    Assigning 1 to -tracing- enables tracing of syntax procedures
+
+untrace;
+    Suspends trace printing for all traced procedures
+    (Equivalent to:  'false -> tracing;')
+
+trace;
+    Resumes trace printing for all traced procedures
+    (Equivalent to:  'true -> tracing;')
+
+untraceall;
+    Untraces all currently traced procedures.
+
+
+The procedure names specified in the -trace- and -untrace- syntax forms
+may be optionally separated by commas.
+
+
+-- trace <procedure names> ; -------------------------------------------
+
+This syntax word alters procedures so that they print out information
+whenever they are executed. Tracing a procedure changes it so that when
+called, it does "before" printing, then it runs, then it does "after"
+printing.
+
+The "before" printing includes the name of the procedure and the inputs
+(arguments) to the procedure (if any). "After" printing includes the
+results of the procedure (if any). Both "before" and "after" printing
+indicate the total depth of currently active traced procedure calls by
+printing a row of `!` characters, followed by `>` before, and `<` after
+the procedure has run.
+
+So, a call to a traced procedure -foo-, that takes three arguments and
+produces two results, might look like
+
+    !!!> foo arg1 arg2 arg3
+    !!!< foo result1 result2
+
+The three `!` characters indicate that there were three other traced
+procedures active (present in the call stack) when -foo- was called.
+
+
+-- Tracing a recursive procedure ---------------------------------------
+
+Tracing is a useful way of displaying intermediate arguments and
+results. An example follows.
+
+    define addup(num);
+        lvars num;
+        if num == 0 then
+            0
+        else
+            num + addup(num - 1)
+        endif
+    enddefine;
+
+    addup(3) =>
+    ** 6
+
+    trace addup;
+
+This causes nothing to be printed out - it merely changes the procedure
+-addup- so that IT does the printing when run, e.g.
+
+    addup(3) =>
+    > addup 3            ;;; entering addup(3)
+    !> addup 2           ;;; entering addup(2)
+    !!> addup 1
+    !!!> addup 0         ;;; entering addup(0) - recursion terminates
+    !!!< addup 0         ;;; leaving addup(0) with result 0
+    !!< addup 1          ;;; leaving addup(1) with result 1
+    !< addup 3           ;;; leaving addup(2) with result 3
+    < addup 6            ;;; leaving addup(3) with result 6
+    ** 6                 ;;; printed by =>
+
+Notice how the characters `>` and `<` indicate the beginning and end
+(respectively) of procedure execution. The number of `!` characters
+indicates the recursion depth.
+
+There is an alternative to the `!` method of indicating depth; see below
+for more details.
+
+
+-- Tracing several procedures -----------------------------------------
+
+You can specify several procedures to be traced, as follows:
+
+    trace proc1 proc2 proc3;
+
+which causes the three named procedures to be altered so that thereafter
+they will cause trace-printing to occur when they are used.
+
+See TEACH * TRACE for examples involving several procedures.
+
+
+-- untrace <procedure names> ; -----------------------------------------
+
+To stop trace printing of one or more procedures, use -untrace-, e.g.
+
+    untrace proc1 proc3;
+
+which will set the two named procedures back to normal.
+
+
+-- Switching all tracing off or on ------------------------------------
+
+vars tracing;
+
+This is a global variable, default value -true-, that can be made
+-false- to switch off all trace printing of traced procedures. The use
+of -trace- or -untrace- sets it -true- again.
+
+If you have declared a variable of your own called "tracing", the
+interaction may cause some odd behaviour.
+
+You can switch off ALL trace printing by doing either
+
+    untrace;
+
+or
+
+    false -> tracing;
+
+Previously traced procedures remain 'marked' as traceable. You can
+restart tracing of such procedures by doing either
+
+    trace;
+
+or
+
+    true -> tracing;
+
+These uses of -trace- and -untrace- without arguments have their effects
+immediately, and so they are not suitable for use inside a procedure
+definition. Instead use an assignment to -tracing-.
+
+The command
+
+    untraceall;
+
+untraces all previously traced procedures.
+
+All other uses of -trace- and -untrace- (i.e. with named procedures),
+will set tracing ON.
+
+If the value 1 (as opposed to -true-) is assigned to -tracing-, then in
+addition to switching tracing on, it will also be possible to trace
+syntax procedures like -if- or -until-. Otherwise, attempting to trace a
+syntax procedure causes an error.
+
+
+-- Local tracing ------------------------------------------------------
+
+-trace- and -untrace- can be used locally within a procedure definition
+to trace or untrace a procedure defined locally. This enables tracing to
+be dependent on calling environment.
+
+    define foo;
+        dlocal addup;     ;;; make addup local
+        trace addup;      ;;; tracing will occur only when foo is active
+        ........
+    enddefine;
+
+
+-- Re-defining traced procedures --------------------------------------
+
+Definitions of procedures that have been traced, or their updaters, can
+be edited and recompiled. The new procedure, or the new updater, will be
+traced if the original one was. So re-tracing is uncessary.
+
+
+-- Tracing system procedures ------------------------------------------
+
+System procedures, e.g. -hd- can be traced in the usual way:
+
+    trace hd;
+
+However, this will only be effective for calls of -hd- that are compiled
+AFTER this use of -trace-. So re-compile if necessary. Traced system
+identifiers are no longer protected against redefinition by the user.
+(See HELP * SYSUNPROTECT, * SYSPROTECT)
+
+
+-- Tracing of updaters ------------------------------------------------
+
+If a traced procedure has an updater, the updater will automatically be
+traced. The trace printing will then include "updater" before the name.
+
+For example:
+    trace hd tl;
+    vars list = [a b c d e];
+    "C" -> hd(tl(tl(list)));
+    > tl [a b c d e]             ;;; entering innermost call of tl
+    < tl [b c d e]               ;;; leaving tl
+    > tl [b c d e]               ;;; entering outer call of tl
+    < tl [c d e]                 ;;; leaving tl
+    > updater hd C [c d e]       ;;; entering updater of hd
+    < updater hd                 ;;; finished
+
+    list =>
+    ** [a b C d e]
+
+
+-- Display format for abnormal procedure entry/exit --------------------
+
+From POPLOG Version 13.2, trace output is printed even if the procedure
+is entered or exitted in an 'abnormal' fashion. This applies in three
+circumstances: procedure entry due to process resumption, procedure exit
+due to process suspension, and procedure exit due to -chain- or one of
+its variants.
+
+These abnormal entry/exit statuses are indicated by replacing the `>`
+and `<` that occur in normal trace output by one of the following
+characters:
+
+    R       entry due to process resume
+    S       exit due to process suspend
+    X       any other abnormal exit
+
+Exits due to -setpop- resetting the control stack are not displayed.
+
+Display of type `X` procedure exits can be suppressed by doing
+
+    false -> pop_chain_trace;
+
+To suppress printing during type `S` and `R` procedure entry/exit, do
+
+    false -> pop_process_trace;
+
+
+Here is an example:
+
+    define savechars();
+        lvars count nchars;
+        0 -> count;
+        repeat
+            -> nchars;
+            if nchars == 0 then
+                ksuspend(consstring(count), 1)
+            else
+                count + nchars -> count;
+                suspend(count, 1)
+            endif
+        endrepeat
+    enddefine;
+
+The procedure -savechars- stores up characters on a process' user stack,
+creating a string when no more characters are available. Each time
+-savechars- is invoked, it is passed some characters, and an integer
+indicating how many. If this integer is not 0, the characters are
+stored, and the current total of saved characters is returned as the
+process is suspended. If -savechars- is invoked with 0 characters, the
+saved ones are made into a string which is returned as the process is
+killed.
+
+    vars p;
+    trace runproc savechars;
+    consproc(0, savechars) -> p;
+
+    runproc(`e`, 1, 2, p) =>
+    > runproc 2 <process>
+    !> savechars            ;;; -savechars- entered for first time
+    !S savechars            ;;; -savechars- suspended (1 is passed back)
+    < runproc
+    ** 1
+    runproc(`x`, `i`, 2, 3, p) =>
+    > runproc 3 <process>
+    !R savechars            ;;; -savechars- resumed (with chars `x`,'i')
+    !S savechars            ;;; -savechars- suspends; (-count- is now 3)
+    < runproc
+    ** 3
+    runproc(`t`, 1, 2, p) =>
+    > runproc 2 <process>
+    !R savechars            ;;; -savechars- resumed (with char `t`)
+    !S savechars            ;;; -savechars- suspends; (-count- is now 4)
+    < runproc
+    ** 4
+    runproc(0, 1, p) =>
+    > runproc 1 <process>
+    !R savechars            ;;; -savechars- resumed (ith 0 chars)
+    !X savechars            ;;; process is ksuspended (with 1 result)
+    < runproc
+    ** exit                 ;;; final string is printed
+
+
+Note: abnormal exits of type `X` are not detectable if a procedure
+simply exits from itself, for reasons too complicated to explain here.
+
+
+-- The current tracing level: poptraceindent --------------------------
+
+vars poptraceindent;
+
+This global variable, initially 0, is incremented, in -systrace- (see
+below) whenever a traced procedure is running. Declared local in
+-systrace-, it is used by -systrace_pr- to count the number of `!`
+characters to print.
+
+
+-- Maximum number of ! to print: popmaxtraceindent ---------------------
+
+vars popmaxtraceindent;
+
+This global variable controls how recursion depth is displayed in trace
+printing. When -poptraceindent- is less than -popmaxtraceindent-, depth
+is indicated by a sequence of `!` characters, e.g.
+
+    !!!!!> foo 1 2 3
+
+If -poptraceindent- exceeds -popmaxtraceindent-, then the depth is
+printed as an integer surrounded by square brackets, e.g.
+
+    [  67]> foo
+
+If you would prefer the latter format at all times, do
+
+    0 -> popmaxtraceindent;
+
+Then the call to -addup- used as an example above would produce this
+output:
+
+    addup(3) =>
+    [   1]> addup 3
+    [   2]> addup 2
+    [   3]> addup 1
+    [   4]> addup 0
+    [   4]< addup 0
+    [   3]< addup 1
+    [   2]< addup 3
+    [   1]< addup 6
+    ** 6
+
+The default value for -popmaxtraceindent- is 40.
+
+
+-- Character consumer for trace printing: cuchartrace -----------------
+
+vars cuchartrace;
+
+The default value of this global variable is -false-. However, if it has
+a character consumer procedure as its value, then this value is locally
+assigned to -cucharout- by -systrace_pr- while trace information is
+printed. Other printing (e.g. by the traced procedure itself) is
+unaffected. This facility makes it possible to redirect trace output to
+a disk file, or a special window (if running under a window manager).
+
+
+-- Summary of more advanced facilities --------------------------------
+
+The rest of this file describes the three procedures -systrace-,
+-systrace_proc-, and -systrace_pr-, which together constitute the
+tracing mechanism. The latter two are user-assignable, making it
+possible to change both the basic function and display format of traced
+procedures.
+
+
+-- systrace(PROC, NAME, TRACEPROC, UPDATER) ----------------------------
+
+This is the basic procedure. When a procedure is traced, the value of
+the name given to -trace- is replaced by a closure of -systrace-,
+partially applied to four arguments:
+
+    PROC        The original procedure to be traced
+    NAME        Its name
+    TRACEPROC   Usually the word "systrace_proc"
+    UPDATER     -true- if PROC is an updater, -false- otherwise
+
+So, the command
+
+    trace foo;
+
+is roughly equivalent to
+
+    systrace(%foo, "foo", "systrace_proc", false%) -> foo;
+    "foo" ->> pdprops(foo) -> pdprops(updater(foo));
+
+The procedure -systrace- is defined something like this:
+
+    define systrace(Proc, Name, Traceproc, Upd);
+        lvars Name Proc Traceproc Upd;
+        dlocal poptraceindent;
+        if tracing then
+            poptraceindent + 1 -> poptraceindent;
+            recursive_valof(Traceproc)(Proc, Name, Upd)
+        else
+            chain(Proc)
+        endif
+    enddefine;
+
+If a procedure to be traced has an updater, then -trace- will make a
+closure of -systrace- to replace the procedure, and assign a closure of
+its updater to be its new updater. The updater of -systrace- takes the
+same arguments as -systrace-, and simply does
+
+        systrace(updater(Proc), Name, Traceproc, true)
+
+So alterations to the original updater will affect tracing. The system
+procedures -sysPASSIGN- and -sysUPASSIGN- (see REF * VMCODE) that handle
+redefined procedures or their updaters, know how to deal with closures
+of systrace so that redefining a traced procedure or its updater has the
+expected effect.
+
+The identifier -systrace- is NOT re-definable.
+
+
+-- systrace_proc(PROC, NAME, UPDATER) ---------------------------------
+
+The word "systrace_proc" is the third argument of -systrace-. Its value,
+the procedure -systrace_proc-, does the actual trace printing and
+running of the procedure. It takes three arguments:
+
+    PROC        The original procedure to be traced
+    NAME        Its name
+    UPDATER     -true- if PROC is an updater, -false- otherwise
+
+A simplified version of this procedure is:
+
+    define systrace_proc(Proc, Name, Updater);
+        lvars args Proc Name Updater n;
+        consvector(pdnargs(Proc)) -> args;
+        stacklength() -> n;
+        systrace_pr(Name, `>`, args, Updater);
+        explode(args);
+        Proc();
+        consvector(stacklength() - n) -> args;
+        systrace_pr(Name, `<`, args, Updater);
+        explode(args);
+    enddefine;
+
+I.e. it collects the arguments in a vector, calls -systrace_pr- to do
+the trace entry printing, puts the arguments back on the stack, and
+calls the traced procedure. Then it collects the results of the call
+into a vector, calls -systrace_pr- to do the trace exit printing, and
+finally puts the results back on the stack.
+
+In fact, -systrace_proc- is considerably more complex than this. It
+checks that the procedure has been supplied enough arguments (by
+comparing the initial stack length with the procedure's -pdnargs-); it
+also has to be careful of procedures like -erasenum- that decrease,
+rather than increase, the number of items on the stack. Also,
+-systrace_proc- includes a complicated 'dlocal expression' (see HELP *
+DLOCAL) responsible for trapping abnormal exits from the traced
+procedure.
+
+-systrace_proc- may be re-defined by the user. This makes it possible
+to completely change the behaviour of traced procedures. For example,
+one might want to record or display execution times, or count the
+number of times a procedure is called, or save the arguments and results
+passed to/from a procedure for use during a debugging break.
+
+
+-- systrace_pr(NAME, STATUS, ARGS, UPDATER) ----------------------------
+
+This procedure is called by -systrace_proc- to do the actual printing of
+trace information. It is passed four arguments:
+
+    NAME        Name of the procedure being traced
+    STATUS      An item indicating the entry/exit status of the
+                procedure being traced (more details below).
+    ARGS        A vector or list of arguments or results from the stack.
+    UPDATER     -true- if an updater is being traced, -false- otherwise.
+
+The entry/exit status codes currently defined are:
+
+    -true-      normal entry
+    -false-     normal exit
+    `>`         normal entry
+    `<`         normal exit
+    `X`         abnormal exit
+    `R`         re-entry due to process resume
+    `S`         exit due to process suspend
+
+-systrace_pr- is defined something like this:
+
+    define systrace_pr(Name, Status, Args, Upd);
+        lvars Name, Status, Args, Upd;
+        dlocal cucharout = cuchartrace, tracing = false;
+        repeat poptraceindent - 1 times cucharout(`!`) endrepeat;
+        cucharout(Status);
+        cucharout(`\s`);
+        if Upd then spr("updater") endif;
+        spr(Name);
+        appdata(Args, spr);
+        cucharout(`\n`)
+    enddefine;
+
+If -poptraceindent- exceeds -popmaxtraceindent-, then instead of
+printing a series of `!`, the recursion depth is printed by
+
+        cucharout(`[`);
+        pr_field(poptraceindent, 4, `\s`, false, sys_syspr);
+        cucharout(`]`);
+
+-systrace_pr-, like -systrace_proc-, can be re-defined by the user.
+This allows users to change the way trace information is printed. If you
+want to modify tracing in more drastic ways, it is better to re-define
+-systrace_proc- (see above).
+
+
+--- C.all/help/trace ---------------------------------------------------
+--- Copyright University of Sussex 1988. All rights reserved. ----------

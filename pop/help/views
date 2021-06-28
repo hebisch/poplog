@@ -1,0 +1,458 @@
+HELP VIEWS                                             A.Sloman Jan 1987
+                                         Revised: Adrian Howard Mar 1992
+
+    LIB VIEWS
+    LIB CURRENT_VIEW
+
+Together these provide a general "structure-sharing" context mechanism
+and specialised collections of procedures for operating on objects with
+values in a context. The package may be used for a variety of
+applications that need to manipulate histories or alternative possible
+situations, including planning systems and "truth maintenance" systems.
+
+The word "view" is used as a synonym for "context" in what follows.
+
+See TEACH * VIEWS for an introduction and overview of the facilities
+described below.
+
+
+CONTENTS - (Use <ENTER> g to access sections)
+
+ -- Overview
+ -- General Facilities For Constructing And Accessing Views
+ -- Manipulating Views: Freeze, Merge, And Check Consistency
+ -- Facilities For Manipulating The "Current" View
+ -- A "Database" Of Items With Values In Views
+ -- Using LIB *VIEWS
+ -- Some Implementation Details
+ -- Notes
+ -- For More Information
+
+
+-- Overview -----------------------------------------------------------
+
+A context or view is an association between items and values. The same
+item (or "key") may have different values in different views. A view may
+have one or more parent views. If the object has no value in a
+particular view, it may inherit a value from a parent or ancestor view.
+
+This means that two views, can share some structure, making it
+unnecessary to copy everything from an existing view to a new one. Only
+the differences need to be recorded in the new one.
+
+The general facilities provided operate on arbitrary networks of views.
+These are provided by LIB * VIEWS.
+
+There is a special subset of procedures for operating on the "current"
+view and for "pushing" and "popping" views, e.g. in searching. These are
+provided by LIB * CURRENT_VIEW
+
+A still more specialised subset makes use of a pattern-directed database
+of items mapped onto different values in different views, also in
+LIB * CURRENT_VIEW
+
+
+-- General Facilities For Constructing And Accessing Views ------------
+
+Global constants:
+
+    no_view_value -> STRING
+        For items with no value in a given view. Doing
+
+            no_view_value -> view_value(view,item)
+
+        removes the item from view, so that it inherits from ancestors
+        of view, if any. -no_view_value- is a unique string
+
+
+Global variables:
+
+    appquit -> BOOL
+    BOOL -> appquit
+        A boolean, default -false-, which if assigned -true- aborts the
+        search in -appview- or -mapview-. This can be used by a
+        procedure given to -appview- or -mapview-.
+
+    view_search -> WORD or P
+    WORD or P -> view_search
+        The value is "depth", "breadth" or procedure. This is used to
+        control -view_value-'s search up a view network for an ancestor
+        view with a value. For an example see TEACH * VIEWS/view_search
+
+    view_hash_default -> P
+    P -> view_hash_default
+        A procedure variable used by -newsubview-; default value is
+        -syshash-. User-assignable. Changing this does not alter
+        existing views.
+
+    view_hash_gc -> BOOL
+    BOOL -> view_hash_default
+        A boolean variable used by -newsubview- to decide whether
+        property tables should be re-hashed after garbage collection.
+        Default value is -false-. Changing it does not alter views
+        already created.
+
+
+New data-type:
+
+    recordclass view view_map view_parents view_mark view_props;
+        This provides the following procedures: -view_map-,
+        -view_parents-, -view_mark-, -view_props-, -isview-, -consview-,
+        -destview-, -view_key- (see HELP *RECORDCLASS.)
+
+
+Procedures:
+
+    view_map(VIEW) -> PROP
+    PROP -> view_map(VIEW)
+        The property associated with each view stores a mapping between
+        items and values for that view. This field should not be
+        changed. The property is created by -new_view-.
+
+    view_parents(VIEW) -> VIEW or LIST OF VIEWS
+    VIEW or LIST OF VIEWS -> view_parents(VIEW)
+        The parents field of a view contains the empty list -nil- if it
+        is the "root" view in a view network. Otherwise it contains the
+        parent view if there is only one, or a list of parents for
+        multiple inheritance.
+
+        If anything other than a view or (possibly empty) list of views
+        is stored as the view_parents of a view, then errors will
+        result.
+
+    view_mark(VIEW) -> INT                                FOR SYSTEM USE
+        This field is used by the mechanism that searches up a view
+        network to ensure that the same view is not examined twice. The
+        current mark is incremented at the beginning of each sweep. See
+        -new_view_mark-, below.
+
+    view_props(VIEW) -> ITEM
+    ITEM -> view_props(VIEW)
+        This field is for user programs, e.g. if it is necessary to keep
+        a list of those views which are descendants of a view they can
+        be stored here. Alternatively a property or other data-structure
+        associating information with a view can be stored in this field.
+        The default value is [].
+
+    new_view(LIST, SIZE, EXPAND, THRESH, HASH, EQTEST, GC,
+                PERM, PARENTS) -> VIEW
+        This is the most general view-constructor supplied. Apart from
+        the parent or list of parents, the arguments are 8 of the 9
+        arguments for *NEWANYPROPERTY (the missing one being the
+        "default value", which is determined by the constant:
+        -no_view_value-), and a list of parent nodes or a parent node.
+        The next procedure is a simplified version that will normally be
+        more useful.
+
+    newsubview(PARENTS, SIZE) -> VIEW
+        A specialised version of -new_view-, controlled by
+        -view_hash_default- and -view_hash_gc-. It uses "nonop =" for
+        equality testing. It a table of the size given, which will be
+        expanded when appropriate (see HELP * NEWANYPROPERTY.) Doing
+
+            newsubview(parents,size)
+
+        is equivalent to:
+
+            new_view(
+                [], size, 1, false,
+                view_hash_default, nonop =, view_hash_gc,
+                false, parents
+            )
+
+    view_value(VIEW, ITEM) -> VALUE
+    VALUE -> view_value(VIEW, ITEM)
+        Given a VIEW and an ITEM, this accesses or updates the VALUE of
+        that ITEM in that VIEW. If no VALUE is found then search for an
+        ancestor view with a value for the item. If no ancestor has a
+        value, then return -no_view_value-.
+
+        If the VALUE assigned is -no_view_value-, then remove the ITEM
+        from the VIEW.
+
+    new_view_mark() -> INT                                FOR SYSTEM USE
+    INT -> new_view_mark()
+        This procedure returns a unique integer, starting from the
+        largest possible negative integer that will fit into one 32 bit
+        machine word. Its updater gives it a new integer to start from.
+        It is used by -appview- to mark views as "seen" on each sweep
+        using the view_mark field.
+
+    appview(VIEW, PROCEDURE)
+        Using the search strategy determined by -view_search- apply the
+        procedure to every ancestor of view.
+
+    appviewmap(VIEW, PROCEDURE)
+        Using the search strategy determined by -view_search- apply
+        -appproperty- procedure to every ancestor of view and he
+        procedure.
+
+
+-- Manipulating Views: Freeze, Merge, And Check Consistency -----------
+
+If views are used for planning or "reason maintenance" or constructing
+temporary hypothetical worlds which are later combined, then then
+following procedures may be useful.
+
+    freeze_view(VIEW, LIST)
+        For each item in LIST find its current (possibly inherited value
+        in VIEW, and make it an actual value in VIEW. It then cannot be
+        affected by changes higher up the chain.
+
+    merge_view_values(VIEW1, VIEW2, CHECK_CLASH)
+        This copies the associations stored in VIEW1 into VIEW2.
+        CHECK_CLASH is either -false- or a procedure with the following
+        arguments:
+
+            check_clash(ITEM, VIEW1, VALUE1, VIEW2, VALUE2)
+
+        For every association that is stored explicitly in the
+        -view_map- of VIEW1, copy it into VIEW2. If CHECK_CLASH is
+        non-false, then for each item with a value in VIEW1 check that
+        there is not already a different value which is being
+        overwritten, and if there is invoke the procedure CHECK_CLASH
+        with arguments as above.
+
+        This can be used to combine a temporary hypothetical extension
+        of VIEW2 with VIEW2 after the extension has been tested and
+        found to be satisfactory.
+
+
+    view_consistent(LIST, VIEW1, VIEW2, EQPROC, REPORT)
+        This is used to test whether two views are consistent and if not
+        to report the inconsistency. LIST is a list of items that may
+        have values in the two views. If the value for an item in either
+        view is -no_view_value- then having a value in the other view
+        does not count as an inconsistency. Having two values which do
+        not satisfy the procedure EQPROC does count as an inconsistency,
+        in which case the following instruction is obeyed:
+
+                REPORT(ITEM, VIEW1, VAL1, VIEW2, VAL2)
+
+        where REPORT is a user supplied procedure.
+
+
+-- Facilities For Manipulating The "Current" View ---------------------
+
+Global variables:
+
+    current_view -> VIEW
+    VIEW -> current_view
+        The current view, or -false- if there is none.
+
+    current_viewname -> WORD
+    WORD -> current_viewname
+        The name of the current view --- produced by
+        gensym("view"). Its -valof- is current_view. It's
+        value is -false- if there is no current view.
+
+    view_stack -> LIST
+    LIST -> view_stack
+        A list of pairs, each pair containing a view and a name.
+
+    chatty -> BOOL
+    BOOL -> chatty
+        If -true- causes POP_VIEW and PUSH_VIEW to print out
+        information.
+
+    use_global_view -> BOOL
+    BOOL -> use_global_view
+        A boolean variable, default -true-. If -true- it optimises the
+        use of large collections of items given a value in an initial
+        view, with only a small proportion altered in descendent views.
+
+    global_view -> VIEW
+    VIEW -> global_view
+        The initial view, set up by -start_views-.
+
+
+Procedures:
+
+    start_views(SIZE)
+        Initialises -current_view-, -current_viewname-, -view_stack- and
+        `gensym("view")' (see REF *gensym.) If
+        -use_global_view- is -true- it assigns the first -current_view-
+        to -global_view-. The argument determines the size of the
+        initial hash-table.
+
+    set_current_view(VIEW, WORD)
+        Assigns to -current_view- and -current_viewname- and pushes them
+        onto -view_stack-. Used by -push_view-.
+
+    push_view(SIZE)
+        Creates a new view and a new name (gensym("view")),
+        uses -set_current_view- to add them to -view_stack- and assign
+        them to -current_view- and -current_viewname-. The new name is
+        declared as a global variable. The argument determines the
+        hash_table size in the property used in the view.
+
+    pop_view()
+        Restores the previous -current_view- and -current_viewname-, and
+        removes the top element of -view_stack-.
+
+    current_view_value(ITEM) -> VALUE
+    VALUE -> current_view_value(ITEM)
+        This is equivalent to `view_value(current_view,ITEM)'.
+
+
+-- A "Database" Of Items With Values In Views -------------------------
+
+The facilities described below are partly analogous to the POP-11
+database package (see HELP *DATABASE). The main difference is that that
+package uses presence or absence of an item in the database to indicate
+a truth value, whereas this one merely uses the database as a list of
+items that have been assigned truth values in one or more views.
+
+
+Global variables:
+
+    view_facts -> LIST
+    LIST -> view_facts
+        A list of lists which are mapped on to values in views.
+
+    it -> ITEM
+    ITEM -> it
+        The last element of -view_facts- examined or updated.
+
+
+Procedures:
+    record_in_view(LIST, VALUE)
+        Ensure the LIST is in -view_facts- if necessary, and assign the
+        VALUE to it in -current_view-.
+
+    true_in_view(PATTERN) -> LIST or FALSE
+        If -view_facts- contains an item that matches the PATTERN and
+        has the value -true- in the current context, it is returned,
+        otherwise -false-. Since matching is done by -matches- (see HELP
+        *MATCHES) the values of pattern variables may be set.
+
+    false_in_view(PATTERN) -> BOOL
+        Equivalent to `not(true_in_view(PATTERN))'.
+
+    view_lookup(PATTERN)
+        This is like -true_in_view-, except that it returns no value,
+        and causes an error if no matching pattern with current value
+        -true- is found. It is useful mainly for retrieving parts of
+        stored items.
+
+    get_all_true(PATTERN) -> LIST
+        Returns a list of all the items in -view_facts- which are -true-
+        in -current_view- and match the pattern.
+
+
+New loop syntax:
+
+   for_view <PATTERN>
+    with_value <EXPR>       ;;; optional: defaults to -true-
+    in_view <VIEW>          ;;; optional: defaults to -current_view-
+    in <LIST>               ;;; optional: defaults to -view_facts-
+    do
+       <ACTION>
+   endfor_view
+        For every list in <LIST> that has value <EXPR> in <VIEW> and
+        which matches the <PATTERN>, the <ACTION> is executed, with the
+        variable "it" bound to the matching list. This is analogous to
+        the use of -foreach- (see HELP *FOREACH) with the POP-11
+        database. Variables in the PATTERN should be bound on each
+        iteration.
+
+        The optional components can occur in any order.
+
+
+-- Using LIB *VIEWS ---------------------------------------------------
+
+For an introduction to LIB VIEWS with examples see TEACH * VIEWS. This
+includes a planning example.
+
+For many applications the user will need to maintain a database of items
+that have values associated with them relative to contexts. The list of
+items stored in the global variable -view_facts-, with associated
+procedures described above is a special case which may suffice for
+relatively simple problems where the database is not large. In more
+complex cases it will be necessary to provide an indexing scheme for
+rapid pattern-directed access.
+
+In such situations the user may wish to create "generator" procedures
+which, when given an item specification, produces an repeater function
+whose results can be scanned for items with a desired value in a desired
+context. The looping construct -for_view-, described above and defined
+in LIB * CURRENT_VIEW may provide some hints as to how to define a
+convenient loop construct that iterates over a generator rather than a
+list.
+
+For some applications it will be necessary to associate with a view
+other views that depend on it. The -view_props- field may be used for
+this purpose. Alternatively, relationships between views like dependency
+or justification may be represented in a separate network of
+data-structures. A reason maintenance system would need to do this, for
+example.
+
+
+-- Some Implementation Details ----------------------------------------
+
+Each view contains a list of "parent" views and a property table created
+by -newanyproperty-. This requires the user to supply a hash function
+and equality test, as explained in HELP *NEWANYPROPERTY. LIB *VIEWS uses
+the system hash function -syshash- and the -class_hash- mechanism, see
+HELP *SYSHASH for details.
+
+The user may wish to provide an alternative hashing procedure and assign
+it to -view_hash_default-.
+
+There is a tradeoff between how effective a procedure is at
+discriminating different structures and how fast it is. For example, a
+very fast hashing procedure suitable for very small tables might be:
+
+    define global procedure hash_fast(item);
+    ;;; Good for very small tables.
+        lvars item;
+        if      issimple(item)
+        then    item
+        else    datasize(item)
+        endif
+    enddefine;
+
+
+-- Notes --------------------------------------------------------------
+
+1. To see in detail how the programs work, and how -newanyproperty- is
+used see LIB * VIEWS
+
+2. It is reasonably efficient because -newanyproperty- and -syshash- are
+implemented in the core of POPLOG.
+
+3. The easiest way to implement breadth first search up a view network
+has a garbage collection overhead. This could be replaced by a more
+complex program if people really want to make much use of breadth first
+searching.
+
+4. Active variables (access oriented programming), available from
+Version 13, will make it feasible to have effects of changes in a
+viewpoint automatically propagated, e.g. to a window display.
+
+5. For applications where only trees, not networks, of views are
+required, the program can be made somewhat simpler and more efficient.
+Experienced users will find it easy to copy LIB *VIEWS and edit out the
+portions concerned with searching up a network.
+
+
+-- For More Information -----------------------------------------------
+
+TEACH * VIEWS gives some detailed examples including an example of a
+simple planner, and an example of a network in which some views have
+more than one parent.
+
+See HELP * PROPERTIES, * NEWPROPERTY, * NEWANYPROPERTY, * NEWMAPPING for
+more information on properties.
+
+HELP * SYSHASH describes the default value of -view_hash_default-.
+
+HELP * DATABASE, TEACH * DATABASE, and HELP * MATCHES give more
+information on the POPLOG database.
+
+               THIS PACKAGE IS LIKELY TO BE EXTENDED LATER
+
+
+
+--- C.all/help/views
+--- Copyright University of Sussex 1992. All rights reserved. ----------

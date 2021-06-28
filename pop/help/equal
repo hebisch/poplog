@@ -1,0 +1,753 @@
+HELP EQUAL                                            A. Sloman Dec 1990
+                                            Revised John Gibson Jan 1996
+
+Equality tests in Pop-11:
+
+            item1  =   item2  -> bool
+            item1  ==  item2  -> bool
+            item1  /=  item2  -> bool
+            item1  /== item2  -> bool
+            item1  =-> item2
+
+(There is also the operator equals, which is the same as = except for
+pattern matching. See below.)
+
+With the exception of =->, all these operators have precedence 7, take
+two arguments of any type and produce a boolean result. (=-> has
+precedence 10 and does not produce a result.) See also REF * DATA.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+      1.1   Different Types of Data
+      1.2   Strict Equality (== or /==)
+      1.3   Structural Equality (= or /=)
+      1.4   Structural Equality 'Assignment' (=->)
+  2   Behaviour of = and /=
+      2.1   Using = with Two Numbers
+      2.2   Don't Test Decimals for Equality
+  3   Behaviour of == and /==
+      3.1   Use == Rather than = on Words
+      3.2   Examples Using ==
+  4   More Examples Using =
+  5   More on Structural Equality (=)
+  6   Pattern Matching With =
+      6.1   Matchvar Syntax
+      6.2   Matchvars with Additional Restrictions
+      6.3   Repeated Variables
+      6.4   Using equals Instead
+      6.5   Notes
+  7   Related Documentation
+
+
+-----------------------------------------------------------------------
+1  Introduction
+-----------------------------------------------------------------------
+
+There are two forms of equality test in Pop-11, represented by the infix
+procedures = and == and their negative forms /= and /==. They all take
+two items of arbitrary type as input and return true or false as output.
+
+A full understanding of how they work requires an understanding of the
+representation of data in Pop-11. (See first section of REF * DATA.)
+
+In some cases the results of = and == applied to numbers can be
+counter-intuitive. The reasons are explained below.
+
+
+1.1  Different Types of Data
+----------------------------
+The main things to note are
+
+  # Some objects in Pop-11 are compound and can only be referred to via
+    pointers, e.g. lists, procedures, strings, words, arrays,
+    "big"integers, double-precision decimals, ratios, complex numbers
+    etc.
+
+  # Some objects are simple and are directly represented in the machine,
+    within one word (usually 32 bits). There are only two types of such
+    objects:
+
+        (1) single decimals (i.e. not ddecimals);
+
+        (2) integers that can fit into one word including sign (i.e. not
+            "bigintegers").
+
+  # Most compound objects are of a type that can have accessible
+    components, e.g. strings and words have characters, vectors, arrays
+    and records contain elements that can be of various types. Some
+    compound objects are complex but do not have accessible components.
+    E.g. a procedure has machine instructions but they cannot be
+    accessed.
+
+  # Some compound objects are represented uniquely in a dictionary or
+    table, and constructed using a procedure that first checks to see
+    if the object already exists and if so produces that one, otherwise
+    it creates a new instance and puts it in the table so that it can
+    be used in future. This assumes a criterion for identity of objects,
+    and that is usually that they are of the same type and have the same
+    components.
+
+    Words are the ONLY compound data type that have this "unique
+    representation" property in Pop-11, though it is possible for users
+    to define their own data types that are constructed in this way,
+    Moreover it is possible to by-pass the uniqueness of words: by
+    keeping a pointer to word, removing it from the dictionary, and
+    then creating a new word with the same characters.
+
+The two equality tests differ in the ways in which they cope with these
+cases.
+
+
+1.2  Strict Equality (== or /==)
+--------------------------------
+The strict equality procedure == (and /==) do a very fast test to see
+whether the two arguments are absolutely identical, i.e. the very same
+simple object or the very same pointer to a compound object. So the two
+bit patterns representing the two arguments must be identical for == to
+produce true (or /== to produce false).
+
+
+1.3  Structural Equality (= or /=)
+----------------------------------
+The structural equality procedure = (and /=) is far more complicated. It
+does different things for different types of data, and users can alter
+the procedure used for certain kinds of data.
+
+See also
+
+    HELP * CLASSES  (section on class_=)
+    REF  * DATA     (section Comparison Procedures)
+    REF  * sys_=
+
+What follows describes the default behaviour of = (which is also
+provided by the procedure sys_=).
+
+
+1.4  Structural Equality 'Assignment' (=->)
+-------------------------------------------
+The 'equals assign' procedure =-> is the same as =, but instead of
+returning a boolean result, mishaps with 'NON-EQUAL ARGUMENTS FOR =->'
+if the two arguments are not equal.
+
+The principal use of this (and the reason for the name 'equals assign')
+is with a second argument containing matchvars. For example
+
+    list =-> [=?x =?y =?z];
+
+is a way of decomposing a list and assigning its elements to variables.
+See Pattern Matching With = below.
+
+
+
+-----------------------------------------------------------------------
+2  Behaviour of = and /=
+-----------------------------------------------------------------------
+
+If applied to simple objects the operator = just uses == to do the test.
+
+If applied to a simple and a compound object it returns false, unless
+both are numbers in which several possibilities arise, described in the
+next section.
+
+If applied to two compound objects it compares their types and if they
+are of different types it returns false (unless they are numbers, see
+next section).
+
+If the two compount arguments are of the same type (e.g. two lists, two
+words, two strings, two ratios) then
+
+  # If they are == it returns true.
+
+  # Otherwise it examines the structures to see whether they have
+    components and whether the corresponding components are the same,
+    using = recursively.
+
+  # If the two items are both numbers a rather complex set of rules is
+    used, described in the next section.
+
+  # If the two arguments are of a type that cannot have components (e.g.
+    two procedures) then the result is false.
+
+  # If they can have components but have none (e.g. empty strings or
+    empty vectors) it returns true.
+
+  # If they have components then if there are exactly the same
+    components as tested in sequence by = then it returns true otherwise
+    false.
+
+
+2.1  Using = with Two Numbers
+-----------------------------
+There are several kinds of numbers, as explained in REF * DATA and
+REF * ITEMISE (the latter explains the syntax for expressing number
+constants). REF * NUMBERS gives more information on numbers. Note that
+the rules for comparing different types of numbers with = described
+here are also applicable to comparisons with >, >=, < and <=.
+
+The equality test on numbers is as follows (but note the warning in
+the next section):
+
+    num1 = num2 -> bool
+
+If num1 and num2 are both rationals (integers, bigintegers or ratios)
+then if they are of different types (e.g. an integer and a ratio), then
+bool is false: num1 and num2 cannot be the same number.
+
+If they are both integers then = gives the same result as ==.
+
+Otherwise the result depends on whether they are structures with the
+same components. E.g. with ratios
+
+    22/7 = 22/7 =>
+    ** <true>
+
+But
+
+    22/7 == 22/7 =>
+    ** <false>
+
+Similarly, comparing bigintegers
+
+    12345678901234567890 = 12345678901234567890 =>
+    ** <true>
+
+    12345678901234567890 == 12345678901234567890 =>
+    ** <false>
+
+If the two numbers are decimals (i.e. simple) then = and == give the
+same result:
+
+    3.5s+0 = 3.5s+0 =>
+    ** <true>
+
+    3.5s+0 == 3.5s+0 =>
+    ** <true>
+
+If one argument is a decimal and the other a ddecimal, then the former
+is converted to a ddecimal first.
+
+    3.5s0 = 3.5d0 =>
+    ** <true>
+
+Whereas a decimal and a ddecimal are never == :
+
+    3.5s0 == 3.5d0 =>
+    ** <false>
+
+Two ddecimals will be = only if they are structures containing exactly
+the same items:
+
+    3.333d0 = 3.333d0 =>
+    ** <true>
+
+But they may be different objects in the machine
+
+    3.333d0 == 3.333d0 =>
+    ** <false>
+
+If one of the numbers is rational (integer, biginteger or ratio) and the
+other a floating-point (decimal or ddecimal), then they are both first
+converted to double-float (ddecimal) before the comparison. This can
+sometimes give counter-intuitive results, e.g.
+
+    3.5**60 =>
+    ** 440639000000000000000000000000000.0
+    intof(3.5**60) =>
+    ** 440638722025939592621503134302208
+
+Whereas
+
+    3.5**60 = intof(3.5**60) =>
+    ** <true>
+and
+
+    3.5**60 = intof(3.5**60) + 3 =>
+    ** <true>
+
+The same rules apply to the comparison of the real and imaginary parts
+of a complex numbers. Note that a real number compared with a complex
+number will be equal only if the complex number is a float-complex with
+0.0 imaginary part (since the imaginary part of a rational complex must
+always be non-zero).
+
+    sqrt(-1) - sqrt(-1) =>
+    ** 0.0_+:0.0
+
+    0.0 = sqrt(-1) - sqrt(-1) =>
+    ** <true>
+
+
+2.2  Don't Test Decimals for Equality
+-------------------------------------
+Note that although decimals are simple they should never be used with ==
+or = because rounding errors can make equality tests meaningless.
+Instead test for similarity within a carefully chosen tolerance:
+
+    vars d1 = sqrt(99), d2 = sqrt(10 * 9.9);    ;;; create two decimals
+
+    abs(d1 - d2) < 0.000001 =>                  ;;; test the difference
+    ** <true>
+
+    d1 == d2 =>                                 ;;; if true that's luck
+    ** <true>
+
+
+
+-----------------------------------------------------------------------
+3  Behaviour of == and /==
+-----------------------------------------------------------------------
+
+Equality testing for simple objects is direct and fast: the result is
+true if the two things are the very same bit pattern. If not, and they
+are both simple objects or one is simple and the other not, then the
+result is false.
+
+
+3.1  Use == Rather than = on Words
+----------------------------------
+Equality testing for compound objects can be much slower than testing
+for simple objects. This means that if compound objects have the unique
+representation property (see Different Types of Data above) then it is
+wasteful to use = to test them. Instead use == because if that produces
+false then = will also (see HELP * EFFICIENCY). Of course, if you don't
+know whether your program is comparing strings or words, because it can
+cope with either, then use =.
+
+
+3.2  Examples Using ==
+----------------------
+
+    [a b c] == [a b c] =>
+    ** <false>
+
+This is because there are TWO lists (which look identical) but, in
+constructing them, we have made two SIMILAR objects at DIFFERENT
+locations in the computer's memory etc. However,
+
+    vars n = [a b c];
+    n == n =>
+    ** <true>
+
+This is because both occurrences of "n" in the test reference exactly
+the same item in the computer's memory.
+
+Additional examples:
+
+    99 == 99 =>                 ;;; two identical simple objects
+    ** <true>
+
+    99 == 89 =>                 ;;; non-identical simple objects
+    ** <false>
+
+    99 == '99' =>               ;;; one simple and one compound
+    ** <false>
+
+    'string' == 'string' =>     ;;; both compound
+    ** <false>
+
+    "string" == "string" =>     ;;; both compound but uniquely represented
+    ** <true>
+
+    [a list] == [a list] =>     ;;; both compound
+    ** <false>
+
+    vars list = [a list];       ;;; assign [a list] to -list-
+    list == list =>             ;;; both compound but identical
+    ** <true>
+
+    3/4 == 3/4 =>               ;;; two ratios, both compound
+    ** <false>
+
+In all the above examples replacing == with /== would reverse the
+truth value produced.
+
+
+
+-----------------------------------------------------------------------
+4  More Examples Using =
+-----------------------------------------------------------------------
+
+In all the cases where == produces the result true, = would also produce
+the result true.  In some cases, = produces true where == would produce
+false.  But whenever = produces false, so does ==.
+
+    99 = 99 =>                  ;;; acceptable but slow
+    ** <true>
+
+    99 = 98 =>                  ;;; acceptable but slow
+    ** <false>
+
+    99 = '99' =>                ;;; one simple and one compound
+    ** <false>
+
+    'string' = 'string' =>      ;;; both compound
+    ** <true>
+
+    "string" = "string" =>      ;;; acceptable but slow
+    ** <true>
+
+    "string" = 'string' =>      ;;; different data types
+
+    [a list] = [a list] =>      ;;; false with == but true now
+    ** <true>
+
+    vars list = [a list];
+    list = list =>              ;;; both compound but identical
+    ** <true>
+
+    3/4 = 3/4 =>                ;;; two ratios, both compound
+    ** <true>
+
+    ;;; The next example demonstrates the need to look at substructures
+    ['string' [list] {vector 2}] = ['string' [list] {vector 2}] =>
+    ** <true>
+
+
+
+-----------------------------------------------------------------------
+5  More on Structural Equality (=)
+-----------------------------------------------------------------------
+
+Objects may be compared differently -- depending on their class. Pop-11
+provides several different classes of objects (integers, words, strings
+etc) and users may define their own new classes. Each class, or data
+type, has a key associated with it. The key of a data type contains
+information about the data type (e.g. what procedures can operate on it
+etc).
+
+The = operator may use different equality testing procedures, depending
+on what data types are being compared. The way objects are compared will
+depend on what  data type is on the right of the operator.
+
+There is an equality testing procedure associated with every key. The =
+operator finds the key of the second argument and uses this to compare
+it with the object on the left. The default equality testing procedure
+for all keys is the standard procedure run by sys_=. The default can be
+changed for both system and user defined classes.
+
+
+
+-----------------------------------------------------------------------
+6  Pattern Matching With =
+-----------------------------------------------------------------------
+
+The second (right-hand) argument to the =, /= and =-> operators may also
+be, or contain, pattern elements called matchvars. These are special
+records which can match against items in the first argument, and also
+bind variables as a side effect.
+
+6.1  Matchvar Syntax
+--------------------
+There are four Pop-11 syntax words to construct matchvars, as follows:
+
+    Syntax          Effect With =
+    ------          -------------
+    =*              Matches one item.
+
+    =?variable      Matches one item and binds it to the variable
+                    variable.
+
+    =**             Matches an arbitrary number of items inside a list
+                    (possibly none).
+
+    =??variable     Matches an arbitrary number of items inside a list
+                    (possibly none), and binds a separate list of them
+                    (possibly []) to the variable variable.
+
+The simplest way to use these constructs is by supplying one directly as
+the second argument to = (although this is not generally very useful):
+
+    vars x, y;
+
+    99 = =* =>
+    ** <true>
+
+    99 = =?x =>
+    ** <true>
+    x =>
+    ** 99
+
+They are much more useful when embedded in other structures:
+
+    vars list = [a b c d e], vector = {1 2 3 4 5};
+
+    list = [a b =* d e] =>
+    ** <true>
+
+    list = [a =** e] =>
+    ** <true>
+
+    vector = {1 =* 3 =* 5} =>
+    ** <true>
+
+    list = [a =* d =* e] =>
+    ** <false>
+
+An important point to note is that =** and =??variable only match a
+sequence of list elements. They do not match a list as a single item,
+nor (for example) a sequence of vector elements:
+
+    list = =??x =>
+    ** <false>
+
+    vector = {1 =** 5} =>
+    ** <false>
+
+Some more examples with variable binding:
+
+    vector = {=?x 2 3 4 5} =>
+    ** <true>
+    x =>
+    ** 1
+
+    list = [=?x d e] =>
+    ** <false>
+
+    list = [=??x d e] =>
+    ** <true>
+    x =>
+    ** [a b c]
+
+    list = [=??x c =??y] =>
+    ** <true>
+    x, y =>
+    ** [a b] [d e]
+
+    list = [=??x =??y] =>
+    ** <true>
+    x, y =>
+    ** [] [a b c d e]
+
+(Note that if a call to = returns false, any variables in the pattern
+will have undefined values. That is, matchvar variable values can be
+altered by either a successful or an unsuccessful call.)
+
+
+6.2  Matchvars with Additional Restrictions
+-------------------------------------------
+Any of the matchvar constructs =*, =**, =?variable and =??variable can
+be followed by
+
+    :restriction
+
+to restrict the items it will match (note that with =* and =**, a space
+is needed before the colon).
+
+restriction can be one of the following:
+
+  # An integer (or the name of a variable containing one). This means
+    that the length of the value matched must equal the specified
+    integer. For example:
+
+        list = [=??x:3 =??y] =>
+        ** <true>
+        x, y =>
+        ** [a b c] [d e]
+
+  # A procedure name. In this case, the procedure is applied to the
+    matching value, and must return a non-false result for the match to
+    succeed. E.g:
+
+        list = [=?x:isinteger =??y] =>
+        ** <false>
+
+        list = [=?x:isword =??y] =>
+        ** <true>
+        x, y =>
+        ** a [b c d e]
+
+  # An expression inside % signs, i.e. % expression %, where expression
+    compiles to an integer or a procedure, e.g.
+
+        [a 3] = [a =?x: %nonop>(%0%)%] =>
+        ** <true>
+        x =>
+        ** 3
+
+Instead of :restriction you can also use
+
+    #restriction
+
+This only affects =?variable and =??variable, and then only when
+restriction is a procedure. The difference from the : form is that when
+the procedure accepts the match by returning a non-false result, that
+result is substituted for the matching value in the variable (at the
+end of the = call):
+
+    list = [=??x#length d e] =>
+    ** <true>
+    x =>
+    ** 3
+
+    define value(item);
+        if item == "a" then 10
+        elseif item == "b" then 20
+        else false
+        endif
+    enddefine;
+
+    list = [=?x#value =** ] =>
+    ** <true>
+    x =>
+    ** 10
+
+    list = [=** =?x:value] =>
+    ** <false>
+
+    list = [=??x:value d e] =>
+    ** <false>
+
+
+6.3  Repeated Variables
+-----------------------
+If the same variable is used more than once in a pattern, the match
+will succeed only if it is matched against the same thing in all its
+occurrences. Thus:
+
+    [a b c a b c] = [=??x =??x] =>
+    ** <true>
+    x =>
+    ** [a b c]
+
+    [a b c c b a] = [=??x =??x] =>
+    ** <false>
+
+    {1 2 3 4 5} = {=?x 2 =?x 4 5} =>
+    ** <false>
+
+However, there some cases of repeated =?? variables that =, /= and =->
+cannot cope with correctly (but equals does, see below). The situation
+can be summarised thus:
+
+    Once any list containing an =?? variable has been matched in its
+    entirety, = is incapable of changing its mind about what the
+    variables in that list should match at some later point in the
+    pattern.
+
+For example, the following should match (with x set to [1] and y to
+[2]), but doesn't:
+
+    [[1 2][2 1]]  =  [[=??x =??y][=??y =??x]] =>
+    ** <false>
+
+The reason is that in matching the first sub-list [1 2], = decides that
+x should be set to [], and y to [1 2]; this is the wrong choice, but
+having completed the first sub-list, is unable to go back and try
+a different choice when matching the second sub-list.
+
+The problem disappears if the sub-lists are removed:
+
+    [1 2 2 1]  =  [=??x =??y =??y =??x] =>
+    ** <true>
+    x, y =>
+    ** [1] [2]
+
+Now, although = initially tries x as [] (then y as [], etc), each wrong
+choice becomes apparent before completing the list containing the
+variables.
+
+
+6.4  Using equals Instead
+-------------------------
+The above inadequacy in the behaviour of = can only be rectified by
+sacrificing speed on all the other cases for which it works correctly.
+
+For this reason, an alternative operator equals is provided. equals is
+significantly slower than =, but guarantees to find a correct match with
+repeated =?? variables (if one is possible):
+
+    [[1 2][2 1]]  equals  [[=??x =??y][=??y =??x]] =>
+    ** <true>
+    x, y =>
+    ** [1] [2]
+
+Moreover, because it can backtrack on any choices for =?? variables,
+equals is also capable of finding all possible ways of matching a
+pattern.
+
+You can use this facility by supplying equals with an optional procedure
+argument. If a procedure is supplied, equals will call it every time it
+finds a match; the procedure must then decide whether the match (i.e.
+the set of values assigned to the variables) is acceptable. If so, the
+procedure should return true (which will cause equals to return true),
+or return false (which will cause equals to try another match, or return
+false if there are no more).
+
+For example, the following procedure can be used to display all possible
+ways of matching a pattern with the variables x and y:
+
+    define tryall();
+        [x ^x y ^y] =>      ;;; print the variables
+        false;              ;;; return false to get next match
+    enddefine;
+
+Note that since equals is an operator, the procedure (third argument)
+must be separated by a comma from the pattern (second argument), and
+the two enclosed in parentheses:
+
+    [1 2 3 4]  equals  ([=??x =??y], tryall) =>
+    ** [x [] y [1 2 3 4]]
+    ** [x [1] y [2 3 4]]
+    ** [x [1 2] y [3 4]]
+    ** [x [1 2 3] y [4]]
+    ** [x [1 2 3 4] y []]
+    ** <false>
+
+
+6.5  Notes
+----------
+(1) When using =? and =?? with procedure-local lexical variables, it is
+more efficient to declare them as dlvars rather than lvars. Providing
+they contain no 'evaluate' keywords (and providing you are using
+* compile_mode :pop11 +constr or +strict), lists and vectors containing
+matchvars will then compile to constant structures.
+
+(2) The variable part of =? and =?? may also be a quoted word, i.e:
+
+    =?"word"
+    =??"word"
+
+This will cause the valof of word to be assigned when the matchvar is
+bound to something (and hence represents a 'floating' variable, rather
+than one using the normal Pop-11 identifier scoping).
+
+(3) The procedure * matchvar_instantiate can be used to make an
+'instance' of a pattern structure, i.e. a copy (or partial copy) of the
+structure in which any matchvars are replaced by  their variable
+values.
+
+
+
+-----------------------------------------------------------------------
+7  Related Documentation
+-----------------------------------------------------------------------
+
+HELP * KEYS
+    Introduction to keys.
+
+REF * KEYS
+    More on keys and the procedure class_=.
+
+HELP * CLASSES
+    Introduction to data types.
+
+REF * DATA
+    More on data types and the equality test procedure sys_=.
+
+REF * DEFSTRUCT
+    Defining new record and vector classes.
+
+HELP * NEWANYPROPERTY
+HELP * NEWMAPPING
+    These two files show  the role of  equality in defining  association
+    tables.
+
+REF * RECORDS
+    Section on matchvar records.
+
+
+
+
+--- C.all/help/equal
+--- Copyright University of Sussex 1996. All rights reserved.

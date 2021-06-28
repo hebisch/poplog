@@ -1,0 +1,213 @@
+HELP CONTROL                                          A. Sloman Jul 1982
+                                         Revised: Adrian Howard Mar 1992
+
+
+CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- 1. Procedure call and return, and exit actions
+ -- 2. Conditionals
+ -- 3. Multi-branch conditionals
+ -- 4. GOTO and GO_ON
+ -- 5. Iteration
+ -- 6. Jumping out of loops (only in current procedure):
+ -- 7. Abnormal exits from procedures
+ -- 8. Interrupts
+ -- 9. Processes.
+ -- 10. Terminating a run of POP-11.
+ -- 11. Procedures as arguments and results.
+ -- 12. Spawning Unix or VMS processes
+ -- RELATED DOCUMENTATION
+
+POP-11 provides a variety of ways of transferring control between
+procedures or instructions:
+
+
+-- 1. Procedure call and return, and exit actions ---------------------
+
+The most basic mechanism for transferring control is calling a procedure
+and returning from a procedure. The latter is done merely by reaching
+the end of the procedure or by using the syntax word -return- (see HELP
+*RETURN.) If procedure P1 calls procedure P2, then on return from P2, P1
+continues with the next instruction after the call of P1 (if there is
+one.)
+
+The use of -dlocal- enables actions to be executed whenever a procedure
+is entered or exited. (See HELP * DLOCAL and REF * VMCODE).
+
+
+-- 2. Conditionals ----------------------------------------------------
+
+Conditional branching instructions are provided by -if- and -UNLESS-.
+See HELP *IF, *UNLESS.
+
+
+-- 3. Multi-branch conditionals ---------------------------------------
+
+These are provided by the -elseif- and -elseunless- clauses of -if- and
+-unless- expressions. See HELP *ELSEIF, *ELSEUNLESS. The library macro
+-switchon- provides convenient syntax in the form of a generalized
+'case' facility. See HELP *SWITCHON.
+
+
+-- 4. GOTO and GO_ON --------------------------------------------------
+
+-goto- can be used to jump unconditionally to a specified label in the
+same procedure. See HELP *LABELS for label formats.
+
+    go_on <expression> to <labels> else <label> ;
+
+If <expression> evaluates to a number, it is used to select the label to
+jump to. See HELP *GO_ON.
+
+Lexically scoped non-local labels can also be used. See HELP * GOTO and
+REF * VMCODE
+
+Unconditional jumping should be used with great care as it can produce
+extremely unreadable code.
+
+
+-- 5. Iteration -------------------------------------------------------
+
+POP-11 provides a variety of looping constructs. See HELP *LOOPS for a
+summary.
+
+
+-- 6. Jumping out of loops (only in current procedure): ---------------
+
+Doing
+
+    quitloop(n);
+
+causes termination of the Nth enclosing loop. N must be an integer
+constant, not a variable or arithmetic expression. N defaults to 1. See
+HELP *QUITLOOP.
+
+Doing
+
+    nextloop(n);
+
+causes the Nth enclosing loop to be re-started. What "re-starting"
+means depends on the case. E.g. if it is a -while- or -until- loop the
+condition will be re-evaluated. If it is a -for- loop, any appropriate
+stepping of loop variables, and testing for termination, will be done
+and the loop body re-entered.
+
+N defaults to 1. See HELP *NEXTLOOP.
+
+    quitif(<condition>)(n);
+
+is equivalent to:
+
+    if <condition> then quitloop(n) endif;
+
+The '(n)' is optional.
+
+    quitunless(<condition>)(n);
+
+is equivalent to:
+
+    unless <condition> then quitloop(n) endunless;
+
+The '(n)' is optional.
+
+Similarly
+
+    nextif(<condition>)(n)
+
+is equivalent to
+
+    if <condition> then nextloop(n) endif;
+
+and
+
+    nextunless(<condition>)(n)
+
+is equivalent to
+
+    unless <condition> then nextloop(n) endunless;
+
+In all the above the argument N is optional, but if present must be a
+constant integer, so that appropriate instructions can be planted at
+compile time. If absent it defaults to 1.
+
+
+-- 7. Abnormal exits from procedures ----------------------------------
+
+Various procedures are provided for this. They unwind the calling stack,
+re-setting local variables, and in some cases call a new procedure. See
+HELP *CHAIN, *CHAINTO, *CHAINFROM, *EXITFROM, *EXITTO, *JUMPOUT, *CATCH,
+and *SETPOP
+
+
+-- 8. Interrupts ------------------------------------------------------
+
+When CTRL-C is typed, or an error occurs, the procedure held in the
+variable *INTERRUPT is invoked (after calling *PRMISHAP in the case of
+an error). The default value of *INTERRUPT is -setpop-. Inside VED the
+value of -vedinterrupt- is assigned to -interrupt-. The default value is
+-veddointerrupt-, which unwinds control back to the VED top level.
+
+For debugging purposes it may be convenient to assign -popready- to
+interrupt. See HELP *INTERRUPT, *POPREADY, and *VEDPOPREADY.
+
+
+-- 9. Processes. ------------------------------------------------------
+
+The procedures *CONSPROC, *CONSPROC_TO, can be used to create processes
+which may be run or resumed using the procedures *RUNPROC, *RESUME,
+*KRESUME. Processes can suspend themselves using *SUSPEND and *KSUSPEND.
+
+See also *PROCESS, *DEADPROC, *ISPROCESS, *SAVEPROC.
+
+REF * PROCESS gives more details of POP-11 processes.
+
+
+-- 10. Terminating a run of POP-11. ------------------------------------
+
+The procedure *SYSEXIT causes termination of POP-11, after calling
+*POPEXIT, which is user definable. (The default version of -popexit-,
+called *VEDPOPEXIT, checks if there are any files left in the VED
+buffer, and appropriate so writes them to the disk.)
+
+
+-- 11. Procedures as arguments and results. ---------------------------
+
+Procedures in POP-11 can accept procedures as arguments and produce
+procedures as results. For examples see *MAPLIST, *PARTAPPLY,
+*PROCEDURE, *CHAIN, *EXITTO, *EXITFROM, *CHAINTO, *CHAINFROM, *APPLIST
+
+
+-- 12. Spawning Unix or VMS processes ---------------------------------
+
+REF * SYSUTIL (in UNIX POPLOG) describes SYSFORK and related procedures,
+which enable a additional UNIX processes to be created using "pipes" for
+communication. See also HELP * SYSFORK.
+
+*SYSEXECUTE can be used to replace the current process with a run of
+some other program. It is often used in a process spawned using
+-sysfork-.
+
+For VMS users, see -sysattach- and -sysspawn- in REF *SYSUTIL.
+
+In both UNIX and VMS *SYSOBEY and *SYSOBEYLIST allow the current process
+to be suspended while some other commands are run.
+
+
+-- RELATED DOCUMENTATION ----------------------------------------------
+
+REF *PROCEDURE  --- describes the nature of POP-11 procedures
+REF *SYNTAX     --- describes POP-11 syntax words
+REF *POPSYNTAX  --- gives POP-11 syntax diagrams
+REF *VMCODE     --- defines the underlying POPLOG virtual machine
+REF *FASTPROCS  --- describes "fast" non-checking procedures
+REF *SYSUTIL    --- facilities for communicating with the operating
+                    system, including pawing sub-processes
+
+HELP *ACTIVE_VARIABLES  --- describes a type of identifier associated
+                            with a procedure which is run when it is
+                            accessed or updated.
+
+
+
+--- C.all/help/control -------------------------------------------------
+--- Copyright University of Sussex 1992. All rights reserved. ----------

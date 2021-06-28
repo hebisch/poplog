@@ -1,0 +1,163 @@
+HELP FLAVOUR_LIBRARY                         Mark Rubinstein  April 1986
+                                           Updated A. Schoter, June 1991
+
+This help file lists protocols for flavours and messages autoloadable
+from the flavours library.  For full details of the flavours system you
+should see TEACH * FLAVOURS.
+
+Each flavour listed here follows a standard for documenting flavour
+protocols.  All immediate components and all instance variables are
+listed. Methods inherited from components are not listed.  If the
+message or the flavour is not built in but autoloadable then that is
+stated at the start of the description.  If message has an updater
+message defined then that is stated at the end of the description.
+Flavours and messages documented elsewhere are not documented here
+except to name the appropriate help file.  The message printself is
+never documented.
+
+For protocols of *METAFLAVOURS, see REF * METAFLAVOUR_FLAVOUR.
+
+-- CONTENTS - (Use <ENTER> g to access sections) -----------------------
+
+ -- Related libraries
+ -- Protocol for bag_flavour
+ -- Protocol for collection_flavour
+ -- Protocol for ivalofinit_flavour
+ -- Protocol for named_object_flavour
+ -- Protocol for vanilla_flavour
+
+-- Related libraries ---------------------------------------------------
+
+First, some flavour related libraries that are neither flavours or
+messages.
+
+isinstance(object, flave or false);
+    Returns true iff <object> is an instance and it is an instance of
+    <flave> or an instance of a flavour that inherits from <flave>.  In
+    other words checks if <object> has the properties of <flave>.  If
+    <flave> is -false- then returns true iff object is an instance.
+make_instance([fname rest....]);
+    Makes an instance of the flavour named <fname> and then sends the
+    message "initialise" with the argument <rest> (the tail of the list)
+    iff the flavour responds to the message "initialise".   See details
+    of method initialise in the section on protocol for vanilla_flavour.
+quitmessage;
+    This is a syntax word in the same way as *QUITLOOP is.  It is used
+    for jumping out of a message cleanly and can be called from within a
+    primary method or a deamon.  Any changes already made to instance
+    variables will be saved but any further computation either in
+    daemons or primary methods will not be executed.  It is a bit like:
+        exitfrom(syssendmessage)
+    but it is better as it ensures the saving of instance variables.
+ved_mcf
+    Mark Current Flavour (in ved).
+ved_lcf
+    Load Current Flavour (in ved).
+
+-- Protocol for bag_flavour --------------------------------------------
+
+    A mixin which has a few of the attributes of flavours which have a
+    list of contents of arbitrary length. Could do with extending.  (See
+    also collection_flavour q.v.)
+
+A mixin
+Inherits from vanilla.
+Instance variables are contents.
+
+add(OBJ)
+    Adds OBJ to the contents.
+remove(OBJ)
+    Removes OBJ from the contents (if present).
+present(OBJ) -> BOOL;
+    Returns OBJ iff OBJ is present in the contents, otherwise returns
+    -false-.
+appcontents(MESS)
+appcontents(MESS, ARGS_VECTOR)
+appcontents(PDR)
+    Applies the argument to each of the contents.  If the argument is a
+    word then sends the message MESS to each of the contents.  If a
+    vector of arguments is provided then the message MESS is sent to
+    each of the contents with the arguments given in the vector.  If the
+    argument is a procedure then it is applied to each of the contents.
+mapcontents(MESS)
+mapcontents(MESS, ARGS_VECTOR)
+mapcontents(PDR)
+    Like appcontents above but each object is replaced by the result of
+    sending the message (or applying the procedure to it).
+make_instance(INIT_LIST) -> INST
+    INIT_LIST should be a list as provided to the procedure
+    -make_instance-.  This method will make and return an instance and
+    also add it to the contents.
+
+-- Protocol for collection_flavour -------------------------------------
+
+    A mixin for bags in which each of the contents are distinct -- no
+    duplicates are kept.
+
+A mixin
+Inherits from bag and vanilla.
+Instance variables are contents.
+
+There are before daemons on the method "add" to ensure that duplicates
+do not arise.
+
+-- Protocol for ivalofinit_flavour -------------------------------------
+
+    A mixin whose initialise method will shadow the default one in
+    vanilla. The only difference between the two is that this one
+    expects all initable facets to be instance variables and uses ivalof
+    to update them.
+
+A mixin
+Inherits from vanilla.
+
+initialise(initlist)
+    If list is [m1 v1 m2 v2 m3 v3...] then keeps updating self with the
+    'v' elements to the message 'm' elements using -ivalof-. I.e.
+        v1 -> ivalof(self, m1);
+        v2 -> ivalof(self, m2);
+        etc.
+    Sent by -make_instance- after creating an instance.
+
+
+-- Protocol for named_object_flavour -----------------------------------
+
+    A mixin encapsulating features of objects with names.
+
+A mixin.
+Inherits from vanilla.
+Instance variables are name.
+
+-- Protocol for vanilla_flavour ----------------------------------------
+
+    The base flavour inherited by all flavours by default.
+
+A mixin.
+
+browseself
+    This message is autoloaded.  Activates the browser on the instance.
+    See HELP * BROWSESELF_MESSAGE for details.
+copyself
+    This message is autoloaded.  Returns a copy of the instance.
+default_method(M)
+    Executed when message M is not otherwise received.  Tries to
+    autoload a file called M_message.p (where M is the message).  If
+    that doesn't work then a MISHAP is called.  This method has an
+    updater.  (see HELP * DEFAULT_METHOD for more details).
+initialise(initlist)
+    If list is [m1 v1 m2 v2 m3 v3...] then keeps updating self with the
+    'v' elements to the message 'm' elements.  I.e. v1 -> self<-m1;
+    v2 -> self<-m2 etc.  Sent by -make_instance- after creating an
+    instance.
+libcompilemessage(m, update:boolean);
+    Keeps trying to compile files from *POPAUTOLIST called <m>_message.p
+    until self will respond to the message m (or the update message m if
+    <update> is true).
+myflavour
+    This message is autoloaded.  Returns the flavour of self.  This
+    message has an updater which can be used to change the flavour of
+    self.
+
+
+--- C.all/help/flavour_library
+--- Copyright University of Sussex 1992. All rights reserved. ----------

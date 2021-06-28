@@ -1,0 +1,106 @@
+HELP ITEM_CHARTYPE                            Updated A.Sloman July 1986
+
+    item_chartype(<ascii_code>) -> <integer>
+    <integer> -> item_chartype(<ascii_code>)
+
+To find the class number currently associated with a character with a
+given *ASCII code, do:
+
+    item_chartype(<ascii_code>) -> <class_number>
+
+To assign a new class number to the character with the given ASCII code,
+do:
+
+    <class_number>  -> item_chartype(<ascii_code>)
+
+ITEM_CHARTYPE is used to access or update the 'type' information
+associated with a character. This information affects the way the POP-11
+itemiser breaks up a stream of characters into text items. For example,
+to turn Z into a character which does not combine with anything else,
+do:
+
+    5 -> item_chartype(`Z`);
+
+(5 is the class number of the separators).
+
+ITEM_CHARTYPE can optionally be given an item repeater as its last
+argument (i.e. a procedure created by *INCHARITEM, or *ITEMREAD), in
+which case only that item repeater is affected by the change in class
+number, for example
+
+    5 -> item_chartype(`Z`, itemread);
+
+only affects the type of Z for the current call of *COMPILE.
+
+    There are 12 character classes, as follows:
+
+    Class   Description
+    -----   -----------
+      1     Alphabetic - the letters a-z, A-Z.
+      2     Numeric - the numerals 0-9.
+      3     Signs - characters like "+", "-", "#", "$", "&" etc. A character
+            in classes 10 and 11 ("bracketed comment" 1 & 2) will default to
+            this class if not occurring in the context of such a comment.
+      4     Underscore, i.e. "_"
+      5     Separators- the characters ".", ",", ";", """, "%" and the
+                brackets "[", "]", "{", "}". Control characters are also
+                included in this class, except for those in class 6.
+                Also included are 8 bit characters - 128 - 255
+      6     Spaces - the space, tab and newline characters.
+      7     String quote - the character "'" (See HELP * STRINGS)
+      8     Character quote - the character "`" (See HELP * ASCII)
+      9     End-of-line comment character - the character ";"
+            In the case of ";" only, three successive characters are needed
+            for a comment (See REF *ITEMISE).
+     10     Bracketed comment or sign, 1st character - default "/"
+                e.g. for comments of form /* ...... */
+     11     Bracketed comment or sign, 2nd character - default "*"
+     12     Alphabeticiser - this is a special class that forces the next
+            character in the input stream to be of class alphabetic, i.e.
+            class 1 - see notes below.
+
+New character classes other than these can  be defined with the procedure
+-item_newtype- (see REF * ITEMISE/item_newtype).
+
+Notes:
+1. A character of class 12 forces the character immediately following it
+to be treated as alphabetic, regardless of its normal class. The next
+character is also interpreted like one following "\" in strings and
+character constants (e.g. "n" represents newline, "t" tab, and "^A"
+Ctrl-A, etc).
+
+As yet, no character has class 12 as standard, but assuming "\" did,
+then the following would be examples of legal input words for the
+itemiser:
+
+          \+ABC\^A    (characters +, A, B, C, CTRL-A)
+          \1234       (   "       1, 2, 3, 4)
+          \n          (   "       <newline> i.e. ASCII 10)
+          XY\t\n      (   "       X, Y, <tab>, <newline>)
+
+
+2. There are two classes for UNIX-style 'bracketed' comments (classes 10
+and 11), allowing comments like
+
+                    1 -> x;  /* this is a comment */ 2 -> y;
+
+where in this example "/" has class BC1 (Bracketed Comment 1) and
+"*" class BC2 (Bracketed Comment 2). In other words, BC1 followed
+by BC2 starts the comment and BC2 followed by BC1 ends it.
+
+Nested comments are allowed as in:
+
+        /* 1 -> x;  /* this is a comment */ 2 -> y; */
+
+All other occurrences of BC1 or BC2 are taken as of class SIGN, so that
+while "/" and "*" have these classes as standard, the arithmetic
+operators that use these as sign characters remain unchanged.
+
+
+See also
+REF *ITEMISE       - for further details of itemisation procedures, see
+HELP *ASCII          - on character codes in POP-11
+HELP *COMMENT        - on commenting POP-11 programs
+HELP *ALPHABETICISER - turning arbitrary characters into alphabetic
+
+-----<Copyright University of Sussex 1986.  All rights reserved.>-------

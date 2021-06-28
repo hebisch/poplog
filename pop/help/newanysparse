@@ -1,0 +1,191 @@
+HELP NEWANYSPARSE                    Jonathan Laventhol, 18 October 1984
+                                                 Revised A.Sloman Oct 86
+
+newanysparse(<integer|list:N>, <default value>) -> <sparse_array>
+newanysparse(<integer|list:N>, <procedure>, apply) -> <sparse_array>
+
+Constructs a <sparse_array> with N (or listlength(N)) dimensions, each
+cell initialised to <default value>, or using <procedure> to compute the
+entries
+
+-- Introduction -------------------------------------------------------
+NEWANYSPARSE is a procedure which creates sparse arrays.  For simple
+use, newsparse is recommended (see HELP *NEWSPARSE).
+
+Sparse arrays, like arrays, store data accessed by subscripts, but
+rather than having an vector holding the cells, as ordinary arrays do
+(see *ARRAYS), these use a tree of properties (see HELP *PROPERTIES) to
+hold the elements, and rather than requiring subscripts to be integers,
+as ordinary arrays do, sparse arrays allow any POPLOG items as
+subscripts.
+
+The use of properties makes it unnecessary to allocate space for cells
+which hold the default value.
+
+Sparse arrays are really procedures which access their own private
+property tree.  Among the consequences of this are that fishing things
+out of the array is slower than for arrays. So speed is traded for space
+and generality.
+
+POP-11 sparse arrays can have 'active defaults' -- a procedure that is
+run to decide what the 'default value' of a cell is - i.e. what value to
+associate with a set of subscripts to which an explicit value has not
+been assigned. This can save an enormous amount of space.
+
+-- Making a Sparse Array ----------------------------------------------
+
+The procedure newanysparse takes two arguments:
+    newanysparse(<dimension-specifier>, <default>) -> <sparse_array> ;
+
+The <dimension-specifier> is either
+    an integer      giving the number of dimensions
+                or
+    a list          giving size information for each dimension
+                    (See later section 'Controlling the Space')
+
+The <default> is the object which 'fills' the cells initially.  This
+can be any POPLOG object.
+
+-- Examples -----------------------------------------------------------
+
+Make a sparse array of 3 dimensions, every cell holding 0
+    newanysparse(3, 0) -> sa;
+
+Initially the default value is associated with everything:
+    sa(1,2,3) =>
+    ** 0
+
+Change the value of some of the cells:
+    6 -> sa(1,2,3);
+    720 -> sa(8,9,10);
+
+We can use sparse arrays for word lookup tables:
+    vars dictionary;
+    newanysparse(3, "something") -> dictionary;
+    "bonjour" -> dictionary("french", "hello", "polite");
+    "ola" -> dictionary("spanish", "hello", "familiar");
+
+-- Active Defaults ----------------------------------------------------
+
+An especially useful feature of these arrays is to have the default
+result computed when needed, according to a rule.
+
+You might want an array of points containing a list of points they
+are connected to.  The arrangement of your program might make it
+desirable that each point is intially connected to itself.  Rather
+than take up storage for this, we can do it with a procedure such as
+this:
+
+    define here(x, y, z) -> result;
+        [[^x ^y ^z]] -> result
+    enddefine;
+
+    vars connected;
+    newanysparse(3, here, apply) -> connected;
+
+In this array, each cell contains a list of the points it is directly
+connected to:
+    connected(1,2,3) =>
+    ** [[1 2 3]]
+    connected(8,9,10) =>
+    ** [[8 9 10]]
+
+You can then add the explicit connectivity for your problem:
+    [8 9 10] :: connected(1,2,3) -> connected(1,2,3);
+    connected(1,2,3) =>
+    ** [[8 9 10] [1 2 3]]
+
+Notice that the default procedure must have the same number of arguments
+as the number of dimensions of the array.  (Also, this is the same
+procedure as one might use to initialise an ordinary array.
+See HELP *NEWANYARRAY)
+
+-- Controlling the Space ----------------------------------------------
+
+In the dictionary example above, the arguments, left to right, are:
+    language    word    manner
+
+We probably want only a few different languages in our dictionary, and
+there are only a few different manners for most languages.  But there
+are many words we might want.  You can specify approximately how big to
+make each dimension by makeing the sparse array like this:
+    newanysparse([5 50 2], "dunno") -> dictionary;
+
+The list [5 50 2] says that you want three dimensions, the first of
+which is to have a table of size 5, the second dimension 50, and the
+third 2.  These numbers affect only the size and speed of the resulting
+array.  If you make them too small, your array will access cells slowly.
+If you make them large, it will take up more space.
+
+If you are interested in efficiency, you might like to know that it
+helps to put the smaller sized properties on the right-hand side of the
+argument list.
+
+-- Implemenation Details ----------------------------------------------
+
+Giving 3 as the <dimension-specifier> is the same as [20 20 20].
+
+The 'size' of each dimension is just the number to give to newproperty
+to make the hash-tables for the cells.
+
+The (inactive) default for the array is just the default value of the
+underlying properties. Arrays with active defaults have a unique,
+zero-length, string as this default. The pdprops of a sparse array
+procedure contain the default value. (See HELP *PDPROPS)  The pdprops
+will be a list of length 3 for arrays with active defaults, length 2
+otherwise.
+
+For those who want to know such things, the code for the
+three-dimensional sparse array made by
+
+    newanysparse([20 10 5], 0) -> sparse_array;
+
+would be very similar to the code shown below.  You may notice that the
+tree of properties is expanded only as necessary, but space is never
+reclaimed even if it were possible.
+
+    vars myprop;
+    newproperty([], 20, 0, true) -> myprop;
+
+    define sparse_array(x, y, z);
+    lvars prop x y z;
+        myprop -> prop;
+        if (prop(x) ->> prop) == 0 then
+            return(0)
+        elseif (prop(y) ->> prop) == 0 then
+            return(0)
+        else
+            prop(z)
+        endif
+    enddefine;
+    ;;;
+    define updaterof sparse_array(newvalue, x, y, z);
+    lvars nextprop prop x y z newvalue;
+        myprop -> prop;
+        prop -> nextprop;
+        if (prop(x) ->> nextprop) == 0 then
+            newproperty([], 10, 0, true) -> nextprop;
+            nextprop -> prop(x);
+        endif;
+        nextprop -> prop;
+        if (prop(y) ->> nextprop) == 0 then
+            newproperty([], 5, 0, true) -> nextprop;
+            nextprop -> prop(x);
+        endif;
+        newvalue -> nextprop(z)
+    enddefine;
+    ;;;
+    cancel myprop;
+    [sparse_array 0] -> pdprops(sparse_array);
+
+For implementation details SHOWLIB * NEWANYSPARSE
+
+See also:
+HELP * NEWSPARSE, * NEWPROPERTY, * NEWANYPROPERTY, * PROPERTIES
+
+REF * PROPS
+
+The last example in * NEWANYPROPERTY illustrates a different technique,
+employing a single property table.
+
+-----<Copyright University of Sussex 1986.  All rights reserved.>-------

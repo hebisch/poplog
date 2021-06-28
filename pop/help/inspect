@@ -1,0 +1,391 @@
+HELP INSPECT                                   John Williams, March 1987
+
+    inspect(<item>);
+
+INSPECT is a simple structure browser. It displays its argument, and
+then responds to user commands. The display typically consists of a one
+line description of the object, followed by each of its components on a
+separate line, numbered for reference purposes. To illustrate:
+
+    inspect(pair_key);
+    A key
+      {0}    Dataword:  pair
+      {1}        Spec:  [full full]
+      {2}  Recogniser:  <procedure ispair>
+      [3]     Class_=:  <procedure sys_=>
+      [4]     Applier:  <procedure>
+      [5]     Printer:  <procedure sys_syspr>
+      [6]      Hasher:  <procedure>
+      {7}    Cons pdr:  <procedure conspair>
+      {8}    Dest pdr:  <procedure destpair>
+      {9}  <procedure front>
+      {10}  <procedure back>
+
+INSPECT responds to the following commands:
+
+-----------------------------------------------------------
+a <var>   Save the current object in <var>
+b         Print a backtrace of the  list
+e         Switch to evaluate mode
+g         Redisplay current object from specified slot number
+h or ?    Help, prints this
+i         Toggle display of identifiers
+k         Inspect key of current object
+m         Display more slots (if available)
+p         Toggle displaying of lists as pairs
+q         Quit, leave the inspector
+s         Set a slot value to an evaluated expresion
+x         Expand dynamic list (by one element)
+.         Redisplay current object from the top
+-         Move out a level of inspection
++         Move in a level of inspection
+0,1,2 ..  Inspect value of numbered slot
+-----------------------------------------------------------
+
+This list of commands can be invoked when in INSPECT by doing;
+
+    inspect> ?
+        or
+    inspect> h
+
+These commands allow you to move conveniently within the structure, to
+temporarily invoke POP-11 or quit INSPECT, to save or change values in
+the structure and to examine different types of information concerning
+the structure.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Evaluate mode and Quitting
+ -- Moving around within INSPECT
+ -- Changing and Saving values
+ -- Types of Information; keys, pairs, identifiers, dynamic lists
+ -- INSPECT1
+ -- ASSOCIATED DOCUMENTATION
+
+-- Evaluate mode and Quitting -----------------------------------------
+
+  q                 Quit, leave the inspector
+  e                 evaluate mode
+
+The command "e" will invoke POP-11, In order to return to INSPECT do
+<CNTRL> C. For example;
+
+     inspect([bob]);
+    A pair
+      [0]  front:  bob
+      [1]  back:  []
+    inspect> e
+     hd([bob])=>
+    ** bob
+
+    <CNTRL> C
+
+    *** Interrupt ***
+    inspect>
+
+You can quit INSPECT at any stage by using the command q
+
+-- Moving around within INSPECT ---------------------------------------
+
+  0,1,2 ..          Inspect value of numbered slot
+  .                 Redisplay current object from the top
+  b                 Print a backtrace of objects selected
+  -                 Move out a level of inspection
+  +                 Move in a level of inspection
+  g <slot num>      Redisplay current object from specified slot number
+  m                 Display more slots (if available)
+
+You can use slot numbers to access different parts of the structure,
+e.g.;
+
+      inspect([a {1 2 3 4 5}]);
+     A pair
+       [0]  front:  a
+       [1]  back:  [{1 2 3 4 5}]
+     inspect> 1
+     A pair
+       [0]  front:  {1 2 3 4 5}
+       [1]  back:  []
+     inspect> 0
+     A vector of length 5
+       [0]  1
+       [1]  2
+       [2]  3
+       [3]  4
+       [4]  5
+
+The "b" command will give a trace of the objects that have been examined,
+e.g.;
+
+     inspect> b
+       [a {1 2 3 4 5}]
+       [{1 2 3 4 5}]
+     . {1 2 3 4 5}
+
+The object currently being examined is marked by a dot in the trace. The
+current object's structure can be re-examined by using the command "."
+It is possible to re-examine other objects by using the "+" and "-"
+commands. The "-" command will allow you to examine the object above you
+present position in the trace , the "+" command will allow you to
+examine the next item in the trace . For example;
+
+     inspect> b
+       [a {1 2 3 4 5}]
+       [{1 2 3 4 5}]
+     . {1 2 3 4 5}
+     inspect> -
+     A pair
+       [0]  front:  {1 2 3 4 5}
+       [1]  back:  []
+     inspect> b
+       [a {1 2 3 4 5}]
+     . [{1 2 3 4 5}]
+       {1 2 3 4 5}
+     inspect> .
+     A pair
+       [0]  front:  {1 2 3 4 5}
+       [1]  back:  []
+     inspect> 1
+     A nil, []
+     inspect> b
+       [a {1 2 3 4 5}]
+       [{1 2 3 4 5}]
+     . []
+     inspect> -
+     A pair
+       [0]  front:  {1 2 3 4 5}
+       [1]  back:  []
+     inspect> +
+     A nil, []
+
+When examining very large structures, it is possible to inspect the
+objects from a certain point onwards. To do this you must specify from
+what position in the structure you wish to start. This can be done with
+the command "g", e.g.;
+
+      inspect([{1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7}]);
+     A pair
+       [0]  front:  {1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7}
+       [1]  back:  []
+     inspect> 0
+     A vector of length 17
+       [0]  1
+       [1]  2
+       [2]  3
+       [3]  4
+       [4]  5
+       [5]  6
+       [6]  7
+       [7]  8
+     *** MORE ***
+     inspect> g 12
+     A vector of length 17
+       [12]  3
+       [13]  4
+       [14]  5
+       [15]  6
+       [16]  7
+     inspect>
+
+"*** MORE ***" indicates that the structure is too big to be seen within
+the current window. It is possible to "scroll" down and view the next
+section by using the "m" command.
+
+Some objects (e.g. integers) have no components:
+
+    inspect(23);
+    A integer, 23
+
+-- Changing and Saving values -----------------------------------------
+
+  a <variable>              Assign current object to value of <variable>
+  s <slot num> <value>      Set a slot value to an evaluated expresion
+
+Values found in the structure can be changed or saved, for example;
+
+     vars list;
+     inspect([bob]);
+    A pair
+      [0]  front:  bob
+      [1]  back:  []
+    inspect> a list
+    Saved current object in list
+    inspect> e
+     list=>
+    ** [bob]
+
+    <CNTRL> C
+
+    *** Interrupt ***
+    inspect> .
+        A pair
+      [0]  front:  bob
+      [1]  back:  []
+    inspect> s 0 "fred"
+    A pair
+      [0]  front:  fred
+      [1]  back:  []
+    inspect> q
+
+Slot numbers are enclosed by [] if the value of the slot can be changed;
+and by {} otherwise.
+
+-- Types of Information; keys, pairs, identifiers, dynamic lists -------
+
+  i    Toggle display of identifiers
+  k    Inspect key of current object
+  p    Toggle displaying of lists as pairs
+  x    Expand dynamic list (by one element)
+
+The browser can provide different sorts of information about an object.
+
+i - Toggle display of identifiers
+
+This will allow the structure of a word to be fully displayed, including
+its identifier. For example;
+
+    : inspect([guy [shot] the {crocodile}]);
+    A list of length 4
+      [0]  guy
+      [1]  [shot]
+      [2]  the
+      [3]  {crocodile}
+      [4]  End:  []
+    inspect> 0
+    ;;; DECLARING VARIABLE guy
+    A word, guy
+      [0]  Value:  <undef guy>
+    inspect> i
+    A word, guy
+      {0}  Ident:  <ident <undef guy>>
+    inspect> 0
+    A ident
+      [0]   Value:  <undef guy>
+      {1}  Status:  perm
+      {2}   Props:  0
+    inspect> 1
+    A word, perm
+    ;;; DECLARING VARIABLE perm
+      {0}  Ident:  <ident <undef perm>>
+    inspect> q
+
+See REF *IDENT for a description of identifiers
+
+k   Inspect key of current object
+
+The key associated with an object identifies the class of the object,
+and can also hold various information about the class; for instance
+which procedures are used to print/recognise/construct objects in the
+class or to manipulate fields within the structure of an object in that
+class. The "k" mode allows you to examine the information about the key
+of the object being examined, for example;
+
+      inspect([guy]);
+     A list of length 1
+       [0]  guy
+       [1]  End:  []
+     inspect> k
+     A key
+       {0}    Dataword:  pair
+       {1}        Spec:  [full full]
+       {2}  Recogniser:  <procedure ispair>
+       [3]     Class_=:  <procedure sys_=>
+       [4]     Applier:  <procedure>
+       [5]     Printer:  <procedure sys_syspr>
+       [6]      Hasher:  <procedure>
+       {7}    Cons pdr:  <procedure conspair>
+       {8}    Dest pdr:  <procedure destpair>
+       {9}  <procedure front>
+       {10}  <procedure back>
+
+(For more information on keys see HELP *KEYS, *DATAKEY)
+
+x   expand dynamic lists
+
+In this mode dynamic lists can be expanded element by element, e.g.;
+
+    define dynamlist();
+        gensym("num");
+    enddefine;
+
+    pdtolist(dynamlist)->n;
+
+    inspect(n);
+    A dotted list of length 1
+      [0]  <true>
+      [1]  End:  <procedure dynamlist>
+    inspect> x
+    A dotted list of length 2
+      [0]  num1
+      [1]  <true>
+      [2]  End:  <procedure dynamlist>
+    inspect> x
+    A dotted list of length 3
+      [1]  num2
+      [2]  <true>
+      [3]  End:  <procedure dynamlist>
+    inspect> -
+    A dotted list of length 3
+      [0]  num1
+      [1]  num2
+      [2]  <true>
+      [3]  End:  <procedure dynamlist>
+
+(For information on dynamic lists, see *PDTOLIST, *ISDYNAMIC, *LISTS,
+REF *LISTS /dynamic).
+
+p    Toggle displaying of lists as pairs
+
+This mode displays lists as pairs, for example;
+
+      inspect([a[b]c[[d]]]);
+     A list of length 4
+       [0]  a
+       [1]  [b]
+       [2]  c
+       [3]  [[d]]
+       [4]  End:  []
+     inspect> p
+     A pair
+       [0]  front:  a
+       [1]  back:  [[b] c [[d]]]
+     inspect> 1
+     A pair
+       [0]  front:  [b]
+       [1]  back:  [c [[d]]]
+
+(For information on pairs and lists, see HELP *LISTS, REF *LISTS)
+
+-- INSPECT1 ------------------------------------------------------------------
+
+LIB INSPECT also defines a procedure, -inspect1-, which may be used
+to display an object in the standard inspect format without entering
+an interactive inspect session. If the object covers more than a screen,
+then after each screenful the user will be asked if they wish to see
+more of the object.
+
+For example:
+    inspect1(sys_os_type);
+    A list of length 3
+      [0]  unix
+      [1]  bsd
+      [2]  4.2
+      [3]  End:  []
+
+
+-- ASSOCIATED DOCUMENTATION -------------------------------------------
+
+For other documentation and library files related to programming support
+see:
+
+  *FASTPROCS    - Remove fast procedures for debugging
+  *TIME         - Timing how long a proceduers takes (inc. garbage coll.)
+  *PROFILE      - Profiling where the system is doing the most work
+  *SHOWTREE     - Visual Demonstration of lists in
+  *HALTS        - Deciding whether a procedure will ever terminate
+  *SHOWCODE     - Tracing POPLOG virtual machine code planting
+                    procedures useful for debugging compilers
+  LIB *DEBUG.P  - Interactive Debugging Aid
+
+--- C.all/help/inspect -------------------------------------------------
+--- Copyright University of Sussex 1987. All rights reserved. ----------

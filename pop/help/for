@@ -1,0 +1,289 @@
+HELP FOR                                Updated A. Sloman, Dec 1986
+                                               Ian Rogers, Apr 1989
+
+FOR is an iterative command. There are several main forms, viz:
+
+    for <variable> in <list> do <actions> endfor
+
+    for <variable> on <list> do <actions> endfor
+
+    for <variable> in_list <list> do <actions> endfor
+
+    for <variable> on_list <list> do <actions> endfor
+
+    for <variable> in <structure> using_subscriptor <procedure> do
+        <actions>
+    endfor
+
+    for <variable> from <number> by <number> to <number> do <actions> endfor
+
+    for <variable> from <number> to <number> do <actions> endfor
+            (Default: by 1)
+
+    for <variable> by <number> to <number> do <actions> endfor
+            (Default: from 1)
+
+    for <variable> to <number> do <actions> endfor
+            (Defaults: from 1, by 1)
+
+    for <action> step <action> till <condition> do <actions> endfor
+
+The first four forms have variants with multiple variables:
+    for V1 V2 ...Vn in L1, L2,...,Ln do <actions> endfor
+
+    for V1 V2 ...Vn on L1, L2,...,Ln do <actions> endfor
+
+    for V1 V2 ...Vn in_list L1, L2,...,Ln do <actions> endfor
+
+    for V1 V2 ...Vn on_list L1, L2,...,Ln do <actions> endfor
+
+-- EXAMPLES -----------------------------------------------------------
+
+The command:
+
+    for <variable> in <expression> do <actions> endfor
+
+evaluates the expression, which should yield a list, and then performs the
+actions with the variable being successively bound to each element of the
+list, for example:
+
+    for x in [a b c] do x => endfor;
+    ** a
+    ** b
+    ** c
+
+The multiple variable form can be used to iterate over elements of
+several lists at once, e.g.
+
+    for x y z in [ a b c d], [ e f g], [ h i j k] do
+        [^x ^y ^z] =>
+    endfor;
+
+    ** [a e h]
+    ** [b f i]
+    ** [c g j]
+
+Note that the loop terminates when the end of the shortest list has
+been reached.
+
+-----------------------------------------------------------------------
+
+The command:
+
+    for <variable> on <expression> do <actions> endfor
+
+evaluates the expression, which should yield a list, and then performs
+the actions with the variable set first to the list, then the *TL of the
+list, then the TL of the TL of the list etc. For example:
+
+    for x on [a b c] do x => endfor;
+    ** [a b c]
+    ** [b c]
+    ** [c]
+
+The multiple variable form can be used to progress down different
+lists at once, e.g.
+
+    for x y z on [ a b c d], [ e f g], [ h i j k] do
+        [^x ^y ^z] =>
+    endfor;
+
+    ** [[a b c d] [e f g] [h i j k]]
+    ** [[b c d] [f g] [i j k]]
+    ** [[c d] [g] [j k]]
+
+As with "in" the loop terminates when the shortest list is exhausted.
+
+---------------------------------------------------------------------
+
+The command
+    for <variable> in <structure> using_subscriptor <procedure> do
+        <actions>
+    endfor
+
+iterates over the elements of the <structure>, using the <procedure>
+to access the elements, e.g.
+
+    for item in {[a] vector [of words] and [lists]}
+    using_subscriptor subscrv
+    do item=>
+    endfor;
+
+    ** [a]
+    ** vector
+    ** [of words]
+    ** and
+    ** [lists]
+
+-----------------------------------------------------------------------
+
+The commands
+    for <variable> in_list <expression> do <actions> endfor
+and
+    for <variable> on_list <expression> do <actions> endfor
+
+do exactly the same things as
+    for ... in ... do ... endfor
+and
+    for ... on ... do ... endfor
+
+respectively except that the addition of "using_subscriptor" before the
+do is not allowed. It is up to your personal taste as to which version
+you use.
+
+See also HELP * FOR_FORM for more complex iteration types such as
+in_property, in_vector, from_repeater etc.
+
+
+---------------------------------------------------------------------
+
+The command:
+
+    for <variable> from <expression1> by <expression2> to <expression3> do
+        <actions>
+    endfor;
+
+binds the variable to the result of evaluating the first expression and
+then performs <actions>; the second expression is then added to the
+variable. If it is less than or equal to the third expression the
+actions are performed again. The addition, testing and execution of
+actions is repeated until the variable exceeds the value of the third
+expression.
+
+If expression2 is negative (before the loop is entered) then the
+termination test uses "<" instead of ">".
+
+The 'by' and 'from' portions may both be omitted; in either case, the
+missing value is assumed to be 1.
+
+------------------------------------------------------------------------
+
+Another form of the FOR command:
+
+    for <action1> step <action2> till <condition> do <actions> endfor;
+
+first executes the instructions <action1>. Next <condition> is checked
+to make sure it is not yet true (if it is, nothing more will happen).
+After that the <actions> are repeatedly executed, each execution being
+followed by the execution of the instructions <actions2> and the
+checking of the condition. This continues until the condition evaluates
+to TRUE, when the execution of the FOR loop is terminated. Thus:
+
+    for "steve" -> person step father(person) -> person
+        till person = "adam" do
+            person =>
+    endfor
+
+would print out:
+
+    ** steve
+    ** frank
+    ** tom
+    .....
+    ** cain
+
+------------------------------------------------------------------------
+
+Notice that the first five forms of the FOR command could all be
+accomplished using the last, thus:
+
+    for <variable> in <expression> do <actions> endfor
+
+is equivalent to:
+
+    for <expression> -> <temporary_variable>
+        step tl(<temporary_variable>) -> <temporary_variable>
+        till <temporary_variable> = []
+    do
+        hd(<temporary_variable>) -> <variable>;
+        <actions>
+    endfor
+
+and:
+
+    for <variable> on <expression> do <actions> endfor;
+
+is equivalent to:
+
+    for <expression> -> <variable>
+        step tl(<variable>) -> <variable>
+        till <variable> = []
+    do
+        <actions>
+    endfor
+
+and:
+
+    for <variable> from <expression1> by <expression2> to <expression3> do
+        <actions>
+    endfor
+
+is equivalent (when expression2 is positive) to:
+
+    for <expression1> -> <variable>
+        step <variable> + <expression2> -> <variable>
+        till <variable> > <expression_3>
+    do
+        <actions>
+    endfor
+
+Finally, the FOR ... STEP format can be re-written using UNTIL, thus:
+
+    <action1>;
+    until <condition> do
+        <actions>;
+        <action2>
+    enduntil
+
+------------------------------------------------------------------------
+
+Please note that POP-11 makes no syntactic distinction between an action
+and an expression. By convention, an expression is some POP-11 code that
+leaves something on the stack whereas an action is some POP-11 code that
+leaves the stack unaltered. Thus the following is legal:
+
+    for x from 1 to 10 do x endfor;
+
+It leaves 10 items on the stack (the integers 1 to 10). A FOR loop can
+(like any POP-11 code) be enclosed in decorated list or vector brackets,
+for example:
+
+    [% for x from 1 to 10 do x endfor %] =>
+    ** [1 2 3 4 5 6 7 8 9 10]
+
+
+See REF * FASTPROCS for FAST_FOR, a fast, non-type-checking iteration over
+lists or integers.
+
+-----------------------------------------------------------------------
+
+The iteration in a FOR loop can be terminated using any of
+
+    * RETURN, * QUITLOOP,  *QUITIF,  * QUITUNLESS
+
+or re-started using
+
+    * NEXTLOOP, * NEXTIF, * NEXTUNLESS
+
+Re-starting means effectively jumpting to just before ENDFOR, so that
+the next loop-iteration is performed, after stepping loop variables and
+testing for completion.
+
+* FOR_FORM describes a method for defining new extensions to the "for"
+loop mechanism.
+
+See also HELP
+    *CONTROL     - for an overview of control facilities
+    *LOOPS       - for other forms of iteration
+    *EXPRASS     - for forms of expression in POP-11
+    *VARS        - for forms and uses of variables in POP-11
+    *LISTSUMMARY - for an overview of lists
+    *FOREACH, *FOREVERY - for iteration over items in a database that
+                match a given pattern.
+    *EFFICIENCY  - for tips on optimisation.
+
+REF * SYNTAX    - syntax words in POP-11
+REF * POPSYNTAX - syntax diagrams for POP-11
+
+--- C.all/help/for
+--- Copyright University of Sussex 1989. All rights reserved. ----------

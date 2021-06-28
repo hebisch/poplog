@@ -1,0 +1,149 @@
+HELP SYSPRMESSAGE                               Jonathan Meyer, Oct 1990
+
+
+    sysprmessage(<culprit1>, <culprit2>, <culpritN>, N,
+                <message_string>, <header_string>, <detail_level>)
+
+    This procedure is used to generate system messages on *CUCHARERR,
+    and is called by *SYSPRWARNING and *SYSPRMISHAP.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Overview
+ -- Using -sysprmessage-
+ -- Redefining prwarning
+ -- Redefining prmishap
+ -- See Also
+
+
+-- Overview -----------------------------------------------------------
+
+In its full form, -sysprmessage- prints 5 lines of information:
+
+    ;;; <header_string> <message_string>
+    ;;; INVOLVING:  <culprit1> <culprit2> ... <culpritN>
+    ;;; FILE     :  <popfilename>  LINE NUMBER <poplinenum>
+    ;;; COMPILING:  <names of procedures being compiled>>
+    ;;; DOING    :  <pdprops of procedures currently executing>
+
+If there are no culprits (ie. N is 0), the INVOLVING line is not
+printed. Similarly, the FILE line is not printed if -popfilename- is
+false, and the COMPILING line is not printed when the Poplog VM is in
+execute mode.
+
+There are two ways of altering which information -sysprmessage- prints.
+By modifying one of the variables:
+
+    POP_MISHAP_DOING_LIM - controls the DOING line
+    POPSYSCALL           - controls the DOING line
+    POPFILENAME          - controls the FILE line
+    POPLINENUM           - controls the FILE line
+
+or by varying the <detail_level> argument, which should be an integer
+between 0-5. See REF *MISHAPS / sysprmessage for more information
+about the detail line.
+
+
+
+-- Using -sysprmessage- -----------------------------------------------
+
+-sysprmessage- can be used in programs to print out useful information.
+The DOING line can be especially useful in debugging. The following
+procedure shows how to call -sysprmessage- to display only the DOING
+line and the given message:
+
+    define show_doing(message) with_props false;
+        dlocal popfilename = false, popsyscall = false;
+        ;;; turn off the FILE line, don't print system calls.
+        sysprmessage(0, message, 'CALLED -', 5);
+    enddefine;
+
+An example call of show_doing:
+
+    define test();
+        show_doing('message 1');
+    enddefine;
+
+    define call_test();
+        test();
+    enddefine;
+
+    test();
+    ;;; CALLED - message 1
+    ;;; DOING    :  test compile nextitem compile
+
+    call_test();
+    ;;; CALLED - message 1
+    ;;; DOING    :  test call_test compile nextitem compile
+
+
+
+-- Redefining prwarning -----------------------------------------------
+
+The following example shows how to use sysprmessage to redefine
+prwarning so that it prints a controllable amount of information
+according to a variable called -warningdetail-.
+
+    vars warningdetail = 5;
+    define prwarning(word);
+        lvars word;
+        if popwarnings then word :: popwarnings -> popwarnings endif;
+        sysprmessage(0, word_string(word), 'DECLARING VARIABLE',
+                    warningdetail);
+    enddefine;
+
+    ;;; test above by marking and compiling the following:
+
+    define foo;
+        if declare_variable_1 > 10 then "hello" endif;
+    enddefine;
+
+    0 -> warningdetail;
+    declare_variable_1;
+
+    3 -> warningdetail;
+    declare_variable_2;
+
+Also try printing out popmessages, to see how calls to sysprmessage are
+reflected in popmessages.
+
+
+
+-- Redefining prmishap ------------------------------------------------
+
+Using sysprmessage, it becomes easy to redefine prmishap to use a
+different word from MISHAP. For example, to make MISHAPS use the word
+ERROR, simply do:
+
+    define prmishap(message, list);
+        lvars message, list;
+        sysprmessage(destlist(list), message, 'ERROR -', 5);
+    enddefine;
+
+And to generate a test myprmishap, do something like:
+
+    <ENTER> im
+
+    Setpop
+    : myprmishap -> prmishap;
+    : 1 2
+    ;;; ERROR - MSEP: MISSING SEPARATOR (eg semicolon)
+    ;;; INVOLVING:  1 2
+    ;;; DOING    :  myprmishap compile Im runproc nextitem compile
+
+
+
+-- See Also -----------------------------------------------------------
+
+REF  *MISHAPS      - Details of Poplog error handling
+HELP *MISHAP       - on POP-11 error procedures
+HELP *PRMISHAP     - prints error messages; user-redefinable
+HELP *INTERRUPT    - on POP-11 interrupt procedures
+HELP *POPFILENAME  - current file
+HELP *POPSYSCALL   - controls inclusion in error messages of systems
+                     procedures
+
+
+--- C.all/help/sysprmessage --------------------------------------------
+--- Copyright University of Sussex 1990. All rights reserved. ----------

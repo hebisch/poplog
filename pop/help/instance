@@ -1,0 +1,102 @@
+HELP *INSTANCE                                  Steven Hardy, June 1982
+                                     (Updated Mark Rubinstein, Feb 1985)
+
+    instance(pattern) -> list;
+
+This procedure takes a pattern (ie a list containing "?" or "??") and
+returns an 'instance' of it, ie. a list like the pattern, but with all
+pattern variables replaced by their values.
+
+For instance "?VAR" is replaced by the valof "VAR", "??VAR" is replaced
+by splicing in elements of the valof "VAR", which should be a list.
+
+For example:
+
+    "steve" -> x;
+    "home" -> y;
+    instance([?x is at ?y]) =>
+    ** [steve is at home]
+
+In the above case it would be simpler to write:
+
+    [^x is at ^y] =>
+
+INSTANCE is to be used when the pattern is not known at compile time
+because, for example, it is the value of a variable, or is constructed
+at run time.
+
+If a double query prefix is used, then the value of the variable to be
+instantiated must be a list. E.g.
+
+    [tom dick harry] -> x;
+    instance([the children of joe are ??x])=>
+    ** [the children of joe are tom dick harry]
+
+Normally INSTANCE does not check that the value of the variable is
+known, so that you could have something like:
+
+    instance([the value of newword is ?newword]) =>
+    ;;; DECLARING VARIABLE newword
+    ** [the value of newword is <undef newword>]
+and
+    instance([the values in newword are ??newword]) =>
+    ;;; MISHAP - LIST NEEDED
+    ;;; INVOLVING:  <undef newword>
+    ;;; DOING    :  null dl instance compile nextitem compile
+
+
+To get round this INSTANCE can now take an optional second argument
+which must be a procedure to be run if the value of a variable is not
+known or if it is not a list when used after the double query (??)
+prefix.
+
+If this argument is provided, then if at run time the value of the
+variable is not known (that is if its *IDENTPROPS == "undef" or its
+*VALOF is an *UNDEF object) or if its value is not a list when it is
+used after the double query prefix, then the procedure is run with two
+arguments, the prefix and the word.  Any results the procedure returns
+will be included in the list returned by INSTANCE.
+
+For example if you want the list to be unchanged if the words are not
+known you can do:
+
+    instance([the value is ?another_new_word], identfn) =>
+    ** [the value is ? another_new_word]
+or
+    instance([the value is ??another_new_word], identfn) =>
+    ** [the value is ?? another_new_word]
+
+If you want INSTANCE to *MISHAP if the value is not known then do:
+
+    instance([the value is ?unknown],
+        mishap(%1, 'value of variable not known'%)) =>
+    ;;; MISHAP - value of variable not known
+    ;;; INVOLVING:  unknown
+    ;;; DOING    :  instance compile nextitem compile
+
+If you want the variable to be replaced by the word "undef" then do:
+
+    instance([the value is ? unknown],
+    procedure(x, y); undef endprocedure) =>
+    ** [the value is undef]
+
+or, using erasenum, the procedure concatenator <>, identfn:
+
+    instance([the value is ? unknown],
+    erasenum(%2%) <> identfn(%undef%) ) =>;
+    ** [the value is undef]
+
+An explanation of the use of '(% ...%)', or partial application can
+be found in HELP *CLOSURES, *PERCENT
+
+Of course if the value of the variable is acceptable then the procedure
+provided will not be used, and if the procedure is not provided then the
+behaviour of INSTANCE will not be affected. That is, as illustrated
+above, the normal consequence of applying VALOF to an identifier not
+declared as a variable, and/or the normal consequence of applying list
+operations to a non-list will ensue!
+
+See also
+    HELP *MATCHES
+
+-----<Copyright University of Sussex 1987.  All rights reserved.>-------

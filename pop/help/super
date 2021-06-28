@@ -1,0 +1,234 @@
+HELP SUPER                                           Steven Hardy, March 1982
+
+LIB SUPER provides an enhanced version of the DATABASE which permits PROLOG
+like operations. All the normal DATABASE operations are provided, including
+ADD, REMOVE, PRESENT, LOOKUP, ALLPRESENT, FOREACH and FOREVERY.  A Procedure
+WHICH is also provided.
+
+SUPER is still experimental and so may have bugs. It is not supported.
+
+-- SUMMARY OF WHAT SUPER OFFERS --------------------------------------------
+
+SUPER allows the words AND and OR to be used, for example:
+
+   present([and [human ?x] [greek ?x] [dead ?x]]) =>
+
+SUPER allows query variables and definitions in DATABASE items, for example:
+
+   add([member ?x [?x ??y]]);
+   add([ifneeded [member ?x [?y ??z]] [member ?x ?z]]);
+   add([ifneeded [bachelor ?x] [male ?x] [single ?x]]);
+
+SUPER provides CUT and FAIL, for example:
+
+   add([ifneeded [not ?x] ?x cut fail]);
+   add([not ?x]);
+
+The 'evaluable' predicates DO and SET allow SUPER to invoke POP procedures.
+
+SPY and NOSPY provide debugging facilities.
+
+-- RESTRICTIONS ----------------------------------------------------------
+
+Segment variables (ie those preceded by '??') can occur ONLY at the end of
+lists. That is, although [?X ??Y] is permissible, [??Y ?X] is not.
+
+Restrictions (ie query variables followed by ':') cannot be used. That is
+[FOOBAZ ?X:ISINTEGER] is NOT permitted, though the following is okay:
+
+    [and [foobaz ?x] [do isinteger ?x]]
+
+REMOVE looks for an item EQUAL to its argument and NOT one that MATCHES. Use
+LOOKUP followed by REMOVE(IT) instead.
+
+The DATABASE is stored as a list of lists. Each lists contains all the
+DATABASE items with a particular word as first element. This is for
+efficiency. Because of this all items added to the DATABASE and all goals (eg
+arguments to PRESENT) must have a word as their first element. That is
+
+    [?x isin [?x ??y]]
+
+is NOT permitted.
+
+Because of this indexing, and because SUPER modifies items as it ADDS them,
+you MUST use ADD (or ALLADD) for putting items into the DATABASE
+
+-- DETAILS --------------------------------------------------------------
+
+AND and OR take any number of arguments.
+
+IFNEEDED items have a 'header' and a list of 'conditions'. If the conditions
+are all PRESENT then the header is PRESENT. The conditions are tried left to
+right.
+
+CUT removes any remaining alternatives for the current 'goal'. Notice that
+AND and OR cannot be defined by the user because of CUT. If one added:
+
+   add([ifneeded [or ?x ??y] ?x]);
+   add([ifneeded [or ?x ??y] [or ??y]]);
+
+then a CUT as an argument to OR would CUT only the call of OR and not the
+goal invoking OR.
+
+The variables used in DATABASE items have no connection with ordinary POP
+variables. The same variables may be used in different DATABASE items and do
+not clash.
+
+The 'output' of SUPER (for example, the variable IT) may contain structures
+of type REF. This happens when a variable remains unbound.
+
+DATABASE items are found in the order they were ADDed and NOT in reverse
+order. This is different to 'normal' DATABASE.
+
+An 'evaluable' predicate, DO, allows access to POP procedures, for example
+[DO NL 1], [DO PR ?X] or [DO ISINTEGER ?X]. The VALOF the first argument to
+DO is applied to the remaining arguments. Any SUPER variables are replaced by
+their values. If the POP procedure returns FALSE then the DO fails. In all
+other cases the DO succeeds and the result (if any) of the POP procedure is
+ignored.
+
+The evaluable predicate SET is used to unify the result of a POP procedure
+with a SUPER expression. For example [SET ?X + 2 2] will unify ?X
+with 4 (that is '+' applied to 2 and 2). [SET [?X ?Y] FOO ?A ??B] will unify
+[?X ?Y] with the result of applying FOO to the value of A and the elements of
+the value of B. SET can be used to find the value of a POP variable, for
+example:
+
+    [set ?x valof x]
+
+SUPER variables are permitted as goals PROVIDED that they have a value.
+
+-- DEBUGGING -----------------------------------------------------------
+
+The macros SPY and NOSPY are provided to assist in debugging SUPER databases.
+Each is followed by a number of predicate names, for example:
+
+   spy member foo
+   nospy foo
+
+Notice that SPY and NOSPY are POP predicates and can only be accessed from
+within SUPER by using DO. Notice too that both are MACROS
+
+If a predicate (MEMBER and FOO in the above examples) has been SPYed then the
+SUPER system prints a message when starting a goal with that as predicate,
+when finishing such goals (whether they succeed or failed) and when retrying
+such goals. The first 'goal' message contains a unique number for later
+identification.
+
+NOSPY turns off SPYing on the given predicates.
+
+SPY on its own turns on SPYing on everything. NOSPY on its own turns off
+SPYing on everything.
+
+-- EXAMPLES ------------------------------------------------------------
+
+   add([ifneeded [member ?x [?y ??z]] [member ?x ?z]]);
+
+If a goal unifying with [MEMBER ?X [?Y ??Z]] is attempted, for example
+
+   present([member c [a b c d]]) =>
+
+then SUPER will set up the sub-goal [MEMBER ?X ?Z], in this case:
+
+    [member c [b c d]]
+
+If this succeeds then the original goal succeeds.
+
+------------------------------------------------------------------------
+
+   add([ifneeded [bachelor ?x] [single ?x] [male ?x]]);
+
+If a goal unifying with [BACHELOR ?X] is attempted, for example
+
+    [bachelor steve]
+
+the SUPER sets up the sub-goal [SINGLE ?X], in this case:
+
+    [single steve]
+
+If this succeeds then SUPER sets up the second sub-goal [MALE ?X], in this
+case
+
+    [male steve]
+
+If this succeeds then the original goal succeeds. If this second sub-goal
+fails then an attempt is made to succeed with the first goal in a different
+way. If this succeeds then the second sub-goal is attempted again. This is
+useful for things such as:
+
+   add([ifneeded [eligible ?x] [bachelor ?x] [rich ?x]]);
+
+If the RICH goal fails then then a new solution to BACHELOR is found.
+
+------------------------------------------------------------------------
+
+   add([ifneeded [married ?x] [single ?x] cut fail]);
+   add([married ?x]);
+
+Given a goal unifying with [MARRIED ?X], SUPER tries [SINGLE ?X]. If this
+succeeds it CUTs the goal [MARRIED ?X]. This means that any more alternatives
+for this goal are abandoned. The FAIL then causes the goal of MARRIED to
+fail. If the SINGLE goal fails then SUPER goes on to try other laternatives
+for MARRIED and finds the second statement which says that ANYTHING is
+married.
+
+Notice that the following is INCORRECT:
+
+   add([ifneeded [married ?x] [single ?x] fail]);
+   add([[married ?x]);
+
+The effect of these two statements is that anything is MARRIED.
+
+------------------------------------------------------------------------
+
+   lookup([and [bachelor ?x] [rich ?x] [do add [eligible ?x]] fail]);
+
+SUPER finds a RICH BACHELOR and then ADDs that he is ELIGIBLE. The FAIL then
+causes a new RICH BACHELOR to be found until all RICH bachelors have been
+found. The calls of ADD are NOT undone by the failure. Eventually, no more
+RICH BACHELORS will be found and call of LOOKUP will fail causing a MISHAP.
+It may be clearer to write:
+
+    foreach [and [bachelor ?x] [rich ?x]] do
+        add([eligible ^x])
+    endforeach;
+
+or, equivalently:
+
+   forevery [[bachelor ?x] [rich ?x]] do
+        add([eligible ^x])
+   endforevery;
+
+------------------------------------------------------------------------
+
+   alladd([
+         [rule sentence nounphrase verbphrase]
+         [rule nounphrase determiner noun]
+         [rule verbphrase verb nounphrase]
+         [lexicon determiner the]
+         [lexicon noun man]
+         [lexicon noun computer]
+         [lexicon verb hated]
+         [ifneeded [recognize ?category ?given ?leaving]
+             [rule ?category ?x ?y]
+             [recognize ?x ?given ?temp]
+             [recognize ?y ?temp ?leaving]]
+         [ifneeded [recognize ?category [?word ??leaving] ?leaving]
+             [lexicon ?category ?word]]
+     ]);
+   lookup([recognize nounphrase [the man hated the computer] ?x]);
+   x =>
+    ** [hated the computer]
+   present([recognize ?x [the man hated the computer] []]) =>
+    ** <true>
+   x =>
+    ** sentence
+
+A simple grammar and recognizer are ADDed to the DATABASE. The RECOGNIZE
+predicate takes three arguments - a syntactic category and two lists of
+words. RECOGNIZE succeeds if removing an instance of the category from the
+first list of words leaves the second list.
+
+You are recommended to try this example with SPY.
+
+See also * WHICH

@@ -1,0 +1,296 @@
+HELP NEWANYPROPERTY                               John Williams Jan 1985
+                                                Mark Rubinstein Jun 1985
+                                                       A.Sloman Oct 1986
+                                                  Adrian Howard Mar 1992
+
+newanyproperty(LIST, SIZE, EXPANSION_FACTOR, EXPANSION_THRESHOLD,
+               HASHING_PROCEDURE, EQUALITY_PROCEDURE, GC_TYPE,
+               DEFAULT_VALUE, DEFAULT_PROCEDURE) -> PROPERTY;
+
+
+CONTENTS - (Use <ENTER> g to access desired section)
+
+ -- Introduction
+ -- LIST [a list]
+ -- SIZE [integer]
+ -- EXPANSION_FACTOR [integer or false]
+ -- EXPANSION_THRESHOLD [integer or false]
+ -- HASHING_PROCEDURE [procedure or false]
+ -- EQUALITY_PROCEDURE [procedure or false]
+ -- GC_TYPE [word]
+ -- DEFAULT_VALUE
+ -- DEFAULT_PROCEDURE [procedure or false]
+ -- Using Complex Keys
+ -- See Also:
+
+
+-- Introduction -------------------------------------------------------
+
+A POPLOG property is a procedure that efficiently maps items of data,
+called "keys", to other items, called "values".
+
+Each property contains a table of "entries", each of which associates a
+particular "key" with a particular "value". POP-11 provides two
+procedures for creating properties: -newproperty-, which deals with
+simple cases using a default mapping rule, and -newanyproperty- offering
+more flexibility.
+
+The procedure -newanyproperty- takes various arguments (described below)
+and returns a property, that is a procedure that takes one argument, a
+key item, and looks up its associated value. The updater of this
+procedure can add or delete entries to or from the property.
+
+Information retrieval from properties is usually considerably faster
+than from functionally similar structures such as association-lists (see
+HELP *ASSOC).  This is because, given a key item to locate, properties
+use a "hashing procedure" to compute the location of the relevant entry.
+Hashing procedures usually use some invariant feature of the key object
+to calculate a number that (appropriately scaled) indicates the position
+in the property of an entry with that key item.  If the hashing
+procedure produces a wide variety of results for different key items,
+most entries are stored in unique locations, and thus very little
+"blind" searching is needed when entries are retrieved.
+
+The arguments taken by -newanyproperty- are described below.
+
+
+-- LIST [a list] ------------------------------------------------------
+
+This is a list of initial key/value associations, as with -newproperty-.
+For example:
+
+    newanyproperty([[one 1] [two 2] [three 3]], ....) -> prop;
+
+creates a property, prop, that maps the word "one" to the number 1, and
+so on. It is equivalent to:
+
+    newanyproperty([], ...) -> prop;
+    1 -> prop("one");
+    2 -> prop("two");
+    3 -> prop("three");
+
+
+-- SIZE [integer] -----------------------------------------------------
+
+This argument allows you to specify the approximate size of the property
+table.  The figure given (which should be a positive integer greater
+than one) does not affect how many entries you can store in the table,
+but can affect the speed with which they can be retrieved.  In general,
+the larger the property, the faster entries can be found.  A rough guide
+might be that properties are at their most efficient if they are about
+75% full. However, if lots of properties are made with too much spare
+capacity the wasted space can lead to excessive paging, slowing programs
+down. So users will need to experiment to find appropriate sizes.
+
+
+-- EXPANSION_FACTOR [integer or false] --------------------------------
+-- EXPANSION_THRESHOLD [integer or false] -----------------------------
+
+It is not always easy to predict in advance how many entries are to be
+stored in a property.  In such cases, it may be better to create an
+"expandable" property, which will automatically grow bigger when a
+certain number of entries (the EXPANSION_THRESHOLD) has been added.
+
+The EXPANSION_FACTOR argument (which should be a positive integer)
+indicates how much bigger the property should get:
+
+    new size = old size << expansion factor
+             = old size * (2 ** expansion factor)
+
+Thus an EXPANSION_FACTOR of 1 means that the property will expand to
+twice its original size.  If this argument is -false-, the property size
+is fixed (whatever the value supplied to the EXPANSION_THRESHOLD
+argument).   If the EXPANSION_THRESHOLD is false then property will
+first expand when SIZE items have been added to the property.
+
+After expansion, the EXPANSION_THRESHOLD is increased in proportion to
+the property's new size.
+
+
+-- HASHING_PROCEDURE [procedure or false] -----------------------------
+
+If this argument is -false-, the system default hashing procedure
+-syshash- is used (this is the hashing procedure used by -newproperty-.)
+
+HASHING_PROCEDURE should be a procedure that takes one argument and
+returns one result.  The result can be any POP-11 object which is then
+automatically mapped into a location in the table. The simplest method
+is to return an integer or a simple decimal number.
+
+If the hashing procedure relies on the absolute address of the key item
+then it is necessary to enclose the procedure as a reference, ie:
+
+    HASHING_PROCEDURE == consref(PROCEDURE)
+
+This tells POP-11 to rehash the contents of the property after a garbage
+collection.
+
+If the hashing procedure does not return a number or simple decimal,
+then it is a POP-11 data structure and its address will be used to
+determine a location in the table.
+
+NOTE: Unless the property is required to produce a random result, the
+HASHING_PROCEDURE must always return an identical object for equivalent
+items.  For example it would be a mistake for the procedure to return a
+string unless it is always the same identical string.
+
+
+-- EQUALITY_PROCEDURE [procedure or false] ----------------------------
+
+This procedure is used to check that a given key item matches the key
+item in the table.
+
+The default procedure, used if the argument is -false- is the identity
+matcher "==". This is the equality procedure used by -newproperty-.  For
+implementation reasons it is not possible to specify an
+EQUALITY_PROCEDURE if no HASHING_PROCEDURE has been specified.
+
+
+-- GC_TYPE [word] -----------------------------------------------------
+
+This controls whether an association is removed from the table if either
+the key item or the value or both would be garbage collected but for the
+fact that they are in the table. Possible values for GC_TYPE are
+explained in REF *PROPS.
+
+The two most commonly used values are "perm" meaning the items remain
+there permanently unless explicitly removed from the table, and
+"tmparg", which means the association is removed from the table if ever
+the key item (or argument) would have been garbage collected but for
+being in the table. In the first case it is a "permanent" property, in
+the second case a "temporary" property.
+
+If a property is "permanent", then an item/value pair in it will remain
+forever even if the user has lost all pointers to the item. If this
+occurs the only way the user can get at the item/value pair is by using
+-appproperty-.
+
+
+-- DEFAULT_VALUE ------------------------------------------------------
+-- DEFAULT_PROCEDURE [procedure or false] -----------------------------
+
+If an entry cannot be found for a key item when looking up the property
+table, then if the DEFAULT_PROCEDURE is false the DEFAULT_VALUE, which
+can be any POP-11 item, is returned.  If however the DEFAULT_PROCEDURE
+is a procedure then it is applied to the key item item and the property
+and the result returned.
+
+On updating an entry in a property, if you update a key item with the
+DEFAULT_VALUE then the effect is to remove the key item and its value
+from the property table, regardless of the value of DEFAULT_PROCEDURE.
+
+For example:
+
+    define nochange(key, prop);
+        key;
+    enddefine;
+
+    ;;; a property which returns the key item if no other value is found
+    vars alter =
+        newanyproperty(
+            [[foo baz]], 5, 2, 5, false, false, "perm", "gone", nochange
+        );
+
+    alter("foo") =>
+    ** baz
+    alter("other") =>
+    ** other
+    "gone" -> alter("foo");
+    alter("foo") =>
+    ** foo
+
+    ;;; a property which mishaps if the key item is not found in the
+    ;;; table.
+    vars must_be_present =
+        newanyproperty(
+            [[one 1][two 2]], 5, 2, 5,
+            false, false, "perm",
+            false,
+            procedure(key, prop);
+                mishap('vital data not present', [^key])
+            endprocedure
+        );
+
+    must_be_present("one") =>
+    ** 1
+    must_be_present("three") =>
+    ;;; MISHAP - vital data not present
+    ;;; INVOLVING:  three
+    ;;; DOING    :  compile nextitem compile
+
+
+-- Using Complex Keys -------------------------------------------------
+
+The procedure -newanyproperty- can be used to create a property that
+maps a collection of items into a value. An algorithm, supplied by the
+user, is needed that maps each collection onto a unique object, which
+can then be used to find an address in the table. The object could most
+conveniently be a number, reducing the need for re-hashing.
+
+For example, the following procedure takes a list of words, and maps
+them into a number, using the positions and first characters of the
+words:
+
+    define hash_words(wordlist)-> num;
+        lvars word, num=0, position=1, wordlist;
+        for word in wordlist do
+            subscrw(1,word) fi_<< position fi_+ num -> num;
+            position fi_+ 1 -> position;
+        endfor;
+    enddefine;
+
+See REF *FASTPROCS For information on the 'fast integer' procedures
+-fi_<<- etc.
+
+To ensure proper equality testing we have to use "=" rather than "==".
+
+    vars procedure job=
+        newanyproperty(
+            [[[joe bloggs] teacher] [[fred smith] dustman]], 99, 1,
+            false, hash_words, nonop =, "perm",
+            undef,false
+        );
+
+    job([joe bloggs])=>
+    ** teacher
+    job([fred smith])=>
+    ** dustman
+
+That would not have worked with -newproperty-, since the list now given
+as argument is not the original list.
+
+    job([jerry black])=>
+    ** undef
+    "programmer" -> job([jerry black]);
+    job([jerry black])=>
+    ** programmer
+
+For properties keyed by more varied and complex structures -syshash- is
+more useful. It makes use of the -class_hash- facility, see HELP
+*SYSHASH for more details.
+
+
+-- See Also: ----------------------------------------------------------
+
+HELP *PROPERTIES    --- Summary of property related procedures
+HELP *NEWPROPERTY   --- Simple interface to -newanyproperty-
+HELP *NEWSPARSE     --- Using properties to implement N dimensional
+     *NEWANYSPARSE      sparse arrays with non-numeric subscripts
+HELP *VIEWS         --- Demo application using properties
+
+
+REF *PROPS          --- Full information on properties in POP-11
+REF *APPPROPERTY    --- Applying a procedure to every element of a
+                        property
+REF *CLEARPROPERTY  --- Removing all entries from a property
+
+
+HELP *DATALIST      --- Listing all the elements of a structure
+HELP *DATALENGTH    --- Getting the length of a structure
+HELP *APPDATA       --- Applying a procedure to every element of a
+                        structure
+
+
+
+--- C.all/help/newanyproperty
+--- Copyright University of Sussex 1992. All rights reserved. ----------

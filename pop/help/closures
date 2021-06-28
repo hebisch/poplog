@@ -1,0 +1,220 @@
+HELP CLOSURES                                         A. Sloman Jan 1991
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Introduction
+ -- Creating closures
+ -- Protected closures
+ -- An example
+ -- Examining closures
+ -- Closures of traced procedures
+ -- How closures work
+ -- Notes
+ -- See also:
+
+-- Introduction -------------------------------------------------------
+
+Closures are procedures that are created from other procedures by means
+of 'partial application'. The new procedure may include some data or
+frozen arguments, which are given to the original procedure when the
+closure is run.
+
+
+-- Creating closures --------------------------------------------------
+
+Closures are created explicitly in three different ways
+  1. using 'decorated brackets' proc(%arg1,arg2,...%)
+    (see HELP * PERCENT).
+  2. using partapply(<procedure>, <list>)
+    (See HELP * PARTAPPLY)
+  3. using  consclosure(<procedure>, <arg1>,<arg2>,...<argN>,N)
+    (See REF * PROCEDURE)
+
+Type 1 compiles to a call of -consclosure-, i.e. type 3.
+
+There are also closures created implicitly by procedures that return
+nested procedures binding values of non-local lexical variables, as
+described (with examples) in HELP * LVARS. These are called "lexical"
+closures. (Full technical details are in REF * VMCODE).
+
+All closures are a combination of procedure and some (alterable) data on
+which the procedure works. Like ordinary procedures they have *PDPROPS,
+*PDNARGS and can have updaters.
+
+
+-- Protected closures -------------------------------------------------
+
+Some closures (e.g. those produced via non-local lexical identifiers)
+are "protected".  A protected closure is unalterable, i.e. its frozen
+values, PDNARGS and PDPART cannot be updated. * ISCLOSURE returns 1 for
+such closures.
+
+-- An example ---------------------------------------------------------
+
+A fairly common use of partial application to create closures is to take
+a two-argument procedure, like -member- and then create a closure of it
+with some data "frozen" in to be used as the second argument. For
+example, using method 1 above, we can create a procedure called
+-iscolour- that recognizes colour names, thus:
+
+    vars iscolour
+
+Then
+    iscolour("green") =>
+    ** <true>
+
+    iscolour("pink") =>
+    ** <false>
+
+From version 14 Poplog it has been possible to define this as follows:
+
+    define iscolour =
+        member(%[red orange yellow green blue indigo violet]%)
+    enddefine;
+
+which has the advantage that VED operations like ved_mcp, ved_lcp, etc
+will work on this.
+
+If a procedure is partially applied to more arguments than it requires,
+then on every call it will leave the surplus items on the user stack.
+This may be a source of bugs. Equally it can be useful. For example, to
+define a procedure that always returns the number 99 partially apply
+identfn to 99:
+
+    define return99 = identfn(%99%)
+    enddefine;
+
+    return99() =>
+    ** 99
+
+An example of identfn partially applied to two arguments can be found in
+the definition of read_typespec in LIB * TYPESPEC_UTILS. (Not suitable
+for beginners!)
+
+
+-- Examining closures -------------------------------------------------
+
+Various procedures are available to interrogate closures:
+
+To find out how many frozen values there are, use -datalength-
+
+    datalength(iscolour) =>
+    ** 1
+
+-datalist- will list them
+
+    datalist(identfn(%1, 2, "cat", "dog"%)) =>
+    ** [1 2 cat dog]
+
+To access or update individual frozen values, the subscriptor -frozval-
+is provided:
+
+    frozval(1, iscolour) =>
+    ** [red orange yellow green blue indigo violet]
+
+We can extend the list of colours thus
+    [pink brown black ] <> frozval(1, iscolour) -> frozval(1, iscolour);
+
+    iscolour("pink") =>
+    ** <true>
+
+The procedure used in a closure can be accessed or updated using
+-pdpart-
+
+    pdpart(iscolour) =>
+    ** <procedure member>
+
+
+-- Closures of traced procedures --------------------------------------
+(See HELP * TRACE, for information on traced procedures)
+
+If the pdpart procedure is traced after the closure is created, the
+traced version will not be accessed by the closure:
+
+    trace member;
+    iscolour("pink") =>
+    ** <true>
+
+However the traced version can be installed in the closure, using the
+updater of -pdpart-
+
+    member -> pdpart(iscolour);
+
+    iscolour("pink") =>
+    > member pink [pink brown black red orange yellow green
+            blue indigo violet]
+    < member <true>
+    ** <true>
+
+Similarly, it will have to be re-installed after UNtracing member.
+
+
+-- How closures work --------------------------------------------------
+
+Suppose P is a procedure requiring N arguments. If we create a closure
+of P with only K arguments (K <= N), e.g.
+
+    P(Arg1, Arg2, ... ArgK%)
+
+then when the closure is run, all that happens is that the K arguments
+are put on the stack and then P is run. If P requires more than K
+arguments the remainder should have been placed on the stack previously.
+
+For example, if P is a procedure requiring five numbers as arguments,
+then a closure C with three "frozen values" can be made thus:
+
+    vars C = P(%3, 4, 5%);
+
+Because P has to be run with five arguments, C must be called with two
+arguments, e.g.
+
+        C(1, 2);
+
+In that case, when C puts 3, 4, and 5 on the stack, 1 and 2 will already
+be there. Hence P will find and remove five items when it runs. This
+explains why only the LAST K arguments for a procedure a "frozen" by
+partial application.
+
+
+-- Notes --------------------------------------------------------------
+
+1. A closure can itself be partially applied. E.g. C(%2%) is a closure
+which, when run, will require only one additional argument.
+
+2. A closure can be created with no frozen values, e.g. P(%%) is
+equivalent to P except that its pdprops, pdnargs, etc can be altered
+independently of P, and "==" will not recognize them as the same
+procedure.
+
+3. When a closure of P is run, the call-stack contains no information
+that P was called from the closure. So, for example -iscaller- will not
+find the closure, though it will find P.
+
+
+-- See also: ----------------------------------------------------------
+
+
+For information on procedures that work with CLOSURES see
+HELP *PARTAPPLY - details of constructing a closure.
+     *PDPART    - getting the procedure a closure was built from
+     *PDNARGS   - getting or setting the number of arguments required
+     *FROZVAL   - getting the values "frozen" into a closure
+     *ISCLOSURE - is something a closure? (Returns 1 if protected)
+     *PDPROPS   - a field holding information about a proceudure
+     *UPDATER   - updaters and 'selectors'
+
+See also HELP *ROUNDBRA - for use of brackets in closure syntax
+
+REF * POPSYNTAX - gives the syntax of POP-11
+REF * DATA      - describes data-types in POP-11
+REF * PROCEDURE - describes types of procedures and operations on them.
+REF * consclosure
+        - describes the basic closure constructor
+REF * VMCODE    - describes some of the underlying mechanisms
+
+TEACH * PERCENT - contains simple tutorial information on closures
+
+
+--- C.all/help/closures ------------------------------------------------
+--- Copyright University of Sussex 1991. All rights reserved. ----------

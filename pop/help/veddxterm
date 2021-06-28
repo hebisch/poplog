@@ -1,0 +1,139 @@
+HELP VEDDXTERM                                   Robert Duncan, Oct 1990
+
+Using VED with the DECwindows terminal emulator.
+
+
+    CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Introduction
+ -- Screen Handling
+ -- Function Keys
+ -- Notes for Ultrix Users
+ -- Notes for VMS Users
+
+
+-- Introduction -------------------------------------------------------
+
+DXTERM is the DECwindows VT320 terminal emulator. For best performance
+with VED, you should run the emulator in either VT100 or VT300/7-bit
+mode.
+
+To configure VED to work with DXTERM, call the procedure
+
+    veddxterm();
+
+or (equivalently) give 'dxterm' as the argument to *VEDUSETERM:
+
+    veduseterm('dxterm') -> ;
+
+Placing either of these commands at the start of your "vedinit.p" file
+will cause VED to configure itself for DXTERM automatically each time it
+is invoked.
+
+If you don't want to commit yourself to DXTERM every time, you can use
+*VEDTERMINALSELECT to make VED query the terminal's answerback message;
+just add the following lines to your "vedinit.p" file:
+
+    if vedterminalselect then
+        ['\^[[c'
+            ['[?63;1;3;4;6;8;9;15;16;29c' 'dxterm']
+            ^^vedterminalselect
+        ] -> vedterminalselect;
+    endif;
+
+This will configure VED for DXTERM only if the terminal responds with
+the correct identification string. To ensure that the terminal does send
+the correct string you should select the "DECterm ID" option from the
+terminal's "Customize/General..." menu.
+
+
+-- Screen Handling ----------------------------------------------------
+
+Once VED has been configured for DXTERM, it can automatically determine
+the size of the terminal window and adjust its display parameters
+accordingly. This is done each time VED is called from the POPLOG
+top-level and (on UNIX systems) when re-entering VED after a suspend. If
+the window size changes while editing, VED will not react immediately to
+the change, but you can force the readjustment by calling the procedure
+
+    vedxrefresh();
+
+This is normally bound to the two-stroke function-key sequence
+
+    PF1 PF1
+
+(see below). Alternatively, you can go to the POPLOG top-level by doing
+
+    <ENTER> pop
+
+and then return straight away to VED; this has the same effect.
+
+
+-- Function Keys ------------------------------------------------------
+
+The DXTERM library assumes that the keyboard is configured as a
+VT220-type keyboard, so the basic function key mappings are as described
+in HELP * VT220KEYS. This key map can be displayed at any time by
+pressing the grey "Help" key.
+
+There are however two differences between the DXTERM keymap and the
+standard VT220 keymap:
+
+    (1) the key F11 generates a single "escape" (ESC) character, so the
+        block of keys F11 - F14 has been reorganised as follows:
+
+
+               F11               F12      F13      F14
+             +--------+        +--------+--------+--------+
+             |        |    Esc | mark   | move   | copy   |
+             |        |   +Key | begin  | in     | in     |
+             +  ESC   +    ----+--------+--------+--------+
+             |        |    KEY | MARK   | MOVE   | COPY   |
+             |        |        | END    | RANGE  | RANGE  |
+             +--------+        +--------+--------+--------+
+
+        The missing functions ("mark top file" and "mark end file") can
+        be obtained with the commands:
+
+            <ENTER> mbf
+            <ENTER> mef
+
+    (2) The double keystroke sequence
+
+            PF1 PF1
+
+        is mapped onto the procedure VEDXREFRESH rather than a plain
+        refresh.
+
+Note that to enable the grey function keys, you must be running the
+terminal emulator in VT300 mode; in VT100 mode, only the application
+keypad is available, although the bindings for the keypad keys are the
+same in both cases.
+
+
+-- Notes for Ultrix Users ---------------------------------------------
+
+When using DXTERM to run a login shell, the TERM environment variable is
+set by default to "vt200" or "vt300". Without any modifications to your
+"vedinit.p" file, VED will use the termcap entry for the VT200/300 to
+configure itself for the terminal. This should work quite sufficiently
+for most purposes, even if the terminal window is a non-standard size.
+The only deficiency with this setup is that VED won't readjust itself to
+any subsequent change in window size: you must use the DXTERM setup
+described above in order to enable this feature.
+
+
+-- Notes for VMS Users ------------------------------------------------
+
+On VMS systems, VED always uses VEDTERMINALSELECT to determine
+automatically the type of terminal in use. The default value of
+VEDTERMINALSELECT does not include an entry for DXTERM, so without any
+modifications to your "vedinit.p" file the terminal will be recognised
+as a standard VT220-type terminal. This will work sufficiently provided
+that the terminal window is a standard size (24 rows x 80 columns); if
+you want to use different-sized windows you should add the DXTERM entry
+to VEDTERMINALSELECT as described above.
+
+
+--- C.all/help/veddxterm
+--- Copyright University of Sussex 1990. All rights reserved. ----------

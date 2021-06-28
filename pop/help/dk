@@ -1,0 +1,346 @@
+HELP DK                                               A. Sloman Jan 1991
+
+    <ENTER> dk
+    <ENTER> dk <function name>
+
+In VED this command allows you to define a key (or sequence of keys),
+i.e. to associate some VED function with a keyboard action.
+
+It can be used either with or without a VED function name as argument.
+The difference is explained below. The <function name> can be a complex
+VED ENTER command.
+
+ENTER DK gives you the option of making the definition temporary, or
+making it permanent, by storing it in your vedinit.p file, which is read
+in whenever you start up VED. (See HELP * INITIAL)
+
+    CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- How to use it
+ -- Three examples
+ -- What happens when you use ENTER dk
+ -- Making the definition temporary or permanent
+ -- Indicating which keys you wish to define
+ -- If you have specified an argument
+ -- If you have not specified an argument
+ -- How to specify <function name> arguments
+ -- When you can omit 'enter' in case (d)
+ -- Moving the text inserted by <ENTER> dk
+ -- Further information
+
+
+-- How to use it ------------------------------------------------------
+
+Type
+
+    <ENTER> dk
+
+This is used to define a function key or key sequence as an abbreviation
+for a longer sequence.
+
+Aternatively,
+
+    <ENTER> dk <function name>
+
+This is used to map a function key or key sequence onto an existing VED
+function. For a list of the most widely used VED functions see
+HELP * LOGICAL_KEYS.
+
+More complete lists are provided in REF * VEDPROCS, REF * VEDCOMMS.
+
+More details on how to specify the <function name> are given below.
+
+
+-- Three examples -----------------------------------------------------
+
+Example 1. Suppose you wanted to define the key sequence <ESC> 4 to be
+equivalent to VED's logical key LINEDELETE (which deletes the whole of
+the current line). Do the following
+
+1.1  <ENTER> dk linedelete
+
+1.2  You will be asked whether you want it to be permanent. Type n (for
+     "no", assuming you are just testing this mechanism, or "y" if you
+     want it to be permanent)
+
+1.3  You will then be shown an incomplete vedsetkey command, and the
+     instruction on the status line will say
+
+        PRESS KEY(S) THEN PRESS <ESC> THREE TIMES
+
+     You should then press <ESC> then 4 (or whatever keys you want to
+     map onto the LINEDELETE function) then press <ESC> three times
+
+The command is then automatically completed and compiled. After that
+you can try it out e.g. by putting the cursor on the next line and
+pressing <ESC> 4. It should delete the line.
+
+                  --------------------------
+
+Example 2. Suppose you have a function key that you want to define as
+equivalent to <ENTER> jjp (i.e. right justify and align current
+paragraph). (See REF * VEDCOMMS/ved_jjp) Then you should do the
+following
+
+2.1  <ENTER> dk enter jjp
+
+2.2  Press "n" to make it temporary
+
+2.3  Press the function key (or required key sequence) then press
+     <ESC> three times.
+
+You can then test the key by putting the cursor in some messy
+text bounded
+by blank lines, such as this paragraph,
+and then see what happens
+when you press the key or key sequence.
+
+                  --------------------------
+
+Example 3. Suppose you have a file in your $poplib directory called
+"info.doc" in which you store reminders of various kinds, and you want
+to make a particular function key read that file into VED. Do the
+follwing:
+
+3.1  <ENTER> dk ved $poplogin/info.doc
+
+2.2  Press "n" to make it temporary, "y" if you want it to be permanent
+
+2.3  Press the function key (or required key sequence) then press
+     <ESC> three times.
+
+
+-- What happens when you use <ENTER> dk -------------------------------
+
+It creates or reads in a VED file, and inserts a command to define a new
+key mapping, using the Pop-11 function -vedsetkey-. It then compiles the
+command.
+
+The file is either a temporary VED file, or your vedinit.p file. The
+command to be created has one of the following two forms.
+
+    define :ved_runtime_action;
+        vedsetkey(<string1>, <string2>);
+    enddefine;
+
+    define :ved_runtime_action;
+        vedsetkey(<string1>, <ved function>);
+    enddefine;
+
+The first form is produced if you give the ENTER dk command with no
+<function name> argument. The second form is produced if you use
+<ENTER> dk with an argument, as in the examples above.
+
+The commands are defined as 'Ved runtime action' procedures. This means
+that when compiled as part of your vedinit.p, they will be executed only
+when Ved starts up. They are run after any standard settings for the
+keys have been performed, immediately before your vedinit() procedure is
+called.
+
+
+-- Making the definition temporary or permanent -----------------------
+
+When you give the command, it first asks if you want the key definition
+to be permanent. Press "y" if you do, otherwise "n", to make it
+temporary.
+
+It will then give you instructions, and edit a temporary file or your
+vedinit.p file accordingly.
+
+
+-- Indicating which keys you wish to define ---------------------------
+
+In the file it inserts part of the required command of the form
+
+    ;;; Inserted by <ENTER> dk
+    define :ved_runtime_action;
+        vedsetkey('
+
+The keys you press next, will insert the characters corresponding to
+<string1> above. You will see the character codes for your keys inserted
+into the command. If you make a mistake you can delete characters by
+pressing <ESC> then <DEL> for each unwanted character. (Or interrupt
+with CTRL-C, or whatever your interrupt key is.)
+
+When you have finished specifying the key or keys you want to define,
+you should press the <ESC> key three times to indicate this. You may
+then see something like this:
+
+        vedsetkey('\^[4',
+
+to indicate that you are defining ESC 4.
+
+
+-- If you have specified an argument ----------------------------------
+
+If you have given a <function name> to specify what you want the key to
+refer to then the definition will immediately be completed and then
+compiled, and the new key can be used immediately. (See below
+for possible formats).
+
+
+-- If you have not specified an argument ------------------------------
+
+Then you will be asked to press a sequence of keys to indicate what
+sequence you are abbreviating. As before you should first press the
+required keys then finish by pressing <ESC> three times, and if you make
+a mistake you can delete characters by typing <ESC> <DEL>.
+
+So if you do not specify an argument then it will twice go into a mode
+in which it tells you to press keys and terminate by pressing the <ESC>
+button three times.
+
+The first time it is reading in the characters generated by the key or
+key sequence which you are defining  i.e. <string1>. The second time it
+is reading in the characters which you want to be simulated when you
+press the key(s), i.e. <string2>. In neither case should you use a
+sequence involving three <ESC> characters in a row.
+
+
+WARNING: do not define a key sequence as an abbreviation for a key
+sequence including itself. That will cause infinite loops.
+
+
+-- How to specify <function name> arguments ---------------------------
+
+There are four formats that you can give for the argument to specify
+which built in VED function you want your keys to invoke.
+
+(a) you can type the full function name, e.g.
+
+        <ENTER> dk vedlinedelete
+        <ENTER> dk vedenter
+        <ENTER> dk ved_jjp
+        <ENTER> dk ved_d
+        <ENTER> dk enter
+
+The last one can be used to define a function key that is equivalent
+to <ENTER> (e.g. if you do not have a convenient <ENTER> key on your
+keyboard.)
+
+(b) you can type the LOGICAL name of a function by simply omitting
+'ved' from the beginning. E.g.
+
+        <ENTER> dk linedelete
+        <ENTER> dk enter
+        <ENTER> dk swapfiles
+
+(c) you can type the form of an <ENTER> command without any additional
+arguments that you would like to have mapped onto a function key, e.g.
+
+        <ENTER> dk enter y
+        <ENTER> dk enter d
+        <ENTER> dk enter jjp
+        <ENTER> dk enter q
+
+(d) you can use dk to define a key that invokes an <ENTER> command with
+an argument, e.g.
+
+        <ENTER> dk enter ved default.file
+or
+        <ENTER> dk ved default.file
+
+You will then define a key whose effect is the same as the command
+
+        <ENTER> ved default.file
+
+This will create a rather complex vedsetkey command in the file. For
+example, if you map that onto the sequence <ESC> 5, it will create and
+compile a command of the form:
+
+        vedsetkey('\^[5', veddo(% 'ved default.file' %) );
+
+The next section explains when you can use "<ENTER> dk ..." instead of
+the full "<ENTER> dk enter ..."
+
+
+-- When you can omit 'enter' in case (d) ------------------------------
+
+As the last example shows, you can sometimes leave out "enter" after
+"dk". This is restricted to cases where the command unambiguously
+indicates your intention to map the key sequence onto an <ENTER> command
+with arguments. It is unambiguous only where there is a space in the
+argument following "dk". For example, suppose you wanted to define a key
+to swap the line under the cursor with the one below: i.e. delete the
+current line (<ENTER> dl), move one line down (<ENTER> ml), then yank
+back the deleted line (<ENTER> yankl). This sequence can be achieved in
+VED in one command using the ved_do procedure (see REF *
+VEDCOMMS/ved_do), thus
+
+    <ENTER> do;dl;ml;yankl
+
+that command has no spaces, so you would have to map it onto a key using
+
+    <ENTER> dk enter do;dl;ml;yankl
+
+However, you can leave a space after "do", so the key can be defined
+more simply by
+
+    <ENTER> dk do ;dl;ml;yankl
+
+as this unambiguously specifies a command with an argument, which must
+therefore be an <ENTER> command.
+
+
+-- Moving the text inserted by <ENTER> dk ----------------------------
+
+HELP * INITIAL has a section headed
+
+ "Warning: put VED customisation in a procedure vedinit()"
+
+Because <ENTER> dk inserts
+
+    define :ved_runtime_action;
+        ...
+    enddefine;
+
+around the vedsetkey commands, it is not necessary to move them inside
+your vedinit() procedure, since (as explained above) this causes them to
+be run after any standard settings for the keys have been performed, and
+immediately before vedinit() is called.
+
+However, you can do this if you wish (it saves a certain amount of
+space). Note that only the vedsetkey commands need be moved; the
+define ... enddefine wrappers can be removed.
+
+
+-- Further information ------------------------------------------------
+
+HELP * VED
+    Overview of VED facilities
+HELP * VEDKEYS
+    List of default VED key mappings
+HELP * LOGICAL_KEYS
+    Logical names of common VED keys
+HELP * VEDMACROS
+    Explains how to use ENTER dm to define new VED ENTER commands.
+HELP * VEDSET
+    A convenient format for customising VED key mappings, screen
+    control etc (if you know VED well and know the terminal well).
+HELP * VEDSETKEY
+    A more primitive mechanism for specifying VED key mappings
+HELP * TERMINAL
+    Overview file describing how to configure VED for a terminal
+HELP * INITIAL
+    Information on initialisation in Poplog (including VED)
+HELP * STRINGS
+    On the syntax for strings in Pop-11
+HELP * ASCII/strings
+    How to represent special characters in strings, e.g. ESC and
+    control characters
+
+REF * VEDTERMINALS
+    More detailed information on how VED accomodates itself to
+    different terminals
+REF * VEDPROCS
+    List of VED system procedures, many of which can be mapped onto
+    function keys or key sequences.
+REF * VEDCOMMS
+    List of VED enter commands. Those that need no argument can be
+    mapped onto VED function keys or key sequences.
+REF * VEDCOMMS/ved_do
+    How to give multiple commands on the command line
+
+
+--- C.all/help/dk
+--- Copyright University of Sussex 1993. All rights reserved. ----------

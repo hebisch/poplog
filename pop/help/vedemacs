@@ -1,0 +1,626 @@
+HELP VEDEMACS                                  Mark Rubinstein  May 1986
+                                            Updated A. Schoter  Mar 1990
+                                                       A.Sloman Oct 1990
+LIB VEDEMACS
+
+VEDEMACS is a library that modifies both the terminal setting (on Unix
+systems) and VED's key mapping to make VED respond to key presses in a
+way that is similar to a subset of the UNIX EMACS editor. Full details
+are given below. Some, but not all, of the facilities, will also work on
+VMS.
+
+The specification is not guaranteed to be the same as all other versions
+of EMACS.
+
+The older LIB EMACS, described in HELP EMACS is now superseded.
+
+
+CONTENTS - (Use ENTER g to access sections)
+
+ -- Introduction
+ -- Making VEDEMACS commands available
+ -- Some Necessary Notation and Definitions
+ -- UNIX Control Characters Changed by LIB VEDEMACS
+ -- Disclaimer
+ -- Important differences between EMACS and POPLOG VEDEMACS
+ -- Query-replace in VEDEMACS and VED
+ -- "Mark" facility in VEDEMACS
+ -- POPLOG extras
+ -- ENTER Commands provided for LIB VEDEMACS
+ -- Standard EMACS facilities
+ -- Character Operations
+ -- "Tracking" end of line (track_eol)
+ -- Word Operations
+ -- Line Operations
+ -- Sentence Operations
+ -- Paragraph Operations
+ -- Getting Out
+ -- Screen and Screen Operations
+ -- Buffer and File Operations
+ -- Help and Helper Functions
+ -- Search
+ -- Replace
+ -- Region Operations
+ -- Macro Operations
+ -- The VED Dired directory browser [Unix Only]
+ -- See also
+
+-- Introduction -------------------------------------------------------
+
+VED is a powerful editor with facilities that are in some ways similar
+to those of Emacs and in some ways different. Experience shows that
+there are some users who much prefer VED and some who much prefer Emacs.
+
+For the latter it is possible to tailor VED to give a partial Emacs
+emulation although some small details remain different. The library file
+LIB VEDEMACS, which provides the emulation, can be compiled in your
+vedinit.p file, or a saved image can be created with the EMACS emulation
+built in, which speeds up initialisation. For help with the latter ask
+your Poplog supplier. (Sample command files for creating saved images
+start with "mk" in the directory $usepop/pop/com on Unix systems and
+$usepop:[pop.com] in VMS.)
+
+If you wish to have VED always run in Emacs mode, you can insert the
+line
+
+    uses vedemacs
+
+at the end of your vedinit.p file in your $poplib directory (your login
+directory by default). More information on tailoring VED and Poplog is
+provided in the file HELP * INITIAL ($usepop/pop/help/initial on Unix
+systems and $usepop:[pop.help]initial on VMS).
+
+For many terminals VED will tailor itself to the screen without your
+taking any action. In particular, it uses the termcap information file
+on Unix systems.  However, you may find that it does not do exactly what
+you need if you have a non-standard terminal or if you do not have a
+termcap file with a suitable entry. In that case you may need to read
+the files that describe the initialisation and terminal recognition
+process:
+
+    REF * VEDTERMINALS
+    HELP * TERMINAL
+
+The former file is in the directory $usepop/pop/ref and the latter in
+$usepop/pop/help
+
+For more information on setting up the terminal, see the Poplog
+Administrator's Guide.
+
+
+-- Making VEDEMACS commands available ---------------------------------
+
+If Vedemacs has not yet been set up for you, you can give the following
+command to Pop-11,
+
+    lib vedemacs
+or
+    uses vedemacs
+
+Either of these commands can be put into your 'vedinit.p' file compiled
+automatically when you start up VED. See HELP INITIAL.
+
+Or, if you have already got into VED, you can set up VEDEMACS by doing
+
+    ENTER lib vedemacs RETURN
+
+
+-- VED logical functions ----------------------------------------------
+
+There are several VED functions provided by default on most keyboards,
+either mapped onto function keys, or else other key sequences, as
+described below. The most commonly used functions have been given
+shorthand names, summarised in the file HELP * LOGICAL_KEYS.
+
+The terminology is not the same as that normally used in connection with
+Emacs, the explanations should be clear to an experienced Emacs user.
+
+Additional VED facilities are described in the files REF * VEDPROCS and
+REF * VEDCOMMS
+
+
+-- Some Necessary Notation and Definitions ----------------------------
+
+VED, like Emacs, maps every character read in onto some function.
+Occasionally several characters have to be read in before VED selects
+the appropriate function.
+
+If the character typed in has not been mapped onto a special function,
+then it simply goes into the buffer (i.e. no special insert command is
+needed). All of the printing characters have this role, unless they are
+preceded by a special character, such as ESC or a control character.
+
+Most commands are control characters or other characters prefixed by
+ESCAPE or a CONTROL-X.  Escape is sometimes called META or ALTMODE in
+EMACS. In VED documentation it is referred to as ESC or <ESC>.
+
+There are also additional commands preceded by ESC-x and typed on the
+command line. Any VED command described in REF * VEDCOMMS may be
+invoked in this way.
+
+Notation (similar to that used in VAX UNIX EMACS manual):
+
+^       A control character ^F means "control F" or "CTRL-F". I.e.
+        while holding down the CTRL key pres the F key.
+
+ESC-    A two-character command sequence where the first character is
+        ESCAPE (the ESC key usually).  ESC-F means "ESCAPE then F"
+
+ESC-X string    A command designated "by hand".  "ESC-x help" means
+        press "ESC" then "x" then "help" then RETURN
+
+dot     EMACS term for the current cursor position in the edit buffer.
+
+mark    A location in the buffer used by region commands, and set
+        by a key sequence to save the current position.
+
+region  The area between the location of dot and mark i.e. between
+        current location and last set location.
+
+
+-- UNIX Control Characters Changed by LIB VEDEMACS --------------------
+
+On Berkeley UNIX and AT&T System V UNIX systems LIB * VEDEMACS changes
+some of the control characters used by the operating system for system
+functions.
+
+^C will always exit the editor and Poplog (equivalent to ENTER qq in
+VED) and ^G becomes the interrupt key. Where it is not possible to
+re-set ^C (e.g. on VMS), the "qq" command can be used instead, i.e.
+ESC-x qq RETURN
+
+^S and ^Q are changed by LIB VEDEMACS so that they no longer stop and
+start output, as they have special EMACS functions -- when the Unix
+system and network software permits.
+
+In some contexts (e.g. remote login, or on VMS) this doesn't work, and
+alternative commands are made available (ESC-s as an alternative to ^S,
+and the "qc" command as an alternative to ^Q), as described below.
+(Standard VED does not use ^S and ^Q, so that they remain available for
+flow control.)
+
+
+-- Disclaimer ---------------------------------------------------------
+
+Please note that LIB VEDEMACS does not purport to be a complete EMACS
+implementation. It is merely intended to enable an experienced EMACS
+user to feel reasonably comfortable starting to use VED, by providing
+the same default functions for most of the frequently used key
+sequences. Many of the fancier things done in EMACS, such as defining
+new commands, have to be done differently in VED. See the VED User
+Guide, and the online HELP * VED file for an overview of documentation
+on VED facilities.
+
+
+-- Important differences between EMACS and POPLOG VEDEMACS ------------
+
+This section is for experienced EMACS users.
+
+a. The ^@ character (i.e. ASCII 0 - the "null" character) is ignored
+   by VED because it is used as a padding character by some terminals
+   (and hence VED's character tables are indexed from 1 upwards).
+
+   So the key sequence to set the EMACS "mark" is not ^@ but ESC-@ or ^^
+   (i.e. CTRL-^). This command "remembers" the current cursor location,
+   for use with "region" commands.
+
+b. ^S (Search) does not always work as required via networks (or on
+   VMS), so the sequence ESC-s is provided as an optional alternative
+   search command in VEDEMACS.
+
+   There is not, at present, any regular expression search. (See
+   HELP * VEDSEARCH for information about "pattern" characters in
+   VED search strings.)
+
+c. ^Q (Quote character) also does not always work, so, as an optional
+   alternative, the COMMAND "qc" is provided (in the form of the VED
+   procedure ved_qc, invoked from VEDEMACS as "ESC-x qc RETURN". This
+   waits for you to type in a character then inserts it in the VED
+   buffer. As an alternative the VED "ENTER ic" command can be used.
+   See HELP * IC.
+
+d. ^Y (yank last thing killed) may not work on VMS. So an alternative
+   yank command is provided: ^X-y
+
+e. The ESC-? command, for obtaining help, is replaced by ESC-#. This
+   is because on many terminals emulating VT100 or VT220 functionality,
+   VED sets the numeric keypad into a mode in which it can be used for a
+   variety of useful functions, e.g. moving the cursor in 8 directions,
+   and using ESC-? would disable this. (See HELP * VT100KEYS). Users
+   who want ESC-? to have its standard Emacs function can put the
+   following line into their vedinit.p file
+
+        vedsetkey('\^[?', vedentervedinsertstring(%'vh '%));
+
+
+f. The full kill-ring mechanism is not provided. VED remembers the last
+   marked range deleted (retrievable using the "y" command), the
+   last full line deleted (retrieved using "yankl"), the last part
+   line or word deleted (retrieved using "yankw") and the last text
+   portion removed via ved_cut or ^W in EMACS, (retrieved using
+   "splice"). (See HELP * YANK) The VEDEMACS delete procedures set the
+   appropriate retrieve procedure to be the next thing invoked by the
+    ^Y command.
+
+g. The word case-change commands move the cursor past the word.
+
+h. The move word right and move word left commands move the cursor
+   up to the next word if in a space, or past the word to the near end
+   of the next word if already in a word. This means that it is always
+   possible to position the cursor at either the left or the right end
+   of a word using only these two functions.
+
+
+-- Query-replace in VEDEMACS and VED ----------------------------------
+
+The "query-replace" command (ESC-q) does not give the user the same
+set of options as the standard VED query-replace options described in
+HELP * VEDSEARCH. Instead it conforms to standard EMACS options as
+described under Query replace below (i.e. SPACE n . or ^G)
+
+This is done by modifying the VED query search procedure ved_s. The
+orignal version is available as oldved_s, and standard VED behaviour can
+be restored by giving the following command after the command to load
+lib vedemacs:
+
+    oldved_s -> ved_s;
+
+-- "Mark" facility in VEDEMACS ----------------------------------------
+
+Up to V.13 Poplog the VEDEMACS "mark" facility used the VED "marked
+range" facility which allowed only complete lines to be marked, as
+described in HELP * MARK.
+
+This is now fixed. The "set mark" command (ESC-@ or ^^) records the
+exact cursor location, including the position in the line.
+
+In order to see where the mark was set, type ^X-^X (i.e. CTRL-X
+twice), then do it again. The sequence ^X-^X swaps the current position
+with the "mark" position. So the cursor will alternate between the two
+positions, making them visible.
+
+^W will kill the text between the two positions, and the next ^Y will
+re-insert it where the cursor is. (These use the VED facilities ved_cut
+and ved_splice.)
+
+The section on POPLOG facilities below indicates how to set a standard
+VED marked range.
+
+
+-- POPLOG extras -------------------------------------------------------
+
+The following items are provided in POPLOG EMACS
+ ESC-x   Enter the command line (like ENTER in VED)
+
+ ^^      PUSH current location onto VED position stack (VEDPUSHKEY)
+         (mark current location, in emacs)
+
+ ^X-^D   Load the marked range  (like ENTER lmr)
+
+ ^X-^E   Load the current procedure (like ENTER lcp)
+
+ ^X-f    Mark current line as first line of VED's marked range
+         (VEDMARKLO) See HELP * MARK
+
+ ^X-l or
+ ^X-@    Mark current line as the last line of the VED's marked range
+        (VEDMARKHI)
+
+
+-- ENTER Commands provided for LIB VEDEMACS ---------------------------
+
+Standard VED commands are described in REF * VEDCOMMS. The following
+are made available by LIB VEDEMACS.
+
+(Note that a Pop-11 procedure called ved_xxx is invoked as ENTER xxx,
+with additional facilities described in HELP * VEDCOMMANDS.) So ved_hug
+is invoked as ENTER hug.
+
+
+ved_hug (With optional argument "on" or "off")
+      Toggles end of line hugging, on or off.
+
+ved_qc (In case ^Q does not work)
+      Waits for next character to be typed in, then inserts it in
+      buffer. (See also HELP * IC)
+
+There are many other features provided by VED, such as, directory search
+lists (see HELP *VEDSEARCHLIST), automatic adaptation to different types
+of files (see HELP *VEDFILETYPES), "compile marked range", automatic
+recognition of which compiler to use, "immediate mode" (See HELP *IM),
+and VED's ability to remember the last 60 commands typed on the command
+line so that they can easily be redone, possibly after minor editing
+(see HELP *VEDCOMMANDS), a tailorable cross-reference mechanism for
+interactive browsing (see HELP *VEDGETSYSFILE). VED provides standard
+customisations for a range of keyboards. See the list in HELP *INITIAL.
+
+For an overview of online documentation on VED see HELP * VED.
+
+For an overview of commands see REF * VEDCOMMS. For an overview of VED
+KEY functions see HELP * VEDKEYS. REF * VEDPROCS and REF * VEDVARS give
+information about additional procedures and global variables used to
+control VED.
+
+VED is in fact simply a collection of POP-11 procedures, which can
+easily be extended, and many of which can be redefined by users.
+
+
+-- Standard EMACS facilities ------------------------------------------
+
+The remainder of this file defines the standard EMACS facilities
+provided by LIB VEDEMACS.
+
+-- Character Operations ------------------------------------------------
+
+^B      Move Left (Back)
+^F      Move Right (Forward)
+^P      Move up (Previous)  (See next section)
+^N      Move Down (Next)    (See next section)
+^H or BS or DEL (or RUBOUT)
+        Delete left
+^T      Transpose previous 2 characters (ht_ -> th_)
+^Q      Literally inserts (quotes)the next character typed (e.g. ^Q-^L)
+        (If ^Q doesn't work, use the "qc" command)
+^U-n    Provide a numeric argument of n to the command that follows (n
+        defaults to 4.  E.g. try ^U-^N and ^U-^U-^F)
+^M or CR or RETURN
+        insert newline.
+^J or NL or LF or LINEFEED
+        insert newline followed by an indent
+
+
+-- "Tracking" end of line (track_eol) ---------------------------------
+
+The default setting is not to "hug" the right hand edge of text, so that
+moves up and down beyond the text are possible. This default can be
+over-ridden, to conform to standard EMACS by giving the command
+
+    ENTER track_eol    (NB use underscore, not hyphen.)
+or
+    ENTER hug
+
+The command can be given an optional argument "off" or "on" to switch
+end of line tracking off or on. If given no argument it simply toggles
+tracking on or off.
+
+(In EMACS the command is track-eol but this is inconsistent with the
+itemising rules of some Poplog languages.)
+
+
+-- Word Operations -----------------------------------------------------
+
+ESC-b   Move left (Back)
+ESC-f   Move right (Forward)
+ESC-d   Delete word right
+ESC-h   Delete word left
+ESC-c   Capitalize current word (i.e. first character only), then move
+        to next word.
+ESC-l   Lowercase whole word
+ESC-u   Uppercase whole word
+ESC-^   Invert case of word
+
+
+-- Line Operations -----------------------------------------------------
+
+^A      Move to the beginning of the line
+^E      Move to the end of the line
+^O      Open up a line for typing
+^K      Kill from dot to end of line (^Y yanks it back at dot)
+^X-K    Kill from dot to beginning of the line (^Y yanks it back)
+^X-^K   Kill whole of current line (^Y yanks it back if non-empty)
+
+
+-- Sentence Operations ------------------------------------------------
+
+ESC-a   Move to start of current sentence or previous sentence
+ESC-e   Move to start of next sentence
+  Sentences are taken to be separated by one of ".", "?", "!"
+  followed by whitespace or a bracket, or else by blank lines.
+  All lines starting with "." are ignored, i.e. they are assumed to
+  be within-sentence formatting commands.
+
+
+-- Paragraph Operations ------------------------------------------------
+
+ESC-j   Justify the current paragraph
+ESC-[   Move to beginning of current or previous paragraph
+ESC-]   Move to beginning of the next paragraph
+  If the last two are used repeatedly they go to the next paragraph
+  each time.
+
+A paragraph boundary is either a blank line, or an indented line, or
+a line starting with "." (for use with troff/nroff formatting).
+
+
+-- Saving text and getting out of VED ---------------------------------
+
+^X-^S   Save the file being worked on
+^X-^W   Write the current buffer into a file with a different name
+^X-^M   Write out all modified files
+^X-Q or
+^X-^Q   Quit the current file with an option to write it (same as ^X-d)
+ESC-^X  Write and compile all program files, then exit to POP
+^C
+or ESC-^C
+or ^X-^C    Finish by exiting to the shell or DCL
+^_      Recursively push (escape) to a new shell (spawn new shell)
+
+
+-- Screen and Screen Operations ----------------------------------------
+
+^V      Show next screen page
+ESC-V   Show previous screen page
+^L      Redisplay screen
+^Z      Scroll screen up
+            (NOT available to Unix users who use ^Z as the suspend
+            character)
+ESC-Z   Scroll screen down
+ESC-!   Move the line dot (cursor) is on to the top of the screen
+ESC-,   Move cursor to beginning of window
+ESC-.   Move cursor to end of window
+^X-2
+    or
+^X-1    Resize current window
+^X-d    Quit current buffer
+
+^X-n
+    or
+^X-N
+    or
+^X 4 b  Move cursor to next window
+
+^X-o
+    or
+^X-P
+    or
+^X-p    Move cursor to previous window (vedswapfiles)
+
+^X-0    Move to previous window and switch windowsize.
+
+ESC-^V  Display the next screen page in the other window
+^X-^Z   Shrink window
+            (NOT available to Unix users who use ^Z as the suspend
+            character)
+^X-z    Enlarge window
+
+
+-- Buffer and File Operations ------------------------------------------
+
+^Y      Yank back the last thing killed (This may invoke ved_y,
+        ved_yankl, ved_yankw, or ved_splice, depending on what was
+        killed last! See "delete" operations.)
+^X-y    available as equivalent to ^Y
+^X-^V   Quit the current file and get another for editing
+^X-^R   Empty current file then read new one into current buffer
+^X-^I   Insert a file at dot (current location).
+^X-^O   Select a different buffer (it must already exist)
+^X-B    Same as ^X-^O
+^X-b    Same as ^X-^O
+^X-^F   Select a different buffer (it need not pre-exist)
+^X-^B   Display a list of available buffers
+ESC-<   Move to the top of the current buffer
+ESC->   Move to the end of the current buffer
+
+
+-- Help and Helper Functions -------------------------------------------
+
+^G      Abort anything at any time
+^X-?    Returns information on the next key sequence entered
+ESC-#   Find help about the given command name (try ESC-# deof)
+        (See comment above about ESC-?)
+^X-h    This works like ESC-h in standard VED as described in
+        HELP * DOCUMENTATION under "Searching for cross references".
+        I.e. if the cursor is to the left of a cross reference entry
+        (e.g. on the asterisk above) then ^X-h will fetch the
+        documentation file referred to (i.e. HELP DOCUMENTATION in the
+        above example). ESC-n will search for the next cross reference
+        within the current file.
+^X-H    like ^X h
+
+
+-- Search --------------------------------------------------------------
+
+The following commands prompt for a search string. Type in the string
+and then press RETURN
+
+^S      Search forward          (If ^S doesn't work, use ESC-s)
+^R      Search backward
+
+See HELP * VEDSEARCH for full details concerning search strings, etc.
+(See comment above about regular expressions.)
+
+
+-- Replace -------------------------------------------------------------
+
+The following commands prompt for a pair of search and replacement
+strings, separated by a "delimiter" as described in HELP * VEDSEARCH.
+End with RETURN
+
+ESC-r   Globally replace occurrences of one string with another
+
+ESC-q   Query replace, one string with another
+
+   The latter command gives you the option to accept or reject the
+   proposed replacement, and to specify that it should continue with
+   further replacements or not. Type one of the following characters:
+
+     SPACE  - do the replacement and continue searching for more
+
+     n      - don't do the replacement, but continue searching
+
+     .      - do the replacement, and terminate search
+
+     ^G     - Don't do the replacement, and terminate search
+
+To restore the standard VED search-and-replace options (RETURN, DEL, y,
+n) do the following after loading lib vedemacs:
+
+    oldved_s -> ved_s;
+
+
+-- Region Operations ---------------------------------------------------
+
+ESC-@ (or ^^) Set the mark (uses vedpositionpush)
+
+^X-^X   Interchange dot and mark (i.e. go to the other end of the
+        region). The cursor jumps to show the change, so this command
+        can be used twice to indicate the current region.
+
+^W      Kill region (^Y - or the command "splice" yanks it back at dot)
+        (This deletes only the text between the mark and dot positions.
+        The mark and dot positions should be thought of as being between
+        the location shown by the cursor and the previous character.)
+
+
+-- Macro Operations ----------------------------------------------------
+
+^X-(    Propmts for a character key and then starts remembering
+        keystrokes, ie. start defining a keyboard macro
+^X-)    Stop remembering keystrokes, ie. end the definition
+^X-e followed by a character
+        Execute remembered keystrokes assigned to given character key,
+        ie. execute the keyboard macro
+
+
+-- Automatic filename completion --------------------------------------
+
+VED has a library that provides automatic filename completion, including
+showing you possible options available if you have typed part of a file
+name.
+
+Full details are available in HELP * VEDFILECOMPLETE. By default the
+library maps the file completion facility onto the key sequence ESC 3.
+
+If you put the following into your vedinit.p file, then the library will
+be "autoloaded" the first time you try to use it by typing ESC 3
+
+    vedset keys
+        "filecomplete" = esc 3
+    endvedset;
+
+(You may map it onto a different key sequence if you wish.)
+
+
+-- The VED Dired directory browser [Unix Only] ------------------------
+
+This is loosely modelled on the EMACS dired facility. For full details
+
+    See HELP * DIRED [Unix only]
+
+Note that if you use the VED dired facility then three key sequences are
+taken over as described in HELP * DIRED, i.e ^X^D ^X^X and ^X^Z
+
+
+-- See also -----------------------------------------------------------
+REF * VEDTERMINALS
+HELP * TERMINAL
+REF * VEDPROCS
+REF * VEDVARS
+REF * VEDCOMMS
+
+HELP * DOCUMENTATION
+HELP * VED
+HELP * INITIAL
+
+--- C.all/help/vedemacs
+--- Copyright University of Sussex 1993. All rights reserved. ----------

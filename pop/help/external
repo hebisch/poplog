@@ -1,0 +1,1057 @@
+HELP EXTERNAL                                                Aled Morris
+                                            Robert James Duncan Jan 1987
+                                       Updated by Ian Rogers, 6 Nov 1990
+                                          Re-organised A.Sloman Jan 1991
+
+
+This help file is split into two parts:
+
+    1. An overview of the various external access capabilities of Poplog
+
+    2. One of the mechanisms for easily declaring, loading and unloading
+    procedures compiled externally to Poplog.
+
+See also HELP * NEWEXTERNAL for later extensions to these facilities.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Part 1
+ -- Overview of external capabilities
+ -- external_do_load
+ -- exload
+ -- exacc
+ -- cons_access
+ -- lib external
+ -- lib newexternal
+ -- lib XptWidgetSet
+ -- Using LIB external
+ -- Part 2
+ -- External - the syntax
+ -- Operation "declare"
+ -- Operation "load"
+ -- Operation "unload"
+ -- Extensions to Pop11
+ -- Arrays
+ -- Pointers
+ -- Call by reference
+ -- Structures
+ -- Details of C interface
+ -- Details of Fortran interface
+ -- Writing other language interfaces
+ -- Type specifiers
+ -- Full example
+ -- Known bugs
+ -- See also
+
+-- Part 1
+-- Overview of external capabilities ----------------------------------
+
+There are occasions when Pop11 is not suitable for a particular
+computation and the problem could be most easily solved by handing
+control over to another language and then waiting for the answer to come
+back.  For instance, when many numerical calculations are needed (e.g.
+multiplying very large matrices, or convolving an image) the most
+convenient language might be Fortran, or C.
+
+There are a number of different ways of accessing external data and functions
+from Pop11. They are referred to by the name of the procedure or library
+containing their functions, ie:-
+
+    - external_do_load
+    - exload
+    - exacc
+    - cons_access
+    - lib external
+    - lib newexternal
+    - lib XptWidgetSet
+
+More technical documentation on the basic mechanisms is provided in the
+following
+
+    REF * EXTERNAL, * DEFSTRUCT, * EXTERNAL_DATA
+
+
+-- external_do_load ---------------------------------------------------
+
+"external_do_load" is the name of a procedure.
+
+This is the most basic form, it is a procedure taking three arguments:-
+
+    The Mark Item (more on this later)
+    The input-file list
+    The symbol list
+
+The input file list, is a list of file names, specifying the object
+modules and archive files to search when loading the external
+identifiers.
+
+The symbol list, is a list of structures. Each structure specifies a
+particular external identifier and is used to return the data associated
+with it.
+
+See REF * external_do_load for further details
+
+
+-- exload -------------------------------------------------------------
+
+This is a syntactic variant of external_do_load; it also requires a mark
+item, a file list, and a sequence of external identifier specifications.
+
+The difference is that this form is "declarative" whereas
+-external_do_load- is procedural. Also, it is possible to specify some
+transformation to be performed on the external data when it is loaded
+into the Poplog identifier.
+
+See REF * exload for further details
+
+
+-- exacc --------------------------------------------------------------
+
+-exacc- is a Pop11 syntax construct for accessing external data. A
+programmer uses this by:
+
+    a. specifying the type of the data. This is done in a Pop11 syntax
+    which is independent of any particular foreign language, but which
+    can encompass all the types of data available in foreign languages.
+
+    b. specifying an expression which, when run, will produce an
+    external pointer record (an "exptr") which points to the data.
+
+    c. specifying an "access part", eg. a field name for structure
+    accesses.
+
+The construct then plants efficient in-line code to perform the access,
+or update, as required.
+
+See REF * exacc for further details
+
+
+-- cons_access --------------------------------------------------------
+
+The procedure -cons_access- can be used to construct access procedures
+which can do the same tasks as the inline code produced by -exacc-. The
+action of the access procedures are specified by Pop11 structures which
+represent the types of the external data, ie. the structure is the
+internal representation of the type syntax used by the -exacc- syntax
+forms etc. This representation is documented in REF * KEYS.
+
+See REF * cons_access for further details
+
+
+-- lib external -------------------------------------------------------
+
+LIB * EXTERNAL provides a foreign-language front end to the external
+load facilities. There are interfaces for C and Fortran currently
+provided in the Poplog libraries.
+
+These libraries also provide a second service to help novice users.
+Procedures, imported using this system, contain extra code to perform
+automatic coercions on procedure's input, and output, arguments. Eg.
+enabling arrays of floats to be passed directly to the procedures.
+
+This system has the disadvantage that only simple values (ie. integers
+and floats) can be returned from external procedures loaded in this way.
+
+This system is described more fully below
+
+
+-- lib newexternal ----------------------------------------------------
+
+LIB * NEWEXTERNAL is similar to LIB * EXTERNAL. The difference is that
+lib newexternal is the location for new features of the foreign language
+interface to be tried, before their integration into lib external.
+
+The new features for C are:
+
+    A completely new parser, and interface paradigm. The difference
+    between the paradigms presented by LIB * c_dec and LIB * newc_dec
+    (the new version) is in the level of help given to the programmer.
+    In essence, there is no automatic coercion performed on procedure's
+    input arguments. The exception to this is a "var args" (ie.
+    variadic function) capability. This should allow programmers to
+    write more efficient code.
+
+    The new interface also allows the programmer to specify C style
+    structure declarations. The return argument of external procedures
+    can be typed to be one of these structures, causing coercion to be
+    performed automatically on the return data.
+
+
+See HELP * NEWEXTERNAL for further details
+
+
+-- lib XptWidgetSet ---------------------------------------------------
+
+LIB * XptWidgetSet is a user/programmer friendly front end for providing
+easy access to X Widget sets and their associated convenience functions.
+
+Access is, notionally, via a property tree. The toplevel of the tree has
+one entry per widget set. The property at the second layer has list of
+entries for particular widgets etc.
+
+This tree structure provides useful help for the widget set interface
+programmer. The properties have "active" default values such that, if a
+required entry does not exist in the property, then the system will
+attempt to load a library as a means to augment the property. This means
+that the interface can be written in a very modular form while retaining
+a single access interface for the user.
+
+See REF * XptWidgetSet for further details
+
+
+-- Using LIB external -------------------------------------------------
+
+Facilities are provided in the Pop11 kernel for linking and calling such
+external procedures, but they are difficult to use.  This autoloading
+library attempts to provide an interface for the built in routines, in
+such a way that the user does not need to know the details of the
+mechanism for handling external procedures.
+
+The library file also provides a system which checks that actual
+parameters given to an external procedure conform to the formal
+parameter specification.
+
+This facility was inspired by the library NAGCALL, by David Young.  We
+are grateful to him for the help he gave in the design of the Fortran
+interface, and his general comments on the design of an interface for
+external routines.
+
+
+Note.   It is assumed that the reader is familiar with at least one
+        non-Poplog language, such as C or Fortran.  The reader should
+        also have some experience with Pop11, with knowledge of the
+        following data-structures: vectors, arrays, and strings, and
+        be aware of the distinction between single and double precision
+        decimals.
+
+
+-- Part 2
+
+-- External - the syntax ----------------------------------------------
+
+The general syntax form for "external" operations is:
+
+    external <word:O> <word:T>
+
+The type of operation performed is determined by the argument O, which
+should be one of the following:
+
+    declare     introduces a block of declarations.  Introduces a block
+                of language specific declarations.
+
+    load        invokes the system linker to fetch all external
+                procedures previously declared.  Introduces a block of
+                object file-names.
+
+    unload      frees the memory previously occupied by external
+                procedures
+
+Each operation will be discussed in detail.
+
+The word argument T denotes a tag which identifies a set of external
+procedures, and any valid Pop11 word may be used.  Thus two sets of
+"declare" operations with the same tag are taken to refer to a single
+set of procedures.  Also, a "load" operation can selectively load a
+single set of external procedures according to the tag used.
+
+
+-- Operation "declare" ------------------------------------------------
+
+The "declare" operation has two forms:
+
+(a) language specific:
+
+    external declare <word:T> in <word:L> ;
+
+    ;;; body
+
+    endexternal
+
+The argument T is the tag, and is used to refer to the set of external
+procedures declared in the body.  L is a word which names the language
+that the block specifies, for example "c" or "fortran".
+
+A language-specific parser is then invoked.  It's task is to read the
+declarations found in the body of the statement block, and create Pop11
+procedures which, when called, will run an external procedure.
+
+(b) Raw import mode:
+
+    external declare <word:T> ;
+
+    ;;; body
+
+    endexternal
+
+The body in this case is a sequence of words which are the linkers names
+for external procedures.  A Pop11 variable of the same name will be
+created to hold the raw external procedure at "load" time.  The syntax
+
+    <word:P> = <word:S>
+
+may also be used to import the linker symbol S to Pop11 variable P.
+
+
+Here is an example, using C syntax, of importing a procedure which takes
+two floating point numbers and returns their product:
+
+    external declare mytag in c;
+
+    float multiply(x, y)
+    float x, y;
+    {}
+
+    endexternal
+
+(for non-C users, the declaration reads: "multiply" is a function
+which returns a floating point decimal, and takes two arguments,
+both of which are floating point decimals).
+
+Notice the use of "{}" to indicate the end of a declaration. This is
+a feature of the C interface - each language system has its own
+separator.
+
+When the above example is compiled, a Pop11 variable named "multiply"
+will be created.  It's value will be a procedure, and the procedure,
+when executed will attempt to run an external procedure named
+"multiply".  Of course, the external procedure "multiply" does not
+exist until it has been linked in with "external load".
+
+Once linked, the Pop procedure "multiply" can be called like any other
+Pop11 procedure.  However, it will check that both its arguments are
+double precision floating point numbers.  When it is satisfied with its
+arguments, it will apply the C routine "multiply", and return the double
+precision decimal that C "multiply" returns.
+
+The procedure "multiply" could also be loaded in raw mode using the
+following example:
+
+    external declare rawtag;
+
+    multiply = _multiply;
+
+    endexternal
+
+After "load"ing, the Pop11 variable -multiply- will hold an external
+procedure, which can be called using -external_apply- (see
+REF * EXTERNAL).  Note the example is from a machine ruinning the Unix
+operating system - in "raw" mode it is the responsibility of the user to
+utilise any linker conventions on external label names.
+
+
+-- Operation "load" ---------------------------------------------------
+
+The syntax of the "load" operation is:
+
+    external load <word:T> ;
+
+    ;;; body
+
+    endexternal
+
+The body in this case is a sequence of object files to link.  The files
+can be specified in one of three ways:
+
+    1   as a word, in which case an operating system dependent suffix is
+        appended.  (in Unix, this is '.o', in VMS, '.obj').
+
+    2   as a string, in which case the filename is passed unchanged
+        (this permits you to use non-standard suffixes, such as '.a')
+
+    3   as a library specification.  This must be a string, but it's
+        form is operating system dependant.  On Unix, an example might
+        be '-lm' to indicate the maths library.  On VMS, using
+        'NAG$LIBRARY:NAG/LIB' might be used to indicate the NAG graphics
+        library.
+
+Note that an "unload" operation is performed on the given tag before the
+load is executed, see below for details. See further below for a full
+example, including "external load".
+
+
+-- Operation "unload" -------------------------------------------------
+
+Syntax:
+
+    external unload <word:T>
+
+This operation frees the memory previously occupied by the external
+procedures known by the tag T.  Attempting to run a procedure after it
+has been unloaded will result in a -mishap-.
+
+Notice that Pop11 maintains a history list of "load" operations, and
+that "unload"ing will undo the effects of all loads back to the given
+tag.  Thus if the following are loaded "A", "B", "C", "D" (in that
+order) then unloading "B" will also unload "C" and "D" automatically.
+(See REF * EXTERNAL for more details).
+
+To examine the state of the external load system, do the following:
+
+    external_show();
+
+
+-- Extensions to Pop11 ------------------------------------------------
+
+Many simple Pop objects correspond directly to primitive data-types used
+by external procedures.  Examples are the integer, and decimals (floating
+point).  Here is a table which summarises the main similarities:
+
+    Pop11       C           Fortran             Pascal
+    ------------------------------------------------------------
+    (integer)   char                            char
+    integer     int         integer             integer
+    decimal     float       real
+    ddecimal    double      double precision    real
+
+Notice that Pop11 has no "char" data-type, but does have strings
+(ie packed arrays) of characters.  Individual characters can be passed
+as integers, hence the entry in the table.
+
+The (so-called) derived data-types, however, do not have direct
+equivalences in Pop11, however, in most cases they can be simulated
+using Pop11 datastructures.
+
+Note:
+
+Since scanning all the external procedures arguments to verify that they
+conform to the formal parameter specification is very time consuming,
+a variable is provided to disable this feature:
+
+    false -> external_type_check;
+
+will disable ALL checking of arguments until -true- is assigned back to
+this variable.
+
+Warning: Arguments that need special treatment on passing, eg. arrays,
+functions etc., require external_type_check to be set to true to
+facilitate this pre-processing.
+
+On the subject of efficiency, it should be noted that, for
+implementation reasons, using pointers will slow down the calling
+process, as will passing an -ident- for call-by-reference.  Used rarely,
+these should cause no noticable degredation of performance; HOWEVER,
+using arrays of pointers can make the calling sequence intolerably slow.
+
+
+-- Arrays -------------------------------------------------------------
+
+The most common derived data-type is the array, and although Pop11
+arrays are implemented in a non-conventional manner, the external load
+package is able to coerce the correct (?) behaviour, provided the
+following guidelines are observed.  To build an array suitable for an
+external procedure to manipulate, a set of Pop11 procedures is provided,
+the names being designed for use with specific external languages.
+
+    Data        aka         C procedure         Fortran procedure
+    -------------------------------------------------------------
+    char                    consstring
+    short                   array_of_short
+    integer     int         array_of_int        array_of_integer
+    decimal     float       array_of_float      array_of_real
+    ddecimal    double      array_of_double     array_of_double
+
+The procedures "array_of_..." take arguments like the Pop11 procedure
+-newarray- (HELP * NEWARRAY). That is, a boundslist, giving the lower
+and upper subscript of each dimension of the array.  For details of
+-consstring- see HELP * CONSSTRING, and see the section below on C
+related issues.
+
+For example, if an external procedure expects the following:
+
+    C:          int i[10];
+    Pascal:     var i: array [0..9] of integer;
+    Fortran:    dimension i(10)
+
+then the following would construct a suitable array for passing as
+parameter "i":
+
+    vars i = array_of_int([0 9]);
+or
+    vars i = array_of_integer([0 9]);
+
+if using Fortran or Pascal.
+
+Note that the Pop11 subscripts needn't be in the same range as the
+external procedure's ones - as long as the number of elements is the
+same, all will be fine.  For example, a Pascal "array [10..20] of
+integer" is compatible with a Pop11 "array_of_integer([105 115])" since
+both have exactly 11 elements.
+
+Whenever possible, the facility will check that an array passed as
+argument is the same size as the one expected by the external procedure.
+
+Note: The C convention that "int foo[99];" and "int *foo;" both
+introduce arrays is not followed by this facility and the run-time
+checking will object to a relaxed attitude in this matter. Also the size
+of the array, for checking purposes, is set at "external declare" time,
+not at run time when the external procedur eis called.
+
+-- Pointers -----------------------------------------------------------
+
+Both C and Pascal can expect pointers to data, these are constructed
+using the procedure "conspointer_to".  For example, an external
+procedure which expects data of the form:
+
+    C:          int *x;
+    Pascal:     var x: ^integer;
+
+would be satisfied by passing the value of x, declared:
+
+    vars x = conspointer_to 7;
+
+The dereferenced value can be then accessed by x(1).
+
+Arrays of pointers can also be constructed, although every member of the
+array must be initialised to a pointer before passing it to the external
+handler.  It is also necessary to specify the type of the data in
+the array. For example:
+
+    C:          int *x[5];
+    Pascal:     var x: array [0..4] ^integer;
+
+might receive data declared:
+
+    vars    p = conspointer_to(0),
+            x = array_of_pointer([0 4], p, [pointer int]);
+
+Notice the use of a constant pointer (i.e. the same pointer for each
+cell in the array).
+
+When working with pointers, it might be useful to declare an operator
+for calling -conspointer_to-.  In C, the operator might be called "&":
+
+    define -3 & datum;
+    lvars datum;
+        conspointer_to(datum);
+    enddefine;
+
+The newly-declared "&" operator can now be used to build pointers as
+follows:
+
+    vars p = &0;
+
+N.B. only pointers to data can be built in this way - not pointers
+to a variable's storage area, unlike the C statements:
+
+    int a, *b;
+    b = &a;
+
+where values assigned to "a" can be retrieved by reference to "*b"
+("that which 'b' points to").
+
+This may seem to be a drawback, since it appears impossible for an
+external procedure to affect the values of Pop11 variables (as per
+'call-by-reference').  The facility, however, provides a means for
+call-by-reference, using the syntax -ident-.
+
+As an example of call-by-reference, consider the following example.
+Suppose an external procedure wishes to halve the value of a variable,
+whose value is an integer, it might be defined thus:
+
+    C:
+        void halve(x)
+        int *x;
+        {
+            *x = *x / 2;
+        }
+
+    Fortran:
+
+        subroutine halve(x)
+        integer x
+
+        x = x / 2
+        return
+        end
+
+    Pascal:
+
+        procedure halve(var x:integer);
+        begin
+            x := x div 2
+        end;
+
+
+Here is an example of a call to then routine "halve", assuming it has
+been loaded.
+
+    vars a = 18;
+    halve(ident a);
+    a =>
+    ** 9
+
+It is possible to think of ident as constructing a pointer, or of
+passing the variable by reference.
+
+
+-- Call by reference --------------------------------------------------
+
+As has been discussed, call-by-reference is implemented using the Pop11
+syntax word -ident-.  However, in Fortran (and other 'true' call-by-
+reference languages - not C or Pascal), all the arguments need to be
+references.  This facility, however, takes care of this, and in the case
+of Fortran (the only c-b-r language that we've studied), it creates any
+references required, at run time.  This means that a Fortran routine
+which takes a number and returns it's square root VIA A VARIABLE, such
+as this:
+
+    subroutine myroot(n, r)
+    double precision n, r
+
+    r = sqrt(n)
+    return
+    end
+
+can be called like this:
+
+    vars ans = 1.0;
+    myroot(9.0, ident ans);
+    ans =>
+    ** 3.0
+
+(notice that before passing an -ident-, the variable must contain an
+instance of the kind of data it is expected to return with).
+
+The number 9.0 has been converted to a reference before being passed to
+the Fortran procedure.
+
+
+-- Structures ---------------------------------------------------------
+
+Structure passing is not supported in the current version of the
+facility.
+
+
+-- Details of C interface ---------------------------------------------
+
+The C language interface is the parser used by the "external declare"
+syntax for reading C language declarations.
+
+The parser will accept any combination of standard C declarators, with
+the exception of the structure, union and enumerated types. See
+HELP * NEWC_DEC for details of a new C parser which can do this.
+
+It is possible to build arbitrary combinations of the derived types
+"pointer to...", "array of..." and "function returning...".  The
+primitive types accepted are:
+
+    char, int, short and long int, float, double
+
+Note that both "short" and "long" integers are treated as "int", since
+"short"s are converted to "int" during a procedure call, and on all
+machines supported, a "long int" is equivalent to an "int".
+
+No distinction is drawn at run time between a "double" and "float".
+
+The special symbol(s) "{}" is(are) used to separate function
+declarations.
+
+The keyword "unsigned" is accepted and ignored.
+
+Arrays passed as parameters may have their size fully, or partially
+specified.
+
+The C operation "typedef" is supported, so it is possible to declare:
+
+    typedef char *string;
+
+    foo(x)
+    string x;
+    {}
+
+which declares the single parameter of "foo" to be a pointer to an
+"int".
+
+All Poplog byte vectors such as strings are guaranteed to be null-
+terminated, so you can pass these directly as C string arguments.
+
+
+-- Details of Fortran interface ---------------------------------------
+
+The Fortran language interface is the parser used by the "external
+declare" syntax for reading Fortran language declarations.
+
+A Fortran language declaration is basically a Fortran function or
+subroutine with all its executable statements taken out.  This usually
+means that you can directly transcribe the header of the Fortran code.
+
+The Fortran type descriptors currently recognised are
+    INTEGER, REAL, DOUBLE {PRECISION}, EXTERNAL
+
+If a variable is typed as EXTERNAL then is is considered to be
+"special": no type checking will be done on its value.  A declaration is
+terminated by the keyword END.
+
+E.g.
+
+The Fortran function:
+
+    DOUBLE PRECISION FUNCTION SQUARE(N)
+    DOUBLE PRECISION N
+    SQUARE = N * N
+    END
+
+
+would be declared thus:
+
+external declare anothertag in fortran;
+
+    DOUBLE PRECISION FUNCTION SQUARE(X)
+    DOUBLE PRECISION X
+    END
+
+endexternal;
+
+Macro expansions are carried out when this pseudo-Fortran is read, so
+that, for example, the same code can be used for single and double
+precision versions of a library.
+
+Some procedures for constructing arrays are also provided.  They take a
+boundslist like the Pop11 procedure -newarray-. They make the sort of
+array you would expect them to:
+
+    array_of_integer, array_of_real, array_of_double
+
+All Fortran arguments are passed as call-by-reference.  The facility
+takes care of this by converting any non-pointer arguments to pointers
+at run time. (q.v. the ident mechanism for updating te contents of
+variables)
+
+
+-- Writing other language interfaces ----------------------------------
+
+The library files "c_dec.p" and "fortran_dec.p" should be consulted for
+examples of the techniques used in writing an interface module for the
+external library.
+
+Any interface module should be written in the section $-external, where
+some extra identifiers that should prove useful can be found.  These are
+summarised below.  The module should export (to the top level section) a
+routine named <language>_dec, in the same way as the Fortran module
+defines a procedure named -fortran_dec-, and the C module -c_dec-.
+
+This routine will be called (at compile time) by the syntax word
+-external-, and it's job is to read up to the syntax word -endexternal-,
+removing it from the -proglist-.
+
+As the "_dec" routine reads from proglist, it can make calls to the
+procedure
+
+    external_import(<word:S>, <word:P>, <vector:A>, <list:R>,
+                    <procedure:E>, <boolean:C>)
+
+to "register" each external procedure that it wants imported.
+
+The arguments are as follows:
+
+    S       the linkers' name for the external procedure (it is the
+            interface module's responsibility to prepend underscores,
+            etc, as it feels appropriate).
+    P       the name of the Pop11 variable which is to take a procedure
+            which calls the external procedure, after checking the
+            arguments.
+    A       a vector of type specifications.  Each entry corresponds to
+            a formal parameter of the external procedure.  see below.
+    R       the type specification (see below) for the return value of
+            the external procedure
+    E       a procedure to print fatal argument type mismatches.  It
+            should expect three arguments, the offensive object, the
+            desired type of the object, and the name of the procedure
+            being called. The procedure should cause a -mishap-, or at
+            least call -interrupt-.
+    C       a flag indicating, when -true-, that the external procedure
+            expects arguments call-by-reference.
+
+Useful identifiers in section $-external.  Set when the library file
+"external.p" is compiled, so they may be used in compile-time
+preprocessor statements (i.e. #_IF etc).
+
+    UNIX            a constant, when -true-, then the current operating
+                    system is Unix 4.2 BSD.  When -false-, VMS is
+                    indicated.
+
+-- Type specifiers ----------------------------------------------------
+
+When a type-specifier  is called  for, a list  (non-dynamic!) should  be
+supplied. It is used to verify that  a given datum conforms to a  formal
+parameter specification. The list should consist of the following  words
+only:
+
+    pointer, array (see below) or function,
+
+and terminate in one of the following simple-types:
+
+    special, char, int, float or double
+
+The array type may  be followed by  and integer, false,  or a list.  The
+integer specifies the size of the expected array vector, in this case it
+has been  possible  to  calculate  its  value  at  compile  time.  False
+specifies that it  was impossible  to calculate  the size  of the  array
+vector, as in  the case of  the fortran declaration  arr(3:*) where  the
+upper bound is unspecified. The list specifies the information necessary
+to calculate  the size  of the  array vector  at run  time. It  has  the
+following form ...
+
+    [n {l 3 v 4} {v 4 v 4} {v 3 l 2}...]
+
+n is an integer containing the value of as much of the size of the array
+vector that could be calculated at compile time.
+
+Each vector represents  a lower and  upper bound of  a dimension of  the
+array. The first two elements specify the lower bound, the last two  the
+upper. An -l- means that the following number is the actual value of the
+bound. A -v- means that the  following number gives the position on  the
+stack of the argument that specifies the value of the bound.
+
+The simple numerical types can be followed by a range specification,  ie
+two integers (or false).  The "special" type  is provided for  passing a
+value with no checking being performed.
+
+e.g.
+
+    [int]           expect an integer
+    [int 0 65535]   expect an integer in the range 0 - 65535 (this is
+                    the spec to simulate "unsigned short int" in C)
+    [pointer int]   expect a pointer to an int, or a call-by-reference
+                    style ident
+    [pointer char]  expect a string
+    [array false int]
+                    expect an array of int, don't check its size
+    [array 100 int]
+                    expect an array of 100 integers total
+    [array [2 {l 3 v 6} float]
+                    expect an array of floats, whose size can be
+                    calculated at run time
+    [pointer pointer function int]
+                    expect a pointer to a pointer to a function (see
+                    below) which returns an int
+    [array false pointer char]
+                    expect an array of strings
+
+and so on.
+
+When specifying the return value of a procedure, an extra type-specifier
+is allowed, namely [void], which simply indicates that the procedure
+returns no value.
+
+
+-- Full example -------------------------------------------------------
+
+The following Fortran program is compiled to produce an object file
+called "thresh.o" (Unix) or "THRESH.OBJ" (VMS)
+
+    c
+    c This subroutine thresholds an array IMAGE with dimensions XSIZE
+    c and YSIZE with the threshold LIMIT.
+    c
+        subroutine threshold(image, xsize, ysize, limit)
+        integer limit,xsize,ysize
+        integer image(xsize,ysize)
+
+        do 10 j=1,ysize
+        do 10 i=1,xsize
+    10  if (image(i,j) .lt. limit) image(i,j) = 0
+        end
+
+And the following C program is compiled to produce an object file
+"array.o" (Unix) or "ARRAY.OBJ" (VMS)
+
+    /* print the contents of a two dimensional integer array */
+
+    void prarr(array, xsize, ysize)
+    int array[], xsize, ysize;
+    {
+        int i;
+
+        for (i = 0; i < xsize * ysize; i++)
+        {
+            printf("%d ", array[i]);
+            if ((i + 1) % xsize == 0)
+                printf("\n");
+        }
+    }
+
+The following two external declaration blocks are used:
+
+    external declare myprog in fortran;
+
+        subroutine threshold(image, xsize, ysize, limit)
+        integer limit,xsize,ysize
+        integer image(xsize,ysize)
+        end
+
+    endexternal;
+
+    external declare myprog in c;
+
+        void prarr(array, xsize, ysize)
+        int array[], xsize, ysize;
+        {}
+
+    endexternal;
+
+And both procedures can be linked in using:
+
+    external load myprog;
+        thresh
+        array
+    endexternal;
+
+Notice that the -external- syntax chooses the suffix for the object
+files according to the operating system in use.
+
+To test the routines, a two dimensional array of integers is needed:
+
+    vars a = array_of_int([1 10 1 10],  procedure (i, j);
+                                            random(9);
+                                        endprocedure);
+
+The C procedure can be used to print the contents of the array before,
+and after, it is thresholded using the Fortran routine:
+
+    prarr(a, 10,10);
+    9 8 1 8 6 5 1 1 4 3
+    1 3 4 6 7 7 6 9 6 6
+    8 1 1 9 3 4 8 7 7 4
+    5 2 7 2 6 3 1 5 2 6
+    3 8 2 9 9 2 1 1 3 5
+    4 9 6 1 7 3 6 4 5 2
+    4 6 8 9 7 6 9 5 8 7
+    9 3 5 7 7 7 4 3 6 8
+    1 7 4 7 9 1 8 8 6 3
+    9 9 5 3 1 5 3 7 5 2
+
+    threshold(a, 10, 10, 5);
+    prarr(a,10,10);
+    9 8 0 8 6 5 0 0 0 0
+    0 0 0 6 7 7 6 9 6 6
+    8 0 0 9 0 0 8 7 7 0
+    5 0 7 0 6 0 0 5 0 6
+    0 8 0 9 9 0 0 0 0 5
+    0 9 6 0 7 0 6 0 5 0
+    0 6 8 9 7 6 9 5 8 7
+    9 0 5 7 7 7 0 0 6 8
+    0 7 0 7 9 0 8 8 6 0
+    9 9 5 0 0 5 0 7 5 0
+
+The array has been thresholded with level=5, ie all values less than 5
+have been set to zero.
+
+Timings.
+=======
+
+These are crude timings included for comparison only.  The programs were
+run on lightly loaded machines, using an array size of 1000x100.
+
+
+                            VAX-11/780      Sun 3-160
+                              VMS 4.3        BSD 4.2
+
+"naive" Pop11                  1700            1100
+
+fast integer Pop11             1200             700
+
+Fortran (as shown)               60             100
+
+C (not shown here)               65              40
+
+                                              (All timings in "jiffies")
+
+
+-- Known bugs ---------------------------------------------------------
+(see also "structures", above)
+
+(1) Unfortunately, there is a problem with the routine that coerces
+    Pop11 arrays into external-format arrays, such that any instances
+of "pointer_to" an array, the array will be converted into a Pop11
+vector-type structure.  This means that you should always keep some
+other reference to each array, and be prepared to rebuild any
+"pointer_to" array constructs.
+
+(2) Passing functions is not supported NOR IS PASSING POINTERS TO
+    FUNCTIONS, however, it is possible to pass a pointer to a pointer to
+a function. The same bug as for arrays (ie the object is converted at
+run time to some more primative form) exists in this case.
+For example:
+
+    arith(x, y, op)
+    int x, y, (**op)();     /* this will work, declaring (*op)() wont */
+    {
+        return((**op)(x,y));
+    }
+
+    addup(x, y)
+    int x, y;
+    {
+        return(x + y);
+    }
+
+Once loaded, it is possible to pass "addup" to "arith" as follows:
+
+    arith(3, 4, addup) =>
+    ** 7
+
+i.e. the problem is that mentioning "addup" in the call, because of the
+way Pop11 holds external procedures, produces the double pointer as
+described.
+
+(3) There is no known bug numbered "3".
+
+(4) No unsigned data is provided.
+
+(5) Run-time type checking is slow (especially on arrays of pointers,
+    which should be avoided).  This is justified (?) by the hope that
+    the saving gained by employing an external procedure justifies the
+    overhead.
+
+(6) Procedures may only return a single simple datum.
+
+(7) There is no mechanism (yet!) for declaring that an external
+    procedure named X should be imported with the Pop11 variable
+    named Y.
+
+(8) Although both Fortran and Pascal have a "boolean" data type
+    ("logical" in Fortran), this has not yet been implemented.
+
+(9) If an "Argument Type Mismatch" error occurs upon calling an external
+    procedure, then the arguments are often corrupted. Eg. if "update_ptr"
+    calls a C procedure expecting a pointer to an "int" then:
+        : 8.7 -> fred;
+        : update_ptr(ident fred);
+        ;;; Error etc...
+        : fred =>
+        ** <pointer_to_double 8.7>
+
+(10) If an array is passed as an argument to an external procedure, then
+    at present the address of the start of the arrayvector is passed.
+    For normal arrays this is fine. However if the array is offset into the
+    arrayvector (ie the lower of the ARRAYVECTOR_BOUNDS is not 1), then
+    this is an incorrect assumption, and the results will be peculiar.
+
+-- See also -----------------------------------------------------------
+
+HELP * NEWARRAY
+    Constructing arrays in Pop11
+HELP * CONSSTRING
+    Constructing strings in Pop11
+
+REF * EXTERNAL
+    The complete guide to the Poplog/External-procedure raw interface
+    mechanism, in conjunction with the following two files:
+
+REF * DEFSTRUCT
+    Pop-11 syntax for defining and accessing both Poplog and external
+    structures
+
+REF * EXTERNAL_DATA
+    Using external data structures in Poplog, and Poplog data externally
+
+REF * IDENT
+    Details the Pop11 identifier system
+
+HELP * NEWC_DEC
+    Details new facilities for invoking external C programs
+
+--- C.all/help/external
+--- Copyright University of Sussex 1991. All rights reserved. ----------

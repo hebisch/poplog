@@ -1,0 +1,104 @@
+HELP SWITCHON                                       Aaron Sloman, March 1982
+
+
+    switchon <start-condition>
+        <one or more CASE or NOTCASE clauses>
+        <optional ELSE clause>
+    endswitchon
+
+SWITCHON is a macro which permits abbreviation of multi-branch
+conditional statements where part of the condition is the same for all
+branches. It is used with  the words THEN, ELSE, CASE, ORCASE, ANDCASE,
+NOTCASE, ANDNOTCASE, ORNOTCASE and ENDSWITCHON. The format is shown by
+the above sequence, which will expand to a multi-branch conditional
+statement. Each CASE or NOTCASE clause (except the first) will turn into
+an ELSEIF clause.
+
+A start-condition is an incomplete expression which when completed by
+the end-conditions in the CASE clauses, forms a complete boolean
+expression. For example, the start-condition HD(LIST) in the line
+
+    switchon hd(list)
+
+could be completed by any of the following end-conditions:
+
+    = [a b c]
+    matches [a ??x]
+    matches [??x:5]
+    isin goodlists
+    .isword
+    > 5
+
+etc. Alternatively, the operator (=, MATCHES etc.) could be part of the
+start-condition, and each end-condition would then be just an operand.
+
+Each CASE clause must start with
+
+    case <end-condition>
+or
+    notcase <end-condition>
+
+followed by
+
+    <any number of ANDCASE or ORCASE or ANDNOTCASE or ORNOTCASE conditions>
+
+followed by
+
+    then <imperative sequence>
+
+A NOTCASE clause starts with NOTCASE instead of CASE, but is otherwise
+like a CASE clause.
+
+An ANDCASE condition is
+
+    andcase <end-condition>
+
+An ORCASE condition is
+
+    orcase <end-condition>
+
+similarly ANDNOTCASE and ORNOTCASE conditions. The latter two, however,
+produce negated versions of the complete conditions.
+
+-- EXAMPLES -----------------------------------------------------------
+
+    switchon hd(item)
+        case = [] then <action1>
+        notcase .islist then <action2>
+        case matches [=] orcase matches [= =] then <action3>
+        case matches [?x:isword ==] andcase matches [== ?x:isword]
+                then <action4>
+        else <default action>
+    endswitchon;
+
+The use of "." as in this example is probably best avoided.
+
+Note, if a complex expression is used after SWITCHON then there is no
+attempt to optimise and replace this by a variable to prevent repeated
+evaluation. This is left to the user. Another example,  derived from
+TEACH ELIZA:
+
+    define respondto(list);
+        vars x, y;
+        switchon list matches
+            case [??x mother ??y] orcase [??x father ??y] then
+                [tell me more about your family] =>
+            case [i want to ??x] then
+                [do you know anyone else who wants to ^^x] =>
+            case [i ??x you] then
+                [perhaps in your fantasy we ^^x each other] =>
+            case [??x ill ??y] andnotcase [== doctor == ] then
+                [have you tried the health centre] =>
+            notcase [?x ?y ==] ornotcase [yes ?x ?y ==] then
+                [you are being somewhat short with me] =>
+            else
+                [how interesting - do go on] =>
+        endswitchon
+    enddefine;
+
+See HELP
+    *CONDITIONALS - summary of conditional statements in POP-11
+    *IFSTMT       - summary of IF statement usage
+    *UNLESS       - summary of UNLESS statement usage
+
+-----<Copyright University of Sussex 1986.  All rights reserved.>-------

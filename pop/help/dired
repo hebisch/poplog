@@ -1,0 +1,615 @@
+HELP DIRED (Unix Only)                             Aaron Sloman May 1990
+                                                    Modified 20 Jun 2008
+
+
+In VED
+    <ENTER> dired  [-flags ...] [<file|pattern>]
+    <ENTER> qdired [-flags ...] [<file|pattern>]
+
+In Pop-11
+    dired [-flags ...] [<file|pattern>]
+
+
+(Do <ENTER> g to display table of contents. See HELP * DIRED.SHORT for
+a summary of facilities.)
+
+-- Introduction -------------------------------------------------------
+
+The "dired" facility in VED provides a collection of commands that are
+used
+
+    (a) to read in names of files in a directory or matching a pattern,
+or
+    (b) to perform some action on the file or pattern indicated by the
+        current line of the VED buffer (which may have been produced by
+        dired).
+
+Actions that can be invoked via dired include deleting, copying,
+renaming, searching for a specified string, reading a file into VED,
+getting a directory listing into VED, compiling a file named on the
+current line etc.
+
+This VED dired facility is loosely modelled on the Emacs "dired"
+facility, but with a number of changes to suit the POPLOG environment,
+and with a mechanism for autoloading user extensions.
+
+The "qdired" version is like "dired" but quits the current VED file.
+
+The options offered by dired and qdired are described below.
+
+CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Introduction
+ -- Getting started
+ -- Flags, file names and patterns
+ -- <ENTER> qdired [<flags>] [<arguments>]
+ -- <ENTER> dired [ <filename|pattern> ]
+ -- Controlling insertion in dired file: dired_current_file
+ -- <ENTER> dired -l [ <filename|pattern> ]
+ -- <ENTER> dired -d [-l??] [<filename|pattern>]
+ -- <ENTER> dired -w     (WRITEABLE)
+ -- <ENTER> dired -r     (READ ONLY)
+ -- <ENTER> dired [-wv or -vw] [<filename>]
+ -- <ENTER> dired [-rv or -vr] [<filename>]
+ -- <ENTER> dired -/ <search string>
+ -- <ENTER> dired -r/ <search string>
+ -- <ENTER> dired -w/ <search string>
+ -- <ENTER> dired -rm [<filename>]
+ -- <ENTER> dired -rm-r [<filename>]
+ -- <ENTER> dired -rmdir [<filename>]
+ -- <ENTER> dired -mv <new filename>
+ -- <ENTER> dired -mvd <new filename>
+ -- <ENTER> dired -cp <new filename>
+ -- <ENTER> dired -cpd <new filename>
+ -- <ENTER> dired -dcd
+ -- <ENTER> -chmod
+ -- <ENTER> -chmod rwxr-x---x
+ -- <ENTER> -chmod 751
+ -- <ENTER> dired -peek [ <filename>]
+ -- <ENTER> dired -load [ <filename>]
+ -- <ENTER> dired -$ <shell command>
+ -- <ENTER> dired -grep <string>
+ -- <ENTER> dired -??
+ -- <ENTER> dired -?
+ -- Global variable: dired_current_file
+ -- Extending dired: dired_action
+ -- Example: defining a new "flag"
+ -- Using the REDO VED key
+ -- The macro dired
+ -- Defining additional key sequences
+
+-- Getting started ----------------------------------------------------
+
+The best way to get a taste of how it works is to get a directory
+listing of your current directory, then browse using the REDO key.
+To get the initial directory listing
+
+    <ENTER> dired *             (or <ENTER> dired . )
+
+This produces a temporary VED file with a list of files in the current
+directory. Sub-directories are indicted by "DIR".
+
+(Note: If you wish to see files whose names start with "." then do
+    <ENTER> dired .*
+or
+    <ENTER> dired .??*
+The latter will not include the directories "." and "..".)
+
+After the above <ENTER> dired commands, the command line will have
+changed to 'dired -'. Move the cursor to any of the file names listed
+and simply press the REDO key. If the file is a directory then a
+directory listing for that directory will be provided, otherwise the
+file itself will be read into VED.
+
+In a subdirectory listing the same options are available, i.e. to
+read in files or get listings of lower level directories. The full
+path names relative to the original specification will always be
+indicated, so that they are available as arguments to future dired
+commands, as described below.
+
+If after "expanding" a sub-directory in this way you wish to remove
+the list of files do the following (to "delete current directory"):
+
+    <ENTER> dired -dcd
+
+This will remove the file names from the listing (but will not alter
+the files themselves.)
+
+
+In this way it is easy to browse through a whole directory tree
+using <ENTER> dired commands.
+
+Additional options for performing various actions on files, such as
+renaming, copying or deleting them, are given below. Moreover, the
+options available can be extended, and the extensions can be made
+autoloadable, as explained below.
+
+
+
+-- Flags, file names and patterns -------------------------------------
+
+The dired (or qdired) command is followed by zero or more flags (strings
+starting with '-'). The flags determine what action is to be performed
+on the argument, e.g. give directory information about it, read it into
+VED, delete it, rename it, etc.
+
+E.g.
+    <ENTER> dired -rm
+
+will delete the file whose name is at the right of the current line.
+
+In addition to flags, arguments which may be file names or patterns,
+may be given on the command line or in the VED buffer or both.
+
+E.g.
+    <ENTER> dired -rm foo/baz/grum
+
+will delete (rm) the file with the given name.
+
+When only one filename or directory name argument is required, it can
+either be given on the command line, or in the VED buffer, on the
+current line,  either in the form of a file name or a pattern using
+wild-cards, e.g. '*' or '?' as permitted in VMS or Unix.
+
+E.g.
+    <ENTER> dired -d a*
+
+Will produce a list of directories in the current directory whose
+names begin with "a".
+
+Some commands, e.g. 'dired -mv' (rename) use both the name in the VED
+buffer AND a file name on the command line, as explained below.
+
+E.g.
+    <ENTER> dired -mvd foo
+
+will take the file that is at the right of the current line and rename
+it as "foo" while keeping its directory unchanged. So the -mvd flag
+requires two arguments, one from the current line in the VED buffer and
+one on the command line.
+
+Other commands e.g. 'dired -chmod' (show or change access mode) require
+the file name to be taken from the VED buffer, and if an argument is
+given on the command line it is used for other purposes (e.g. to specify
+the new mode).
+
+At most one file name or pattern can occur per line in the VED buffer.
+It is taken to be the rightmost portion of text on the line delimited by
+a space. E.g. on the line below the file is 'adm/courses'
+
+    -rw-r--r--  1  aarons       2718 Oct 11 02:25 adm/courses
+
+Anything at all can occur to the left of the file name, as long as there
+is at least one tab or space delimiting the file name.
+
+File names in the buffer can include wild cards, in which case dired
+will normally produce a directory listing. Otherwise it will act (in the
+appropriate way) on the individual file or directory.
+
+E.g.
+    <ENTER> dired
+
+given when the rightmost portion of the current line of VED is foo/a*
+will produce a listing of all the files whose names match the pattern
+'foo/a*'
+
+
+-- <ENTER> qdired [<flags>] [<arguments>] -----------------------------
+
+Wherever dired can be used in the forms listed below, qdired can be used
+instead. The only difference is that qdired will quit the current file
+before performing the action required.
+
+However, the command is not equivalent to ved_q <> ved_dired since
+ved_qdired usually has to read a file name from the current VED buffer
+before it quits it.
+
+The main dired commands now follow.
+
+
+-- <ENTER> dired [ <filename|pattern> ] -------------------------------
+    Examine directory or file or set of files. If it's neither a
+    directory nor a pattern then dired invokes VED on the file named,
+    or taken from the VED buffer. Otherwise produce a directory list in
+    a temporary file.
+
+More precisely, when no flag is given, the action depends on the
+argument. If there is no argument on the command line it is taken from
+the VED buffer.
+
+When the argument specifying a pattern or filename is taken from the
+current VED buffer, and the buffer was produced by -ved_dired- then
+the expanded information is inserted into the same buffer, unless
+the global variable -dired_current_file- is false. The default value
+is -true-
+
+o If the argument is a directory its contents are listed in a temporary
+  file. Names of sub-directories are preceded by "DIR".
+
+o If it is a pattern with wild cards, then the names of files matching
+  the pattern are read into a temporary file, with directories indicated
+  as above.
+
+o If the argument is neither a directory nor a pattern then VED is
+  invoked on it, and the file read in if it exists, otherwise an error
+  message is given.
+
+Note that the "empty" flag '-' is treated as equivalent to no flag.
+
+Whether the file read in has -vedwriteable- set true or not, i.e.
+whether it is read in unprotected or protected (like HELP files) will
+depend on the value of -dired_protect_files-. The value of this is
+switched by commands described below including the characters
+
+    `w`  - make files writeable
+    `r`  - make files read only (i.e. non-writeable)
+
+
+-- Controlling insertion in dired file: dired_current_file ------------
+
+When dired is invoked with a directory name or pattern already in a file
+previously produced by dired, then by default the new information
+requested will be spliced into the same file. E.g. if the file
+contains the line
+
+    DIR admin
+
+Then the command <ENTER> dired (or ved_dired invoked via a key
+sequence), will produce something like this.
+   DIR admin
+   DIRED:- dired admin/*
+   DIR admin/adv
+       admin/annual.rep
+       admin/budget
+   DIR admin/courses
+       admin/equipment
+       admin/grants
+   DIR admin/syllabus
+       admin/visitors
+   ENDDIRED
+
+with the new bit indicated by DIRED and ENDDIRED. If the command given
+is "<ENTER> dired -l" then the format between DIRED and ENDDIRED is as
+for the Unix command "ls -l". (The new bit is not indented, because
+browsing with dired can produce quite long file names.)
+
+To prevent the insertion of the text in the same file and cause it to be
+inserted in a new temporary VED file, assign -false- to the variable
+-ved_current_file-.
+
+I.e. in your vedinit.p file do
+
+    vars dired_current_file = false;
+
+Alternatively you can change it interactively with
+
+<ENTER> set dired_current_file
+
+(See HELP * VED_SET)
+
+
+-- <ENTER> dired -l [ <filename|pattern> ] ----------------------------
+    Make a directory listing in a temporary non-writeable file.
+    "-l" makes it a verbose listing in the format of Unix 'ls'.
+
+All the standard additional flags that work with "ls -l" are available,
+e.g. <ENTER> dired -ltg will show group ownership and list the files in
+reverse chronological order.
+
+If no filename or pattern is given, dired assumes that the current line
+in the VED buffer ends with a file name or directory name.
+
+To get a listing of all the files in the current directory use one of
+        <ENTER> dired *
+        <ENTER> dired .
+        <ENTER> dired -l *
+or, to list the files latest first:
+        <ENTER> dired -lt *
+
+
+-- <ENTER> dired -d [-l??] [<filename|pattern>] -----------------------
+    As <ENTER> dired, or <ENTER> dired -l, but include only directories
+    in the listing.
+
+-- <ENTER> dired -w     (WRITEABLE) -----------------------------------
+    Make -dired_protect_files- false, so that thereafter new files
+    read in by dired are WRITEABLE (i.e. -vedwriteable- is true)
+    until another command, e.g. -r, sets -dired_protect_files- false.
+
+-- <ENTER> dired -r     (READ ONLY) -----------------------------------
+    Make -dired_protect_files- true, so that thereafter new files
+    read in become Read Only (i.e. -vedwriteable- is false), until
+    over-ridden by a command containing `w`, e.g. -w or -wv or -w/
+
+-- <ENTER> dired [-wv or -vw] [<filename>] ----------------------------
+    Invokes VED on the file named, or else on the file named on the
+    current line in the VED buffer. Whatever the state of
+    -dired_protect_files-, the file is writeable.
+    (-vw is equivalent to -wv)
+
+-- <ENTER> dired [-rv or -vr] [<filename>] ----------------------------
+    Like -wv but make the file read only. (-vr is equivalent to -rv)
+
+-- <ENTER> dired -/ <search string> -----------------------------------
+    Invokes VED on the file name in the current line and searches for
+    the first occurrence of the search string (which may contain
+    patterns). Whether the files are writeable or not depends on the
+    current value of -dired_protect_files. See -r, -w, -v.
+
+-- <ENTER> dired -r/ <search string> -----------------------------------
+-- <ENTER> dired -w/ <search string> -----------------------------------
+    These are like dired -/ except that 'r' gets the file in read-only
+    mode, and 'w' mkes it writeable.
+
+-- <ENTER> dired -rm [<filename>] -------------------------------------
+    Starts by asking for confirmation that the file is to be deleted.
+    Removes the file specified, or if none is given the file named
+    on the current line, after checking. The file name is marked as
+    removed in the directory. If the file is a directory this uses
+    'rmdir', after checking. Marks the file as deleted in the current
+    buffer. (see also -rm-r and -rmdir)
+
+-- <ENTER> dired -rm-r [<filename>] ----------------------------------
+    Removes files recursively, like unix 'rm -r'
+
+-- <ENTER> dired -rmdir [<filename>] ----------------------------------
+    Removes the directory specified
+
+-- <ENTER> dired -mv <new filename> -----------------------------------
+    Moves (i.e. renames) the file named on the current VED line to the
+    new name specified, after checking. The file is marked as having
+    been moved or renamed. If the <new filename> refers to a directory
+    then the file is moved to that directory. This command asks for
+    confirmation before proceeding.
+
+-- <ENTER> dired -mvd <new filename> ----------------------------------
+    This is like dired -mv, except that the new file name is not a full
+    path name, and the file is renamed in the same directory. Can be
+    used to move a file to a sub-directory of its existing directory by
+    giving a relative pathname on the command line.
+
+    E.g. if the current ved line ends with: foo/baz/grum/file
+    Then "<ENTER> dired -mvd new" renames it as foo/baz/grum/new
+    and "<ENTER> dired -mvd sub/new" renames it as foo/baz/grum/sub/new
+
+    The last form will work only if the directory foo/baz/grum/sub
+    already exists.
+
+
+-- <ENTER> dired -cp <new filename> -----------------------------------
+    Copies the file named on the current line to the new name specified,
+    after checking. The file is marked as having been copied. If the
+    <new filename> refers to a directory then the file is copied to that
+    directory. This command asks for confirmation before proceeding.
+
+-- <ENTER> dired -cpd <new filename> ----------------------------------
+    This is exactly like "dired -mvd" except that it copies instead of
+    moving or renaming the file.
+
+    Put another way, it is like "dired -cp" except that if copies the
+    file to a new name in the same directory as the existing file. See
+    example given for "dired -mvd"
+
+-- <ENTER> dired -dcd -------------------------------------------------
+    This "delete currend directory" command works on the listing
+    produced by a dired command to "expand" a directory in a dired
+    listing. The expanded directory listing will start with "DIRED"
+    and end with "ENDDIRED". The "dired -dcd" command will delete all
+    the lines between these two brackets. It will NOT affect any files
+    on disk, only the dired listing in the current VED buffer. This
+    makes it possible temporarily to add a sub-directory listing, then
+    remove it easily.
+
+    If the current directory has sub-directories that have been
+    listed, they will also be removed. I.e. when the procedure searches
+    back for DIRED or forward for ENDDIRED it skips matching pairs found
+    on the way. For details SHOWLIB * DIRED_DCD
+
+-- <ENTER> -chmod -----------------------------------------------------
+    Displays protection of file on current VED line.
+    The display, shown on the status line is in format for changing the
+    protection. See next two options.
+
+-- <ENTER> -chmod rwxr-x---x ------------------------------------------
+-- <ENTER> -chmod 751 -------------------------------------------------
+    Alter protection of file on current VED line. In the second format
+    the number is interpreted as in Octal. See Unix 'man chmod'.
+
+-- <ENTER> dired -peek [ <filename>] ----------------------------------
+    Creates a temporary VED buffer and reads in a window full of the
+    file specified, or the file named on the current line. The amount
+    read in is specified by * vedstartwindow . This makes it possible
+    to examine a long file briefly before deciding what to do about it.
+    Peek gives you a small menu of options, e.g. Show more, VED the file,
+    quit it, delete it, leave the fragment in VED, etc.
+
+-- <ENTER> dired -load [ <filename>] ----------------------------------
+    Compiles the file given as argument, or if there isn't one, compiles
+    the file whose name is at the right of the current VED buffer. The
+    compiler used is based on the file extension. For details
+        SHOWLIB * DIRED_LOAD
+
+-- <ENTER> dired -$ <shell command> -----------------------------------
+    Calls -sysobey- with the shell command, except that the file name
+    taken from the current line in VED is substituted wherever '%'
+    occurs in the shell command. E.g. to change the protection on the
+    file on the current line in VED to -rw-r--r-- do:
+        <ENTER> dired -$ chmod 644 %
+
+    Any output goes into a temporary file. Don't run interactive
+    commands. (See also TEACH * VEDEXPAND)
+
+-- <ENTER> dired -grep <string> ---------------------------------------
+
+    Calls grep with the given <string> as its first argument and the
+    file name on current line as second argument, except that if it is
+    the name of a directory "/*" is appended. E.g. put the cursor on
+    the next line and do '<ENTER> dired -grep block'
+        $usepop/pop/lib/lib
+
+    This will print out all lines of files in the library that include
+    the string 'block'.
+
+-- <ENTER> dired -?? --------------------------------------------------
+    Displays this help file
+
+-- <ENTER> dired -? ---------------------------------------------------
+    Displays a shorter help file.
+
+-- Global variable: dired_current_file --------------------------------
+
+This defaults to -true- but can be set false. If it is false then
+-ved_dired- always creates a new temporary file for information about
+directories or files. If it is -true- then where possible the
+information will be spliced into the current file, provided that it
+is a directory listing file produced by -ved_dired-.
+
+
+-- Extending dired: dired_action --------------------------------------
+
+There are two ways of extending ved_dired. One is to define a procedure
+whose name starts with 'dired_' and the other is to use the property
+-dired_action- to associate a dired "flag" i.e. a string starting with
+'-' with a procedure.
+
+A command "<ENTER> dired -foo ...." will invoke a procedure P if
+either
+    (a) the property dired_action associates the flag '-foo' with P.
+or
+    (b) the procedure's name is "dired_foo"
+
+Option (a) is tried first.
+
+Either way the procedure must take four arguments. of four arguments:
+
+    define P(Flag, Arg1, Arg2, Arg3)
+
+    Flag is whatever flag was typed after "dired" on the command line,
+         e.g. '-rm', '-ls' '-r/' etc.
+
+    Arg1 is the main argument which may have come from the command line
+         or the VED buffer.
+    Arg2 is a file name taken from the VED buffer unless Arg1 has
+         already come from the VED buffer, in which case Arg2 is false.
+    Arg3 is set true if procedure is called from ved_qdired, not
+         ved_dired. In that case it can be assumed that the original
+         file was quit after the file name had been taken from the
+        current line (if necessary). I.e. if it is true then proc must
+        not assume that it runs in the original file.
+
+Often such procedures will ignore some or all of of Flag, Arg2 and
+Arg3.
+
+-- Example: defining a new "flag" -------------------------------------
+For example, here is a procedure that invokes VED on a file then goes
+to the end of the file. It is to be associated with the flag '-end'.
+
+    define dired_end(flag,file,dummy,dummy);
+        ;;; flag is the string that invoked the procedure, e.g. '-end'
+        ;;; file is the filename to be used, taken either from the
+        ;;; command line or the VED buffer. The third argument is not
+        ;;; used.
+        lvars flag, file, dummy;
+        if readable(file) then
+            edit(file);
+            vedendfile();
+        else
+            vederror('NO SUCH FILE as ' >< file)
+        endif
+    enddefine;
+
+This procedure can be invoked by
+    <ENTER> dired -end
+
+If you wish to make it invoked by
+    <ENTER> dired -e
+
+associate the procedure (or its name) with the flag thus:
+
+    "dired_end" -> dired_action('-e');
+
+Storing the name of the procedure in the property rather than the
+procedure allows the procedure to be recompiled, or temporarily altered,
+without having to store the new version in dired_action.
+
+Thereafter
+
+    <ENTER> dired -e foo
+        Will take you to the end of file foo
+
+    <ENTER> dired -e
+        Will take you to the end of the file listed on the
+        current line of VED buffer.
+
+-- Using the REDO VED key ---------------------------------------------
+
+When browsing directories it is common to use the REDO key to get a new
+directory listing for a sub-directory or to read in a file that is not a
+directory.
+
+Some dired commands replace the command line with 'dired -' so that it
+is then easy to go to command line to add to the "flag".
+
+
+-- The macro dired ----------------------------------------------------
+
+The Pop-11 macro can be used to invoke dired. For example, typing, to
+Pop-11 the command
+
+    dired -d foo/baz/*
+
+will produce a VED file showing all the directories in the directory
+foo/baz - if there are any. Otherwise it prints a message and exits.
+
+
+-- Defining additional key sequences ----------------------------------
+
+The following key sequences used to be defined by default, but since
+20 Jun 2008 this is no longer the case. Commands to define them are
+below:
+
+CTRL-x CTRL-z
+    This is equivalent to calling ved_dired() (= <ENTER> dired)
+    The effect will depend on the current line in VED buffer.
+
+    Use the following in your vedinit.p file to define that:
+
+vedsetkey('\^X\^Z', procedure;
+    dlocal vedcommand = nullstring;
+    ved_dired();
+endprocedure);
+
+CTRL-x CTRL-d
+    This is equivalent to typing <ENTER> dired -
+
+    It leaves the cursor on the status line, so that you can complete
+    the command and press RETURN.
+
+    Use the following in your vedinit.p file to define that:
+
+    vedsetkey('\^X\^D',vedenter<>vedinsertstring(%default_command%));
+
+CTRL-x CTRL-x
+    This is equivalent to <ENTER> qdired
+
+    It invokes dired on the file (or directory) indicated by the current
+    line of the current VED buffer, but first quits that buffer, so that
+    the new file is read in its place. This is useful when you have used
+    dired to get a directory listing and are interested only in one of
+    the entries, and therefore do not wish to return to this listing.
+
+    Use the following in your vedinit.p file to define that:
+
+vedsetkey('\^X\^X', procedure;
+    dlocal vedcommand = nullstring;
+    ved_qdired();
+endprocedure);
+
+
+The key sequences should be defined only after you have either run dired
+or given the command
+
+            uses ved_dired;
+
+--- C.unix/help/dired
+--- Copyright University of Sussex 2008. All rights reserved. ----------

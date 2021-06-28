@@ -1,0 +1,226 @@
+HELP RMS                                         Bob Searle and Chris Mellish
+
+LIB RMS provides the basic facilities of a "Reason Maintenance System", as
+described in:
+
+     "Truth Maintenance Systems for Problem Solving"
+     Jon Doyle, MIT AI-TR-419, January 1978
+
+(It has nothing to do with Record Management Services). This brief HELP file
+does not describe what a Reason Maintenance System is, but simply summarises
+the procedures provided by LIB RMS and LIB RMSAPPS.
+
+---- LIB RMS ---------------------------------------------------------------
+
+The RMS deals with information in the form of NODES, which represent facts
+that are believed (IN) or disbelieved (OUT). The procedure for creating a new
+node is MAKENODE, which takes as its argument any structure which when printed
+out gives a readable rendering of what the fact is. For instance:
+
+    makenode([nobody likes me])=>
+    ** <node1>
+
+When printed out, for brevity a node comes out as the word "node" followed by
+a unique number. A fuller printout is obtained by use of the procedure
+SHOWNODE.
+
+If a node is to be believed, it must be JUSTIFIED. The procedure JUSTIFYNODE
+takes a node and two lists of nodes (the INLIST and the OUTLIST) and creates
+an SL justification for the node. The idea is that the node will be believed
+as long as it has a justification where everything in the INLIST is IN and
+everything in the OUTLIST is OUT.
+
+    vars sun, nosun;
+    makenode([the sun is shining]) -> sun;
+    makenode([the sun is not shining]) -> nosun;
+    justifynode(sun,[],[^nosun]);
+    shownode(sun);
+
+    <node1> [the sun is shining]
+            IN      <sl1>   []      [<node2>]
+
+    shownode(nosun);
+
+    <node2> [the sun is not shining]
+            OUT
+
+SHOWNODE gives the node number, human-readable form, and an indication as to
+whether the proposition is IN or OUT. If it is IN, it prints the "name" of one
+of its valid justification (here, "<sl1>"), together with the relevant INLIST
+and OUTLIST.
+
+The procedure RMSNODEISIN tests whether a node is IN or not. Eg. in the last
+example:
+
+    rmsnodeisin(sun)=>
+    ** <true>
+
+It may be useful to mark a node as CONTRADICTORY, using the procedure
+RMSCONTRADICT. Such a node should never come IN. Note that the system will
+only pay any attention to this information if it attempts to bring the node
+IN. If the node is already IN, nothing happens immediately.
+
+   rmscontradict(nosun);
+   shownode(nosun);
+
+   <node2> [the sun is not shining]
+           OUT
+                   ***contradiction***
+
+If the system is ever about to bring IN a contradiction, it must sort things
+out so that, by suitably changing the status of assumptions made earlier, the
+contradiction is no longer believed. The procedure RMSFIXCONTRA is called
+automatically for this. The procedure takes as its argument the contradictory
+node. The default value of this procedure is RMSDEFFIXCONTRA, but the user may
+assign a new value to it. Defining such a procedure appropriately would
+require some study of the RMS code, however.
+
+
+---- LIB RMSAPPS -----------------------------------------------------------
+
+LIB RMSAPPS is not strictly necessary, but packages up some of the RMS
+facilities in some useful ways. The facilities provided are:
+
+   NODES - a global variable, holding a list of all the RMS nodes created
+           by the following procedures:
+
+        DECLARE - takes one argument, calls MAKENODE on it, returns the node
+                  created and puts it on the list. The node is initially OUT.
+
+        PREMISE - as DECLARE, except that the node is made IN by giving it
+                  a justification with INLIST and OUTLIST []. Returns the node
+                  as its result.
+
+        ASSERT  - takes three arguments. Calls DECLARE with the first and then
+                  justifies the resulting node with the other two. Returns the
+                  node as its result.
+
+   SHOWINNODES     - Three procedures for displaying the nodes in NODES. The
+   SHOWOUTNODES      first two call SHOWNODE on only IN and OUT nodes
+   SHOWNODES         respectively. The third calls SHOWNODE on all nodes.
+
+
+--- EXAMPLES OF USE OF THE RMS SYSTEM --------------------------------------
+
+(1) MIDSUMMER PROBLEM
+
+;;; this scenarion demostrates the use of dependancy-directed backtracking
+;;; to resolve 'inconsistencies' in belief systems.
+;;; thses inconsistencies are declared by the particular belief system and
+;;; are enforced by rms.
+;;; this example is based on Jon Doyle, (MIT AI-TR-419, January 1978)
+;;;     "Truth Maintenance Systems for Problem Solving"
+;;; the story is that of Hermia, Lysander, Helena, and Demetrius from
+;;;     Wm. Shakespeare's "A Midsummer Night's Dream"
+
+
+;;; get rms primed up to go
+
+lib rms;
+lib rmsapps;
+
+;;; initialise list of interesting nodes
+
+[] -> nodes;
+
+;;; declare some variables
+
+vars node, tragedy, hermia, lyshermia, demhermia, lyshelena;
+
+;;; first declare the loves of the women as unchangeable
+
+premise([loves hermia lysander]) -> hermia;
+erase(premise([loves helena demetrius]));
+
+;;; now declare the loves of the men as assumptions
+;;; demetrius starts out loving hermia, but if this turns out
+;;;     to be unfortunate, he will turn his attentions to helena
+
+declare([not loves demetrius hermia]) -> node;
+assert([loves demetrius hermia],[],[^node]) -> demhermia;
+erase(assert([loves demetrius helena],[^node],[]));
+
+;;; similarly, lysander loves hermia,
+;;;     but will settle for helena if required
+
+declare([not loves lysander hermia]) -> node;
+assert([loves lysander hermia],[],[^node]) -> lyshermia;
+assert([loves lysander helena],[^node],[]) -> lyshelena;
+
+;;; unfortunately, lysander is a jealous man,
+;;;     and wants hermia for himself
+
+premise([jealous lysander]) -> node;
+
+;;; being violent, this leads him to want to kill demetrius,
+;;;     because of both of their loves, and lysander's jealousy
+
+assert([kills lysander demetrius],[^node ^demhermia ^lyshermia],[])
+   -> node;
+
+showinnodes();          ;;; display what is currently believed
+
+;;; since this is supposed to be a comedy, and killing isn't funny,
+;;;     the attempted murder is declared to be a tragedy
+;;; first - we declare that a tragedy exists
+
+declare([tragedy]) -> tragedy;
+
+;;; second - tell rms not to allow this to come about
+
+rmscontradict(tragedy);
+
+;;; and, third - connect the attempted murder to the tragedy
+
+justifynode(tragedy,[^node],[]);
+
+;;; display rms' resloution of the conflict
+
+showinnodes();
+showoutnodes();
+
+;;; unfortunately, hermia is taking this situation badly, and is
+;;; about to commit suicide from unrequited love, because her
+;;; chosen one, lysander now loves another
+
+assert([suicide hermia],[^hermia ^lyshelena],[]) -> node;
+
+;;; suicides aren't any better in comedies than murders, so this
+;;; must also be declared a tragedy, and resolved by rms
+
+declare([tragedy 2]) -> tragedy;
+rmscontradict(tragedy);
+justifynode(tragedy,[^node],[]);
+
+;;; this brings the story to a successful conclusion, viz:
+
+showinnodes();
+
+;;; the items not currently believed are:
+
+showoutnodes();
+
+(2) DETECTION OF CIRCULAR REASONING
+
+;;; demonstration of circular reasoning,
+;;;     and the detection of such by rms
+
+lib rms;
+lib rmsapps;
+
+vars node1, node2, node3, assump;
+[] -> nodes;
+
+premise('x+y=4') -> node1;
+declare('assume 1') -> assump;
+assert('x=1',[],[^assump]) -> node2;
+assert('y=3',[^node1 ^node2],[]) -> node3;
+shownodes();
+justifynode(assump,[],[]);
+shownodes();
+declare('assume 2') -> assump;
+justifynode(node3,[],[^assump]);
+justifynode(node2,[^node1 ^node3],[]);
+shownodes();
+justifynode(assump,[],[]);
+shownodes();

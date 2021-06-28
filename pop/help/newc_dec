@@ -1,0 +1,358 @@
+HELP NEWC_DEC                                     Ian Rogers, June 1990
+
+Note added by Aaron Sloman: 1 Jun 2001
+    See also HELP ANSI_C_DEC
+    This describes a change to LIB NEWC_DEC to support
+    ANSI style C declarations.
+
+
+See
+    REF * EXTERNAL
+        for details of the external interface.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Accessing these facilities
+ -- Recognised types
+ -- All about structures
+ -- Valid return types for procedures
+ -- define:c_type
+ -- Varargs
+ -- Importing procedures
+ -- Efficiency Notes
+ -- Warning
+ -- See also
+ -- Known Bugs
+
+-- Accessing these facilities -----------------------------------------
+
+The facilities described in this file are obtained by adding the line:
+
+    uses newexternal;
+
+or
+
+    uses newc_dec;
+
+before any attempt is made to parse any C code (ie. before any occurence
+of the keywords "external declare name in c")
+
+
+-- Recognised types ---------------------------------------------------
+
+As well as all the types recognised by the old parser (see
+HELP * EXTERNAL), LIB *NEWC_DEC has some extra capabilities:
+
+"typedef" works, eg:
+
+    typedef char *String;
+
+    pr_string(x)
+        String x;
+        {}
+
+You can parse structs, eg.
+
+    struct _two_shorts {short x,y;};
+
+and use them in typedefs:
+
+    typedef struct _two_shorts Coord;
+
+or, more normally:
+
+    typedef struct _two_shorts {short x,y;} Coord;
+
+
+Unions are also supported, eg.
+
+    typedef union {int                  type;
+                   struct _two_shorts   plane_vertex;
+                   struct _three_shorts solid_vertex;}
+            AnyVertex;
+
+Enumerated types can be used to introduce a set of defined constants
+just as in C. Eg:
+
+    typedef enum {False, True} Bool;
+
+will create the two pop11 macros -False- and -True- (with the values 0
+and 1 respectively). Bool is typed to be an "int" and can be used as an
+ordinary type specifier.
+
+
+-- All about structures -----------------------------------------------
+
+When a structure is declared, a "constructor" procedure for that
+structure is constructed based on the name of the structure. The name of
+the procedure is constructed by prefixing the name of the structure with
+"init". Structures declared by "typedef" are also honoured (in fact
+this is the normal way of doing things) eg.
+
+    uses newexternal;
+
+    external declare test in c;
+
+        typedef struct _two_shorts {short x,y;} Coord;
+
+    endexternal;
+
+    initCoord =>
+    ** <procedure initCoord>
+
+This procedure takes either false or an external pointer class record
+(see REF * EXTERNAL). If the argument is an external pointer it is
+assumed to point to the base address of some structure in external
+memory. In this case a sufficient amount of data is construct on the
+Poplog side to "shadow" this structure. This is how you access external
+structures.
+
+Alternatively, if the argument is false, then a piece of blank external
+memory is constructed, along with everything else, and it is this piece
+of memory which is shadowed. This is how you construct structures fit to
+pass out to C programs.
+
+As record returned by the init procedure is itself an external pointer
+class record (which points to the base address of the external memory)
+it can, in turn, be given as an argument to an init procedure of a
+different struct. This is how "structure shadowing" can be implemented.
+
+As well as the "init" procedure, "cons", "dest" and "is" procedures are
+also built.
+
+Accessing the values in structure slots is done by two new keywords:
+
+    #:  has the same semantics as C's  .
+    #-> has the same semantics as C's  ->
+
+For example:
+
+    vars point = initCoord(false);
+
+    4 -> point #: x;
+    10 -> point #: y;
+
+    point =>
+    ** struct _two_shorts
+        x - 4
+        y - 10
+
+-- Valid return types for procedures ----------------------------------
+
+External procedures can now be given any return type that can be parsed
+by the typedef statement. Eg:
+
+
+    Coord MousePosition();
+        {}
+
+
+    MousePosition() =>
+    ** struct _two_shorts
+        x - 39
+        y - 51
+
+
+-- define:c_type -------------------------------------------------
+
+The define-form "c_type" can be used to define arbitray "return
+types". Ie types that can be used to specify the coercion to be
+performed on the data returned by external C functions.
+
+Eg. imagine the following C code has been compiled into a file
+'example.o'
+
+    struct _two_shorts {short x,y;};
+
+    struct _two_shorts *func()
+    {
+        static struct _two_shorts grum;
+        grum.x = 3;
+        grum.y = 4;
+        return(&grum);
+    }
+
+The function, and its return data, can be accessed as follows:-
+
+    uses newexternal;
+
+    external declare test in c;
+
+        typedef struct _two_shorts {short x,y;} Coord;
+
+        Coord *func()
+            {}
+
+    endexternal;
+
+    external load test;
+        'example.o'
+    endexternal;
+
+    func()(0) =>
+    ** struct _two_shorts
+        x - 3
+        y - 4
+
+Alternatively, if you wanted the data to be returned in a two element
+pop11 vector then you could define an c_type as follows;
+
+
+    uses newexternal;
+
+    external declare test in c;
+
+        typedef struct _two_shorts {short x,y;} Coord;
+
+    endexternal;
+
+    define:c_type twovec(eptr);
+        lvars eptr;
+        initCoord(eptr) -> eptr;
+        {%
+            eptr #: x,
+            eptr #: y
+         %}
+    enddefine;
+
+    external declare test in c;
+
+        twovec func()
+            {}
+
+    endexternal;
+
+    external load test;
+        'example.o'
+    endexternal;
+
+    func() =>
+    ** {3 4}
+
+-- Varargs ------------------------------------------------------------
+
+If an external procedure contains a "vararg" list as one of its formal
+parameters then, within "external ... endexternal" syntax,
+it can be declared as being a procedure which takes just one argument
+which is typed as -vararg-.
+
+Eg.
+
+    external declare PrintStuff in c
+
+        printf(dummy);
+            vararg dummy;
+            {}
+
+    endexternal;
+
+When the procedure is called, there must be an integer on the top of the
+stack to indicate the *total* number of arguments to be passed to the
+external procedure (in this case, including the format string as well as
+the printed data). A convenient way to do this is with the syntax word
+#| See REF * #|
+
+Eg.
+
+    printf(#| string, item1, item2 |#);
+
+
+NB1. Some C procedures require you to terminate a varargs list with
+one or more zeros. This mechanism is *not* a replacement of that, ie.
+the zeros must be included inside the #| .... |# construct.
+
+
+-- Importing procedures -----------------------------------------------
+
+The global variable -external_import_procedure- is used to control how
+an external procedure is imported into the Poplog system during the
+"external load .... endexternal" phase. Its value, which is a procedure
+which coerces an external pointer into an external procedure, is usually
+one of -external_ptr_to_procedure- (the default) or
+-XptImportProcedure-.
+
+
+-- Efficiency Notes ---------------------------------------------------
+
+The syntax construct "exacc" can be used in conjunction with C structure
+types in order to produce inline access code.
+
+Eg.
+
+    uses newexternal;
+
+    external declare test in c;
+
+        typedef struct _two_shorts {short x,y;};
+
+    endexternal;
+
+    vars foo = init_two_shorts(false);
+
+    5 -> exacc :_two_shorts foo.x;
+
+    foo =>
+    ** struct _two_shorts
+        x - 5
+        y - 0
+
+
+Also the example given above for the use of define:c_type could be
+written more efficiently using -exacc-.
+
+Eg.
+
+    l_typespec twonums {
+            one :short,
+            two :short
+        };
+
+    define:c_type twovec(twonums);
+        lvars twonums;
+        {%
+            exacc twonums.one;
+            exacc twonums.two;
+         %}
+    enddefine;
+
+
+-- Warning ------------------------------------------------------------
+
+    This version of "c_dec" provides minimal help with the coercion of
+arguments, unlike the previous version. This enables the user to develop
+more efficient interface functions, but at the cost of using data
+structures that are more "terse".
+
+
+-- See also -----------------------------------------------------------
+
+    HELP * ANSI_C_DEC
+    LIB * ANSI_C_DEC
+        The above two provide facilities for coping with ANSI C
+
+    HELP * EXTERNAL
+        Details of the old style C interface
+    LIB * NEWC_DEC
+        All the gory details of the new interface
+    REF * DEFSTRUCT
+        Defining Poplog, and external, structure types
+    REF * EXTERNAL
+        A more complete and precise overview of mechanisms for
+        incorporating external data and code
+    REF * EXTERNAL_DATA
+        Describes how to deal with data maintained in memory outside of
+        the Poplog system proper by 'external' functions and procedures,
+        that is, those written in non-Poplog languages (such as C,
+        FORTRAN, PASCAL etc).
+
+-- Known Bugs ---------------------------------------------------------
+
+1. Pointers are treated as arrays
+
+2. -external_import_procedure- should be local to each "declare" tag.
+
+3. Unions aren't integrated with -exacc- in the way that ordinary
+structures are.
+
+--- C.all/help/newc_dec
+--- Copyright University of Sussex 2001. All rights reserved. ----------

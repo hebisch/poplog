@@ -1,0 +1,94 @@
+HELP CHAIN                                         R. Barrett et al 1984
+                                         Updated: Adrian Howard Mar 1992
+
+    chain(P)
+
+The procedure -chain- takes one argument, a procedure. When a procedure
+C calls -chain-, control is immediately transferred to P. Any remaining
+instructions in C are never executed. Local variable values are not
+passed on from C to the procedure called by -chain-. When the procedure
+given as argument to -chain- is run, all variable values are set to what
+they were when C inherited them. When P finishes, control returns to the
+procedure which originally called C.
+
+Procedure -b-, below, has been altered to "chain" -c- rather than
+calling it normally:
+
+    vars x;
+
+    define c;
+        npr('running C');
+        x * 2 -> x; x =>
+        npr('C finished');
+    enddefine;
+
+    define b;
+        dlocal x;
+        npr('running B');
+        x * 2 -> x; x =>
+        chain(c);           ;;; the call to -chain- to procedure -c-
+        x =>
+        npr('B finished');
+    enddefine;
+
+    define a;
+        dlocal x;
+        npr('running A');
+        3 -> x; x =>
+        b();
+        npr('continuing to run A');
+        x =>
+        npr('A finished');
+    enddefine;
+
+The effect of the non-standard control structure can be seen when we run
+-a-:
+
+    a();
+    running A
+    ** 3                ;;; -x- is 3 in -a-
+
+    running B
+    ** 6                ;;; -x- is 6 in -b-. This value for -x- will not
+                        ;;; be passed on to -c-, as it is local to -b-.
+                        ;;; At this point -c- is "chained" to.
+
+    running C           ;;; -x- is reset to what it was before entry to
+                        ;;; -b-, i.e. 3.
+
+    ** 6                ;;; -c- immediately doubles the value of -x- and
+                        ;;; prints it out
+
+    C finished continuing to run A
+    ** 6                ;;; -x- is global to -c-, and is therefore not
+                        ;;; reset when control returns from -c- to -a-
+                        ;;; (not to -b-).
+    A finished
+
+The caller of -chain-, procedure -b-, is exited from, and a -chain- to
+-c- is made. The value of -x- in -c- is set as it was when -b- inherited
+it (to what it was in -a-.) When -c- finishes, control returns to -a-,
+not to -b-. The instructions in -b- after the call of -c- are never
+executed. Since -x- is not local to -c-, its value is not reset in -a-.
+
+For other non-standard control structures, see *CHAINFROM, *CHAINTO,
+*EXITTO, *EXITFROM, *CATCH, *JUMPOUT
+
+Also see:
+
+    HELP *CALLER
+        Procedure identifying a single caller at a specified level
+
+    HELP *INTERRUPT
+        On POP-11 interrupt procedures
+
+    HELP *CONTROL
+        A summary of control structures in POP-11
+
+    REF *PROCEDURE
+        Full details of POP-11 procedure calling mechanisms
+
+
+
+--- C.all/help/chain
+--- Copyright University of Sussex 1992. All rights reserved. ----------

@@ -1,0 +1,555 @@
+HELP LVARS                               J.Gibson and A.Sloman June 1984
+                                           (Updated A.Sloman Jun 1990)
+
+lvars <word 1>, <word 2>, <word 3> = <initialisation>, ...;
+
+lconstant <word 1> = <init 1>, <word 2> = <init 2>, ...;
+
+dlvars <word 1>, <word 2>, <word 3> = <initialisation>, ...;
+
+lvars and lconstant can be used to declare lexically scoped variables.
+"define lvars" and "define lconstant" can also be used, by analogy with
+"define vars" and "define constant". "dlvars" is used for efficiency in
+special cases, explained below. Initialisations are compulsory for
+lconstant declarations, optional for the others.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Introduction
+ -- Why use lexical variables? (1 - efficiency)
+ -- Restrictions on lexically scoped identifiers
+ -- Nested procedures accessing lexical variables (dlvars)
+ -- Using lconstant for nested procedure definitions
+ -- Why use lexical variables? (2 - fewer bugs)
+ -- Use lexical locals with functional arguments
+ -- Why use lexical variables? (3 - using lexical closures)
+ -- Sharing a lexical environment between procedures
+ -- Problems of accessing lexical identifiers
+ -- Lexical variables and sections
+ -- Formal parameters of procedures may be declared lexical
+ -- Lexical closures vs partial application
+ -- Merging lexical environments: #_INCLUDE and include
+ -- Poplog virtual machine instructions
+ -- Related Documentation
+
+-- Introduction -------------------------------------------------------
+
+"lvars" and "lconstant" are syntax word used for declaring a variable as
+"lexically" scoped rather than having a "permanent" scope (sometimes
+misleadingly called "dynamic" scope.  See HELP * LEXICAL for an
+explanation of the difference. For more detailed and technical
+discussion see REF * VMCODE).
+
+The syntax for lvars and lconstant declarations is just as for vars and
+constant declarations, and for the duration of any file or procedure in
+which they occur will override any dynamic declaration for the same
+name.
+
+If used at the top level in a file or compilation stream lvars and
+lconstant declarations are analogous to vars and constant declarations,
+except that they identifiers they declare are accessible only within
+that compilation stream. (See REF * PROGLIST and REF * POPCOMPILE for
+technical information on the compilation stream.)
+
+For general information on non-lexically scoped variable declarations see
+HELP *VARS.
+
+For general information on lexical scoping see HELP * LEXICAL. This
+also explains the use of the syntactic form
+
+    lblock <statement sequence> endlblock
+
+to create a block of program within which lexical identifiers can be
+declared with scope restricted to the block, and without requiring an
+extra level of procedure call.
+
+
+For information on "file-local" lexicals see HELP * LEXICAL and
+HELP * DLOCAL
+
+In older versions of POP-11 and POP-2, and in older LISP systems (e.g.
+Interlisp), only dynamically scoped variables are provided.
+
+
+-- Why use lexical variables? (1 - efficiency) ------------------------
+
+One of the advantages of LVARS over VARS within procedure definitions is
+efficiency, since lexical local variables are allocated either to
+registers or to cells in the procedure stack frame (giving faster access
+and more compact code).
+
+Thus of two procedures that differ only in that the second declares its
+local variables as lexically scoped, thus:
+
+    define foo(x, y, z) -> w;
+        ......
+    enddefine;
+
+    define baz(x, y, z) -> w;
+        lvars x, y, z, w;
+        ......
+    enddefine;
+
+The second will generally be more efficient.
+
+If a procedure contains an lconstant declaration then it must include
+initialisation. The intialisation expression will be evaluated ONCE
+at compile time and the result inserted wherever the lconstant
+identifier occurs. Thus
+
+    define foo();
+        lconstant list = [a b c];
+        ...list...
+        ...list...
+    enddefine;
+
+Is equivalent to
+
+    lconstant list = [a b c];
+
+    define foo();
+
+        ... #_< list >_# ...
+        ... #_< list >_# ...
+
+    enddefine;
+
+Where the #_< .. >_# brackets specify compile time evaluation as
+explained in HELP * HASH_
+
+
+-- Restrictions on lexically scoped identifiers -----------------------
+
+various operations on the lexically scoped variables will not work as
+for non-lexical, e.g. use of "valof" and use as pattern variables in the
+pattern matcher. (See HELP * MATCHES)  Similarly POPVAL applied to a
+list containing an identifier defined as lexical will not access the
+value of the identifier in the current lexical scope.
+
+
+-- Nested procedures accessing lexical variables (dlvars) -------------
+
+The efficiency gain in using lvars is not always realised if the
+procedure contains NESTED procedure definitions that use one or more of
+the lexical variables non-locally. This is because the compiler may have
+to make a new closure of the nested procedure every time the enclosing
+procedure runs, causing considerable storage turn-over and garbage
+collections. This would happen with the following code, for example:
+
+define print_length(item) -> n;
+    ;;; given any item return the number of characters required
+    ;;; to print it
+    lvars item, n = 0;
+
+    define cucharout(char);
+        ;;; locally re-define cucharout to increment n
+        lvars char;
+        n + 1 -> n
+    enddefine;
+
+    pr(item)
+enddefine;
+
+The garbage collections can be demonstrated:
+
+true -> popgctrace; ;;; indicate garbage collections
+repeat 50000 times print_length('a') -> endrepeat;
+;;; GC-auto(C) TIME: 0.12, MEM: used 18317 + free 387186 + stack 1 = 405504
+;;; GC-auto(C) TIME: 0.14, MEM: used 18159 + free 385296 + stack 1 = 403456
+
+Every execution of print_length creates a closure of the nested
+procedure to ensure that the correct environment for "n" is preserved.
+
+In this case the user can easily tell that no such precaution is
+necessary, since the nested procedure will be run only in the context of
+the activation of print_length. So "n" can be declared as a lexically
+scoped dynamic variable, with far less overhead, thus:
+
+define print_length(item) -> n;
+    lvars item;
+
+    dlvars n = 0;   ;;; more efficient than lvars
+
+    define cucharout(char);
+        ;;; locally re-define cucharout to increment n
+        lvars char;
+        n + 1 -> n
+    enddefine;
+
+    pr(item)
+enddefine;
+
+This version will run without generating garbage collections.
+
+
+-- Using lconstant for nested procedure definitions -------------------
+
+In some cases the user can tell that the nested procedure is to be
+invoked ONLY in the scope of the enclosing procedure, and that it will
+never be "pushed" as a data object, e.g. stored in a list or given as
+argument to another procedure to run in a different environment. In that
+case the nested procedure can be defined using "lconstant" as in the
+following (contrived) procedure to sum the lengths of the items in a
+list.
+
+define sum_lengths(list) -> n;
+    lvars item, list, n = 0;
+
+    define lconstant increment(item);
+        lvars item;
+        datalength(item) + n -> n;      ;;; "n" used non-locally
+    enddefine;
+
+    for item in list do increment(item) endfor
+
+enddefine;
+
+This non-local use of the lexical identifier "n" will not cause garbage,
+and has all the efficiency advantages of lexical scoping.
+
+true -> popgctrace;
+vars list = [a cat];
+repeat 50000 times sum_lengths(list) -> endrepeat;
+
+(The full story is quite complicated. For more details see the section
+on implementation of lexical variables in REF * VMCODE/Implementation).
+
+Note that "lconstant" and "define lconstant" can also be used, like
+"lvars" at the top level in a file to declare constant identifiers
+accessible only in that file.
+
+
+-- Why use lexical variables? (2 - fewer bugs) ------------------------
+
+Another, more important, advantage of lexical scoping is protection
+against unintended interactions between variables in different
+procedures. For example if the procedure -dolist- were defined thus
+to achieve the effect of the procedure -applist-:
+
+    define dolist(list, proc);
+        ;;; Apply procedure proc to every element in list
+        vars item;
+        for item in list do proc(item) endfor
+    enddefine;
+
+Then the following procedure -whichin- would not work as intended because
+the second argument that it gives to -dolist- is a procedure that is
+intended to access the variable -list- in -whichin- whereas in fact it will
+access the variable local to -dolist-, which will be running when the
+nested procedure is invoked.
+
+    define whichin(items, list);
+        ;;; Print out elements of -items- that are in -list-
+        dolist(items,
+            procedure(x);
+                if member(x,list) then x => endif
+            endprocedure)
+    enddefine;
+
+    whichin([a b c], [1 a 2 b]);   ;;; should print out only a and b
+    ** a
+    ** b
+    ** c    ;;; error
+
+But if we re-define dolist with all its variables lexically scoped, then
+nothing defined outside it can access them
+
+    define dolist(list, proc);
+        ;;; apply procedure proc to every element in list
+        lvars item, list, proc;
+        for item in list do proc(item) endfor
+    enddefine;
+
+without changing the definition of -whichin-, it now works:
+
+    whichin([a b c], [1 a 2 b]);   ;;; should print out only a and b
+    ** a
+    ** b
+
+
+-- Use lexical locals with functional arguments -----------------------
+
+In general, any procedure like -dolist- that takes another procedure P
+as argument and runs it (or hands P as argument to other procedures that
+will run P), should have its local variables declared as lexical, to
+prevent unwanted interactions.
+
+Alternatively the procedure can be defined within a section to prevent
+unwanted interactions, though the overheads of using a section are
+greater. (HELP * SECTIONS).
+
+
+-- Why use lexical variables? (3 - using lexical closures) ------------
+
+A third advantage of LVARS over VARS is that a procedure using lexical
+variables can return as a result a procedure that "remembers" the values
+that those variables had when the procedure was returned. Two procedures
+returned as results can share an environment composed of such lexical
+variables. This considerably enhances the expressive power of the
+language.
+
+In particular, suppose that inside a procedure P1 an identifier
+L is declared using LVARS. Then L can be used non-locally in a procedure
+P2 whose definition is nested within P1. If P2 is returned as a result
+by P1, or saved in a data-structure for later invocation, then P2 will
+"remember" the lexical values of the variables that it uses non-locally,
+such as L. In fact a different procedure with an associated "lexical
+environment" will be created each time P1 is run and returns P2, so
+there is a storage, and garbage collection, overhead in using this
+mechanism.
+
+For example a we can define a procedure that makes a "contents-repeater"
+for a vector (i.e. a procedure which returns the next item in the vector
+each time it is invoked, and returns TERMIN when the vector is
+exhausted):
+
+    define vectorin(vector) -> pdr;
+        ;;; given a vector return a contents-repeater
+        lvars vector, pdr, index = 1, vectorlength =datalength(vector);
+        procedure();
+            ;;; return "next" item in vector, or termin
+            if index > vectorlength then
+                termin                      ;;; nothing left to return
+            else
+                subscrv(index, vector);     ;;; return next item
+                index + 1 -> index;         ;;; and increment index pointer
+            endif;
+        endprocedure -> pdr;
+    enddefine;
+
+The procedure returned by -vectorin- has to "remember" the values of
+-vector- and -index- that were current when it was created. So each
+time -vectorin- is run it creates a "lexical closure" procedure, with the
+environment frozen in. If the procedure updates the variables, as the
+above nested procedure does, it must remember the updated values.
+
+We can demonstrate that this works by using -vectorin- as defined above
+to create two different contents-repeaters, each of which remembers its
+own environment:
+
+    vars procedure (rep1, rep2);
+    vectorin({1 2 3}) -> rep1;
+    vectorin({the cat}) -> rep2;
+
+    rep1() =>
+    ** 1
+    rep2() =>
+    ** the
+    rep2() =>
+    ** cat
+    rep2() =>
+    ** <termin>         ;;; rep2 now finished
+    rep1()=>
+    ** 2                ;;; but rep2 still remembers its environment
+
+
+-- Sharing a lexical environment between procedures -------------------
+
+A more interesting example returns two procedures that share an
+environment. The first is as before, namely a generator of elements
+from the vector, whereas the second is a back_spacer, which decrements
+the internal counter.
+
+define vectorin(vector) -> generator -> back_spacer;
+    ;;; given a vector return a contents-repeater, and a back_spacer
+    lvars vector, back_spacer,
+         index = 1, vectorlength =datalength(vector);
+
+    procedure() -> next;
+        ;;; return "next" item in vector, or termin
+        lvars next;
+        if index > vectorlength then
+            termin -> next              ;;; nothing left to return
+        else
+            subscrv(index, vector) -> next;
+            index + 1 -> index;         ;;; and increment index pointer
+        endif;
+    endprocedure -> generator;
+
+    procedure();
+        ;;; reset the index
+        index - 1 -> index
+    endprocedure -> back_spacer
+
+enddefine;
+
+vars repeater, back_spacer;
+
+vectorin({the cat on the old mat}) -> repeater -> back_spacer;
+
+repeater () =>
+** the
+repeater () =>
+** cat
+back_spacer();
+repeater () =>
+** cat
+repeater() =>
+** on
+
+A different call of vectorin would create two entirely separate
+procedures with a shared environment.
+
+-- Problems of accessing lexical identifiers --------------------------
+
+Against the above advantages is the disadvantage that at run time,
+during debugging, it is not easy to get at the values of lexical
+variables, since the context in which they were compiled has been lost.
+Special tools will be provided for this later.
+
+
+-- Lexical variables and sections -------------------------------------
+
+An identifier that has been declared as lexical will be accessible
+within the scope of a different section within the same file. I.e.
+lexical identifiers are ignored by the section mechanism. The following
+example illustrates this.
+
+    vars a = 1;     ;;; non-lexical
+    lvars b = 2;    ;;; lexical
+    vars c =  3;    ;;; non-lexical, but imported to the section
+
+    section testing c => f;   ;;; entering a section, importing c, exporting f
+
+    a =>            ;;; inaccessible
+    ;;; DECLARING VARIABLE a
+    ** <undef a>
+
+    b =>            ;;; accessible
+    ** 2
+
+    c =>            ;;; accessible
+    ** 3
+
+    vars d = 4;     ;;; non-lexical, not exported
+    lvars e = 5;    ;;; lexical, doesn't need to be exported
+    vars f = 6;     ;;; non-lexical, exported
+
+    endsection;     ;;; leaving the section
+
+    d =>            ;;; inaccessible
+    ;;; DECLARING VARIABLE d
+    ** <undef d>
+
+    e =>            ;;; accessible
+    ** 5
+
+    f =>            ;;; exported so accessible
+    ** 6
+
+
+-- Formal parameters of procedures may be declared lexical ------------
+
+Since a procedure can now have two kinds of variable, formal argument
+and result variables are now ambiguous (i.e. are they "vars" or
+"lvars"?). They will default to "vars", but the POP compiler makes this
+default declaration ONLY for names which do not appear in any "vars" or
+"lvars" statements immediately following the procedure header.
+
+As shown in the above examples, "lvars" can be used to declare that the
+formal parameters of a procedure are lexically scoped, either for the
+sake of efficiency or for other reasons.
+
+It is recommended that all formals be declared as lexical in this way,
+unless there are good reasons for them to be permanent identifiers (e.g.
+CUCHAROUT, PRMISHAP, etc.). Output locals can also be declared as
+lexical. It is possible for some formal parameters to be lexical, some
+permanent: e.g.
+
+       define foo(x, y, z) -> p;
+           vars z, u, v, w;
+           lvars x, a, y = 99, b =g(x,y), c, d, procedure p;
+           ...
+       enddefine;
+
+etc. Note also that since the first N lvars are allocated to registers
+(where N varies according to machine, ranging from 0 on Intel
+80386-based machines, through 2 on a VAX or M680?0 to 8 on a SPARC
+processor). This allows chosen variables to get the registers (i.e. x
+and a in the example above).
+
+Pop-11 compile_mode can be set so that any procedure whose formal
+parameters or output locals are not explicitly declared as vars or lvars
+will produce a warning message, e.g.
+
+    compile_mode:pop11 +varsch;
+
+    define foo(x,y) -> z;
+        . . . .
+    enddefine;
+
+    ;;; y DEFAULTED TO VARS IN PROCEDURE foo
+    ;;; x DEFAULTED TO VARS IN PROCEDURE foo
+    ;;; z DEFAULTED TO VARS IN PROCEDURE foo
+
+For more on compilation modes
+    See REF * POPCOMPILE, SHOWLIB * compile_mode
+
+
+-- Lexical closures vs partial application ----------------------------
+
+Pop-11 provides a mechanism that achieves some of what can be done using
+lexical closures, i.e. procedures created by combining a procedure with
+an environment. In some cases Pop-11 partial application is more
+efficient, though using lexical closures is generally more elegant.
+
+For more on partial application see
+    TEACH * PERCENT
+    HELP * PERCENT
+    HELP * CLOSURES
+    HELP * PARTAPPLY
+    HELP * CONSCLOSURE
+    REF * PROCEDURE/Closures
+
+
+-- Merging lexical environments: #_INCLUDE and include ----------------
+
+It is sometimes convenient to declare various constants and macros that
+are used only during compilation. If declared as lvars and lconstants
+they will be discarded at the end of the current compilation stream,
+saving space.
+
+These can be put into a file that is compiled whenever it is needed.
+However, if such a file is compiled using -compile-, or -uses-, or
+-lib-, then the lexically scoped identifiers will not be accessing in
+the "calling" file, defeating the purpose of providing a re-usable set
+of lexical declarations. For this reason, Pop-11 allows a new file to be
+merged with the current compilation stream instead of having its own
+stream. This is achieved using #_INCLUDE or include. The latter is
+generally more convenient. See HELP * INCLUDE, REF * #_INCLUDE .
+
+
+-- Poplog virtual machine instructions --------------------------------
+
+There are several virtual machine instructions available for planting
+code to create and manipulate lexical identifiers. Examples include
+sysLVARS, sysNEW_LVAR sysLBLOCK
+
+    See REF * VMCODE/sysLBLOCK,  *VMCODE/sysLVARS, *VMCODE/sysLBLOCK
+
+
+-- Related Documentation ----------------------------------------------
+
+HELP *VARIABLES   - range and nature of variables
+HELP *VARS        - declaring dynamic variables
+HELP *DLOCAL      - dynamic local expressions
+HELP *LEXICAL     - nature of lexical variables
+HELP *EFFICIENCY  - more on the use of lexical variables
+HELP *CONSTANT    - constants and their declaration
+HELP *INCLUDE     - extending current compilation stream
+REF * #_INCLUDE   -  (ditto, with more details).
+
+REF  *IDENT       - technical details of POP-11 identifiers
+HELP *IDENTIFIERS - introduction to POP-11 identifiers
+
+HELP * CLOSURES   - see section on partial application  above
+
+REF  *SYNTAX      - POP-11 syntax, including declarations
+REF  *POPSYNTAX   - POP-11 syntax, in diagrammatic form.
+REF  *VMCODE      - technical details of the POP-11 virtual machine
+    (This explains that three kinds of lexical variables have to be
+    distinguished, with different implementation requirements.)
+
+--- C.all/help/lvars
+--- Copyright University of Sussex 1990. All rights reserved. ----------

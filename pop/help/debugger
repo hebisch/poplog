@@ -1,0 +1,958 @@
+HELP DEBUGGER                                Simon Nichols, October 1993
+
+    lib debugger;
+
+A source-level debugger for Pop-11.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+
+  2   Compiling in debugging mode
+
+  3   Turning off debugging
+
+  4   Autoloading
+
+  5   Automatically entering the debugger after a mishap or interrupt
+
+  6   Setting a breakpoint from outside the debugger
+
+  7   The current file
+
+  8   Procedure specifications
+
+  9   Action at a breakpoint
+
+ 10   Interaction inside Ved
+
+ 11   Interaction outside Ved
+
+ 12   Printing
+
+ 13   Commands
+      13.1  ?
+      13.2  abort
+      13.3  animate
+      13.4  backtrace [all]
+      13.5  breakpoints
+      13.6  continue
+      13.7  default [<command>]
+      13.8  delete <breakpoint number>
+      13.9  down
+      13.10 frame [<frame number>]
+      13.11 help
+      13.12 ignore [only] [<procedure spec>]
+      13.13 inspect <variable name>
+      13.14 next
+      13.15 pop11
+      13.16 print <variable names>
+      13.17 quit
+      13.18 return [<expression>]
+      13.19 skip
+      13.20 source
+      13.21 step
+      13.22 stop
+      13.23 stop at [<file> :] <line>
+      13.24 stop in <procedure spec>
+      13.25 stop here
+      13.26 trace <procedure spec>
+      13.27 unignore [only] [<procedure spec>]
+      13.28 untrace <procedure spec>
+      13.29 up
+      13.30 userstack [<depth>]
+      13.31 : <Pop-11 statement>
+      13.32 where
+
+ 14   Command scripts
+
+ 15   Problems
+      15.1  Reloading parts of files
+      15.2  dlocal expressions
+      15.3  Specifying with_props in the define header
+
+
+-----------------------------------------------------------------------
+1  Introduction
+-----------------------------------------------------------------------
+
+This library package defines a source-level debugger for Pop-11. The
+debugger accepts commands in terms of the source files, line numbers and
+variable names of your program. In particular, it enables you to:
+
+    # set breakpoints on source line numbers and source procedures;
+
+    # single-step execution;
+
+    # examine and update all variables, including lexical ones;
+
+    # change the current execution context by moving up and down the
+      call stack;
+
+    # execute Pop-11 code in the current execution context.
+
+
+-----------------------------------------------------------------------
+2  Compiling in debugging mode
+-----------------------------------------------------------------------
+
+To make use of the debugger, you need do nothing more than load the
+debugger library:
+
+    lib debugger;
+
+or
+
+    uses debugger;
+
+and ensure that * POP_DEBUGGING has a non-<false> value. After this, all
+compilation, whether performed inside or outside Ved, will result in
+procedures which can be debugged.
+
+The debugger works by redefining the VM code planting procedures (see
+REF * VMCODE) to add extra code to each procedure in order to maintain
+the values of run-time state information required by the debugger and
+also to plant checkpoints in the code corresponding to the boundaries
+between source lines. When the procedure is executed, the checkpoint
+code may invoke the debugger, depending on whether you have a breakpoint
+set on the corresponding line or are single-stepping.
+
+As a result, code compiled in debugging mode is both bulkier and runs
+slower than code which is compiled normally.
+
+Note that only procedures which have been compiled in debugging mode can
+be debugged, i.e., you can only set breakpoints on such procedures.
+
+
+-----------------------------------------------------------------------
+3  Turning off debugging
+-----------------------------------------------------------------------
+
+To turn off all debugging, assign <false> to the variable
+debugger_debugging. This means both that code subsequently compiled will
+not have the extra debugging code planted and also that any code already
+compiled in debugging mode will execute without calling the debugger.
+
+Once you have debugged your program, you can assign <false> to
+debugger_debugging and recompile the program. If you need the debugger
+again, just reassign <true> to debugger_debugging.
+
+The two aspects of debugging (compilation and execution) can be
+independently switched on or off by assigning one of the words "compile"
+or "execute" to the variable debugger_debugging.
+
+Assigning "compile" to debugger_debugging means that code will be
+compiled in debugging mode, but when it (or any code already compiled in
+debugging mode) is executed the debugger will not be invoked. (Note that
+you can selectively turn off debugging for particular procedures by
+means of the debugger ignore command: see below.)
+
+Assigning "execute" to debugger_debugging means that when you execute
+code already compiled in debugging mode it will invoke the debugger, but
+any code subsequently compiled will not have the extra debugging code
+planted.
+
+Regardless of the value of debugger_debugging, no debugging takes place
+unless the value of pop_debugging is non-<false>.
+
+
+-----------------------------------------------------------------------
+4  Autoloading
+-----------------------------------------------------------------------
+
+Libraries that are autoloaded are never compiled in debugging mode:
+debugging is always disabled when autoloading is taking place. This is
+to prevent common Pop-11 utility procedures and Ved commands from
+invoking the debugger.
+
+
+-----------------------------------------------------------------------
+5  Automatically entering the debugger after a mishap or interrupt
+-----------------------------------------------------------------------
+
+The debugger defines a procedure debugger_interrupt which you may assign
+to interrupt to cause interrupts and mishaps to invoke the debugger.
+This is not done by default.
+
+Note that if you use the load marked range facility in Ved (see
+HELP * LMR) to load a line which only assigns to interrupt, this will
+have no effect as ved_lmr locally redefines the interrupt procedure. You
+should load a marked range which includes both an assignment to
+interrupt and a call to the code you wish to debug. Alternatively.
+either assign to interrupt outside of Ved, or in immediate mode (see
+HELP * IM).
+
+
+-----------------------------------------------------------------------
+6  Setting a breakpoint from outside the debugger
+-----------------------------------------------------------------------
+
+To set a breakpoint on a procedure from outside the debugger, use either
+the macro stopin, i.e.
+
+    stopin <procedure spec>;
+
+or the Ved command  ved_stopin, i.e.
+
+    <ENTER> stopin <procedure spec>
+
+For a definition of <procedure spec>, see the section below entitled
+"Procedure specifications".
+
+Setting a breakpoint on a procedure has the same effect as setting a
+breakpoint on the line containing the first (executable) statement
+within the procedure. However, breakpoints can only be set on line
+numbers from within the debugger.
+
+
+-----------------------------------------------------------------------
+7  The current file
+-----------------------------------------------------------------------
+
+This help file will sometimes refer to the current file. If you are
+debugging a program and are stopped at a breakpoint in some procedure P,
+the file in which P is defined is the current file.
+
+
+-----------------------------------------------------------------------
+8  Procedure specifications
+-----------------------------------------------------------------------
+
+Many of the commands listed below, the Pop-11 macro stopin and the Ved
+command ved_stopin take a procedure specification as argument (referred
+to in this help file as <procedure spec>). This has the general form:
+
+    [ <file> : ] [ <section prefix> ] [ <name prefix> ] <name>
+
+Here, <name> is the name of the procedure and must be given, e.g.
+
+    insert
+
+If the procedure is defined locally to another, you must prefix its name
+with the name of its parent. The two names are separated by a dot, e.g.
+
+    sort.insert
+
+if the definition of insert is nested inside the definition of sort. If
+the parent is itself a local procedure, you must add another prefix for
+its parent, and so on, e.g.
+
+    create_set.sort.insert
+
+If the procedure is defined in a section, you can prefix the name with
+its section pathname (see REF * SECTIONS) to remove any potential
+ambiguity, e.g.
+
+    $-set_utils$-create_set.sort.insert
+
+Finally, <file> is the name (as a string) of the file in which the
+procedure is defined, e.g.
+
+    'set_utils.p' : $-set_utils$-create_set.sort.insert
+
+If a <file> is not given, the current file (see above) is used. If there
+is no current file, the debugger searches all the files which have been
+loaded in debugging mode for a procedure with the given name.
+
+
+-----------------------------------------------------------------------
+9  Action at a breakpoint
+-----------------------------------------------------------------------
+
+When a procedure has a breakpoint set on it or on one of its source
+lines, invoking it by any means will cause execution to pause at the
+breakpoint and a message to be printed showing the file name and line
+number of the source line that is about to be executed. For example:
+
+    [Breakpoint] '/csuna/home/simonn/pop/test.p' : foo, line 16
+
+The debugger command loop is then entered, and the debugger will prompt
+for input. The debugger prompt is:
+
+    debug(N):
+
+where N is an integer representing the current debugger level.
+
+In the debugger command loop, any of the commands listed below may be
+given. Commands which do not cause execution of your program to resume
+will return to the debugger command loop when they have completed.
+
+
+-----------------------------------------------------------------------
+10  Interaction inside Ved
+-----------------------------------------------------------------------
+
+When using the debugger in Ved, all debugger interaction (requests for
+commands and output from commands) takes place in the immediate mode Ved
+buffer (see HELP * IM), since this is where Ved-based interaction with
+Poplog languages usually takes place. Although this means that program
+interaction and debugger interaction take place in the same Ved buffer,
+this does save excessive switching between buffers (at least three if a
+program performs any input or output).
+
+Single-stepping causes the source file containing the relevant procedure
+to be edited. The cursor is positioned on the line being executed and is
+moved as execution proceeds.
+
+
+-----------------------------------------------------------------------
+11  Interaction outside Ved
+-----------------------------------------------------------------------
+
+Although the debugger is really designed for use in Ved, it is quite
+usable outside (at the Pop-11 top level). The main difference (not
+surprisingly) is that stopping at a breakpoint does not cause the file
+containing the procedure with the breakpoint to be edited. Instead, each
+source line is printed as it is executed. This can sometimes be
+confusing: however, if you get lost as to exactly what's being executed,
+use the backtrace or where commands, described below.
+
+
+-----------------------------------------------------------------------
+12  Printing
+-----------------------------------------------------------------------
+
+All printing by the debugger is done with pr locally assigned the value
+of the procedure variable debugger_pr. By default, debugger_pr has the
+value * SYSPR, so that any customized printing procedures you may have
+defined as the * CLASS_PRINT of particular items' keys will be invoked.
+
+You can change the value of debugger_pr; for example, if there is an
+error in one of your customized printing routines and you would prefer
+printing done using * SYS_SYSPR (Poplog's standard printing procedure),
+just assign sys_syspr to debugger_pr
+
+    sys_syspr -> debugger_pr;
+
+To restore the default behaviour, do
+
+    syspr -> debugger_pr;
+
+
+-----------------------------------------------------------------------
+13  Commands
+-----------------------------------------------------------------------
+
+The following sections outline the available commands. A particularly
+useful command is ? which lists the available commands.
+
+All command names may be abbreviated. If an abbreviation is ambiguous
+(i.e. it could refer to more than one command), a mishap results.
+
+Each command synopsis (specified in the subheading for the command)
+specifies any required or optional command arguments. Optional arguments
+are enclosed in bold square brackets, thus:
+
+    backtrace [all]
+
+
+13.1  ?
+-------
+
+Displays a list of the available commands.
+
+
+13.2  abort
+-----------
+
+Aborts execution (i.e. does a * SETPOP).
+
+
+13.3  animate
+-------------
+
+Sets animation mode, which enables you to watch your program execute in
+slow motion. Use the continue command (see below) after the animate
+command to start the animation.
+
+Animation mode is especially useful when you have assigned
+debugger_interrupt to interrupt: you can watch your program execute and
+interrupt it (with the keyboard interrupt character, usually CTRL-C)
+when you get to a point where you want to single-step, look at the
+values of variables, etc.
+
+The variable debugger_pause_interval controls how long the debugger
+pauses at each source line (in seconds), with a default value of 1/2 a
+second. To change the pause to, for example, 1/4 of a second, do
+
+    0.25 -> debugger_pause_interval;
+
+
+13.4  backtrace [all]
+---------------------
+
+Print a call stack backtrace, i.e. a list of all currently active
+procedure invocations. Each procedure invocation corresponds to a call
+stack frame, and is printed in the form:
+
+    [<frame number>] <procedure name>  (line <line number>)
+
+for example
+
+    > [1] baz  (line 16)
+      [2] foo  (line 23)
+      [9] compile
+
+The ">" indicates the currently selected frame. This starts off as the
+frame relating to the active call, i.e., the current procedure
+invocation, which is always frame number 1. This can be changed by using
+the frame command with an argument (see below). This argument will be a
+frame number, which is one of the numbers enclosed in square brackets.
+
+In the above example, frames numbers from 3 to 8 are not listed. This is
+because they correspond to certain system procedures or are anonymous
+procedures. The missing system procedures are displayed if the optional
+parameter "all" is supplied to the backtrace command. Anonymous
+procedures (i.e. ones whose * PDPROPS are <false>) are usually never
+shown, even though the numbering of stack frames respects their
+presence. The one exception to this rule is when an anonymous procedure
+is the currently active procedure.
+
+
+13.5  breakpoints
+-----------------
+
+Lists all the breakpoints you have set, in the form
+
+    [<breakpoint number>] <file name> : <procedure name>, <line number>
+
+for example
+
+    [1] '/csuna/home/simonn/pop/test1.p' : foo, line 16
+    [2] '/csuna/home/simonn/pop/test2.p' : baz, line 23
+
+Each breakpoint is assigned an integer breakpoint number, which is the
+number displayed in square brackets. The breakpoint number is required
+if you wish to delete the breakpoint (see the description of the delete
+command, below).
+
+
+13.6  continue
+--------------
+
+Continue execution, stopping at the next breakpoint (if there is one).
+
+
+13.7  default [<command>]
+-------------------------
+
+Without an argument default prints the current default command, which is
+the command executed when you just type <RETURN>. The default default
+command is step.
+
+With an argument, default sets the default command to the given command.
+For example
+
+    default next
+
+sets the default command to next, which is often a useful thing to do.
+
+If you do not want a default command, type
+
+    default none
+
+to the debugger prompt.
+
+It is possible to change the default command from outside the debugger
+by assigning to the variable debugger_default_command either a word
+representing the name of a command or a list representing a complete
+command (name and arguments). For example:
+
+    "next" -> debugger_default_command;
+
+    [print x] -> debugger_default_command;
+
+debugger_default_command is actually an active variable: see
+HELP * ACTIVE_VARIABLES.
+
+
+13.8  delete <breakpoint number>
+--------------------------------
+
+Delete the specified breakpoint. The breakpoint is specified using an
+integer breakpoint number, as displayed by the breakpoints command (see
+above). For example, to delete the breakpoint on line 23 of procedure
+baz as shown in the breakpoints example above, do
+
+    delete 2
+
+Instead of a breakpoint number, the word "all" may be used. The command
+
+    delete all
+
+deletes all the breakpoints currently set.
+
+
+13.9  down
+----------
+
+Moves down the call stack by one frame, displaying information relating
+to the frame called by the current one. This usually makes sense only if
+you have previously moved up the call stack by means of the up or frame
+commands (see below).
+
+Down is equivalent to frame N, where N is the current frame number plus
+one.
+
+
+13.10  frame [<frame number>]
+-----------------------------
+
+Displays call stack frame information relating to the current frame
+(procedure invocation). The name of the owner procedure, and the name
+and value of both lexical and dynamic local variables are printed, in
+the form
+
+    Stackframe <frame number>
+    Owner: procedure <procedure name>
+    Lexical local variables:
+     <lexical local bindings>
+    Dynamic local variables:
+     <dynamic local bindings>
+
+where <lexical local bindings> and <dynamic local bindings> have the
+form
+
+    <variable name> = <variable value>
+
+For example
+
+    Stackframe 1
+    Owner: procedure foo
+    Lexical local variables:
+     y = 0
+     x = 3
+    Dynamic local variables:
+     popdprecision = <true>
+
+If the optional <frame number> is given, it selects and displays
+information for the specified frame. Further uses of the frame command
+without an argument will reference the selected frame.
+
+The frame number is one of the numbers displayed by the backtrace
+command (see above).
+
+
+13.11  help
+-----------
+
+Same as doing
+
+    help debugger
+
+to the Pop-11 top level, or
+
+    <ENTER> help debugger
+
+in Ved, i.e., shows you this file.
+
+
+13.12  ignore [only] [<procedure spec>]
+---------------------------------------
+
+Causes execution of the specified procedure (and all procedures defined
+locally to it) to proceed without entering the debugger, regardless of
+any breakpoints set in the procedure. You will not be able to step into
+the procedure either. Trace output is still produced, though (see the
+description of the trace command, below).
+
+This command is useful when you want to ignore frequently used utility
+procedures when debugging, or for coping with troublesome dlocal
+expressions (see the section "A problem with dlocal expressions",
+below).
+
+If you want to ignore a procedure but still want to debug its local
+procedures, use the "only" argument in addition to the procedure
+specification, e.g.
+
+    ignore only foo
+
+to ignore procedure foo but not its local procedures.
+
+Without any arguments, ignore lists all the procedures currently being
+ignored.
+
+
+13.13  inspect <variable name>
+------------------------------
+
+Invokes the Pop-11 structure browser on the specified variable:
+see HELP * INSPECT. If the variable does not exist, a mishap message is
+printed.
+
+The <variable name> may be a section pathname: see REF * SECTIONS.
+
+
+13.14  next
+-----------
+
+Step on to the next source line. If the current source line is a
+procedure call, step over the procedure, i.e. only stop in it if a break
+point is set for that procedure.
+
+
+13.15  pop11
+------------
+
+Enter a nested invocation of the Pop-11 compiler, such that compilation
+respects the current lexical variable bindings. So, if you are stopped
+inside a procedure foo with a local lexical variable x, any use of
+the variable x will access the lexical local of foo.
+
+When you exit the compiler you will return to the debugger.
+
+
+13.16  print <variable names>
+-----------------------------
+
+Print the values of the specified variables. If a variable does not
+exist a mishap message is printed.
+
+Each <variable name> may be a section pathname: see REF * SECTIONS. If
+there is more than one <variable name>, they are separated by spaces or
+tabs.
+
+Note that the ":" command, which is followed by a Pop-11 statement, is
+more general since it allows arbitrary Pop-11 expressions to be printed
+rather than just variables (see ":", below).
+
+
+13.17  quit
+-----------
+
+Quits the current invocation of the debugger command loop. The effect is
+similar to the continue command (see above) in that execution of any
+running program will continue until the next (if any) breakpoint. If no
+program is being debugged, the current invocation of the debugger is
+terminated and you will return either to any previous invocation of the
+debugger (if the current debugger level is greater than one) or else the
+Pop-11 top level.
+
+
+13.18  return [<expression>]
+----------------------------
+
+Return immediately from the current procedure invocation, without
+executing the rest of the procedure (contrast skip, below). A return
+value may optionally be specified.
+
+Beware of specifying a value to be returned when the procedure being
+returned from has already pushed a return value on the user stack. You
+can use the userstack command (see below) to examine the user stack.
+
+
+13.19  skip
+-----------
+
+Complete the current procedure invocation without single-stepping and
+stop in the caller (contrast return, above).
+
+
+13.20  source
+-------------
+
+Displays the source code for the procedure corresponding to the
+currently selected frame. This is in contrast to where (see below),
+which always shows the source for the currently executing procedure
+(frame number 1). So, if you are stopped at a breakpoint and select a
+frame with the frame command (see above), source will show you the
+source code for that frame.
+
+If you using the debugger inside Ved, the source file corresponding to
+the selected frame is made the current Ved file and the cursor is
+positioned on the line currently executing. Outside of Ved, only the
+source line is shown.
+
+
+13.21  step
+-----------
+
+Single-step, i.e. step on to the next source line. If the current source
+line is a procedure call, step into the procedure whether there is break
+point set for it or not.
+
+
+13.22  stop
+-----------
+
+Without any arguments, stop behaves like breakpoints, i.e., it lists all
+the breakpoints you have set (see breakpoints, above).
+
+
+13.23  stop at [<file> :] <line>
+--------------------------------
+
+Stop at (i.e. set a breakpoint on) a given line number in the current
+file. A different file name may be specified: the file name is enclosed
+in string quotes and is separated from the line number by a colon.
+
+The stop at command may also be given as stopat.
+
+
+13.24  stop in <procedure spec>
+-------------------------------
+
+Stop in (i.e. set a breakpoint on) the given procedure.
+
+Setting a breakpoint on a procedure has the same effect as setting a
+breakpoint on the line containing the first executable statement within
+the procedure. This sometimes has unexpected consequences. For example,
+when the first executable statement in a procedure is the start of a
+loop, a breakpoint will then be placed at the top of the loop, and
+execution will pause each time round the loop.
+
+The stop in command may also be given as stopin.
+
+
+13.25  stop here
+----------------
+
+Stop at the current line number in the current file.
+
+
+13.26  trace <procedure spec>
+-----------------------------
+
+An interface to the Pop-11 trace command (see HELP * TRACE). This causes
+information to be printed whenever the specified procedure is invoked.
+Its arguments (if any) are printed when the procedure is entered and its
+results (if any) are printed when it exits. Abnormal exits and process
+suspends/resumes are also displayed.
+
+The debugger assigns 0 to popmaxtraceindent causing a procedure's
+recursion depth always to be displayed in square brackets.
+
+There is a similar restriction to the use of the trace command inside
+the debugger as outside: generally, only top-level permanent procedures,
+not lexical ones, may be traced (see HELP * LVARS for information about
+lexically scoped variables). There is a slight relaxation of this
+restriction in the debugger: procedures which are top-level lvars may be
+traced.
+
+
+13.27  unignore [only] [<procedure spec>]
+-----------------------------------------
+
+Undoes the effect of a corresponding ignore command (see above).
+
+Without any arguments, unignore lists all the procedures currently being
+ignored.
+
+
+13.28  untrace <procedure spec>
+-------------------------------
+
+Turns off tracing for the specified procedure. See trace, above.
+
+
+13.29  up
+---------
+
+Moves up the call stack by one frame, displaying information relating to
+the frame which called the current one, i.e., the immediate caller of
+the current procedure. You can move back down the call stack by means of
+the down or frame commands (see above).
+
+Up is equivalent to frame N, where N is the current frame number minus
+one.
+
+
+13.30  userstack [<depth>]
+--------------------------
+
+Prints the values currently on the user stack (see HELP * STACK)
+without removing them. If the optional depth argument is given, only
+that number of items are printed.
+
+
+13.31  : <Pop-11 statement>
+---------------------------
+
+Execute a line of Pop-11 code. Note that one line only may be entered,
+since it is terminated by <RETURN> (i.e., a newline character). The
+evaluation of the Pop-11 statement respects the current lexical variable
+bindings. So, if you are stopped inside a procedure with a local lexical
+variable x, the following will print its value:
+
+    : x =>
+
+If x is a list, the following will print its head:
+
+    : hd(x) =>
+
+It is even possible to update x, for example:
+
+    : tl(x) -> x;
+
+
+13.32  where
+------------
+
+Tells you where you are, i.e., which procedure you are currently
+executing, the file in which it is defined and the line about to be
+executed, as follows
+
+    <file name> : <procedure name>, <line number>
+
+For example,
+
+    '/csuna/home/simonn/pop/test.p' : foo, line 16
+
+If you using the debugger inside Ved, <file name> is made the current
+Ved file and the cursor is positioned on <line number>. This is useful
+when you have edited source files or looked at help files (for example)
+in the middle of a debugging session, and want to recover the debugging
+context.
+
+Outside of Ved, the current source line is displayed before the file
+name and line number, for example:
+
+        n + 1 -> n;
+    '/csuna/home/simonn/pop/test.p' : foo, line 16
+
+
+-----------------------------------------------------------------------
+14  Command scripts
+-----------------------------------------------------------------------
+
+The debugger supports command scripts, which are sequences of debugger
+commands, delimited by the syntax words debugger and enddebugger, i.e.
+
+    debugger
+        <command-1>
+        ...
+        <command-N>
+    enddebugger;
+
+The commands must be written one per line, since each command is
+terminated by the end of line character. In addition, there should be
+nothing either following the debugger opener or preceding the
+enddebugger closer on the same source line. Thus, a one-line script:
+
+    debugger <command> enddebugger;
+
+is NOT allowed.
+
+Not all commands make sense in a command script, particularly commands
+concerning the state or execution of the currently active procedure,
+i.e.
+
+    animate
+    continue
+    frame
+    next
+    return
+    skip
+    step
+    where
+
+If a script contains such a command, the message
+
+    No active procedures compiled in debugging mode
+
+will be printed and the command ignored.
+
+A command script is particularly useful for large applications, where
+you might establish useful debugger settings -- such as breakpoints and
+procedures to be ignored -- and save them for subsequent debugging
+sessions.
+
+Note that a command script must generally be located in a file distinct
+from the source code you wish to refer to in the script. In addition, it
+must be loaded after any source code to which the commands in the script
+refer. A command script may also be entered at the Pop-11 top-level (or
+immediate mode).
+
+
+-----------------------------------------------------------------------
+15  Problems
+-----------------------------------------------------------------------
+
+There are a number of potential problems which you may encounter when
+using the debugger.
+
+
+15.1  Reloading parts of files
+------------------------------
+
+If a part of a file which has been compiled in debugging mode is
+reloaded (for example, using * LMR or * LCP in Ved) this can cause
+problems if both the following conditions hold:
+
+    a) lines have been inserted in the range being recompiled without an
+       offsetting number of deletions (i.e., there has been a net
+       increase in the number of lines in the file due to additions in
+       the range to be reloaded);
+
+    b) there are procedure definitions beyond the end of the range being
+       recompiled.
+
+The effect of these two circumstances is that the line numbers of
+procedures beyond the end of the range that is reloaded will change.
+When such procedures are debugged, single-stepping will show the wrong
+source line (the setting of breakpoints will also be problematic).
+
+A warning message is printed when this problem is likely to occur, for
+example
+
+    ;;; WARNING - LINE NUMBER INFORMATION MAY BE INACCURATE AFTER LINE 48
+    ;;; FILE     :  /csuna/home/simonn/pop/test.p   LINE NUMBER:  49
+
+Currently, it is essentially the second condition above which gives rise
+to this message, i.e., a range has been recompiled and there are
+procedure definitions beyond the end of the range. Thus, the presence of
+the warning is not a guarantee of problems.
+
+The solution is either to reload the complete file or to extend the
+range to be loaded up to the end of the file.
+
+
+15.2  dlocal expressions
+------------------------
+
+If a procedure has a * DLOCAL expression which calls a procedure which is
+compiled in debugging mode, there is a potential problem when debugging
+that procedure inside Ved. The problem arises because Ved immediate mode
+is a Poplog * PROCESS; the program being debugged (as with any Poplog
+program run from immediate mode) is another process; when swapping
+between the two, dlocal entry/exit code is run. If this code invokes a
+procedure which is being debugged it is possible to get into a state
+where the procedure invoked from the dlocal entry/exit code seems to be
+repeatedly invoked and no progress is apparently made.
+
+Note that the dlocal expression code itself is never compiled in
+debugging mode: the problem only arises when it calls a procedure
+compiled in debugging mode.
+
+The solution is to use the ignore command (see above) to ignore the
+offending procedure.
+
+
+15.3  Specifying with_props in the define header
+------------------------------------------------
+
+If you write procedure definitions of the form (see HELP * DEFINE):
+
+    define foo() with_props baz;
+        ...
+    enddefine;
+
+then you will not be able to reference the above procedure by the name
+foo, only by the name baz. For example, you can say:
+
+    stop in baz
+
+but not
+
+    stop in foo
+
+This happens because the debugger works at the VM code level, and
+receives information about a procedure definition via sysPROCEDURE. The
+Pop-11 compiler calls sysPROCEDURE with a procedure's pdprops, which may
+not be the same as the name appearing in the source code if with_props
+is used.
+
+
+--- C.all/help/debugger
+--- Copyright University of Sussex 1993. All rights reserved.

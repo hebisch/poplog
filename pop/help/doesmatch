@@ -1,0 +1,839 @@
+HELP DOESMATCH                                     Aaron Sloman Nov 1995
+                                                    Revised 10 Jan 1998
+=======================================================================
+News:
+10 Jan 1998:
+    Changed to reflect the introduction of LIB * READPATTERN and !
+
+27 Dec 1995:
+    Revised to include LIB NEWMATCHES
+    Some material transferred to HELP READPATTERN
+=======================================================================
+
+The new operator doesmatch generalises matches by finding matches
+that were previously not detected. It is also more efficient in
+many cases. Finally, it allows restrictions to be associated with
+"==" pattern elements.
+
+This file describes, "!", doesmatch, and while_matching.
+
+    ![ .... ]
+        creates a new type of pattern structure for use with lvars, etc.
+        loaded by lib readpattern; See also HELP * READPATTERN.
+
+    <list> doesmatch <pattern> -> <boolean>
+
+    <list> doesmatch !<pattern> -> <boolean>
+
+    <list> doesmatch !<pattern> where <condition> -> <boolean>
+
+    while_matching <list> with <pattern> do <actions> endwhile_matching;
+
+    while_matching <list> with <pattern> when <condition> do
+        <actions>
+    endwhile_matching;
+
+The operator doesmatch and the syntax word while_matching are both
+autoloadable, so no action is required to make them available.
+
+However the syntactic operator "!" is not autoloadable, except at
+Birmingham, so in order to make it available use the following to ensure
+that LIB READPATTERN is loaded:
+
+    uses readpattern
+
+LIB NEWMATCHES
+    Converts the operator matches and the procedure sysmatch to be
+    equivalent to doesmatch and newsysmatch, described below. This
+    enables old code to obtain the new functionality, in nearly all
+    cases.
+
+NB: the facilities described here will not work except in Poplog V15.0
+or a later version, as they require the extended behaviour of valof,
+described below,
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Summary: readpattern, !, doesmatch, while_matching
+ -- Note on efficiency of doesmatch
+ -- The new version of "valof" in Poplog V15.0
+ -- Using doesmatch to generalise matches
+ -- Examples of the use of doesmatch
+ -- Finding common sub-lists
+ -- -- Solving the problem by using doesmatch
+ -- More examples where doesmatch is superior
+ -- doesmatch works with variable restrictions
+ -- Using a restriction procedure held in an lvars variable
+ -- Using restrictions with anonymous pattern elements = and ==
+ -- Using an optional procedure to constrain doesmatch
+ -- Using "where" to provide the procedure argument
+ -- Using doesmatch and "!" to produce a failure-driven loop
+ -- Using while_matching to explore all matches
+ -- -- Using while_matching with a "when" clause
+ -- Using doesmatch to define database procedures
+ -- An alternative: use LIB NEWMATCHES
+ -- Assigning doesmatch to matches
+ -- Using newsysmatch to redefine sysmatch
+
+-- Summary: readpattern, !, doesmatch, while_matching -----------------
+
+LIB READPATTERN
+    This makes available the new operator "!" which causes lists to be
+    read in such a way as to convert pattern variables to identifier
+    records. These lists can be used with the normal Pop-11 matcher,
+    (because since Poplog V15.0 the Pop-11 procedure valof, which is
+    used to implement the matcher, works on both words and identifier
+    records.)
+
+    The syntax for invoking the new mechanism is simply to place "!"
+    in front of a list expression. E.g. after doing
+
+        uses readpattern
+
+    the expression
+
+        ![?x ison ?y]
+
+    creates a list in which the words "x" and "y" are replaced by the
+    corresponding current identifiers.
+
+    Thus at last the Pop-11 matcher can be used with lvars and section
+    variables. For full details, see HELP * READPATTERN
+
+
+LIB DOESMATCH
+    Provides a generalisation of the standard matcher (matches), which
+    handles some cases that matches cannot handle. That is because it
+    does a more exhaustive search for a consistent match.
+
+    The extensions provided by doesmatch are those previously provided
+    by LIB FMATCHES, except that doesmatch can be used in more contexts,
+    in conjunction with the new pattern creation operator: "!"
+
+    It also allows pattern elements like
+        == :5       To match exactly 5 elements.
+        == :p       To match a sublist satisfying the procedure p.
+
+        = :isword   To match an item that is a word.
+        = :3        To match a list, word, string, vector, etc.
+                    with exactly three components.
+
+    Also doesmatch is often a lot more efficient because it does not
+    create so many temporary data structures.
+
+
+LIB WHILE_MATCHING
+    Uses both readpattern and doesmatch to define a new type of looping
+    construct, analogous to the fmatching construct previously made
+    available by LIB FMATCHES.
+
+LIB NEWMATCHES
+    Normally loaded using the command
+
+        uses newmatches
+
+    converts the procedures matches, sysmatch and the matcher
+    arrow --> to have the behaviour described below.
+
+
+-- Note on efficiency of doesmatch ------------------------------------
+
+The cost of the increased generality of doesmatch is the creation of
+additional temporary data-structures, and therefore there is a potential
+garbage collection overhead. This price was paid by LIB FMATCHES, and
+earlier implementations of LIB DOESMATCH.
+
+However, the latest implementation, using ideas from John Gibson's new
+LIB * EQUALS (not available in Poplog V15), avoids the GC penalty, by
+using the Pop-11 stack for `continuations'.
+
+It also reclaims space used for temporary lists created in exploring
+segment pattern elements ("??" or "=="), and also the temporary list
+popmatchvars recording which pattern variables have been bound.
+
+So in some cases doesmatch will be more efficient than the built in
+Pop-11 matcher. It is definitely more efficient when "??" is
+used in the middle of a list.
+
+Whether it is more efficient with "?" variables or "??" used at the end
+of a list, depends on the number of variables. The cross-over point
+seems to be somewhere between about 3 and 7 variables, but it depends on
+the amount of free memory, which in turn determines the frequency of
+garbage collections. The old matcher ALWAYS created garbage by
+creating temporary structures. The new version only does so when
+necessary, e.g. to assign values to segment variables. Where there
+are lots of invocations of the matcher and heap space is scarce,
+doesmatch can be spectacularly more efficient than matches.
+
+
+-- The new version of "valof" in Poplog V15.0 -------------------------
+
+One of the changes in Pop-11 in Poplog version 15.0 is that "valof" and
+its updater work on identifiers as well as on words. This means that if
+the ordinary Pop-11 matcher is given a pattern which contains identifier
+records, it will now work properly. Thus for use with variables declared
+in sections or in the scope of an lvars declaration it is sufficient for
+patterns to contain the corresponding identifier records instead of the
+words, as previously.
+
+Many of the examples below depend on this change, so they will not work
+in earlier versions of Poplog. They should all work in Linux poplog, and
+DEC Alpha Poplog, which did not exist prior to Poplog V15.0
+
+
+-- Using doesmatch to generalise matches ------------------------------
+
+LIB DOESMATCH
+provides a new infix operator which is partly like matches
+
+(a) It can be used with patterns of the form ![ ... ] containing lexical
+and section variables, (This is also true of matches, since Poplog
+V15.0)
+
+(b) It finds some matches (involving repetitions of the same segment
+variable) that are not found by -matches-.
+
+(c) It allows a third procedure argument, which is used to test each
+match. If that returns -false- the matcher will backtrack and attempt
+another way to match the list and the pattern provided. If doesmatch is
+used with "!", then the new syntax word "where" can be used to add the
+a post-match test expression in a concise form.
+
+(d) It allows anonymous pattern elements ("==" and "=") to be associated
+with a restriction which is either a restriction procedure or a number
+constraining the length of the item matched.
+
+Examples of all four features are given below. Features (b) and (c)
+have potential disadvantages, namely the creation of extra structure
+to record unexplored alternative matches when segment variables are
+used. This can add to the memory management load. However the extra
+garbage collection overhead produced in the first implementation of
+doesmatch has been removed. See the above note on efficiency.
+
+-- Examples of the use of doesmatch -----------------------------------
+
+Examples follow, showing how doesmatch generalises the ordinary matches
+operator and works both with ordinary vars and with identifiers as
+pattern variables. (See HELP FMATCHES).
+
+-- Finding common sub-lists -------------------------------------------
+
+Suppose you are given two lists
+    [ 1 2 3 a 4 5 6]
+and
+    [ 11 12 13 14 a 15]
+
+and you want to find if they have a common element, and if so which
+it is. You might try putting the two lists into a list, and then
+matching it against a pattern with a repeated pattern variable, leaving
+it to the matcher to find an appropriate way of decomposing the two
+lists, for example:
+
+define findcommon(list1,list2) -> common;
+    lvars list1, list2;
+
+    vars common;    ;;; pattern variable
+
+    unless [^list1 ^list2] matches [[== ?common ==] [== ?common ==]]
+    then
+        false -> common
+    endunless
+enddefine;
+
+
+Now try out the procedure:
+
+findcommon([ 1 2 3 a 4 5 6], [ 11 12 13 14 a 15]) =>
+** <false>
+
+It fails to find the common item because once -matches- has found a
+way of attaching an element of list1 to the variable -common- it then
+tries to do the same to list2. But it happens to choose an element of
+list1 that is not in list2, so the attempt fails. But it cannot go back
+and try another element of list1, because it keeps no record of how far
+it had got, though it would succeed in this case where there's only one
+long flat list:
+
+vars common;
+[1 2 3 a 4 5 6 11 12 13 14 a 15] matches [== ?common == ?common ==] =>
+** <true>
+common=>
+** a
+
+-- -- Solving the problem by using doesmatch
+
+If we redefine the procedure to use -doesmatch- (calling it getcommon),
+it will work even with the embedded lists:
+
+define getcommon(list1,list2) -> common;
+    lvars list1, list2;
+
+    vars common;    ;;; Pattern variable
+
+    unless [^list1 ^list2] doesmatch [[== ?common ==] [== ?common ==]]
+    then
+        false -> common
+    endunless
+enddefine;
+
+Now try it:
+
+getcommon([ 1 2 3 a 4 5 6], [ 11 12 13 14 a 15]) =>
+** a
+
+getcommon([ 1 cat 2 3 4 5 6], [ 11 12 13 14 15 cat]) =>
+** cat
+
+
+Using the prefix "!" defined in LIB READPATTERN, we can make this work
+with lvars;
+
+uses readpattern;
+
+define getcommon(list1, list2) -> common;
+    lvars list1, list2;
+
+    lvars common;   ;;; pattern variable
+
+    unless [^list1 ^list2] doesmatch ![[== ?common ==] [== ?common ==]]
+    then
+        false -> common
+    endunless
+enddefine;
+
+getcommon([ 1 2 3 [apple] 4 5 6], [ 11 12 13 14 [apple] 15]) =>
+** [apple]
+
+
+-- More examples where doesmatch is superior --------------------------
+
+Here are some more cases where -matches- cannot cope but -doesmatch- can:
+
+vars x,y;
+
+;;; This example coes from Jeff Dalton, in Edinburgh
+[[1 2 3 4 5] 1 2] matches  [[??x ??y] ??x] =>
+** <false>
+
+
+[[1 2 3 4 5] 1 2] doesmatch [[??x ??y] ??x] =>
+** <true>
+x,y =>
+** [1 2] [3 4 5]
+
+;;; Compare this case, where both work (WHY?):
+[1 2 [1 2 3 4 5]] matches  [??x [??x ??y]] =>
+** <true>
+x,y =>
+** [1 2] [3 4 5]
+
+[1 2 [1 2 3 4 5]] doesmatch  [??x [??x ??y]],x,y =>
+** <true> [1 2] [3 4 5]
+
+The reason matches works with this example and not the previous one
+is that it matches from left to right. Thus ??x is first bound
+to [1 2] because there is no other choince, thus it does not need
+the ability to record a choice point and return to it.
+
+
+;;; Here matches fails, but  doesmatch succeeds:
+[[1 2 3 4][3 4 1 2]] matches [[??x ??y][??y ??x]] =>
+** <false>
+
+[[1 2 3 4][3 4 1 2]] doesmatch [[??x ??y][??y ??x]] =>
+** <true>
+x, y =>
+** [1 2] [3 4]
+
+;;; Also with "!". But because this is outside a procedure, it declares
+;;; vx and vy
+[[1 2 3 4][3 4 1 2]] doesmatch ! [[??vx ??vy][??vy ??vx]], vx,vy =>
+;;; DECLARING VARIABLE vx
+;;; DECLARING VARIABLE vy
+** <true> [1 2] [3 4]
+
+;;; But accepts already declared lexical variables
+cancel vx vy;
+lvars vx = "a", vy = "b";
+[[1 2 3 4][3 4 1 2]] doesmatch ! [[??vx ??vy][??vy ??vx]], vx,vy =>
+** <true> [1 2] [3 4]
+
+
+;;; Another hard one for matches
+[[1 2 3 4][a b 2 c d]] matches [[== ?x ==][== ?x ==]], x=>
+** <false> 1
+
+;;; But doesmatch copes
+[[1 2 3 4][a b 2 c d]] doesmatch [[== ?x ==][== ?x ==]], x=>
+** <true> 2
+
+;;; and with "!"
+[[1 2 3 4][a b 2 c d]] doesmatch ![[== ?x ==][== ?x ==]], x=>
+
+NOTE: the cost of doesmatch coping in these cases is that (like
+fmatches) it has to do more search. It keeps records of attempted
+matching of segments (occurrences of "??" and "==") so that if necessary
+it can go back and try another. In very simple cases, where there are
+few variables in a pattern and the only sort of segment pattern element
+is "==", not "??", and where the match is determinate, then matches
+may be both safe to use and more efficient.
+
+
+-- doesmatch works with variable restrictions -------------------------
+
+Like matches, doesmatch allows pattern variables to have attached
+restrictions (See HELP MATCHES for information on restrictions on
+pattern elements).
+
+We can use ":<integer>" to restrict the length of a segment variable
+(i.e. "??" variable):
+
+[[a b c]] doesmatch [[== ??x:2]], x =>
+** <true> [b c]
+
+;;; And also after replacement of pattern variables with identifiers
+[[a b c]] doesmatch ![[== ??x:2]], x =>
+** <true> [b c]
+
+;;; Even in a lexical scope
+lvars xxx;
+[[a b c]] doesmatch ![[== ??xxx:2 =]], xxx =>
+** <true> [a b]
+
+;;; Or a procedure restriction
+[a b c 3 4 d b 4 5 e] doesmatch ![== ?x == ?x:isinteger ==], x=>
+** <true> 4
+
+[a b c 3 4 d b 4 5 e] doesmatch ![== ?x == ?x:isword ==], x=>
+** <true> b
+
+-- Using a restriction procedure held in an lvars variable ------------
+
+When "!" is used to transform a pattern, the item following ":" can be a
+lexical variable whose value is a procedure, or a number, as in this
+example. Note the need to separate ":" and "^":
+
+lvars x, check = isword;
+[a b c 3 4 c d 4 5 e] doesmatch ![== ?x == ?x: ^check ==], x=>
+** <true> c
+
+lvars x, check = 4;
+[a b c 3 4 c d 4 5 e] doesmatch ![== ??x: ^check c ==], x=>
+** <true> [b c 3 4]
+
+This also works with restriction held in vars variables.
+vars x, num = 4;
+[a b c 3 4 c d 4 5 e] doesmatch ![== ??x: ^num c ==], x=>
+** <true> [b c 3 4]
+
+-- Using restrictions with anonymous pattern elements = and == --------
+
+
+After an occurrence of either "=" or "==" in list pattern, a colon may
+occur followed by an integer or a word naming a procedure or a
+procedure. The item after ":" is interpreted as a restriction on what
+may match the pattern element, exactly as with pattern variables.
+
+NB there must be a space before ":" as the Pop-11 itemiser will not
+separate "=:" into "=" and ":" nor "==:" into "==" and ":".
+
+Examples
+[a b c] doesmatch [= = :isword =] =>
+** <true>
+
+[a 2 c] doesmatch [= = :isword =] =>
+** <false>
+
+vars x,y;
+[[a b c 1 2]] doesmatch [[??x = :isinteger ??y]], x,y =>
+** <true> [a b c] [2]
+
+[[a b c 1 2]] doesmatch [[??x = :isword ??y]], x,y =>
+** <true> [] [b c 1 2]
+
+define aboveone(list);
+    lvars list;
+    length(list) > 1
+enddefine;
+
+[[a b c 1 2]] doesmatch [[== :aboveone = :isword ??y]], x,y =>
+** <true> [] [1 2]
+
+[a b c d] doesmatch [?x == :2],x =>
+** <false> a
+
+[a b c d] doesmatch [?x == :3],x =>
+** <true> a
+
+-- Using an optional procedure to constrain doesmatch -----------------
+
+Doesmatch can take an optional extra boolean procedure as third
+argument, which it uses to check that the match is OK. Here use the form
+
+    procedure; .... endprocedure
+
+to specify an anonymous procedure.
+
+Note that in order to ensure that it picks up the third argument,
+doesmatch needs to be used in one of these two formats:
+
+    <datum> matches (<pattern>, <procedure>)
+
+or
+
+    matches(<datum>, <pattern>, <procedure>)
+
+Our examples use the former syntax. A more convenient syntax is
+supported using "where", described below, but only if "!" is used to
+prefix lists.
+
+vars x,y,z;
+[1 3 2 5 2 4]
+    doesmatch
+        ([== ?x ??z ?y ==], procedure; x == y endprocedure) =>
+** <true>
+x, y, z=>
+** 2 2 [5]
+
+-- Using "where" to provide the procedure argument --------------------
+
+The above syntax is rather cumbersome, so if the "!" operator is used,
+then a more compact version can be expressed, using "where" to indicate
+the body of the procedure. The format is
+
+    <datum> doesmatch !<pattern> where < ..... >
+
+The instructions following "where" can be terminated by ",", ";", "=>"
+or a normal expression terminator bracket, e.g. ")", "then", "else",
+etc.
+
+Example:
+
+vars x,y,z;
+[1 3 2 5 2 4] doesmatch ![== ?x ??z ?y ==] where x == y =>
+
+Leaving out "!" will produce a syntactic error.
+
+Here is another example, looking for palindromes
+
+
+define ispalindrome(list) -> (boole, first, rest);
+    ;;; note all the variables are lexical, in Poplog V15
+
+    list doesmatch ![??first ??rest] where first = rev(rest) -> boole
+
+enddefine;
+
+ispalindrome([1 2 3 3 2 1]) =>
+** <true> [1 2 3] [3 2 1]
+
+ispalindrome([1 2 3 4 3 2 1]) =>
+** <false> [] []
+
+
+-- Using doesmatch and "!" to produce a failure-driven loop -----------
+
+If a "where" clause performs some action then always returns false (on
+the stack), this causes doesmatch to go back and attempt another match.
+It does this repeatedly until there are no more options.
+
+We can use this "failure driven loop" to find all occurrences of
+repeated items in a list:
+
+lvars x;
+[ 1 2 3 4 1 2 3 4] doesmatch ![== ?x == ?x ==] where (x => false) =>
+** 1
+** 2
+** 3
+** 4
+** <false>
+
+(The four numbers are printed out as successive values of x. The <false>
+is the final result printed out by the right hand "=>")
+
+The above would work with vars as well as with lvars.
+
+Here is another example of a failure driven loop to print out all
+possible matches using a where clause that returns false. Compile the
+two lines in one go:
+
+lvars aaa, bbb;
+[1 2 3 4] doesmatch ![?? aaa ?? bbb] where ([^aaa ^bbb] => false) ->;
+** [[] [1 2 3 4]]
+** [[1] [2 3 4]]
+** [[1 2] [3 4]]
+** [[1 2 3] [4]]
+** [[1 2 3 4] []]
+
+Compare the following, which does not use "!", and therefore cannot use
+a where clause, but needs a procedure argument for doesmatch:
+
+lvars aaa, bbb;
+[1 2 3 4]
+    doesmatch
+        ([?? aaa ?? bbb], procedure; [^aaa ^bbb] => false endprocedure) ->;
+;;; DECLARING VARIABLE aaa
+;;; DECLARING VARIABLE bbb
+** [<undef> <undef>]
+** [<undef> <undef>]
+** [<undef> <undef>]
+** [<undef> <undef>]
+** [<undef> <undef>]
+
+As explained in HELP READPATTTERN, the reason this does not work is that
+without using "!" the pattern contains words, and when the matcher runs
+it uses the updater of valof on the words. That does not access the
+lexical variables aaa and bbb, and causes new global (permanent)
+variables to be declared.
+
+Consequently the lexical variables aaa and bbb retain their undefined
+values in the procedure, and these are printed out by the print command.
+
+Inserting "!" before the pattern fixes this, but so does compiling the
+doesmatch command without including the "lvars" declaration.
+
+[1 2 3 4]
+    doesmatch
+        ([?? aaa ?? bbb], procedure; [^aaa ^bbb] => false endprocedure) ->;
+** [[] [1 2 3 4]]
+** [[1] [2 3 4]]
+** [[1 2] [3 4]]
+** [[1 2 3] [4]]
+** [[1 2 3 4] []]
+
+Here the aaa and bbb in the procedure are the global variables updated
+by the matcher.
+
+-- Using while_matching to explore all matches -------------------------
+
+The autoloadable library while_matching provides convenient syntax for
+exploiting the facility of doesmatch to handle a final test procedure.
+
+The above example could be formulated as follows, using this construct:
+
+uses while_matching;        ;;; not necessary if installed as autoloadable
+
+vars aaa,bbb;
+while_matching [1 2 3 4] with [?? aaa ?? bbb] do
+    [^aaa ^bbb] =>
+endwhile_matching;
+
+or, with a shorter closing bracket:
+
+vars aaa, bbb;
+while_matching [1 2 3 4] with [?? aaa ?? bbb] do
+    [^aaa ^bbb] =>
+endwhile;
+
+As with the other cases, this can use "![....]" so as to access lvars
+variables in a pattern.
+
+lvars vvv, www;
+while_matching [1 2 3 4] with ![?? vvv ?? www] do
+    [^vvv ^www] =>
+endwhile;
+
+Here is an example to find maternal grandmothers:
+
+lvars p1, p2, p3;
+while_matching [[mother a b][mother b c][mother c d][mother b e]]
+with ![== [mother ?p1 ?p2] == [mother ?p2 ?p3] ==]
+do
+    [granny ^p1 ^p3] =>
+endwhile;
+** [granny a c]
+** [granny a e]
+** [granny b d]
+
+This sort of thing is not as general as forevery, described below.
+
+-- -- Using while_matching with a "when" clause
+
+Sometimes the action is to be performed only in a subset of cases. This
+can be expressed using a conditional action, as in this example, which
+finds all nonempty subsets of a list that are separated by a single
+item.
+
+lvars x, y;
+while_matching [1 2 3 4] with ![== ??x = ??y == ] do
+    if x /== [] and y /== [] then
+        [^x ^y] =>
+    endif;
+endwhile_matching;
+** [[1] [3]]
+** [[1] [3 4]]
+** [[1 2] [4]]
+** [[2] [4]]
+
+;;; Now using a when clause instead of if ... then
+;;; This produces the same result, but may sometimes be a bit clearer
+
+lvars x,y;
+while_matching [1 2 3 4] with ![== ??x = ??y == ]
+when x /== [] and y /== []
+do
+    [^x ^y] =>
+endwhile_matching;
+
+;;; It also works with ordinary vars if "!" is not used.
+vars x,y;
+while_matching [1 2 3 4] with [== ??x = ??y == ]
+when x /== [] and y /== []
+do
+    [^x ^y] =>
+endwhile_matching;
+
+
+;;; Compare what is printed out if the when clause is omitted.
+lvars x,y;
+while_matching [1 2 3 4] with ![== ??x = ??y == ] do
+    [^x ^y] =>
+endwhile_matching;
+
+See HELP READPATTERN for more examples, including the use of sections.
+
+All the examples there would work with doesmatch replacing matches.
+
+
+-- Using doesmatch to define database procedures ----------------------
+
+It would be possible to re-define all the database procedures using
+doesmatch instead of matches.
+
+;;; Set up an initial database for testing
+[[a ison b][d ison c] [b ison table][e ison c][c ison table]] -> database;
+
+
+For example, present could be defined as follows:
+
+define procedure present(pattern);
+    lvars DB = database;
+    until null(DB) do
+        if fast_front(DB) doesmatch pattern then
+            fast_front(DB) -> it;
+            return(true);
+        endif;
+        fast_back(DB) -> DB
+    enduntil;
+    return(false)
+enddefine;
+
+present([?x ison ?y]) =>
+** <true>
+it =>
+** [a ison b]
+
+(This could not work with fmatches, because the pattern is passed in
+from outside the procedure.)
+
+-- An alternative: use LIB NEWMATCHES ---------------------------------
+
+By loading LIB * NEWMATCHES you will redefine the operator matches to be
+equivalent to doesmatch and the procedure sysmatch to be equivalent to
+the procedure newsysmatch, defined in LIB * DOESMATCH. The operator
+"-->" (see HELP * MATCHES, TEACH * MATCHARROW)
+
+After that, in all the examples above, "doesmatch" can be replaced with
+"matches" and all the examples will then work. Provided that the library
+LIB * NEWMATCHES is compiled before any database procedures, they will
+use the new facilities too.
+
+How this works is explained in the following sections.
+
+-- Assigning doesmatch to matches -------------------------------------
+
+Instead of redefining procedures that use matches, we can simply assign
+doesmatch to matches, and newsysmatch to sysmatch, after saving the old
+values so that they can be restored if necessary;
+
+;;; Save the original values
+constant oldmatches = nonop matches, oldsysmatch = sysmatch;
+applist([oldmatches oldsysmatch], sysprotect);
+
+;;; Change the values after loading lib doesmatch and unprotecting
+;;; the identifiers
+uses doesmatch;
+
+applist([matches sysmatch], sysunprotect);
+
+nonop doesmatch -> nonop matches;
+newsysmatch -> sysmatch;
+
+applist([matches sysmatch], sysprotect);
+
+Re-protect it if desired. (Undone by tracing matches).
+sysprotect("matches");
+
+It should now be possible to redo all the above tests of the database,
+as well as some that make use of the more general matching capability of
+doesmatch. (See the note on efficiency, above).
+
+E.g. this will now work:
+
+[[a b c][c a b]] matches [[??x ??y][??y ??x]] ,x,y =>
+** <true> [a b] [c]
+
+
+LIB * NEWMATCHES does the above and also redefines the matcher arrow.
+
+So this will no longer produce an error:
+
+    [[a b c][c a b]] --> [[??x ??y][??y ??x]];
+
+
+-- Using newsysmatch to redefine sysmatch ---------------------------
+
+Some of the database facilities are not defined in terms of matches,
+but in terms of sysmatch, e.g. forevery. (SHOWLIB * FOREVERY)
+
+The procedure newsysmatch, defined in LIB DOESMATCH, is very like
+sysmatch, except that it uses the more powerful facilities described
+above. It has the same format
+
+    newsysmatch(pattern, datum) -> boolean
+
+As shown above we can change sysmatch after saving its value.
+
+Also, like sysmatch, this procedure leaves popmatchvars holding the list
+of variables whose values were set in the match, thus it should only be
+used in a context where popmatchvars is re-set to [] afterwards.
+
+See HELP * SYSMATCH. Note that sysmatch takes its arguments in the
+reverse order to matches and doesmatch, i.e.
+
+    sysmatch(pattern, datum) -> boolean
+
+After redefining sysmatch, either explicitly or by uses newmatches,
+we can then force recompilation of forevery, to use the new definition:
+
+
+lib forevery
+
+[[a ison b] [d ison c] [b ison table] [e ison c] [c ison table]]
+    -> database;
+
+After all that
+
+lvars x,y,z;
+forevery ![[ ?x ison ? y][?y ison ?z]] in database do
+    [^x above ^z]=>
+endforevery;
+
+** [a above table]
+** [d above table]
+** [e above table]
+
+We can also use patterns of forms that would not work with the old
+matcher, e.g. [[??x ??y][??y ??x]] matched against [[a b c][c a b]]
+
+However, this approach will not allow the database facilities to find
+all the multiple new matches that can be found by doesmatch in cases
+where multiple matches are possible. For that more sophisticated code in
+lib forevery, foreach, which, etc. would be required. It is not clear
+whether such generality is required in the database, i.e. a database
+item that can be matched in several ways by the same pattern.
+
+
+--- $poplocal/local/newkit/prb/help/doesmatch
+--- $poplocal/local/help/doesmatch
+--- Copyright University of Birmingham 2000. All rights reserved. ------

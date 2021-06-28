@@ -1,0 +1,940 @@
+HELP VED_NET (Unix only)                              A. Sloman June 1991
+
+THIS FILE IS MADE OBSOLETE BY THE NEW VED_GN PACKAGE
+
+SEE
+    uses ved_gn
+    HELP ved_gn
+
+====
+
+LIB VED_NET
+LIB VED_GN
+
+A VED interface for reading UNIX  net news.
+See * VED_POSTNEWS for sending news.
+
+The facilities described below allow you to browse in VED through news
+bulletin boards under the control of a file specifying which news groups
+you are interested in. Since you are always in VED, all normal VED
+commands remain available, including ved_mail, ved_send, etc.
+
+The most common command is
+    ENTER gn
+By repeatedly using that, and using VED cursor move keys, and the
+REDO key, you can browse for hours, once you have set up your news
+control file vednewsrc (usually just .newsrc in your login directory).
+
+If you just want to read ONE news article read the section after the
+introduction, below.
+
+More details follow the table of contents below.
+
+Please note that this software is provided "as is" in the hope that it
+will be of use. It is not supported.
+
+CONTENTS - (Use ENTER g to access required sections)
+
+ -- Introduction
+ -- Reading one article, e.g. ENTER gn comp.lang.lisp.2800
+ -- The structure of news files: pathnames
+ -- More general facilities
+ -- News directories used
+ -- The vednewsrc file format
+ -- Use "!" to suppress a group in the vednewsrc file
+ -- Listing available news groups (NEEDS TO BE CHANGED ON EACH SITE)
+ -- The "subject index" file format
+ -- Options for formatting the subject index file
+ -- Using the subject index to choose what to read
+ -- ENTER gn (Get News)
+ -- 1. ENTER gn <path spec> (invokes ENTER net)
+ -- 2. ENTER gn (in an ordinary file - get vednewsrc file)
+ -- 3. ENTER gn (in vednewsrc file - get "subject index file")
+ -- 4. ENTER gn (in "subject index file" - get news file)
+ -- 5. ENTER gn (in news file - go back to Subject index file)
+ -- 6. ENTER gn . (Bring current group up to date)
+ -- 7. ENTER gn1 (in vednewsrc file - try only ONE news group)
+ -- Additional ENTER gn commands
+ -- Saving a "subject index file" for future use
+ -- ENTER net and ENTER oldnet
+ -- Path specifications for news groups, using ENTER net
+ -- ENTER net flags: specify subject lines or 'ls' listing
+ -- ENTER net (with arguments)
+ -- ENTER net (with no argument)
+ -- ENTER net -lt
+ -- ENTER net -lt uk
+ -- ENTER net uk.events
+ -- ENTER net -s <path spec> (Make subject index file)
+ -- ENTER gn -s <path spec>
+ -- ENTER net -s uk.events.30*
+ -- ENTER gn -s uk.events.30*
+ -- ENTER net comp
+ -- ENTER gn comp
+ -- ENTER net comp.lang.lisp.1082
+ -- ENTER gn comp.lang.lisp.1082
+ -- ENTER oldnet comp.ai
+ -- ENTER save <filename>
+ -- Browsing with the active file
+ -- Sending news: ENTER postnews
+ -- ENTER followup (prepare followup article)
+ -- ENTER followup reply (prepare reply to original poster)
+ -- Renaming <group>.general -> <group>.followup
+ -- Acknowledgements
+ -- Further reading
+
+-- Introduction -------------------------------------------------------
+
+This package uses VED as an interface for reading NET news files. It
+overcomes various problems with the standard news readers (readnews and
+rn). In particular you are never in the grip of a special program: you
+are always in VED and free to switch between reading news and doing
+anything else then coming back to exactly where you were. So you can
+easily reply to a message, copy a bit of a news item into a file,
+send some or all of a news item to someone else, using ved_send, etc.
+
+The program also allows you easily to go back to an earlier file, or to
+scan up and down the current file, to copy bits of files in or out, etc.
+
+-- Reading one article, e.g. ENTER gn comp.lang.lisp.2800 -----------
+
+If you just want to read one news article, perhaps recommend by a
+friend, or if you don't want to bother with setting up the environment
+for regular use, as described below, you can use the article's
+"pathname" as an argument for ENTER gn. E.g. to read the article
+'comp.lang.lisp.2800' (if it exists) type
+
+    ENTER gn comp.lang.lisp.2800
+
+If you mis-type part of the "path name" e.g. comp.lng.lisp.2800 you
+will get an error message saying something like "invalid directory".
+If you type the number of an article that does not exist you will
+(at present) just get a blank file. (This should be changed).
+
+
+-- The structure of news files: pathnames -----------------------------
+
+The news files are divided into groups, e.g. comp, sci, soc, uk, eunet,
+etc. Each group can be further subdivided, and the subdivisions are
+further subdivided, giving a tree structure, which is mapped onto
+the Unix directory structure. Here are examples of some group names
+that may or may not be available on your machine:
+
+    comp.ai
+    comp.sys
+    comp.sys.sequent
+    comp.sys.dec
+    comp.sys.sun
+    comp.editors
+    comp.lang.prolog
+    comp.lang.lisp
+    comp.lang.lisp.franz
+    comp.lang.c
+    sci.psychology
+    sci.physics
+    local.test
+    local.announce
+
+Thus, if the news directory is in the location /usr/spool/news (where
+it often is) the article comp.lang.lisp.2800 will be in the file
+
+    /usr/spool/news/comp/lang/lisp/2800
+
+The ved_gn program automatically does the translation for you.
+
+
+-- More general facilities --------------------------------------------
+
+The NEWS browsing facilities allow you to define a top level menu of
+news groups that interest you (your "vednewsrc" file), and then when you
+select one of those groups the program will check to see whether there
+are any new news items in that group, and if so create a VED file, the
+subject index file for that group, giving a menu of unread news items in
+the group, so that you can select the ones you wish to read. The menu
+shows the subject and the sender's name, for each news item.
+
+There are two command interfaces. One (ENTER net) uses the command
+line, where you have to specify the desired group and what you want to
+do with it. The other "get news" command (ENTER gn) uses the current
+file to determine what to do when you give the command. You can use the
+REDO button to invoke ved_gn repeatedly, and it will take appropriate
+action depending on the context.
+
+If you use ENTER gn with an argument it assumes you want the command
+line interface, and invokes it, so you can get by with only one command
+name.
+
+For most purposes ENTER gn will do everything you want.
+
+
+-- News directories used ----------------------------------------------
+
+All the commands need to know the root of the news directory.
+
+There are two global variables defining root news directories:
+
+For reading current news files:
+  vednewsdir
+    defaults to '/usr/spool/news' used by ved_net and ved_gn
+
+    (This file is often a symbolic link to another directory where
+    the news files really are).
+
+For reading 'archived' news files:
+  vedoldnewsdir
+    defaults to '/usr/spool/oldnews' used by ved_oldnet
+    (This facility is not always provided).
+
+If these names are wrong for your machine, you can put alternative names
+into your vedinit.p file, e.g.
+
+    '/sys/news' -> vednewsdir;
+
+Path names for individual news groups and news files are automatically
+appended to the appropriate root news directory names.
+
+The ENTER gn command also needs to know which is the user's
+"newsrecord" file, i.e. the file that keeps a record of which news
+groups you are interested in and which numbers for each group you have
+already been told about. This file is stored in the global variable
+
+    vednewsrc, which defaults to:  '$HOME/.newsrc'
+
+You can assign a different filename to vednewsrc if you wish the
+VED-based newsreader to use a different file from your standard .newsrc.
+E.g. in your vedinit.p do something like
+
+    '$HOME/.vednewsrc' -> vednewsrc;
+
+or if you prefer it to be controlled by an environment variable NEWSRC
+defined in your .login file, then put into your vedinit.p file
+
+    '$NEWSRC' -> vednewsrc;
+
+and in your .login file do
+
+    setenv NEWSRC ~/.newsrc
+
+or whatever you wish it to be.
+
+
+-- The vednewsrc file format ------------------------------------------
+
+The vednewsrc file defines the set of news groups you are interested
+in, and for each group contains a number specifying the latest message
+in that group that you have read. E.g. the line specifying that you
+want to see news in group comp.ai and that the last one you read was
+number 93 would be
+
+    comp.ai: 93
+
+The format of this file is the same as for the '.newsrc' file used by
+the 'readnews' and 'rn' commands, except that in the readnews format,
+    comp.ai: 1-93
+
+the VED news reader ignores everything but the last integer on the line.
+
+Each line in the vednewsrc file starts with the name of a news group,
+followed by a colon then a space followed by a number which is 0 if you
+have never seen any files in that group, or else records the latest news
+file in that group that you have read.
+
+E.g. the file might include lines like the following, in any order:
+
+sussex: 5
+sussex.announce: 15
+comp.ai: 50
+comp.lang.lisp: 0
+uk.lisp: 0
+comp.lang.prolog: 18
+comp.misc: 46
+comp.sys.atari.st: 553
+eunet.news: 6
+local: 0
+comp.sys.sun: 32
+comp.sys.sequent: 2650
+comp.sys.dec: 99
+sussex.test: 4
+
+WARNING: don't include any spurious spaces (e.g. before the colon).
+
+If you have previously used the 'readnews' command, you will have a
+similar format except that there may be more than one number, e.g.
+    comp.ai: 0-55,900-987
+Only the last number in the line will be taken note of or changed
+by the VED news reader.
+
+If a line contains the exclamation mark "!" instead of a colon then it
+is assumed that you wish that newsgroup to be ignored by the ENTER gn
+command, and the next line will be examined instead. You can therefore
+also use "!" to insert comments.
+
+The numbers after the colon will be altered when you browse. E.g. if a
+line contains
+    comp.ai: 239
+
+and there are new items with numbers 240 to 260, and you happen to
+read only items 240, 251 and 253, then the line will be changed
+automatically to
+    comp.ai: 253
+
+indicating that in future you don't want to be shown any earlier comp.ai
+news files. If you do want to go back to earlier numbers, then edit the
+vednewsrc file yourself, to change the number, so that you can go back
+to old messages later and re-read them.
+
+If you do not write the vednewsrc file, then it is left with the numbers
+unchanged and you can look at all the same news entries again next time.
+
+
+Generally the system manager will not keep all news files indefinitely,
+so you may find that although the last item you read in a group was
+number 305, the currently available items start from 530. I.e. items
+306-529 have been deleted to save space, and you have missed them
+forever - unless someone has archived them.
+
+
+-- Use "!" to suppress a group in the vednewsrc file -------------------
+
+Insert "!" in the line if you want to ignore a group temporarily, or
+insert a comment in the vednewsrc file.
+
+E.g.
+    comment! temporarily not using lisp, but remember last item read
+    comp.lisp! 300
+
+Alternatively "#" at the beginning of a line will be treated as
+indicating a comment line, which is ignored. Blank lines are also
+ignored.
+
+
+-- Listing available news groups (NEEDS TO BE CHANGED ON EACH SITE) ---
+
+You can examine a list of available groups to choose from in the
+'active' news file.
+
+At Sussex this is
+    '/usr/lib/news/active' on SYMA
+
+Also available on some COGS CRN machines at Sussex as
+
+    '/syma/news/lib/active'
+
+The active file shows which news groups are available and the numbers of
+the news files in each. If new to news, you could copy the whole file
+into your .newsrc then edit it to the above format, in order to browse,
+then delete the groups you don't want, or suppress them using "!".
+
+Some of the groups are real junk. There is a group called 'junk' that
+does not necessarily contain only junk. It will contain items that the
+current news software has not installed properly, or items that arrive
+after the time at which they are supposed to be out of date. Sometimes
+they are worth reading.
+
+There is further information in the following files in the same
+directory as the "active" file
+
+    newsgroups
+        This file gives a description of each news group.
+
+    moderators
+        This file gives email addresses of the "moderators" for
+        groups that are moderated.
+
+    history
+        This is a VERY large file giving information about recently
+        received news articles. It can grow to several megabytes.
+
+
+-- The "subject index" file format ------------------------------------
+
+The 'ENTER gn' command described below creates a temporary "subject
+index file" for a news group specified by the current line in the
+vednewsrc file. You can then select which message you wish to read, by
+re-using the 'gn' command.
+
+The first line of the subject index file for a particular news group has
+the directory path name for the news group, the second line the name of
+the group. The third line is an instruction telling you to use 'gn' to
+read selected messages, e.g.
+
+    /usr/spool/news/comp/lang/prolog
+           comp.lang.prolog
+    --------------USE <ENTER> gn to get news file-----------------
+
+The rest of the file lists the articles in that news group, whose
+numbers are higher than the number recorded in your vednewsrc file: i.e.
+the articles that arrived after the one you last looked at. Each entry
+is of the form
+
+    article number  Subject  Sender
+
+So if the cursor is on the line
+    comp.ai: 2290
+
+in the vednewsrc file, the 'gn' command might create, in VED, a subject
+index file containing:
+
+   /usr/spool/news/comp/ai
+   comp.ai
+   ------------------USE <ENTER> gn to get news file---------------
+2291  [Re: AI and Intelligence] [geb@cadre.dsl.PITTSBURGH.EDU (Gordon E. Banks)]
+2292  [Re: AI and Intelligence] [ap1i+@andrew.cmu.edu (Andrew C. Plotkin)]
+2293  [Re: AI and Intelligence] [jeff@lorrie.atmos.washington.edu (Jeff L. Bowden)]
+2294  [Re: Learned Behavior vs. Hard-Wired Behavior] [Makey@LOGICON.ARPA (Jeff Makey)]
+2295  [Re: Learned Behavior vs. Hard-Wired Behavior] [tim@hoptoad.uucp (Tim Maroney)]
+
+The viewing window will be offset to the right so that the numbers on
+the left are not shown. What you will see will be more like this:
+
+ [Re: AI and Intelligence] [geb@cadre.dsl.PITTSBURGH.EDU (Gordon E. Banks)]
+ [Re: AI and Intelligence] [ap1i+@andrew.cmu.edu (Andrew C. Plotkin)]
+ [Re: AI and Intelligence] [jeff@lorrie.atmos.washington.edu (Jeff L. Bowden)]
+ [Re: Learned Behavior vs. Hard-Wired Behavior] [Makey@LOGICON.ARPA (Jeff Makey)]
+ [Re: Learned Behavior vs. Hard-Wired Behavior] [tim@hoptoad.uucp (Tim Maroney)
+
+An asterisk is visible to the left of the Subject if you have already
+read the same file in another news group in the current session.
+
+
+-- Options for formatting the subject index file ----------------------
+
+If you wish to see only the SUBJECT and not the information about the
+SENDER, then do, in your vedinit.p
+
+    vars gn_show_sender = false;
+
+The default value is -true-.
+
+If you wish to EXCLUDE files whose subject lines include "Re:", which
+implies that they are comments on previous message, you should do
+
+    vars gn_include_Re = false;
+
+The default value is -true-.
+
+[Additional control variables are listed in LIB * VED_NET with comments
+indicating their function.]
+
+
+-- Using the subject index to choose what to read ---------------------
+
+The subject index file can be treated as a menu of options: to select
+an article for reading, simply put the cursor on the line in question
+and then type
+    ENTER gn
+
+This command (unlike most VED commands) behaves differently in different
+contexts, as described below.
+
+
+-- ENTER gn (Get News) ----------------------------------------------
+
+This is probably the most convenient command for reading news.
+It has several modes determined by context, following a suggestion by
+Chris Thornton. This makes it unnecessary to remember several different
+commands.
+
+
+-- 1. ENTER gn <path spec> (invokes ENTER net) -------------------
+
+If you give it a path name as argument, it behaves exactly like
+ENTER net, described below, e.g.
+    ENTER gn comp.ai.3056
+is the same as
+    ENTER net comp.ai.3056
+
+This is convenient for reading a single article. To get a complete list
+of article numbers in a group leave out the number, e.g.
+
+    ENTER gn comp.ai
+
+
+-- 2. ENTER gn (in an ordinary file - get vednewsrc file) ----------
+
+If it is in a type of VED file that it does not recognise, i.e. not a
+VED news file, then ved_gn uses the file name held in the variable
+-vednewsrc- to find your news record file and reads it in to VED.
+(See the section above on the format for this file.)
+
+This gives you a menu of news groups to choose from, using the
+REDO key or the 'gn' command.
+
+
+-- 3. ENTER gn (in vednewsrc file - get "subject index file") -------
+
+Search from current line in vednewsrc file looking for a news group that
+has some unread news items, and build a subject index file for that
+group.
+
+If you are already in the vednewsrc file, then the gn command uses the
+current line to identify a news group and the number of the last news
+item read in that group. It looks at news files in that group to see
+whether there are any with later numbers, and if so creates a
+subject index file for that group (in the format described above).
+
+If there is nothing new in the group named on the current line, 'gn'
+searches down the vednewsrc file (ignoring lines containing "!"), until
+it finds a group with unread items, and builds a subject index file
+showing the new items.
+
+The command ENTER gn1 (described below) will try only ONE news group
+instead of searching on.
+
+The subject index file and the individual news files are read in with
+VEDWRITEABLE false, so re-name the file if you want to save it.
+
+
+-- 4. ENTER gn (in "subject index file" - get news file) ------------
+
+ENTER gn
+ENTER gn <number>
+If you are already in a NEWS index file created by gn with the above
+format, then the gn command will Get the News file corresponding to the
+current line, or corresponding to the number given as argument.
+
+If you are at the end of the file and no argument is given it quits the
+file and goes to the vednewsrc file.
+
+In the first case it will also mark the current line with an asterisk to
+the left of the subject, and move the cursor to the next line. Since the
+same file can occur in other news groups, the program remembers the
+inode number of the file so that if you build an index for another group
+it will mark the corresponding file with an asterisk to tell you that
+you have already looked at it.
+
+When gn gets the news file it puts the sender's name on the status line.
+The newsfile will been displayed from the start of the main text, i.e.
+hide the header lines by scrolling them off the screen.  If you want to
+see the header lines each time you access a new newsfile, put the
+following line in your vedinit.p:
+
+    false -> ved_hide_header;
+
+The number of the last file read in this group is updated in the
+vednewsrc file, unless a bigger number was previously recorded.
+
+-- 5. ENTER gn (in news file - go back to Subject index file) -------
+
+When you have finished reading a news file then <ESC> q, or ENTER q
+will make it go away. You can also use ENTER gn for this (or the
+<REDO> key if 'gn' was your previous command).
+
+The news files are read in with VEDWRITEABLE false, so rename if you
+want to save them, or use ENTER save <filename>. Whenever you come
+back to an index file in which gn was used, the cursor will have moved
+to the next line, ready to be used on the next newsgroup or index entry.
+
+You can also quit the current news file and return to the index using
+ENTER gn (or the REDO button).
+
+
+-- 6. ENTER gn . (Bring current group up to date) -------------------
+
+Suppose you have not read a group for a long time and there are very
+many message numbers to catch up on. If you want to skip them all,
+and update the .newsrc file AS IF you had read them all, do
+
+    ENTER gn .
+
+You can do this whether currently in a particular news file or in the
+subject index file for a group or in the vednewsrc file. In the latter
+case it will "update" the group on the current line.
+
+
+-- 7. ENTER gn1 (in vednewsrc file - try only ONE news group) -------
+
+If the current file is the vednewsrc file then either of the commands
+    ENTER gn1
+
+will check the news group on the current line to see if there are any
+unread news items in that group, and if so will make an index file. If
+not it prints a message and stops, unlike 'ENTER gn' which continues
+searching down the vednewsrc file until it finds a news group with
+unread items.
+
+-- Additional ENTER gn commands ---------------------------------------
+
+There are additional "ENTER gn" commands that, for historical reasons,
+are equivalent to corresponding "ENTER net" commands, as explained
+below.
+
+
+-- Saving a "subject index file" for future use -----------------------
+
+If the gn command presents you with a long list of articles in a group
+and you wish to read one of them now, while saving some of the earlier
+ones for browsing at another time you can save the subject index file,
+using a command like
+
+    ENTER name news_to_read
+
+to change the name of the file.
+
+Delete the entries that don't interest you, then, PROVIDED that you
+leave the first three lines of the file untouched i.e. the header lines,
+you can later use the ENTER gn command to go directly from this file
+to the news articles (if they have not been purged!).
+
+
+-- ENTER net and ENTER oldnet -------------------------------------
+
+Can be used inside VED
+    a. to find which news (or old news) directories exist
+    b. to find which files exist in those directories (using 'ls')
+    c. to scan the 'Subject' lines of news items
+    c. to read news files
+
+-- Path specifications for news groups, using ENTER net -------------
+
+The ENTER net and ENTER oldnet commands may include path
+specifications optionally preceded by a flag.
+
+In the formats given below <path spec> is a path specification. Path
+specifications are the same as news groups, except that the specification
+may include news file numbers or wild-cards.
+
+E.g. to access the news group comp.sys.atar.st and files in it whose
+numbers start with 30, the argument to ENTER net (or oldnet) may be a
+<path spec> in the form
+
+    comp.sys.atari.st.30*
+
+The actual path name used might be
+    /usr/spool/news/comp/sys/atari/st/30*
+
+or, if reading archived news
+
+    /usr/spool/oldnews/comp/sys/atari/st/30*
+
+
+-- ENTER net flags: specify subject lines or 'ls' listing -----------
+
+An optional first argument can begin with '-', in which case it is
+called a 'flag', and controls the behaviour of ved_net.
+
+The flag '-s' specifies that a subject index file should be made
+for the group, as shown below. Commands using this flag can also
+be used with "ENTER gn".
+
+If there is anything else beginning with '-' then it is assumed to give
+flags for the 'ls' command, whose output, for the given news group
+directory specification, will be read into a temporary VED file.
+
+E.g '-t' means use reverse chronological order, as shown below.
+Otherwise the alphabetical order of file names will be used.
+
+
+-- ENTER net (with arguments) ---------------------------------------
+
+The following formats are accepted:
+
+    ENTER net    [<ls flags | -s>] <path spec>
+    ENTER oldnet [<ls flags | -s>] <path spec>
+
+E.g.
+    ENTER net -lt foo.baz.grumble
+
+will produce a reverse chronological long listing of the contents of the
+directory for the group.
+
+In all cases VEDWRITEABLE is made FALSE.
+
+There are two cases handled by ENTER net (or oldnet)
+    1. If the argument corresponds to a name of a non-directory file,
+    then that file will be read in to VED, with the 'Subject:' line at
+    the top of the window, e.g. ENTER net comp.ai.300
+    will read in message number 300 in the 'comp.ai' news group.
+
+    2. If the argument corresponds to a news directory, or if it
+    contains wild cards, then 'ls -C <path spec>' will be
+    invoked, and the output in columns will be read into VED.
+
+Similar comments apply to ENTER oldnet
+
+Examples follow.
+
+
+-- ENTER net (with no argument) -------------------------------------
+is the same as ENTER ls -C /usr/spool/news
+
+This gives the top level news directory names in columns, in
+alphabetical order, e.g. (January 1989):
+
+ /usr/spool/news
+batch   control general junk    misc    rec     soc     to
+comp    eunet   gnu     local   news    sci     talk    uk
+
+Any of these names can then be used as an argument to ENTER net
+to find out what lower level news categories there are, as shown
+below. NB. you may find different sub-headings available if you
+try this.
+
+
+-- ENTER net -lt ---------------------------------------------------
+
+is the same as ENTER ls -lt /usr/spool/news. In Feb 1989 on CSUNA
+at Sussex, it gave:
+
+/usr/spool/news
+total 46
+drwxrwxrwx  2 58           2560 Feb 12 06:08 control
+drwxrwxrwx  2 58          36352 Feb 12 06:08 junk
+drwxr-xr-x  2 58            512 Feb  2 20:04 general
+drwxrwxrwx 19 58            512 Feb  1 07:55 sci
+drwxrwxrwx 19 58            512 Jan 24 15:01 rec
+drwxrwxrwx 10 58            512 Jan 17 12:20 news
+drwxrwxrwx 45 58           1024 Dec 18 22:00 comp
+drwxr-xr-x 12 58            512 Nov 27 09:45 gnu
+
+    .......  etc ........
+
+
+-- ENTER net -lt uk ------------------------------------------------
+
+is the same as ENTER ls -lt /usr/spool/news/uk, giving
+ /usr/spool/news/uk
+ total 10
+ drwxrwxrwx  2 News          512 Jan 25 12:48 events
+ drwxrwxrwx  2 News          512 Jan 25 05:09 test
+ drwxrwxrwx  2 News          512 Jan 24 05:35 jobs
+    .......  etc ........
+
+
+-- ENTER net uk.events --------------------------------------------
+
+on the same day gave:
+ /usr/spool/news/uk/events
+ 296     297     298     299     300     301     302
+
+
+-- ENTER net -s <path spec> (Make subject index file) ---------------
+-- ENTER gn -s <path spec>  (Make subject index file) ---------------
+
+This format produces a subject index file, in the format specified
+previously. E.g.
+
+    ENTER net -s uk.events
+or
+    ENTER gn -s uk.events
+
+Might produce something like this:
+
+/usr/spool/news/uk/events
+uk.events
+--------------USE <ENTER> gn to get news file-----------------
+295  [University of Manchester: computing courses] [ian@ipse2pt5.cs.man.ac.uk (Ian Cottam)]
+296  [Correction -Feigenbaum is NOT coming in July] [xuazz@warwick.ac.uk (Simon Musgrave)]
+297  [Re: Advertising of University courses] [chgs02@vaxa.strath.ac.uk (Ann)]
+298  [NAG/SERC Finite Element Library Course] [cjc@inf.rl.ac.uk (John Collie)]
+299  [Apple developer's group meeting: QuickTime demo] [sw@nan.co.uk (Sak Wathanasin)]
+300  [C A L L  F O R  P A P E R S : 5th REFINEMENT WORKSHOP] [brianm@r8a.cs.man.ac.uk (Brian Monahan)]
+    .......  etc ........
+
+The ENTER gn command, described above, can then be used to Get a News
+file into VED, corresponding to the line the cursor is on in the index
+file.
+
+
+-- ENTER net -s uk.events.30* -------------------------------------
+-- ENTER gn -s uk.events.30* ------------------------------------------
+
+Would produce only entries for files with names starting '30'. E.g.
+
+Note that the pattern given at the end can include formats described in
+connection with sys_file_match in REF * SYSUTIL/sys_file_match
+
+For example, to see only the comp.arch articles whose numbers are in the
+range starting 186... to 187..., do
+
+    ENTER gn -s comp.arch.18[6-7]*
+
+
+-- ENTER net comp ---------------------------------------------------
+-- ENTER gn comp ------------------------------------------------------
+
+is the same as ENTER ls -C /usr/spool/news/comp
+which gave (Jan 1989):
+/usr/spool/news/comp
+ai              doc             lang            parallel        sys
+arch            editors         laser-printers  periphs         terminals
+archives        edu             lsi             protocols       text
+binaries        emacs           mail            risks           theory
+bugs            fonts           misc            simulation      unix
+cog-eng         graphics        music           society         windows
+compilers       hypercube       newprod         software-eng    women
+databases       ibm             org             sources
+dcom            ivideodisc      os              std
+
+To find out what is in the lower level group comp.lang do
+    ENTER net comp.lang
+or
+    ENTER gn comp.lang
+
+which might produce
+/usr/spool/news/comp/lang
+ada             clu             idl             postscript      smalltalk
+apl             eiffel          lisp            prolog          visual
+asm370          forth           misc            rexx
+c               fortran         modula2         scheme
+c++             icon            pascal          sigplan
+
+Similarly to see what files are in the lisp group do
+    ENTER net comp.lang.lisp
+
+This may provide a list of numbers, for individual news files, and
+also some names for lower level directories, e.g. 'franz' for
+comp.lang.lisp.franz. The "-s" flag, possibly with a pattern, as
+described above, can then be used to build a subject index file.
+
+The number can be used to specify the particular news item wanted.
+
+-- ENTER net comp.lang.lisp.1082 ------------------------------------
+-- ENTER gn comp.lang.lisp.1082 -------------------------------------
+
+These two commands are equivalent. Doing this is approximately like
+
+    ENTER pved /usr/spool/news/comp/lang/lisp/1082
+
+except that it shows only the portion of the file starting with the
+Subject line. Like 'pved' it makes vedwriteable false for the file.
+
+When a newsfile has been read in, it is treated like any ordinary VED
+file, apart from having vedwriteable FALSE. When you have finished
+reading it do either
+    ENTER q
+or
+    <ESC> q
+
+or ENTER gn
+
+
+-- ENTER oldnet comp.ai ----------------------------------------------
+
+If your system uses the news archiver to save some news files in an
+'old' directory, then this command will get you a list of the archived
+comp.ai files.
+
+'oldnet' can be used exactly like 'net', with all the same options. The
+only difference is that it uses vedoldnewsdir instead of vednewsdir.
+
+
+-- ENTER save <filename> --------------------------------------------
+
+When you are reading a news file bits of the file can easily be copied
+to another file, using marked ranges in the normal way. (HELP *MARK)
+
+Since VED can interfere with some files, e.g. by converting TABS or
+removing trailing blanks, the comand ENTER save is provided to copy
+the original news file to a named user file. If the file already exists
+the news file is appended.
+
+If you wish to store the whole file as it is in the VED buffer, then
+    ENTER name myfile
+
+will re-name file as 'myfile' and make VEDWRITEABLE TRUE. Then
+
+    ENTER w1
+
+will store it on the disk.
+
+
+-- Browsing with the active file -------------------------------------
+
+If you read in the active file described above, e.g.
+
+    ENTER pved /usr/lib/news/active
+
+or on some COGS CRN machines at Sussex
+
+    ENTER pved /syma/news/lib/active
+
+Then instead of copying the entries to another file you can use the
+vedexpand facility (see TEACH * VEDEXPAND) to get the group name out of
+the file into the ENTER net comand line.
+
+Assuming that you have, in your vedinit.p file
+
+`^` -> vedexpandchar;
+
+you can put the VED cursor just before a group name (such as
+comp.lang.lisp) and do
+
+    ENTER net ^f
+
+This will put the group name into the command line, replacing "^f".
+
+See also
+TEACH * VEDEXPAND
+
+
+-- Sending news: ENTER postnews -------------------------------------
+
+The ENTER postnews command can be used to send news.
+ See HELP * VED_POSTNEWS for details
+
+-- ENTER followup (prepare followup article) ------------------------
+-- ENTER followup reply (prepare reply to original poster) ----------
+
+ENTER followup
+    Makes a copy of message in a temporary non-writeable file,
+    prepares a header, and then globally indents original message
+    with '> '. Delete bits you don't want to quote, add your stuff
+    then ENTER postnews
+
+    See HELP * VED_POSTNEWS for full details.
+
+ENTER followup reply
+    Is similar but prepares an email heading to go to the sender
+    using ved_send. To: line and Cc: line may need some editing.
+
+If you find these commands too verbose, you can, of course, define
+abbreviations in your vedinit.p or your private autolodable library
+of ved extensions. E.g.
+
+To make 'ENTER fup' prepare a followup article do
+    vars ved_fup = ved_followup;
+
+To make 'ENTER fr' prepare a followup reply to sender do:
+
+    define ved_fr;
+        dlocal vedargument = 'reply';
+        ved_followup();
+    enddefine;
+
+To assign these procedures to a VED key sequence use VEDSETKEY. See
+HELP * VEDSETKEY
+
+ENTER followup (with or without "reply') sets vedlinemax to 68,
+so that your messages are not too 'wide', in case others wish to
+quote them by indenting. (This number may be reduced).
+
+-- Renaming <group>.general -> <group>.followup -----------------------
+
+There is a convention according to which if a newsgroup name ends in
+'.general' then replies and followups should be addressed to the
+corresponding '.followup' news group. However, not all .general
+groups have .followup groups corresponding to them, so whether
+ved_postnews attempts to conversion depents on whether the variable
+
+    followup_general
+
+has been set to TRUE (don't rename) or FALSE (rename). It defaults to
+FALSE, but users can change it to TRUE to prevent the
+automatic conversion.
+
+-- Acknowledgements ---------------------------------------------------
+
+Information and suggestions were provided by Chris Thornton, Leila
+Burrell-Davis and Ben Rubinstein.
+
+-- Further reading ----------------------------------------------------
+See HELP * VED_POSTNEWS for sending news.
+
+On some machines you can find out about alternative mechanisms by
+looking at various Unix 'man' files
+    man readnews
+    man rn
+    man vn
+
+--- C.unix/help/ved_net
+--- Copyright University of Sussex 1991. All rights reserved. ----------

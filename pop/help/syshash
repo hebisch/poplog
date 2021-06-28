@@ -1,0 +1,110 @@
+HELP SYSHASH                                  John Williams, Oct 30 1986
+
+    syshash(<item>) -> <integer>
+
+The procedure SYSHASH takes any POPLOG item as argument and returns a
+hash code for that item. The manner in which this hash code is computed
+depends on the class of the item; however, the following rules should
+always hold:
+
+    1)  hash codes are (maybe negative) simple integers
+
+    2)  hash codes are independent of machine addresses
+        (and hence do not change after garbage collections)
+
+    3)  X = Y   implies  syshash(X) == syshash(Y)
+
+Future versions of POPLOG may use different criteria when applying
+SYSHASH to Prolog variables or terms.
+
+Feature (3) makes it possible to use SYSHASH and "=" as arguments for
+* NEWANYPROPERTY to create a hash table that maps arbitrary structures
+to values, on the basis of their contents. Feature (2) allows the GCFLAG
+argument of NEWANYPROPERTY to be set FALSE.
+
+The behaviour of SYSHASH is controlled by the global variable
+POP_HASH_LIM, which must hold an integer as value. Its default value is
+3, but is user assignable. It controls the depth to which SYSHASH will
+recurse on structures or iterate on lists. To take account of the first
+N elements of a list, assign (N + 1) to POP_HASH_LIM.
+
+
+The main built-in hashing algorithms are (roughly):
+
+    numbers:
+        intof(num)
+
+    words, strings:
+        word(1) + (last(word) << 5) + length(word)
+
+    lists:
+        (N.B. dynamic lists are NOT expanded)
+        syshash(pair_key) -> n;
+        for i from 1 to min(pop_hash_lim, length(list)) do
+            (syshash(list(i)) << i) + n -> n
+        endfor
+
+    records:
+        syshash(dataword(record)) + syshash(last(record))
+
+    vectors:
+        syshash(dataword(vector)) + syshash(last(vector))
+            + syshash(datalength(vector))
+
+    arrays:
+        syshash(arrayvector(array))
+
+    procedures:
+        datasize(pdr) << pdnargs(pdr)
+
+    prologterms:
+        syshash(prolog_functor(term)) + syshash(prolog_arity(term))
+            + syshash(prolog_arg(1, term))
+
+
+The hashing algorithm for a particular class of object can be altered by
+changing the CLASS_HASH procedure for the key of that class. For
+example:
+
+    datalength -> class_hash(word_key);
+    syshash("foo") =>
+    ** 3
+    syshash("syshash") =>
+    ** 7
+
+The result of a user-defined CLASS_HASH procedure should obey the three
+rules stated above. Also, Common Lisp users should beware of GLOBAL
+changes to the CLASS_HASH of built-in classes: the function SYSHASH may
+cease to work properly. In such cases, it may be safer to use the
+*DLOCAL mechanism to locally redefine a CLASS_HASH procedure. For
+example:
+
+    define myprogram();
+        dlocal % class_hash(pair_key) % = myhashpdr;
+        ...
+    enddefine;
+
+If the CLASS_= procedure for a key is changed, then consideration should
+be given to changing the CLASS_HASH procedure too, since structures that
+are = are supposed to produce == hash codes.
+
+
+SYSHASH could be defined as
+
+    define syshash(item);
+        class_hash(datakey(item))(item)
+    enddefine;
+
+The real SYSHASH also uses POP_HASH_LIM to keep track of how many times
+it has called itself, to avoid infinite recursion on circular
+structures.
+
+
+See also:
+    HELP * CLASSES
+    HELP * NEWMAPPING
+    REF  * KEYS
+    HELP * NEWANYPROPERTY
+
+--- C.all/help/syshash -------------------------------------------------
+--- Copyright University of Sussex 1987. All rights reserved. ----------

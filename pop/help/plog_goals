@@ -1,0 +1,115 @@
+HELP PLOG_GOALS                                John Williams, April 1987
+(Provisional version)
+
+LIB PLOG_GOALS.P
+
+Creates a recordclass PLOG_GOAL with three fields:
+
+    PLOG_GOAL_TERM
+        a Prolog term
+
+    PLOG_GOAL_ENV
+        an alist mapping non-plog vars (idents) to plog-vars in the term
+
+    PLOG_GOAL_PROCESS
+        a process, used to generate solutions to the term (see below)
+
+
+Also the following procedures:
+
+    CONSPLOG_GOAL
+        constructor procedure
+
+    DESTPLOG_GOAL
+        deststructor procedure
+
+    ISPLOG_GOAL
+        recogniser procedure
+
+
+The key of PLOG_GOAL structures is held in the constant
+
+    PLOG_GOAL_KEY
+
+
+-- Applying a PLOG_GOAL ------------------------------------------------
+
+    PLOG_GOAL_INVOKE
+
+The procedure PLOG_GOAL_INVOKE takes two arguments, a PLOG_GOAL and a
+procedure, which is bound to the variable PLOG_GOAL_FAIL_HOOK. Inside
+PLOG_GOAL_INVOKE, the PLOG_GOAL_ENV part of the PLOG_GOAL is locally
+bound to the variable CURRENT_PLOG_GOAL_ENV.
+
+If this is the first time the PLOG_GOAL has been passed to
+PLOG_GOAL_INVOKE then a term like this is made
+
+        term, Fail_plog_goal, Kill_plog_goal
+
+            (where 'term' is PLOG_GOAL_TERM(PLOG_GOAL))
+
+and then a process which invokes this term (once, using
+PROLOG_BARRIER_APPLY) is created and assigned to the PLOG_GOAL_PROCESS
+field of the PLOG_GOAL.
+
+'Fail_plog_goal/0' is a predicate that simply applies the value of
+PLOG_GOAL_FAIL_HOOK.
+
+'Kill_plog_goal/0' kills the current process, returning any items
+that have been put on the process' stack.
+
+So, effectively, each time a particular PLOG_GOAL is passed to
+PLOG_GOAL_INVOKE, the next solution is found, and then the procedure
+passed as the second argument to PLOG_GOAL_INVOKE is called. This can
+do anything. When no more solutions are available, the process is
+killed. Further attempts to invoke the PLOG_GOAL will result in a
+new process being created, and all the solutions found for a second
+time.
+
+PLOG_GOAL_INVOKE returns TRUE unless the process has been killed, in
+which case it returns FALSE (plus anything stored on the process'
+stack).
+
+
+    APPLY_PLOG_GOAL
+
+This is the CLASS_APPLY procedure for the PLOG_GOAL data type.
+It takes one argument, a PLOG_GOAL, and passes it to PLOG_GOAL_INVOKE,
+along with a procedure to be assigned to PLOG_GOAL_FAIL_HOOK that
+
+    (a) assigns the values of the PLOG_VAR's in CURRENT_PLOG_GOAL_ENV to
+        the respective non-plog (ie Lisp or POP11) variables.
+
+    (b) suspends the current process
+
+
+-- Example -------------------------------------------------------------
+
+vars x y X Y a g;
+prolog_newvar() -> X;
+prolog_newvar() -> Y;
+prolog_maketerm(X, Y, [a b c d e], "append", 3) -> a;
+consplog_goal(a, [x ^X y ^Y], false) -> g;
+
+g ==>
+** <plog_goal <prologterm append <prologvar _1>
+                                 <prologvar _2>
+                                 [a b c d e]>
+              [x <prologvar _1> y <prologvar _2>]
+              <false>>
+
+;;; print values of X and Y for each solution
+while g() do
+    spr(x), npr(y)
+endwhile;
+
+[] [a b c d e]
+[a] [b c d e]
+[a b] [c d e]
+[a b c] [d e]
+[a b c d] [e]
+[a b c d e] []
+
+
+--- C.all/help/plog_goals
+--- Copyright University of Sussex 1989. All rights reserved. ----------

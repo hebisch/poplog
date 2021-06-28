@@ -1,0 +1,1583 @@
+HELP DEFINE_PARSER                          Robert Duncan, November 1992
+                                                       Revised June 1993
+
+    uses lr_parser;
+
+    define :parser <declaration-part> <name> <arguments-part> ;
+        <options-part>
+        <definitions-part>
+        <tokens-part>
+        <rules-part>
+    enddefine;
+
+Pop-11 syntax interface to the LALR(1) parser generator.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+
+  2   Loading the Library
+
+  3   An Example
+
+  4   Structure of the Define Form
+      4.1   The Declaration and Arguments Parts
+      4.2   The Options Part
+      4.3   The Definitions Part
+      4.4   The Tokens Part
+      4.5   The Rules Part
+
+  5   Input to the Parser
+
+  6   Structure of the Parser
+
+  7   Additional Features
+      7.1   Intermediate Actions in Rules
+      7.2   Meta Symbols and Rules
+      7.3   Operator Precedences
+      7.4   Generating a Program File
+
+  8   Error Handling
+      8.1   Error Reporting
+      8.2   Error Recovery
+
+  9   Hints on Parser Development
+
+ 10   Further Examples
+
+
+-----------------------------------------------------------------------
+1  Introduction
+-----------------------------------------------------------------------
+
+define_parser is a *define_form which simplifies the construction of
+parsing procedures for LALR(1) languages. Its design is influenced
+heavily by other similar systems, most notably the Unix yacc utility,
+but integrated into the Poplog environment.
+
+The define-form allows the parser to be built around a grammar for the
+language: this is used to generate automatically the basic parsing
+engine, leaving the programmer free to concentrate on writing the action
+code which determines what the parser does once it has identified the
+particular language constructs. Parsers built in this way are quicker
+and simpler to write than those done by hand, especially if an
+appropriate grammar is already available from elsewhere (perhaps as part
+of a language specification); they are also easier to read, understand
+and modify at a later date. The technique has been proven over many
+years by the success of yacc and its derivatives.
+
+The define-form is built directly on the parser-generator utilities
+defined by LIB * LR_PARSER. Users who have not encountered similar
+systems before might like to consult the file HELP * LR_PARSER to get
+some background information about the LALR(1) system and how the basic
+parsing engine works. It should be noted that LALR(1) grammars are of
+most use in describing formal languages (including programming
+languages, command interpreters and the like) rather than natural
+languages.
+
+Like all define-forms, the define_parser syntax generates a procedure at
+the point at which it is compiled. You can, however, arrange for a
+Pop-11 program to be generated simultaneously which can be loaded at a
+later time to recreate the parsing procedure without using this library.
+This gives the maximum flexibility between development and delivery.
+Other features of the system include a choice of parsing engines (one
+for tracing and one for fast execution) and independence of the parser
+from the lexical representation of grammar tokens.
+
+
+-----------------------------------------------------------------------
+2  Loading the Library
+-----------------------------------------------------------------------
+
+In order to use the define_parser syntax, your program must include the
+line:
+
+    uses lr_parser;
+
+The define-form will then be autoloaded on first use. You should mark
+and load this line now if you want to compile the examples in this file.
+
+
+-----------------------------------------------------------------------
+3  An Example
+-----------------------------------------------------------------------
+
+The following example defines a parser for terms in the lambda calculus
+and illustrates the main features of the define-form. The definition is
+based around a grammar for lambda terms, the same as that used in the
+Lambda1 example from HELP * LR_PARSER.
+
+    define :parser Lambda();
+
+    tokens
+
+        \  .  '('  ')'  VAR:isword
+
+    endtokens
+
+    rules
+
+        exp ::=
+                \ VAR:x . exp:e      { [ABS ^x ^e] }
+            |   appexp
+            ;
+
+        appexp ::=
+                appexp:e1 aexp:e2    { [APP ^e1 ^e2] }
+            |   aexp
+            ;
+
+        aexp ::=
+                VAR:x                { [VAR ^x] }
+            |   '(' exp:e ')'        { e }
+            ;
+
+    endrules
+
+    enddefine;
+
+The tokens part of the definition declares the terminal symbols of the
+grammar, and defines recognisers which allow the parser to identify
+instances of the tokens in its input: the first four tokens are taken
+literally, but the VAR token is declared to be any other item satisfying
+the test isword. The quotes around the tokens '(' and ')' are necessary
+because unquoted these have a special meaning as part of the define-form
+syntax.
+
+The rules part simultaneously declares the non-terminal symbols, the
+start symbol and all the productions of the grammar. Each production can
+have a Pop-11 action (written inside the {} brackets) associated with
+it, which is run automatically when the rule is reduced. Symbols in a
+rule can have names attached which are bound to the symbol values during
+execution of the action code. The actions shown here build a parse tree
+reflecting the abstract syntax of lambda terms.
+
+You should try marking and loading this definition now. If it seems to
+take a long time, that could be because the define_parser library has to
+be autoloaded on first use. Compiling the definition a second time
+should be considerably quicker.
+
+The result of the definition is a procedure:
+
+    Lambda =>
+    ** <procedure Lambda>
+
+To run the parser, we need to provide it with a source of input. To keep
+the parser independent of any particular input format, input is obtained
+from a procedure which generates a sequence of items; these items are
+mapped to grammar tokens by means of the recognisers declared in the
+tokens part of the definition. By default, the parser will look for an
+input procedure called Lambda_input (which is, of course, the grammar
+name with _input added to the end) which is declared automatically by
+the define-form, and initialised to readitem:
+
+    Lambda_input =>
+    ** <procedure readitem>
+
+Using readitem means that the parser fits comfortably with standard
+Pop-11 input conventions, but the input procedure can be redefined as
+appropriate and for demonstration purposes we shall define it to work on
+single characters, stopping at the end of a line:
+
+    define Lambda_input();
+        lvars c = cucharin();
+        while c == `\s` or c == `\t` do
+            ;;; skip leading spaces
+            cucharin() -> c;
+        endwhile;
+        if c == `\n` or c == termin then
+            ;;; end of input
+            termin;
+        elseif strmember(c, '\\.()') or islowercode(c) then
+            ;;; legal item
+            consword(c, 1);
+        else
+            ;;; illegal item
+            consstring(c, 1);
+        endif;
+    enddefine;
+
+We can then try some examples: to run these, you must mark and load both
+the line containing the procedure call, and the subsequent line of
+input.
+
+    Lambda() =>
+    x
+    ** [VAR x]
+
+    Lambda() =>
+    \x.\y.x
+    ** [ABS x [ABS y [VAR x]]]
+
+    Lambda() =>
+    (\x.xx)(\x.xx)
+    ** [APP [ABS x [APP [VAR x] [VAR x]]] [ABS x [APP [VAR x] [VAR x]]]]
+
+If the input is syntactically incorrect and can't be parsed, the parser
+gives up with an error:
+
+    Lambda() =>
+    f(xy))
+
+    ;;; MISHAP - PARSE ERROR
+    ;;; INVOLVING:  )
+
+The same happens if the input contains something the parser doesn't
+recognise as a token -- in this case, a string:
+
+    Lambda() =>
+    f(f0)
+
+    ;;; MISHAP - PARSE ERROR
+    ;;; INVOLVING:  '0'
+
+
+-----------------------------------------------------------------------
+4  Structure of the Define Form
+-----------------------------------------------------------------------
+
+The parser define-form has the syntax:
+
+    define :parser <declaration-part> <name> <arguments-part> ;
+        <options-part>
+        <definitions-part>
+        <tokens-part>
+        <rules-part>
+    enddefine
+
+This defines a parsing procedure called <name>. It may also, depending
+on any options specified, define a second, input procedure called:
+
+    <name>_input
+
+The <declaration-part> controls the declaration of both identifiers.
+
+The <arguments-part> specifies any arguments to the parse procedure.
+
+The <options-part> can be omitted. If present, it contains various
+options for controlling the behaviour of the parser generator.
+
+The <definitions-part> can also be omitted. If present, it contains
+ordinary Pop-11 code which is compiled inside the procedure body. This
+is meant for the definition of local variables and procedures used
+within any subsequent action code.
+
+The <tokens-part> is compulsory. It declares the terminal symbols of the
+grammar and defines recognisers for them so that the parser can identify
+instances of tokens in its input.
+
+The <rules-part> is also compulsory. It declares the non-terminal
+symbols, start symbol and productions of the grammar and defines actions
+to be invoked whenever a rule is reduced during parsing.
+
+The define-form is read using the standard Pop-11 itemiser, so the usual
+itemisation rules apply. In particular, comments can appear anywhere.
+Macro-expansion is not done, except of course in those sections which
+are compiled as ordinary Pop-11 code.
+
+
+4.1  The Declaration and Arguments Parts
+----------------------------------------
+The <declarations-part> of the define-form controls the declaration of
+both the parser itself and the subsidiary input procedure (where
+necessary). It consists of any meaningful combination of the usual
+declarators:
+
+    global constant lconstant vars lvars procedure
+
+See HELP * DEFINE if the meaning of any of these is unclear. The actual
+declaration is done with pop11_define_declare so any attributes not
+specified explicitly in the <declaration-part> inherit the defaults
+pertaining to a standard definition.
+
+The <arguments-part> declares any arguments expected by the parser and
+can be omitted if there are none. It has the general form:
+
+    ( <argument-list> )
+
+where the <argument-list> is a comma-separated sequence of arguments.
+Each argument is normally just a word, which is implicitly declared as
+lvars within the procedure body, but this default declaration can be
+overridden by prefixing the argument with an explicit declaration made
+up of declarators from the set:
+
+    lvars dlvars dlocal vars procedure
+
+The <arguments-part> is superficially similar to the argument list of a
+standard procedure definition, but with two significant differences:
+
+    o   in a standard definition, declarations for the arguments follow
+        the definition header, interspersed with declarations of local
+        variables; any arguments not explicitly declared default to vars
+
+    o   in a parser definition, the syntax does not allow for any
+        following declarations, so declarations for the arguments are
+        given as part of the argument list; arguments not explicitly
+        declared default to lvars
+
+
+4.2  The Options Part
+---------------------
+The <options-part> of the define-form has the general structure:
+
+    options
+        <option-sequence>
+    endoptions
+
+The <option-sequence> is a possibly empty list of options, where each
+option has one of the forms:
+
+    <name>
+
+    <name> = <value>
+
+The option <name> is always a word; the <value> (if present) is
+typically a single item (word, string or number) but depends on the
+particular option. Adjacent options can be separated by commas.
+
+Options specified in the <options-part> apply only to the definition in
+which they occur. You can select options which apply globally to all
+parser definitions by assigning to the variable define_parser_options.
+If set, this must be a list of options, where a simple option is denoted
+by its name, and an option taking a value is denoted as a sub-list:
+
+    [^name ^value]
+
+Options from this global list are processed after those specified in the
+<options-part> so take precedence.
+
+The available options are summarised here, but many are discussed in
+more detail at relevant points throughout the text:
+
+
+conflicts = <N1> / <N2>
+    Declares the number of conflicts expected in the parser: <N1> is the
+    number of SHIFT/REDUCE conflicts and <N2> is the number of
+    REDUCE/REDUCE conflicts. <N1> and <N2> must both be non-negative
+    integers.
+
+input = <name>
+    Declares an alternative name for the parser's input procedure. The
+    <name> argument must be a word; if omitted, it defaults to "input".
+    See the section headed Input to the Parser below.
+
+keep
+    Passed on to the call to lr_build causing the generated parser to be
+    added into the lr_parser property table keyed under the procedure
+    name.
+
+parser = <name>
+    Declares a name for the parser tables generated by lr_build. The
+    <name> argument must be a word and is declared lconstant within
+    the parser procedure, making it accessible from user code in the
+    <definitions-part> and the <rules-part> of the definition. If the
+    <name> argument is omitted, it defaults to the word "parser".
+
+program = <filename>
+    Writes a program to <filename> which will recreate the parser
+    without using the define-form, requiring less time and space to
+    compile. The <filename> argument can be a word or string; a word
+    will have the extension '.p' added automatically. If omitted, the
+    <filename> defaults to the procedure name. See the section headed
+    Generating a Program File below.
+
+raw_input
+    Declares that the parser's input procedure has the call form
+
+        input() -> (item, token_n)
+
+    and disables generation of the input map. See the section headed
+    Input to the Parser below.
+
+report = <filename>
+    Calls the procedure lr_report to write a report on the parser to
+    <filename>. The <filename> argument can be a word or string; on VMS
+    systems, a word will have the extension '.lis' added automatically.
+    If omitted, the <filename> defaults to the procedure name.
+
+results = <N>
+    Declares the default multiplicity of non-terminal symbols, i.e. the
+    number of values expected from all symbols not explicitly qualified.
+    The value <N> must be a non-negative integer.
+
+showcode
+    Used in combination with LIB * SHOWCODE. If set, then the variable
+    pop_show_code is set <true> while the parser definition is compiled.
+
+stack_checks
+    Adds code to each user action to check that the number of results
+    returned by the action matches that which the parser expects from
+    the corresponding non-terminal symbol.
+
+start = <symbol>
+    Declares <symbol> as the start symbol of the grammar: <symbol> must
+    be subsequently declared as a non-terminal symbol. The default start
+    symbol is the first non-terminal declared.
+
+termin = <name>
+    Declares an alternative name for the end-of-input marker. The <name>
+    argument must be a word; if omitted, it defaults to "termin". See
+    the section headed Input to the Parser below.
+
+trace
+    Uses the lr_trace implementation of the LR(1) parsing algorithm in
+    place of standard lr_parse. This produces the same results (albeit
+    more slowly) but also generates a trace of the parse in an output
+    file.
+
+
+4.3  The Definitions Part
+-------------------------
+The <definitions-part> of the define-form has the general structure:
+
+    definitions
+        <pop11-statement-sequence>
+    enddefinitions
+
+The Pop-11 code is compiled in the usual way within the context of the
+parse procedure. This provides a place for defining local variables and
+procedures which are to be used in subsequent recogniser or action code,
+or for declaring dynamic local variables and actions.
+
+
+4.4  The Tokens Part
+--------------------
+The <tokens-part> of the define-form has the general structure:
+
+    tokens
+        <token-definitions>
+    endtokens
+
+The <token-definitions> consists of a sequence of token definitions.
+This may be empty: it is possible to have a grammar with no terminal
+symbols, although its behaviour would be predictable.
+
+A simple token definition has one of three forms:
+
+    <token>
+
+    <token> = <pop11-expression>
+
+    <token> : <pop11-expression>
+
+More complex definitions involving precedences are possible: these are
+described later. Adjacent token definitions are normally separated by a
+comma but this can be omitted for definitions consisting of the <token>
+alone.
+
+Each form of definition declares the item <token> as a terminal symbol
+of the grammar. A token is always a word. You can write tokens inside
+string quotes, in which case they are read as strings but converted
+immediately to words using consword. There are three possible reasons
+for using quoted tokens:
+
+    o   certain words are special to the parser syntax form and simply
+        can't be used as tokens unquoted; the full list of these special
+        words is:
+
+            options endoptions definitions enddefinitions
+            tokens endtokens rules endrules
+            , ; : = ::= | ( ) { }
+
+    o   quoted tokens are read as strings, and so can contain characters
+        which aren't normally allowed in words, e.g:
+
+            'long-var'  '...'  '\n'
+
+    o   using quotes consistently can be useful in distinguishing
+        terminal and non-terminal symbols in grammar rules, e.g:
+
+            'while' expression 'do' block 'endwhile'
+
+        In this case, the tokens are the same written with or without
+        quotes.
+
+A token definition also defines a recogniser for the token it declares:
+the recogniser is simply a test which the parser can apply to an input
+item to determine whether it corresponds to that token.
+
+In the simplest definition form:
+
+    <token>
+
+the token is its own recogniser: the input item is compared against the
+token itself using "==".
+
+In the other definition forms:
+
+    <token> = <pop11-expression>
+    <token> : <pop11-expression>
+
+the <pop11-expression> part is evaluated in the usual way. In the "="
+case, the result of the expression is compared against the input item
+using the standard equality procedure; in the ":" case, the result
+itself is expected to be a procedure which is applied to the item.
+
+Recogniser expressions are evaluated at run-time, each time the
+recogniser is applied, so be wary of using tests such as:
+
+    ABCD : member(% [a b c d] %)
+
+where the closure will be repeatedly constructed. For efficiency, use
+the compile-time evaluation brackets:
+
+    #_< ... >_#
+
+or define a local procedure in the <definitions-part>.
+
+Recognisers are applied to an input item in the order in which they were
+declared, and the first one returning a non-false result determines the
+token to which the item corresponds. More details about how input items
+are classified are given in the section headed Input to the Parser
+below.
+
+
+4.5  The Rules Part
+-------------------
+The <rules-part> of the define-form has the general structure:
+
+    rules
+        <rule-definitions>
+    endrules
+
+The <rule-definitions> consists of a sequence of rule definitions. This
+may not be empty: the grammar must have at least one non-terminal symbol
+with at least one rule.
+
+The basic form of a rule definition is:
+
+    <left-hand-side> ::= <right-hand-side> <action> ;
+
+The left-hand-side of a rule has two possible forms:
+
+    <symbol>
+
+    <symbol> : <multiplicity>
+
+In each case, the item <symbol> is declared as a non-terminal symbol of
+the grammar. The first non-terminal symbol declared is taken to be the
+start symbol of the grammar. The rules for non-terminal symbols are the
+same as those for tokens: symbols are always words, but may be written
+in string quotes where necessary. It is an error for a symbol previously
+declared as a token to be redeclared as a non-terminal symbol.
+
+The <multiplicity> part of the left-hand-side is a non-negative integer
+which specifies the multiplicity of the symbol, i.e, how many results an
+instance of the symbol is expected to return. The default multiplicity
+is normally 1, but can be changed with the option results.
+
+The same symbol can appear on the left-hand-side of more than one rule
+but the multiplicity must be the same in each case. Where two or more
+adjacent rules share the same left-hand-side they can be abbreviated
+using the syntax:
+
+    <left-hand-side> ::= <right-hand-side-1> <action-1>
+                      |  <right-hand-side-2> <action-2>
+                                    ...
+                      |  <right-hand-side-n> <action-n>
+                      ;
+
+The right-hand-side of a rule consists of a sequence of symbols, both
+terminal and non-terminal. It may be empty to indicate a null
+production. The right-hand-side can contain references to non-terminal
+symbols which have not yet been declared: this is quite common, since
+grammars are very often written in "top-down" style. It is an error if
+any of these symbols remain undeclared once all the rules have been
+read.
+
+A symbol occurring on the right-hand-side of a rule can be qualified
+with a list of identifiers:
+
+    <symbol> : ( <id-1> , ..., <id-n> )         (n >= 0)
+
+If there is just a single identifier, the parentheses can be omitted:
+
+    <symbol> : <id>
+
+The identifiers name the values associated with the symbol for use in
+the <action> part of the rule. The number of identifiers must match the
+multiplicity of the symbol. As a special case, the item "_" can be used
+as a placeholder to indicate the presence of a value which is not
+wanted: in the example
+
+    phrase : (first, _, last)
+
+the symbol phrase is expected to return three results, but only the
+first and the last are interesting enough to be named: the middle one is
+discarded.
+
+A qualifying identifier list which consists only of "_" items can be
+abbreviated to a non-negative integer count:
+
+    <symbol> : <N>
+
+This indicates that the symbol has <N> values, but none of them are
+wanted. As before, <N> must agree with the declared multiplicity of the
+symbol.
+
+An unqualified symbol behaves as if it were qualified with its
+multiplicity: all its values are ignored. For this to work, the
+multiplicity must be already known, either because the symbol has been
+explicitly declared or (if it's a forward reference) because it has the
+default multiplicity.
+
+Symbols from the left- and right-hand-sides of a rule, stripped of their
+qualifiers, together define a production of the grammar which is added
+to the rule set.
+
+The <action> part of a rule is optional. If present, it has the form:
+
+    { <pop11-statement-sequence> }
+
+The brackets ({}) are part of the define-form syntax and have nothing to
+do with their use in Pop-11 as vector constructors. The action code is
+compiled as a lexical block, so that any lexical variables or constants
+declared within the action code are not visible elsewhere: variables
+which are to be common to all actions must be declared in the
+<definitions-part> of the define-form.
+
+The action code is evaluated each time the corresponding grammar rule is
+reduced by the parser. Its purpose is to compute the value(s) of the
+rule's left-hand-side symbol. The number of results which the action
+code returns MUST match the multiplicity of the left-hand-side symbol:
+this is a frequent source of error which cannot be checked for at
+compile-time, but you can use the option stack_checks to enable run-time
+checking.
+
+The action code can refer to the values of symbols from the
+right-hand-side of the rule by means of their qualifying identifiers:
+these are automatically declared as lexical variables within the action
+code block. A terminal symbol always carries a single value, which is
+the input item read for that token; a non-terminal symbol carries 0 or
+more values (depending on its multiplicity) computed by earlier reduce
+actions. The final result of a call to the parser is whatever is
+returned by the action code associated with the final reduction of the
+start symbol.
+
+If the <action> part of a rule is missing, the default action is to
+return the first <N> values from the right-hand-side of the rule, where
+<N> is the multiplicity of the left-hand-side. If the right-hand-side
+returns fewer then <N> values, this will cause the error:
+
+    MISHAP - TOO FEW RESULTS RETURNED BY RIGHT-HAND-SIDE
+
+
+Some examples:
+
+    (1) exp ::= \ VAR:x . exp:e { [ABS ^x ^e] } ;
+
+This declares the symbol exp as a non-terminal symbol and declares the
+production:
+
+        exp --> \ VAR . exp
+
+Because the exp symbol on the left-hand-side has no qualifier, it is
+assumed to be of multiplicity 1. The right-hand-side of the rule
+consists of four symbols, of which the values of the literal tokens '\'
+and '.' are ignored, but the values of the VAR and exp symbols are
+assigned to the lexical variables x and e respectively. The action code
+for the rule constructs a list containing these two values: this is a
+single result, correctly matching the multiplicity of the exp symbol.
+
+    (2) exp ::= appexp ;
+
+This (re)declares the non-terminal symbol exp and the grammar rule:
+
+        exp --> appexp
+
+There is no action code, so the default action applies: the value
+returned by appexp becomes the value of exp.
+
+    (3) aexp ::= '(' exp:e ')' { e } ;
+
+This declares the non-terminal aexp with multiplicity 1, and the grammar
+rule:
+
+        aexp --> '(' exp ')'
+
+The explicit but trivial action is necessary, because without it, the
+value of aexp would default to the first value taken from the
+right-hand-side: the value of '('.
+
+
+Note
+====
+Grammar rules can, of course, be recursive, in the sense that the
+right-hand-side of a rule can include its own left-hand-side symbol. The
+parser has a distinct preference for so-called left-recursive rules,
+i.e. ones where the left-hand-side symbol appears as the first symbol on
+the right-hand-side. Often there will be no choice how to write a
+particular rule, but consider the case of a non-terminal describing a
+simple sequence of items, for which there are two possible formulations:
+
+    item_seq_A ::=  /* empty */
+                |   item_seq_A item     /* left-recursive */
+                ;
+
+    item_seq_B ::=  /* empty */
+                |   item item_seq_B     /* right-recursive */
+                ;
+
+Semantically, these are equivalent in that they both derive the same
+sentences, but the parser can read the left-recursive item_seq_A in
+constant space, where reading an item_seq_B requires space proportional
+to the number of items in the sequence.
+
+
+-----------------------------------------------------------------------
+5  Input to the Parser
+-----------------------------------------------------------------------
+
+The parser obtains its input from a procedure having the general call
+form:
+
+    input() -> item
+
+The type of item returned by the input is not constrained in any way.
+The parser consumes items returned by successive calls to this procedure
+up to some special end-of-input marker (usually <termin>) or until it
+encounters an error.
+
+The input procedure is only ever referenced by name, and the default
+name for a parser called <name> is
+
+    <name>_input
+
+You can define this procedure for yourself, but if there is no
+declaration for it active at the time the parser definition is compiled,
+then it will be declared automatically using the same <declaration-part>
+as the parser itself and given the initial value of readitem.
+
+You can choose a different name for the input procedure with the option:
+
+    input = <input-name>
+
+where the <input-name> must be a word. In this case, you must provide a
+definition for the procedure yourself, since the define_parser syntax
+will not declare an input procedure with anything other than the default
+name. The <input-name> should be at least declared (if not defined)
+before the <tokens-part> of the parser definition is read; one possible
+place for this is the <definitions-part> of the define-form:
+
+    define :parser Lambda();
+        options
+            input = tokenise
+        endoptions
+        definitions
+            define lconstant tokenise() -> item;
+                lvars item, c = cucharin();
+                /* ... continues as above */
+            enddefine;
+        enddefinitions
+        ...
+    enddefine;
+
+Alternatively, you can parameterise the parser on its input by including
+the input procedure name in the <arguments-part> of the definition. In
+this case, of course, the parser must be applied to an appropriate input
+procedure each time it is called.
+
+The parser maps input items onto grammar tokens using the recognisers
+declared in the <tokens-part> of the define-form. These are compiled
+into a separate procedure called the input map. The input map applies
+the base input procedure to obtain the next input item; this is compared
+first against the end-of-input marker (using "==") to determine if the
+input is complete, and if not, the item is then tested against each of
+the recognisers in turn, and the first to succeed determines the grammar
+token to which the item corresponds. Tokens are represented as small
+integer numbers: 0 stands for the end-of-input marker and other tokens
+are counted from 1 in their order of declaration. If an input item fails
+all the recogniser tests, its token number is returned as -1 which will
+provoke a subsequent error from the parser.
+
+The general call form of the input map is:
+
+    input_map() -> (item, token_n)
+
+where item is as returned by the base input procedure and token_n is its
+corresponding token number. The input map generated for the Lambda
+grammar would look something like:
+
+    define Lambda_input_map() -> (item, token_n);
+        lvars item = Lambda_input(), token_n;
+        if item == termin then
+            0;      ;;; end-of-input
+        elseif item == "\" then
+            1;      ;;; \
+        elseif item == "." then
+            2;      ;;; .
+        elseif item == "(" then
+            3;      ;;; '('
+        elseif item == ")" then
+            4;      ;;; ')'
+        elseif isword(item) then
+            5;      ;;; VAR
+        else
+           -1;      ;;; unrecognised
+        endif -> token_n;
+    enddefine;
+
+The test against the end-of-input marker is always done first. The use
+of <termin> to indicate the end of input is conventional, but you can
+specify a different marker with the option:
+
+    termin = <end-of-input-name>
+
+where the <end-of-input-name> must be a word and should be declared
+before the <tokens-part> of the define-form is read.
+
+The subsequent recogniser tests are always applied in the strict order
+in which they were declared in the <tokens-part>: this is a defined
+property of the define_parser syntax and is important in cases such as
+the above where the isword test for a VAR token would be equally
+satisfied by the other special tokens, if applied first. A rearrangement
+of the Lambda <tokens-part> to read:
+
+    tokens
+
+        VAR:isword;
+
+        \  .  '('  ')'
+
+    endtokens
+
+would be incorrect, since only the VAR token would ever be recognised.
+
+Use of the input map is a convenience to allow off-the-shelf itemisers
+such as readitem to be integrated easily with the parser generator. Many
+languages, however, require special-purpose lexical analysers which will
+typically classify items down to token level, making the extra level of
+interpretation imposed by the input map an unnecessary expense.
+
+You can disable use of the input map by specifying the option:
+
+    raw_input
+
+This acts as a declaration that the input procedure itself has the call
+form:
+
+    input() -> (item, token_n)
+
+making the input map redundant. In this case, any explicit recognisers
+included in the <tokens-part> are ignored -- or rather, are compiled
+with pop_syntax_only set to <true> -- which allows the same definition
+to be compiled for either input form.
+
+Obviously, when using this option, the token numbers returned by the
+input must agree with the order in which the tokens themselves are
+declared in the <tokens-part> of the definition. There is no way of
+ensuring this automatically, so some care is needed.
+
+
+-----------------------------------------------------------------------
+6  Structure of the Parser
+-----------------------------------------------------------------------
+
+The define_parser syntax form creates a parsing procedure using the
+parser-generation utilities described in REF * LR_PARSER. The resulting
+procedure is equivalent to an ordinary Pop-11 procedure with the general
+outline:
+
+    define <declaration> <name> ( <arguments> );            /* 1 */
+        <argument-declarations>
+
+        lconstant <parser> = lr_build(<name>, <grammar>);   /* 2 */
+
+        <local-definitions>                                 /* 3 */
+
+        define lconstant <input-p>() -> (item, token_n);    /* 5 */
+            lvars item, token_n;
+            ...
+        enddefine;
+
+        define lconstant <reduce-p>(/* rule_n */);          /* 6 */
+            go_on /* rule_n */ to
+            ...
+        enddefine;
+
+        lr_parse(<input-p>, <reduce-p>, <parser>);          /* 4 */
+    enddefine;
+
+The principal components of this definition are as follows:
+
+1)  The procedure <name> is as originally given; its <declaration> and
+    the <arguments> and their declarations are synthesised in an obvious
+    way from the <declarations-part> and <arguments-part> of the
+    define-form.
+
+2)  The <tokens-part> and <rules-part> of the define-form declare the
+    symbols and productions of a grammar. These are passed at compile-
+    time to the procedure lr_build -- with the procedure <name> also
+    used as the grammar name -- and the resulting parser structure which
+    encodes the parsing tables for the grammar is bound to an lconstant
+    identifier within the procedure body. The default name for the
+    parser is a private one, but you can specify an alternative name
+    with the option:
+
+        parser = <parser-name>
+
+    where the <parser-name> must be a word. This allows the parser
+    tables to be referenced from Pop-11 code in the subsequent
+    <definitions-part> and <rules-part>. This is particularly useful for
+    error reporting: see the section on Error Handling below.
+
+3)  Any local definitions are simply copied from the <definitions-part>
+    of the define-form. This code is the first to be executed when the
+    procedure is applied, so can be used to initialise the parse.
+
+4)  The main action of the procedure lies in the final call to lr_parse
+    which interprets the parsing tables constructed at (2). The
+    interpreter requires two additional procedure arguments defined
+    locally at (5) & (6). No code is executed after this call returns --
+    except, of course, for any dlocal exit actions included in the local
+    definitions -- so this determines the result of the parse.
+
+    The option:
+
+        trace
+
+    causes the trace interpreter lr_trace to be used instead of the
+    standard lr_parse: this uses the same parsing algorithm, so produces
+    the same results, but will additionally generate a trace of its
+    actions, usually in a Ved window.
+
+5)  The input procedure provides the input source for the parse: this is
+    simply the input map discussed above. If the option raw_input is
+    specified, this local definition is omitted and the base input
+    procedure is passed directly to lr_parse.
+
+6)  The reduce procedure is called once for each reduction in the parse.
+    This is generated from the action code in the <rules-part> of the
+    define-form and consists of a single go_on which switches on the
+    rule number to select the appropriate action-code block. Code is
+    added to the start of each action to declare the identifiers named
+    on the right-hand-side of the rule and initialise them with items
+    popped from the stack.
+
+You can elect to have the program text for the parsing procedure written
+out to a separate file so that it can be compiled independently at a
+later date: this is described more fully in the section headed
+Generating a Program File below.
+
+
+-----------------------------------------------------------------------
+7  Additional Features
+-----------------------------------------------------------------------
+
+These are more advanced features which can be ignored initially, but
+which can significantly improve more complex applications.
+
+
+7.1  Intermediate Actions in Rules
+----------------------------------
+The full syntax of rules allows for intermediate actions to be
+interspersed with symbols on the right-hand-side:
+
+    <left-hand-side> ::=
+            <action-1> <symbol-1> ... <action-n> <symbol-n> <action>
+        ;
+
+Each intermediate action adds to the grammar a new non-terminal symbol
+with a single empty rule as follows:
+
+    <left-hand-side> ::=
+            '{1}' <symbol-1> ... '{n}' <symbol-n> <action>
+        ;
+
+    '{1}' ::= <action-1> ;
+
+        ...
+
+    '{n}' ::= <action-n> ;
+
+The new symbols are kept distinct from any explicitly declared and will
+appear as '{1}', '{2}', ... etc. in the parser report file. The empty
+rules can introduce conflicts into the parser, so it's a good idea to
+get the grammar as complete as possible before adding any intermediate
+actions which might confuse things.
+
+Intermediate actions have the same form as the final actions already
+discussed. The action code is executed when it is encountered by the
+parser during the reading of the rule. Such actions are useful for
+checking values just read, or for initialising the next symbol to be
+read. The code can refer to named values occurring to the left in the
+rule, but not to those on the right since they haven't been read at the
+time the code is executed.
+
+Intermediate actions can modify results returned by symbols or actions
+on the left, and the changed values will be seen by any subsequent
+actions occurring on the right. For example, in the rule:
+
+    binding ::=
+        var:id { declare(id) -> id } '=' expression:e { ... id ... }
+
+the reference to id in the final action will see the value returned by
+the previous call of declare.
+
+Intermediate actions can also return additional results, indicated by
+qualifying the action with an identifier list in the same way as for a
+symbol:
+
+    <action> : ( <id-1>, ..., <id-n> )
+
+Unqualified actions are always assumed to return no results, regardless
+of the defaults applying to non-terminal symbols.
+
+
+7.2  Meta Symbols and Rules
+---------------------------
+Meta symbols and rules provide a macro-like facility for abbreviating
+common forms in grammars -- a user-definable meta-notation for
+expressing concepts such as the optional occurrence of phrases, the
+repetition of phrases etc.
+
+For example, the notion of an optional phrase could be expressed with
+the meta rules:
+
+    OPT(phrase) ::=
+            /* empty */             { false }
+        |   phrase
+        ;
+
+This in itself adds nothing to the grammar, but the OPT meta-symbol can
+be used in other rules wherever an optional item is required, as in:
+
+    vars ::=
+            /* empty */             { [] }
+        |   var:v OPT(',') vars:vs  { v :: vs }
+        ;
+
+Meta-symbols and their rules are declared in the <rules-part> of the
+define-form along with the standard rules. The order of declaration is
+unimportant: meta-symbols can be forward referenced in the same way as
+ordinary non-terminal symbols.
+
+The form of a meta-rule definition is the same as for any other rule,
+except that the left-hand-side <symbol> is replaced by a <meta-symbol>
+of the form:
+
+    <symbol> ( <formal-parameters> )
+
+Meta-symbols have the same itemisation rules as tokens and non-terminal
+symbols and they share the same name-space: you cannot have a
+meta-symbol with the same name as a token or other symbol. A meta-rule
+is distinguished from an ordinary rule solely by the presence of
+parentheses on the left-hand-side. As with other rules, consecutive
+meta-rules with the same left-hand-side can be combined.
+
+The <formal-parameters> part of a meta-rule consists of a comma-
+separated sequence of formal parameter names which again obey the usual
+itemisation rules. Formal parameter names can be used on the
+right-hand-side of the meta-rule in place of tokens or non-terminal
+symbols; they cannot be used to stand for Pop-11 identifier names, or
+anywhere in the action code associated with the rule. There is no notion
+of whether a particular formal parameter is meant to stand for either a
+token or a non-terminal symbol, but the multiplicity of the parameter
+must be known. Each formal parameter is assumed to have the default
+multiplicity unless it is explicitly qualified on the left-hand-side of
+the meta-rule, as in:
+
+    EXAMPLE(phrase:2) ::= ...
+
+where the formal parameter phrase is declared to have multiplicity 2.
+
+As with ordinary symbols, the meta-symbol itself can be declared to have
+a multiplicity different to the default. The number and multiplicities
+of the formal parameters together with the multiplicity of the result
+determines the signature of the meta-symbol. For the examples so far,
+the signatures are:
+
+    OPT(1) : 1
+
+    EXAMPLE(2) : 1
+
+Repeated declarations for the same meta-symbol must have the same
+signature.
+
+A meta-rule definition does not in itself add anything to the grammar
+being defined. However, on the right-hand-side of any rule -- including
+other meta-rules -- the occurrence of a grammar symbol can be replaced
+by an application of a meta-symbol, written:
+
+    <symbol> ( <actual-parameters> )
+
+The actual parameters can be tokens, non-terminal symbols, nested
+meta-applications, or -- in the case of a meta-rule definition -- formal
+parameters of the meta-rule. Needless to say, the multiplicities of the
+actual parameters and the number of results expected from the
+application must match the signature of the meta-symbol being applied.
+
+Each distinct application of a meta-symbol adds a new non-terminal
+symbol to the grammar. These new symbols are distinct from any
+explicitly declared: in any output produced by the parser generator they
+appear as the application itself. Rules for the new symbols are
+generated by copying the rules associated with the meta-symbol,
+consistently replacing all formal parameters by the actual parameters
+supplied to the application. So the example rule for vars given above is
+exactly equivalent to the following expansion:
+
+    vars ::=
+            /* empty */             { [] }
+        |   var:v 'OPT(,)' vars:vs  { v :: vs }
+        ;
+
+    'OPT(,)' ::=
+            /* empty */             { false }
+        |   ','
+        ;
+
+All copies of a meta-rule share the same action code, because the code
+is independent of the parameters to the rule.
+
+Repeated applications of a meta-symbol to the same actual parameters
+share the same generated symbol and rules. This means that recursive and
+nested meta-rules can be freely used without any efficiency penalty:
+
+    SEQ(phrase, separator) ::=
+            /* empty */             { [] }
+        |   phrase:x separator SEQ(phrase, separator):xs
+                                    { x :: xs }
+        ;
+
+    vars ::=
+            SEQ(var, OPT(','))
+        ;
+
+
+7.3  Operator Precedences
+-------------------------
+The full syntax of token definitions allows tokens to be declared as
+operators with numeric precedence as follows:
+
+    <precedence> ( <simple-token-definitions> )
+
+This declares all the tokens defined within the parentheses to have the
+specified <precedence>; the <precedence> is omitted for non-operator
+tokens. The <simple-token-definitions> are as before; the parentheses
+can be omitted for a single definition.
+
+The <precedence> is an integer number. The magnitude of the number
+determines the binding power of the operator: the smaller the magnitude,
+the tighter the operator binds. The sign of the number determines its
+associativity: positive means left-associative and negative means
+right-associative. These are the same conventions used for operators in
+Pop-11.
+
+A rule normally inherits the precedence of its right-most token. This
+can be overridden for a particular rule by writing an explicit
+precedence immediately before its right-hand-side:
+
+    <left-hand-side> ::= <precedence> <right-hand-side> <action> ;
+
+Precedences are used in the resolution of SHIFT/REDUCE conflicts
+(described in HELP * LR_PARSER). In a SHIFT/REDUCE conflict, the parser
+has a choice between SHIFTING some token S onto the parser stack, or
+REDUCING by a rule R. If both S and R have precedences, the choice can
+be determined by using the rule:
+
+    IF S binds more tightly than R
+    OR S and R have the same binding power
+       AND S is right-associative
+    THEN
+        choose the SHIFT
+    OTHERWISE
+        choose the REDUCE
+
+Expressed as Pop-11 code:
+
+    define resolve(S, R) -> choice;
+        lvars S, Sp, R, Rp, choice = undef;
+        if  (precedence(S) ->> Sp)
+        and (precedence(R) ->> Rp)
+        then
+            if abs(Sp) < abs(Rp)
+            or abs(Sp) = abs(Rp) and Sp < 0
+            then
+                S
+            else
+                R
+            endif -> choice;
+        endif;
+    enddefine;
+
+The rationale for this is best demonstrated by an example. The rule set:
+
+    exp ::= exp '+' exp
+        |   exp '-' exp
+        |   exp '*' exp
+        |   exp '/' exp
+        |   '-' exp
+        |   NUMBER
+        ;
+
+generates a parser with 20 SHIFT/REDUCE conflicts. This is clearly
+because the rules are ambiguous, as illustrated by the input:
+
+    NUMBER '+' NUMBER '*' NUMBER
+
+This sentence has two alternative interpretations, resulting in a
+conflict once the parser has read to the position:
+
+    NUMBER '+' NUMBER <.> '*' NUMBER
+
+A SHIFT here corresponds to the interpretation:
+
+    NUMBER '+' ( NUMBER '*' NUMBER )
+
+while a REDUCE leads to the alternative:
+
+    ( NUMBER '+' NUMBER ) '*' NUMBER
+
+Informally, we would resolve this ambiguity by taking into account the
+precedences of the operator symbols '+' and '*': multiplication normally
+takes precedence over addition, making the first (SHIFT) alternative the
+preferred one. We can make this explicit in the parser by declaring the
+operator tokens as follows:
+
+    5 ( '+' '-' )
+    4 ( '*' '/' )
+    NUMBER
+
+This is sufficient to remove all ambiguities from the grammar. In the
+specific example, the choice is between a SHIFT of token '*' and a
+REDUCE by rule
+
+    exp --> exp '+' exp
+
+The precedence of '*' is 4; the precedence of the rule, derived from
+that of its right-most token '+', is 5. Hence the choice favours the
+SHIFT.
+
+This parser is not quite correct however, because of the use of the '-'
+token to stand for two distinct operators: negation and subtraction. As
+a prefix operator, '-' binds very tightly, but the parser doesn't know
+this: in the configuration
+
+    '-' NUMBER <.> '*' NUMBER
+
+the parser will still choose to SHIFT the '*' token, because of its
+apparently higher binding power. The solution is to add an explicit
+precedence to the negation rule:
+
+    exp ::= exp '+' exp
+        |   exp '-' exp
+        |   exp '*' exp
+        |   exp '/' exp
+        | 3 '-' exp         /****/
+        |   NUMBER
+        ;
+
+This overrides the default derived from the precedence of the token '-'
+and means that the rule has a lower precedence than anything else,
+ensuring that it will always be reduced first.
+
+In this conflict-resolution strategy, the associativity of a rule is
+always disregarded: there is no obviously best choice to make in the
+face of conflicting associativities, so the decision made here (based on
+the token alone) is arbitrary. It is therefore better to avoid having
+operators with different associativities at the same precedence level.
+
+The use of operator precedences (where appropriate) to resolve conflicts
+is a much better solution than the alternative strategy of creating a
+hierarchy of additional non-terminal symbols which reflects the
+hierarchy of the operators, like this:
+
+    exp ::= add_exp;
+
+    add_exp ::= add_exp add_op mul_exp
+            |   mul_exp
+            ;
+
+    mul_exp ::= mull_exp mul_op NUMBER
+            |   NUMBER
+            ;
+
+In the first place, operator grammars are usually easier to write and
+understand. They're also more efficient: introducing the extra symbols
+and rules means that the parser spends much of its time promoting
+symbols through the hierarchy, i.e, instead of a single reduction
+
+    NUMBER ==> exp
+
+we now have:
+
+    NUMBER ==> mul_exp ==> add_exp ==> exp
+
+
+7.4  Generating a Program File
+------------------------------
+Compiling a parser definition involves a considerable amount of library
+code. The time and space overhead imposed by loading this code is
+typically acceptable for development systems, but may not be so for
+production systems, particularly as the majority of the code is
+redundant at run-time. To ameliorate this problem, you can arrange to
+generate a Pop-11 program file which can be loaded in place of the
+define-form, and which will recreate the parser without the use of the
+define_parser library.
+
+This feature is enabled with the option:
+
+    program = <filename>
+
+where <filename> is the name of the program file to create.
+
+The generated file contains just a single definition for the parse
+procedure and so may not be suitable for compiling on its own: if the
+parser was defined originally inside a section, for example, or declared
+lconstant. The file is best used in conjunction with the #_INCLUDE
+mechanism which performs a textual insertion of the file contents.
+
+The following example demonstrates a useful idiom which supports the use
+of the program option:
+
+    #_IF DEF DEVELOPMENT
+        define :parser foo();
+            options
+                program = 'fooProg.p'
+            endoptions
+            ...
+        enddefine;
+    #_ELSE
+        #_INCLUDE 'fooProg.p'
+    #_ENDIF
+
+If this is compiled in a context where DEVELOPMENT is defined to have a
+non-false value, the procedure foo will be built using the parser
+define-form and a corresponding program will be written out to the file
+'fooProg.p'; in any other context, the 'fooProg.p' file will be compiled
+instead. The use of #_INCLUDE to load the program file ensures that it
+is compiled in the same lexical/section context in which the define-form
+was originally processed. See REF * PROGLIST for an explanation of the
+"#_" macros.
+
+Note that the define-form will always generate a procedure at the point
+at which it is compiled, regardless of whether the program option is in
+effect. Also, the program which is written out is unaffected by the
+stack_checks and trace options.
+
+
+-----------------------------------------------------------------------
+8  Error Handling
+-----------------------------------------------------------------------
+
+On encountering an error, the parser calls the procedure:
+
+    lr_parse_error(item, token_n, state)
+
+where item is the input item which caused the parse to fail, token_n is
+its token number and state is the state number in which the error arose.
+
+This procedure is redefinable. Its default action is to call:
+
+    mishap(item, 1, 'PARSE ERROR');
+
+This behaviour is unlikely to be acceptable for any but the simplest of
+cases. Improving the error handling requires redefining the error
+procedure. This can be done locally within the <definitions-part> of the
+define-form, i.e:
+
+    definitions
+        define dlocal lr_parse_error(item, token_n, state);
+            lvars item, token_n, state;
+            ...
+        enddefine;
+    enddefinitions
+
+
+8.1  Error Reporting
+--------------------
+Redefining the error procedure allows error messages to be tailored more
+appropriately for the application.
+
+One obvious distinction in errors is that item may simply be something
+which failed all the input recogniser tests and so doesn't correspond to
+any grammar token: in this case, token_n will be -1 and a special
+message such as 'ILLEGAL INPUT' can be given for this event.
+
+Otherwise, the error is a true parsing error in the sense that the token
+is known, but is invalid in the current state. You can use the parser
+report file (produced with the report option) to see which parser states
+can generate errors: basically, any state without a default action.
+
+One strategy for error reporting is simply to enumerate all error states
+and devise an appropriate message for each one: the state argument to
+the error routine can then be used to index a table of error messages.
+This might give the most precise reports, but it can be a tedious job
+when the number of states runs into hundreds, and has a major drawback
+in that the composition and numbering of states is very sensitive to
+changes in the grammar: the addition of a single extra rule could
+completely disrupt such a system. There is little point in using this
+strategy unless the grammar can be considered extremely stable.
+
+A more fruitful approach is to use the information available from the
+parser at run-time to construct an error message dynamically. This means
+using the parsing tables, which can be obtained with the parser option
+(see above). The tables can be investigated with the procedures defined
+in LIB * LR_STATE for which you must include in your program the line:
+
+    uses lr_state;
+
+The state procedures allow you to determine which tokens and symbols are
+valid in the current state, the set of potential successor states and so
+on. They are fully described in REF * LR_PARSER.
+
+For example, we could augment the Lambda parser shown earlier with the
+following:
+
+    options
+        parser  ;;; gives access to the parser tables
+    endoptions
+
+    definitions
+        ;;; redefine the error procedure local to the parser
+        define dlocal lr_parse_error(item, token_n, state);
+            lvars item, token_n, state, token, tokens;
+            mishap(item, 1,
+                ;;; produce an appropriate message
+                if token_n == -1 then
+                    'ILLEGAL INPUT'
+                else
+                    lr_state_tokens(state, parser) -> (tokens,);
+                    dest(tokens) -> (token, tokens);
+                    if tokens /== [] then
+                        'ITEM CANNOT START AN EXPRESSION'
+                    elseif token == termin then
+                        'UNEXPECTED ITEM FOUND AT END OF EXPRESSION'
+                    else
+                        'UNEXPECTED ITEM FOUND READING TO: ' sys_>< token
+                    endif;
+                endif);
+        enddefine;
+    enddefinitions
+
+This would cause the parsing errors shown before to report as:
+
+    Lambda() =>
+    f(xy))
+
+    ;;; MISHAP - UNEXPECTED ITEM FOUND AT END OF EXPRESSION
+    ;;; INVOLVING:  )
+
+    Lambda() =>
+    f(f0)
+
+    ;;; MISHAP - ILLEGAL INPUT
+    ;;; INVOLVING:  '0'
+
+A more sophisticated example of error reporting is given in the example
+file LIB * LR_EXAMPLE_1.
+
+
+8.2  Error Recovery
+-------------------
+You cannot (at present) recover from parsing errors, in the sense that
+once the procedure lr_parse_error has been called, it is impossible to
+resume parsing from that state. The only option is to exit the current
+invocation of the parser and re-enter, doing whatever cleaning up is
+required. It is intended that some support for automatic recovery will
+be provided in the future.
+
+
+-----------------------------------------------------------------------
+9  Hints on Parser Development
+-----------------------------------------------------------------------
+
+A successful parser depends above all on a correct grammar, so
+concentrate on getting the grammar right before worrying about the
+action code.
+
+Try to minimise the number of conflicts in the grammar. If these do
+arise, they will lead to warnings of the form:
+
+    WARNING - <n> SHIFT/REDUCE CONFLICTS
+
+    WARNING - <m> REDUCE/REDUCE CONFLICTS
+
+Such warnings indicate that the parser cannot interpret the grammar
+exactly as it's written: it will still run, but may not behave quite as
+intended. Don't ignore them. For help in tracking down the source of
+conflicts, look at the parser report file which is produced with
+the option:
+
+    report = <filename>
+
+This is, unfortunately, difficult to understand without some background
+knowledge, for which see HELP * LR_PARSER.
+
+Conflicts which cannot be eliminated but which are judged to be benign
+can be declared with the option:
+
+    conflicts = <n> / <m>
+
+If the number of conflicts found when the definition is compiled matches
+exactly the number declared, then no warning messages will be produced.
+
+If it's not obvious what the parser's doing when it runs, use the trace
+option to compile it in trace mode. This produces a step-by-step trace
+of the parser's actions in a Ved buffer, showing in particular the
+sequence of reductions being performed. A description of the trace
+output can be found in REF * LR_PARSER.
+
+As an alternative, the option
+
+    keep
+
+arranges for the parser tables to be saved in a property from where they
+can be recovered later with the call
+
+    lr_parser(<name>) -> parser
+
+The parser structure can be used with any of the procedures described in
+REF * LR_PARSER. In particular, if your action code is in a mess, use
+the lr_trace procedure to interpret the tables directly and generate a
+parse-tree which can be displayed with LIB * SHOWTREE.
+
+A common error with the action code is to return the wrong number of
+results -- more or less than was implied by the multiplicity of the
+corresponding left-hand-side symbol. This corrupts the parser's value
+stack, but the resulting errors may not show up until some distance from
+the actual cause of the problem, making it difficult to diagnose.
+
+The option
+
+    stack_checks
+
+causes additional code to be added to each action code block to check
+the number of results returned and raise an error immediately on
+encountering a discrepancy. The error message is of the form:
+
+    MISHAP - STACK CHECK FAILED IN PARSER <name>, LINE <n>
+    INVOLVING:  <nfound> <op> <nwanted>
+
+where <nfound> is the number of results actually returned, <nwanted> is
+the number expected and <op> is either "<" or ">" as appropriate.
+
+You can set options without changing your program by setting the
+variable define_parser_options before compiling, e.g:
+
+    vars define_parser_options = [keep stack_checks];
+
+
+-----------------------------------------------------------------------
+10  Further Examples
+-----------------------------------------------------------------------
+
+Realistic examples are too large to be included in a help file, so the
+following libraries have been provided for demonstration purposes. They
+can be viewed using
+
+    <ENTER> showlib
+
+
+LIB * LR_EXAMPLE_1
+    Defines a complete compiler for a tiny imperative language using the
+    parser generator in conjunction with the Poplog Virtual Machine.
+
+LIB * LR_EXAMPLE_2
+    A parser for ANSI C based on the grammar in the second edition of
+    The C Programming Language by Kernighan and Ritchie.
+
+
+--- C.all/help/define_parser
+--- Copyright University of Sussex 1993. All rights reserved.

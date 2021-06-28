@@ -1,0 +1,324 @@
+HELP MKIMAGE                                    Robert Duncan, June 1991
+
+A library to simplify the making of saved images.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+  2   Loading Libraries
+  3   Mixed Language Images
+  4   Startup Actions
+  5   Optional Flags
+
+
+-----------------------------------------------------------------------
+1  Introduction
+-----------------------------------------------------------------------
+
+LIB * MKIMAGE helps to simplify the process of making saved images. It
+provides a standard method for making saved images built from a list of
+files. It is not a library which should be loaded interactively in the
+usual way, but a "command" library designed for use as part of a Shell
+or DCL command.
+
+The synopsis of a MKIMAGE command is:
+
+    pop11 %nort mkimage [flags...] image [files...] [: startup...]
+
+The flags, files and startup components are all optional, so the
+simplest example of this would be:
+
+    pop11 %nort mkimage example
+
+which makes a saved image called 'example.psv' in the current (default)
+directory. The image can be run with the command
+
+    pop11 +example
+
+This particular image won't do very much: its behaviour will typically
+be indistinguishable from that of the base 'pop11' command.
+
+You should always pass the %nort argument to Poplog commands which make
+saved images: if you want to know why, read Runtime Actions in
+REF * SYSTEM.
+
+
+-----------------------------------------------------------------------
+2  Loading Libraries
+-----------------------------------------------------------------------
+
+To make a more interesting image, you can include library names as part
+of the command line, as in:
+
+    pop11 %nort mkimage example flavours
+
+This too creates an 'example.psv' saved image, but this version will
+include the * FLAVOURS package. You can specify as many libraries as you
+like, to be loaded in order:
+
+    pop11 %nort mkimage example flavours browseself_message
+
+You can also give the pathnames of files to compile if you want to
+include some of your own code in an image:
+
+    pop11 %nort mkimage myapp myapp/build.p     ;;; Unix
+    pop11 %nort mkimage myapp [myapp]build.p    ;;; VMS
+
+A name on its own like 'flavours' is taken as the name of a library
+file; a name with a directory component like 'myapp/build.p' is taken as
+the name of a file to compile.
+
+
+-----------------------------------------------------------------------
+3  Mixed Language Images
+-----------------------------------------------------------------------
+
+LIB * MKIMAGE supports mixed language images. To get a particular
+language in your image, just include the corresponding library.
+
+For example, the command
+
+    pop11 %nort mkimage example prolog
+
+will create an image which behaves just like the standard Prolog saved
+image (since LIB * PROLOG loads the Prolog subsystem).
+
+Once the language itself has been loaded, you can then add libraries
+from that subsystem. The command
+
+    pop11 %nort mkimage example prolog edinsynt
+
+first loads Prolog and then the Prolog Edinburgh syntax library, just as
+if you had typed
+
+    library(edinsynt).
+
+to the Prolog prompt.
+
+Multiple languages can be mixed in one image: to build an image
+containing both Prolog and Common Lisp, do
+
+    pop11 %nort mkimage example prolog clisp
+
+By default, when a mixed-language image is restored, it will start up
+using the top-level of the first language subsystem which was loaded. So
+the previous command would make an image which would start up in Prolog,
+whereas the command
+
+    pop11 %nort mkimage example clisp prolog
+
+makes an image which will start up in Lisp. If you don't like the
+default behaviour, you can explicitly nominate a start-up subsystem with
+the -subsystem option described below.
+
+There is another difference between these two Prolog/Lisp images. When
+making mixed language images, libraries are always sought first relative
+to the most recently loaded language subsystem. So the command
+
+    pop11 %nort mkimage example clisp prolog
+
+first loads the 'clisp' library from pop11, but then loads the 'prolog'
+library from Lisp, as if you had typed
+
+    (require 'prolog)
+
+to the Lisp prompt. This library contains more than just the base Prolog
+subsystem, because it also defines constructs for running Prolog goals
+from Lisp. With the libraries given in the original order:
+
+    pop11 %nort mkimage example prolog clisp
+
+because there is no Prolog 'clisp' library, both libraries are loaded
+from pop11 and hence the extra Prolog/Lisp mixed-language features
+aren't included.
+
+Searching for libraries relative to the most recently loaded subsystem
+usually gives the best behaviour. If there's an undesirable name clash,
+and you can't change the order of loading, you can add a file extension
+to the library name to disambiguate. The command
+
+    pop11 %nort mkimage example clisp prolog.p
+
+will force the pop11 'prolog.p' library to be loaded in preference to
+the Lisp version ('prolog.lsp').
+
+All the standard language saved images (prolog, clisp and pml) will
+accept 'mkimage' as a first argument and load this library accordingly.
+Thus the Prolog/Lisp saved image could be better built with the command:
+
+    clisp %nort mkimage example prolog
+
+The resulting image will be smaller, because it shares the Common Lisp
+code with the existing 'clisp' image, but of course it must be restored
+using 'clisp' as the base command:
+
+    clisp +example
+
+This property is inherited by all images made with the MKIMAGE command.
+To build another layer on top of the last example, do
+
+    clisp +example %nort mkimage example2 .....
+
+The resulting image 'example2.psv' would be restored with the command:
+
+    clisp +example +example2
+
+
+-----------------------------------------------------------------------
+4  Startup Actions
+-----------------------------------------------------------------------
+
+As already described, the normal start-up behaviour of an image made with
+MKIMAGE is to run the top-level of the primary subsystem. The idea is to
+make images which behave just like the standard language images but with
+frequently-used libraries already built in.
+
+An alternative use of saved images is to make specialised applications,
+and you can do this by adding a <startup> option to the MKIMAGE command.
+This relies on the fact that all subsystem images, when restored, will
+interpret an argument beginning ':' as an expression to evaluate. For
+example:
+
+    pop11 ":3=>"
+    ** 3
+
+    prolog ":write('** 3\n')."
+    ** 3
+    yes
+
+etc. If you add such an argument to the end of the MKIMAGE command, then
+that argument is automatically prefixed to the argument list every time
+the image is restored.
+
+Example:
+
+    pop11 %nort mkimage example ":3=>"
+
+    pop11 +example
+    ** 3
+
+So if you have an application myapp which is built from a file
+"myapp/build.p", you can turn this into an application image with the
+command:
+
+    pop11 %nort mkimage myapp myapp/build.p ":myapp();"
+
+Certain libraries you might want to initialise before the image is made:
+you can do this with the -init option described below.
+
+
+-----------------------------------------------------------------------
+5  Optional Flags
+-----------------------------------------------------------------------
+
+There are several optional flags which can be added to the MKIMAGE
+command to tailor its behaviour. All flags are prefixed with '-' and
+should precede the image name.
+
+-ved
+    Changes the default start-up behaviour to Ved mode: when the image is
+    restored, any command-line argument is interpreted as the name of a
+    file to be edited.
+
+    Example: the command
+
+        pop11 %nort mkimage -ved vt220 vedvt220
+
+    builds an image 'vt220.psv' which includes the code to customise Ved
+    for a VT220 terminal. The subsequent command
+
+        pop11 +vt220 foo.p
+
+    will restore the image and invoke Ved on the file 'foo.p'.
+
+-subsystem subsystem
+    Selects the named subsystem as the primary subsystem to be run when
+    the image is restored. The nominated subsystem must be included in
+    the image.
+
+    Example: the command
+
+        pop11 %nort mkimage -subsystem pop11 prolog clisp
+
+    builds an image which contains both Prolog and Lisp subsystems, but
+    which will start up in the standard Pop-11 top-level.
+
+-init subsystem code
+    Adds initialisation code for the named subsystem, to be run
+    immediately before the image is made. You can specify this option
+    many times, and the fragments of code will be evaluated in order.
+
+    Example:
+
+        pop11 %nort mkimage -init pop11 "myapp_init();" myapp \
+            myapp/build.p ":myapp();"
+
+-share
+-noshare
+    Determine whether the image is to be shareable or not. Images are
+    always made using * sys_lock_system, so the non-writeable part of
+    the image can be made shareable. The default behaviour is to share
+    images which are installed in the Poplog system image directories
+    "popsavelib" and "poplocalbin" and not to share others.
+
+-nonwriteable
+    If supplied, calls * sys_lock_system with a flag saying that the
+    default placement for  all structures  not  individually  or
+    class-marked as writeable/nonwriteable, and for all closures, should
+    be non-writeable. If not supplied, these items are marked as
+    writeable. (The effect of this that things like lists and vectors
+    which aren't marked as writeable with the writeable operator will go
+    into non-writeable memory in the image.)
+
+    Note that MKIMAGE always sets the variable pop_record_writeable true
+    anyway, regardless of whether -nonwriteable is supplied or not.
+
+-install
+    On Unix systems, this is the same as -share. On VMS systems, this
+    implies -share, but also enables the use of * sys_install_image to
+    make the image shareable by all users.
+
+-entrymain
+-entry procedure-name
+    As an alternative to supplying an argument beginning with ':' (as
+    described above), the -entry option requests that control be passed
+    directly to the procedure given by procedure-name when the image is
+    restored (note that procedure-name may contain a Pop-11 section
+    pathname component.) The -entrymain option specifies the default
+    name $-Pop$-Main as the entry procedure.
+
+    With either of these options, control is passed directly to the
+    procedure, WITHOUT calling syssetup. Thus none of the standard
+    language subsystem interpretation of arguments in poparglist
+    occurs.
+
+-debug
+-nodebug
+    Causes true (-debug) or false (-nodebug) to be assigned to
+    pop_debugging while files are being compiled (the default setting is
+    "undef"). (Has no affect on the value of pop_debugging when the
+    saved image is restored.)
+
+-flags key flags
+    LIB * MKIMAGE defines a property named mkimage_flags_table. This
+    option adds to the table a mapping from the word key to a list of
+    flags, where flags may be a single string or a sequence of strings
+    written between '(' ')' (these typically need quoting to get past
+    the Shell). The property can be interrogated by the libraries being
+    loaded.
+
+    For example, a library may contain code of the form:
+
+        global vars debugging = false;
+        #_IF DEF mkimage_flags_table
+            mkimage_flags_table("debugging") -> debugging;
+        #_ENDIF
+
+    To load this library in debugging mode, you could do
+
+        pop11 %nort mkimage -flags debugging "" example ....
+
+
+
+--- C.all/help/mkimage
+--- Copyright University of Sussex 1993. All rights reserved.

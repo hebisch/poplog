@@ -1,0 +1,151 @@
+HELP VEDSYSFILE                                  John Williams, Jan 1991
+
+    vedsysfile(DEFAULT, SEARCH_LIST, INITIALISATION_PROCEDURE)
+
+This procedure is used by commands such as HELP, TEACH, DOC, REF and
+SHOWLIB for finding system documentation or source code, and reading it
+into the editor, VED.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- How to use VEDSYSFILE
+ -- An example
+ -- How VEDSYSFILE searches for the requested document
+ -- What happens if the search fails?
+ -- Logging attempts to access documentation
+ -- Related documentation
+
+
+-- How to use VEDSYSFILE -----------------------------------------------
+
+VEDSYSFILE takes three arguments, as follows:
+
+    vedsysfile(DEFAULT, SEARCH_LIST, INITIALISATION_PROCEDURE)
+
+Note: the name of the required document is NOT one of these three
+arguments; that is taken from the variable VEDARGUMENT (for reasons
+which will become apparent later).
+
+The first argument, DEFAULT, should be a word which has been declared as
+a permanent identifier. The value of this word is used as the default
+document name, should VEDARGUMENT be an empty string.
+
+The second argument, SEARCH_LIST, should be a list of directory
+specifiers, in standard "search_list" format (see HELP * SEARCH_LISTS).
+VEDSYSFILE looks through these directories for the reqested document.
+
+The third argument, INITIALISATION_PROCEDURE, should be a procedure. It
+will be executed if the document is succesfully located, just after the
+file is read into the editor. Such procedures normally set file
+attributes such as *VEDWRITEABLE and *VEDCOMPILEABLE. If this argument
+is FALSE, the procedure *VEDHELPDEFAULTS is used instead.
+
+VEDSYSFILE produces no results. Its net effect is to either (a) read a
+document into the editor, or (b) call the procedure *VEDSYSFILEERROR, if
+the document could not be located.
+
+
+-- An example ----------------------------------------------------------
+
+The system procedure *VED_TEACH is defined as follows:
+
+    define vars ved_teach();
+        vedsetup();
+        vedsysfile("vedteachname", vedteachlist, false)
+    enddefine;
+
+The call to -vedsetup- ensures that the users 'vedinit.p' file, which
+might alter the default values of *VEDTEACHNAME and *VEDTEACHLIST, has
+been compiled.
+
+The procedures *VED_DOC, *VED_HELP, *VED_REF, *VED_SHOWLIB, and *VED_SRC
+are defined similarly. The latter two are autoloadable libraries, so you
+can examine the code if you wish.
+
+
+-- How VEDSYSFILE searches for the requested document ------------------
+
+VEDSYSFILE uses the procedure *VEDGETLIBFILENAME to find the full
+pathname of the requested document, by calling it as follows:
+
+    vedgetlibfilename(SEARCH_LIST, DEFAULT, REQUEST) -> FILENAME
+
+The arguments SEARCH_LIST and DEFAULT are as described above. The third
+argument, REQUEST, is the name of the document, taken from either
+VEDARGUMENT or DEFAULT, as explained above.
+
+VEDGETLIBFILENAME uses *SYSSEARCHPATH to perform the search, and then
+assigns REQUEST to the value of DEFAULT if the search was successful.
+
+
+-- What happens if the search fails? -----------------------------------
+
+If VEDSYSFILE is unable to locate the required document, it calls the
+procedure *VEDSYSFILEERROR as follows:
+
+    vedsysfileerror(DOC_TYPE, REQUEST)
+
+where DOC_TYPE is a string specifying the documentation category (e.g.
+'HELP', 'REF', etc), and REQUEST (also a string) is the name of the
+document that couldn't be found.
+
+By default, VEDSYSFILEERROR prints a message of the form
+
+    <DOC_TYPE> NAME not found - Try <DOC_TYPE> DEFAULT
+
+e.g.
+
+    HELP GOBBLEDEGOOK not found - Try HELP HELPFILES
+
+However, it is possible to redefine VEDSYSFILEERROR, in which case
+alternative actions can be performed each time a documentation request
+fails.
+
+
+-- Logging attempts to access documentation ----------------------------
+
+It is possible to record documentation access requests, by providing an
+appopriate definition for the procedure *VEDSYSFILELOG.
+
+You could use this facility in order to maintain a league table; or
+create a history list; or anything else you can think of.
+
+Normally, VEDSYSFILELOG is set to *IDENTFN, in which case nothing
+happens. If it is defined as a procedure with three arguments then it is
+called with the name of the calling procedure, the requested document,
+and the file which was found (or FALSE if not found).
+
+For example, you could maintain a list of document requests as follows:
+
+        vars helplog = [];
+
+        define vedsysfilelog(caller_name, request, found);
+            [% caller_name, request, found %] :: helplog -> helplog
+        enddefine;
+
+Every time you call, for example, HELP or TEACH, a list like
+
+        [ved_help 'foobaz' '/poplog/pop/help/foobaz']
+
+will be added to HELPLOG.
+
+
+-- Related documentation ----------------------------------------------
+
+See also
+
+    HELP * DOCUMENTATION    - General overview of Poplog documentation
+    HELP * DOC              - The DOC command
+    HELP * HELP             - The HELP command
+    HELP * REF              - The REF command
+    HELP * TEACH            - The TEACH command
+    HELP * SHOWLIB          - The SHOWLIB command
+    HELP * SRC              - The SRC command
+    HELP * SEARCH_LISTS     - Describes the SEARCH_LIST format
+    HELP * VEDGETSYSFILE    - Explains VED's cross-referencing system
+    REF * VEDPROCS          - Complete list of VED procedures
+
+
+--- C.all/help/vedsysfile
+--- Copyright University of Sussex 1991. All rights reserved. ----------

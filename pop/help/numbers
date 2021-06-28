@@ -1,0 +1,250 @@
+HELP NUMBERS                                          Nic Ford, Jul 1987
+                                                     A.Sloman March 1989
+
+Keywords: integer, biginteger, number, decimal, ddecimal, ratio,
+    complex, printing.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Introduction
+ -- Integers and Bigintegers
+ -- Ratios
+ -- Decimals and ddecimals
+ -- Complex Numbers
+ -- Printing numbers in binary, octal, hexadecimal, etc
+ -- Reading numbers in program text or using readitem, etc.
+ -- Associated documentation
+
+-- Introduction --------------------------------------------------------
+
+There  are  six  different  types  of  number  within  POP-11:  integer,
+biginteger, ratio, decimal, ddecimal and complex number. This help  file
+briefly describes what each type is and the role it plays within POP-11,
+and then details the lexical syntax used to represent it within POP-11 -
+that is, the sequences of characters which can be used to build  numbers
+of that type.
+
+-- Integers and Bigintegers --------------------------------------------
+
+An integer  in POP-11  is a  rational number  with no  fractional  part.
+Although decimals can also have no fractional part (or, more accurately,
+a fractional  part of  zero) integers  are useful  because they  can  be
+stored  more  compactly  and   accessed  more  quickly  than   decimals.
+Bigintegers are integers  which cannot  be stored  compactly because  of
+their magnitude.
+
+An integer can be represented in a program file as:
+
+    a)  A sequence  of digits  (characters  in the  range `0`  to  `9`),
+        optionally preceded by a minus sign.
+
+        Examples: 463, -67
+
+    b)  An integer INT1  directly  preceded by an  integer of type  (a),
+        INT2, and a colon - INT2 must be in the range 2-36, and is taken
+        as the  base of  the  integer (for  digits  greater than  9  the
+        characters A-Z are  used). No  digit in  INT1 may  have a  value
+        equal to  or  greater than  INT2.  If  either INT1  or  INT2  is
+        negative (not both), then INT1 will be forced negative.
+
+        Examples: 2:11, -8:5641, 16:-FFA5E
+
+    c)  A character  constant (the  character "`",  followed by  another
+        character, optionally followed by  another "`"). This yields  an
+        integer in the range 0-255.
+
+        Examples: `A`, `B, `\^H`
+
+Integers of type (a)  and (b) may optionally  be followed the  character
+`e`, and  a signed  or unsigned  class (a)  integer -  this defines  the
+exponent of  the  integer. Thus  the  sequence "R:NeI"  will  build  the
+integer N *  (R ** I)  WARNING: Specifying an  exponenent may force  the
+building of a ratio instead of an integer.
+
+Examples: 3e2, 12:B98Ae7
+
+A biginteger is  created whenever  a character  sequence evaluates  to a
+number too large to be a simple integer.
+
+Examples: 3e67, 45e10
+
+(See also REF * ITEMISE)
+
+-- Ratios --------------------------------------------------------------
+
+A ratio  is a  decimal  number which  has  a non-zero  fractional  part,
+described as the ratio of two integers. A ratio can be used to represent
+an irrational  number (that  is,  a decimal  with an  "infinitely  long"
+fractional part).
+
+A ratio is built from an integer  of type (a) or (b), INT1, followed  by
+the character sequence "_/", followed by  an integer of type (a),  INT2,
+which may  not be  negative. If  INT1 is  of type  (b) (that  is, it  is
+preceded by a radix) then that radix is also used for INT2. A ratio will
+be translated to its simplest possible representation (i.e. "3_/6"  will
+be translated  into the  ratio "1_/2"),  and if  the denominator  (INT2)
+evaluates to 1, then the resulting number will be an integer.
+
+Examples: 3_/10, -1_/2, 18:GF_/45
+
+The variable * POP_PR_RATIOS (default true) can be made false to
+make ratios print like decimals.
+
+    false -> pop_pr_ratios;
+    3/4 =>
+    ** 0.75
+
+    true -> pop_pr_ratios;
+    3/4 =>
+    ** 3_/4
+
+When it is false it is only PRINTING that is altered. To prevent
+the creation of ratios ensure that division is by a decimal not
+an integer, e.g.
+
+    true -> pop_pr_ratios;
+    3/4.0 =>
+    ** 0.75
+
+Since ratios are records that require temporary storage in the heap,
+repeated division of integers by integers can lead to a lot of store
+use, and trigger unwanted garbage collections. See HELP * EFFICIENCY
+
+
+-- Decimals and ddecimals ----------------------------------------------
+
+A decimal is a  floating point number -  a rational number,  represented
+with a fractional part. Decimals with  a fractional part of zero may  be
+represented as integers. Irrational decimals are coerced into ratios  by
+POP-11.
+
+A floating point number is represented by a sequence of characters,  all
+of which are digits, except for one,  which is a period (the period  may
+not appear at the start  or end of the  sequence). As with integers,  if
+the number is preceded by an integer and a colon, then that integer will
+be taken as the base.
+
+Examples: 0.6557, 45.56, 9:67.0
+
+Also as with integers, an exponent may be specified, using the character
+`e` in the same way. In addition, the characters `d` and `s` may be used
+in place of  `e` - both  `d` and `e`  force the resultant  number to  be
+double precision (a DDECIMAL), `s` forces  it to be single precision  (a
+DECIMAL). A sequence of characters denoting a floating point number will
+always be coerced into a DDECIMAL by POP-11, unless the `s` exponent  is
+used in this way.
+
+Examples: 232.056e-2, 5:131.43d5, 345.2s+7
+
+
+-- Complex Numbers -----------------------------------------------------
+
+A complex  number is  made  up of  two parts:  its  real part,  and  its
+imaginary. Both  parts (confusingly)  are real  numbers -  however,  the
+imaginary part is multiplied  (or, considered to  be multiplied -  ask a
+mathematician) by the  square root  of minus  one before  any and  every
+mathematical function is carried out.  Complex numbers are described  in
+two parts because the square  root of minus one  cannot exist as a  real
+number, and so must be kept separate from the mathematical "real" world.
+
+A complex number in POP-11 is represented by any two of the above  types
+of number  (the  first  representing  the  real  part,  the  second  the
+imaginary) separated  by the  character sequences  "_+:" or  "_-:".  The
+imaginary part of a complex number may  not be preceded by a minus  sign
+or base specification - if the real part has a base then it will be used
+by the imaginary also, and if the  imaginary part has to be negative  it
+is made such by use of the "_-:" sequence. Unlike integers, if the  real
+part both is negative, and  has a base, then  the unary minus sign  MUST
+succeed the radix and preceed the number (i.e. "16:-A_+:B" must be  used
+in preference to "-16:A_+:B").
+
+Real and  imaginary parts may  be of different  types - however, if  the
+are both floating point then  they will be coerced  to the same type  of
+floating point (i.e. DECIMALS or DDECIMALS). If the imaginary part  of a
+complex number is zero, and both parts are rational, then the  resultant
+number will be not complex, but one of the other number types.
+
+Examples: 6_+:7, 1.2_-:5.6, 3:21.1_+:1_/2
+
+
+-- Printing numbers in binary, octal, hexadecimal, etc ----------------
+
+By default, numbers are printed in decimal format. However the variable
+*POP_PR_RADIX can be given an integer value between 2 and 36 to alter
+the base. E.g. to print in hexadecimal
+
+    16 -> pop_pr_radix;
+    2, 8,9, 15, 16, 17, 31, 32, 33 =>
+    ** 2 8 9 F 10 11 1F 20 21
+
+The procedure RADIX_APPLY, described in REF * PRINT, can be used
+to apply an arbitrary printing function with a given base. E.g.
+
+    radix_apply(15,pr,16);
+    F
+
+    radix_apply(15.9,pr,16);
+    F.E66666
+
+    radix_apply(15,8,4,prnum,16);
+           F.000
+
+There are several different global variables, with names starting
+'pop_pr' that control printing formats.
+
+For more information on printing numbers (and other things) see
+
+ HELP * POP_PR_EXPONENT
+ HELP * POP_PR_PLACES
+ HELP * POP_PR_QUOTES
+ HELP * POP_PR_RADIX
+ HELP * POP_PR_RATIOS
+ HELP * PRINT
+ HELP *PRNUM
+ REF * PRINT
+
+-- Reading numbers in program text or using readitem, etc. ------------
+
+For full information on the formats for reading in different sorts of
+numbers, see
+
+ REF * ITEMISE
+
+
+-- Associated documentation -------------------------------------------
+
+HELP files concerned with numbers and mathematical procedures:
+
+ HELP *MATH           - mathematical procedures in POP-11
+ HELP *ABS            - returns the absolute value of a number
+ HELP *BIGINTEGERS    - on BIGINTEGERS
+ HELP *COS            - returns the cosine of a number
+ HELP *DIV            - divide with remainder and quotient
+ HELP *DECIMALS       - on DECIMALS and DDECIMALS
+ HELP *EXP            - returns the exponential of a number
+ HELP *FRACOF         - returns the fractional part of a decimal
+ HELP *INTOF          - returns the integral part of a decimal
+ HELP *ISBIGINTEGER   - check an item is a BIGINTEGER
+ HELP *ISDDECIMAL     - check an item is a DDECIMAL
+ HELP *ISDECIMAL      - check an item is a DDECIMAL or DECIMAL
+ HELP *ISINTEGER      - check an item is an INTEGER or BIGINTEGER
+ HELP *LOG            - returns the log to base 2 of a number
+ HELP *PI             - variable holding the value of PI
+ HELP *POPRADIANS     - specifies whether using radians or degrees
+ HELP *RANDOM         - the random number generator
+ HELP *RANSEED        - the seed for the random number generator
+ HELP *REALOF         - returns the decimal version of a number
+ HELP *SIGN           - returns the sign of a number
+ HELP *SIN            - returns the sine of a number
+
+TEACH files concerned with numbers:
+
+ TEACH *ARITH          - arithmetic in POP-11
+ TEACH *DECIMALS       - tutorial on decimals and ratios in POP-11
+
+REF files concerned with numbers:
+
+ REF *NUMBERS        - on numbers & procedures using numbers in POP-11
+
+--- C.all/help/numbers -------------------------------------------------
+--- Copyright University of Sussex 1991. All rights reserved. ----------

@@ -1,0 +1,232 @@
+HELP POPLISP                                     John Williams, May 1986
+
+This file describes how to refer to Pop-11 objects from Lisp programs,
+and vice versa. Please note that only the facilities explicitly
+documented here are supported.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Pop-11 in Lisp
+  2   Lisp in Pop-11
+  3   Passing Lisp Functions to Pop-11 Procedures
+  4   Truth Values in Lisp and Pop-11
+  5   Pop-11/Lisp Datatype Correspondences
+
+
+-----------------------------------------------------------------------
+1  Pop-11 in Lisp
+-----------------------------------------------------------------------
+
+In Lisp, symbols can denote many things: variables, functions, names of
+data types, and so on. Normally, when the compiler encounters an
+"undefined" symbol in such a context, a warning or error is signaled.
+However, if the symbol's home package is named pop11, the compiler will
+instead interpret this symbol as a reference to the Pop-11 quantity of
+the same name. This feature makes it possible for Lisp programs to refer
+to Pop-11 procedures, variables, data types, and library packages. Here
+are some examples:
+
+    (pop11::last '(a b c))              ; function
+
+    (setf (pop11::last l) x)            ; setf method
+
+    pop11::popgctrace                   ; variable
+
+    (setq pop11::popgctrace t)          ; variable
+
+    (typep '(a . b) 'pop11::pair)       ; type
+
+    '#S(pop11::pair 1 2)                ; type
+
+    #S(pop11::string 97 98 99 100)      ; type
+
+    (require 'pop11::showtree)          ; module
+
+
+Notice that, for convenience, case-conversion is performed. Hence the
+Lisp symbol POP11::LAST is mapped to the Pop-11 identifier last.
+
+Note also that the substring $- can be used in symbols of the Pop-11
+package to indicate Pop-11 sections in the normal manner, e.g.
+
+    pop11:$-lisp$-make_stream
+
+The value of this symbol is the same as the value of the word
+"make_stream" in the Pop-11 section named "lisp".
+
+The mapping created by the compiler is permanent. Thus assignments and
+references from either Pop-11 or Lisp affect the same identifier. This
+link can be broken by applying the Lisp function makunbound to the
+symbol, or the Pop-11 procedure syscancel to the word.
+
+When Pop-11 procedures are called in this way, they obey the same result
+passing discipline as Lisp functions. So:
+
+    (pop11::dest '(a b c))
+    A
+    (B C)
+
+    (setq x (pop11::dest '(a b c)))
+    A
+
+    (pop11::consvector (values-list '(a b c d)) 1)
+    #(A)
+
+    (multiple-value-call #'pop11::consvector (values-list '(a b c d)) 4)
+    #(A B C D)
+
+
+Normally, the debugger will not display Pop-11 procedures in backtraces.
+Giving the command:
+
+    :unhide pop11
+
+to the debugger will make Pop-11 procedures visible. See HELP * BREAK
+for more details.
+
+
+-----------------------------------------------------------------------
+2  Lisp in Pop-11
+-----------------------------------------------------------------------
+
+A macro, @, for notating Lisp symbols in Pop-11 is provided. Characters
+following the @ up till a separator or whitespace character are
+collected, and the appropriate Lisp symbol created. Thus @CAR denotes
+the Lisp symbol CAR. Package specifiers may be used; so @:FOO denotes
+the keyword :FOO, and @SYS:FOO denotes a symbol named "FOO" accessible
+in the system package.
+
+The class_apply method for a Lisp symbol executes the functional value
+of that symbol. When Lisp functions are invoked in this way, they must
+be passed an extra argument, representing the number of arguments they
+are being given. Some examples:
+
+    @CAR([a b c], 1) =>
+    ** a
+
+    @MEMBER([b], [[a] [b] [c]], @:TEST, @EQUAL, 4) =>
+    ** [[b] [c]]
+
+    @+(1, 2, 3, 4, 5, 5) =>
+    ** 15
+
+Lisp functions do not have updaters, so Lisp symbols cannot be invoked
+in update mode.
+
+
+To access the values of Lisp symbols as variables or constants, use
+syssynonym. This will create the same kind of linkage between the Lisp
+symbol's value cell and a Pop-11 word as described above. For example:
+
+    syssynonym("prlen", @*PRINT-LENGTH*);
+
+    define prlisplist(list, prlen);
+        dlocal prlen;
+        @PRINT(list, 1) ->;
+    enddefine;
+
+    prlisplist([a b c d e], 3);
+    (a b c ...)
+
+
+See HELP * SYSSYNONYM for more details.
+
+
+-----------------------------------------------------------------------
+3  Passing Lisp Functions to Pop-11 Procedures
+-----------------------------------------------------------------------
+
+The mechanisms outlined above do not enable Lisp functions to be passed
+to Pop-11 procedures that take procedures as arguments (e.g. applist).
+For example, the following will cause an error:
+
+    (pop11::applist '(a b c) #'print)
+
+This is because Lisp functions need to be told how many arguments they
+are being applied to, something that applist does not do when calling
+its procedure argument.
+
+To solve this problem, the (Lisp) function make-pop11-procedure is
+provided. This takes a function and arity, and creates a Pop-11
+procedure that will call the Lisp function, telling it that it is being
+applied to the specified number of arguments. So, the correct version of
+the example given above is:
+
+    (pop11::applist '(a b c) (make-pop11-procedure #'print 1))
+
+
+-----------------------------------------------------------------------
+4  Truth Values in Lisp and Pop-11
+-----------------------------------------------------------------------
+
+Lisp's two truth values, nil and t, are identical to the Pop-11 objects
+[] and <true>. The Pop-11 truth value <false> is not recognised by Lisp,
+and indeed may cause problems if passed as an argument to a Lisp
+function. So, when Lisp predicates are called by Pop-11 procedures, or
+Pop-11 predicates are called by Lisp functions, conversions between nil
+and <false> may be needed. Two Pop-11 procedures are available for such
+purposes: pop_true, which turns nil into <false>, and lisp_true, which
+turns <false> into nil. Some examples of their use:
+
+In Lisp:
+
+    (pop11::ispair 23)
+    #<FALSE>
+    (pop11::lisp_true (pop11::ispair 23))
+    NIL
+
+
+In Pop-11:
+
+    @CONSP(23, 1) =>
+    ** []
+    pop_true(@CONSP(23, 1)) =>
+    ** <false>
+
+
+-----------------------------------------------------------------------
+5  Pop-11/Lisp Datatype Correspondences
+-----------------------------------------------------------------------
+
+Most Lisp datatypes are identical to their conceptual equivalents in
+Pop-11. The supported correspondences are:
+
+    Lisp type                   Pop-11 type
+    ---------                   -----------
+    fixnum                      integer
+    bignum                      biginteger
+    integer                     integral
+    ratio                       ratio
+    short-float                 decimal
+    single-float                decimal
+    double-float                ddecimal
+    long-float                  ddecimal
+    complex                     complex
+
+    array                       array or vectorclass object
+    simple-bit-vector           bitvector (see LIB * BITVECTORS)
+    simple-string               string
+    simple-vector               vector
+
+    cons                        pair
+    null                        nil
+    hash-table                  property
+    random-state                random_state (see LIB * RANDOM_STATES)
+
+
+Some notes:
+
+    Lisp expects arrays to be 0-origin, and in row-major order.
+
+    Pop-11 can only handle simple, non-adjustable, non-displaced Lisp
+    arrays and vectors.
+
+    Lisp does not treat Pop-11 dynamic lists as such.
+
+    Lisp does not handle Pop-11 active properties correctly
+
+
+
+--- C.all/lisp/help/poplisp
+--- Copyright University of Sussex 1991. All rights reserved.

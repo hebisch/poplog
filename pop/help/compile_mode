@@ -1,0 +1,270 @@
+HELP COMPILE_MODE                  Jason Handby & John Gibson, July 1991
+                                            Updated John Gibson Sep 1996
+
+The Pop-11 compile_mode syntax provides an easy method for setting
+various compiler flags.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+  2   Flags for :pop11
+  3   Flags for :vm
+  4   Flags for :popc
+  5   See Also
+
+
+-----------------------------------------------------------------------
+1  Introduction
+-----------------------------------------------------------------------
+
+compile_mode provides a useful syntax for setting the various flags
+which control the process of compilation. It is used as follows:
+
+    compile_mode [global] [ :group {+|-}flag ... ] ... ;
+
+where each flag is a flag for the preceding group.
+
+For example:
+
+    compile_mode :pop11 +defcon +defpdr  :vm -bjmpch;
+    compile_mode global :vm +goonch -pentch +typech -prmprt;
+
+:group is used to indicate the type of the flags which follow. It has
+three possible values:
+
+    :pop11      control operation of normal Pop compiler (which compiles
+                Pop-11 into VM code)
+
+    :vm         control compilation of VM code into machine code
+
+    :popc       control operation of the Popc compiler (currently only
+                of interest to Poplog developers)
+
+
+Values of flag for various groups are listed below. To set a flag,
+prefix it with a plus sign (+). To unset it, use a minus (-).
+
+The global keyword if present indicates the settings should be made
+globally throughout the system; otherwise, the settings apply only to
+the current compilation stream (i.e. file), procedure, or lexical block.
+
+Note that with the exception of :pop11 -lprops, no settings made in user
+files affect the compilation of libraries -- even with global. (This is
+because syslibcompile and subsystem_libcompile locally restore all flags
+except :pop11 lprops to their initial state.)
+
+
+-----------------------------------------------------------------------
+2  Flags for :pop11
+-----------------------------------------------------------------------
+
+These flags are stored as bits in the integer variable pop_pop11_flags
+(see INCLUDE * POP11_FLAGS).
+
+    defcon      When set, the default declaration for a toplevel define
+                will be constant when no explicit declaration keyword is
+                specified. Thus when set, 'define foo() ...' at toplevel
+                will declare foo as a permanent constant. (Note that the
+                default for nested defines is always lconstant, although
+                see oldvar below.)
+
+                This flag is ignored when pop_debugging is true (as this
+                turns off all permanent constants).
+
+    defpdr      When set, the default identprops value for define will
+                be "procedure". Thus when set, 'define foo() ...' will
+                declare foo as a procedure-type identifier.
+
+    lprops      When unset (i.e. -lprops), a define for a lexical
+                identifier ('define lconstant ...' or 'define lvars
+                ...') will give the procedure being defined a pdprops
+                value of false by default (unless an explicit with_props
+                value is given). This flag is effective only when
+                pop_debugging is false.
+
+    varsch      From Poplog Version 14.53, this flag only affects
+                explicit vars statements in procedures, unless +oldvar
+                is set.
+
+                With -oldvar (the default), undeclared formal argument
+                and result variables of procedures default to lvars, and
+                undeclared nested defines default to lconstant.
+
+                With +oldvar, undeclared procedure formals default to
+                vars rather than lvars, and undeclared nested defines
+                default to vars rather than lconstant. However, if
+                +varsch is set also, the (variable) procedure
+                pop11_vars_default_check is called with the name of the
+                identifier concerned as argument. The standard version
+                of this procedure for ordinary interactive compilation
+                then prints a warning message (but still defaults the
+                identifier to vars); in Popc compilation, on the other
+                hand, pop11_vars_default_check is redefined to treat the
+                condition as an error.
+
+                Regardless of the oldvar setting, with +varsch it is an
+                error to have an explicit vars statement inside a
+                procedure (dlocal must be used instead).
+
+    constr      Setting this flag allows list and vector constructor
+                expressions containing no 'evaluate' keywords to be
+                produced as compile-time constants (as opposed to
+                producing new structures each time the code is run). See
+                REF * pop11_comp_constructor for details.
+
+    global      Makes global be the default for all permanent vars and
+                constant declarations. (An explicit nonglobal must  be
+                used to override this flag.)
+
+    normal      This is  provided  for  convenience. Setting +normal
+                provides the normal settings for pop_pop11_flags, and is
+                equivalent to
+
+                    -varsch -defpdr -defcon +lprops -constr -global
+
+                (Although note that it does not affect the setting of
+                oldvar.)
+
+    strict      This flag is a 'macro'. :pop11 +strict is equivalent to
+
+                    compile_mode
+                        :pop11 +varsch +defpdr +defcon -lprops +constr
+                                                               +global
+                        :vm +prmfix
+                        :popc -wrdflt -wrclos;
+
+                It should be used in system libraries and sourcefiles to
+                enforce the required degree of strictness during
+                compilation. (Note that it includes +global, which makes
+                all vars and constants automatically global; a
+                non-global identifier must be declared explicitly with
+                nonglobal.)
+
+    oldvar      Restores the pre-Version 14.53 behaviour of the compiler,
+                i.e.
+
+                    # undeclared procedure input and output locals
+                      default to vars rather than lvars;
+
+                    # undeclared nested defines default to vars rather
+                      than lconstant;
+
+                    # variables declared as vars inside procedures do
+                      not produce a warning message.
+
+
+-----------------------------------------------------------------------
+3  Flags for :vm
+-----------------------------------------------------------------------
+
+These flags are stored as bits in the integer variable pop_vm_flags
+(see INCLUDE * VM_FLAGS).
+
+
+    mixlex      DANGEROUS: do not use unless you know exactly what you
+    dislpp      are doing! (See INCLUDE * VM_FLAGS for more details.)
+
+    lexprt      If unset, an error is NOT signalled if a protected
+                permanent identifier is declared lexically (by sysLVARS,
+                sysDLVARS, sysLCONSTANT).
+
+    bjmpch      Normally, jump instructions (such as sysGOTO, sysIFSO,
+                sysIFNOT, etc) plant extra code before a backward jump
+                (i.e. one that references a label already planted with
+                sysLABEL), where the extra code checks for interrupts
+                and user stack overflow. While this flag is unset, the
+                checking code is omitted. This flag is only effective
+                when pop_debugging is false.
+
+    goonch      While this flag is unset, sysGO_ON will not plant code
+                to check that the item on top of the stack is an
+                integer. Effective only when pop_debugging is false.
+
+    pentch      Normally, procedures have extra code planted at the
+                beginning to check for interrupts, user stack overflow
+                and call stack overflow. When this flag is unset (at the
+                time of the sysENDPROCEDURE that terminates a
+                procedure), the checking code is omitted. Effective only
+                when pop_debugging is false.
+
+    typech      Unsetting this flag disables the code that normally gets
+                planted to check that run-time assignments to typed
+                variables are assigning the correct type of object.
+                (Currently, the only kind of typed variable is
+                procedure-type). Effective only when pop_debugging is
+                false.
+
+    prmprt      If unset, an error is NOT signalled if a protected
+                permanent identifier is redeclared (by sysSYNTAX,
+                ident_declare etc).
+
+    prmfix      If set, a mishap results if a redeclaration of a
+                permanent identifier does not agree with its current
+                declaration (in respect of identprops and constant/var).
+                In addition, redeclarations do not cause
+                already-assigned constants to revert to 'unassigned'
+                status (so that they cannot be assigned again and their
+                present value continues to be used, rather than their
+                being treated as variables until reassigned). See
+                ident_declare in REF * IDENT for more details. This flag
+                is effective only when pop_debugging is false.
+
+    nofast      If set, sys_use_current_ident and sys_current_ident with
+                2nd argument true will call pop_nofast_trans to
+                translate 'fast' permanent identifier names to their
+                non-fast versions. (See LIB * pop_nofast_trans.)
+
+                With the exception of sysPOP, sysLOCAL and sysPASSIGN,
+                all VM instructions call sys_use_current_ident with 2nd
+                argument true; hence +nofast will cause these to
+                substitute fast procedures with their non-fast versions.
+
+                In addition, sys_current_ident is called with 2nd arg
+                true by itemread; hence fast to non-fast translation
+                will be performed for Pop-11 macros and syntax words.
+                +nofast also disables the "fast" flag in Pop-11 syntax
+                constructs such as exacc and XptVal.
+
+                Also if set, uses_lib_idents (called by the Pop-11 uses
+                construct), will call pop_nofast_trans to load any
+                non-fast version of a library in addition to the fast
+                one.
+
+
+-----------------------------------------------------------------------
+4  Flags for :popc
+-----------------------------------------------------------------------
+
+These flags are stored as bits in the active integer variable
+pop_popc_flags (see INCLUDE * POPC_FLAGS). They are ignored when using
+normal Pop-11.
+
+
+    syspop      If set, the current file uses the sysPop-11 dialect.
+                (Produces a mishap unless using Popc).
+
+    wrdflt      When set, makes the default for structures be
+                nonwriteable (ie. for structures not otherwise marked as
+                writeable or nonwriteable, individually or by class
+                key). If not set, the default is writeable.
+
+    wrclos      When set, makes (user-created) closures writeable
+                (except where individually marked nonwriteable). If not
+                set, all closures default to nonwriteable (as for
+                ordinary procedures).
+
+
+-----------------------------------------------------------------------
+5  See Also
+-----------------------------------------------------------------------
+
+REF * POPCOMPILE
+    An overview of the Pop-11 compiler.
+
+REF * VMCODE
+    An overview of the Poplog Virtual Machine.
+
+
+
+--- C.all/help/compile_mode
+--- Copyright University of Sussex 1996. All rights reserved.

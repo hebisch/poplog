@@ -1,0 +1,97 @@
+HELP SYSGETPASSWDENTRY                       Mark Rubinstein  March 1986
+                                               Revised A.Sloman Aug 1986
+
+sysgetpasswdentry(<user name/id>) -> <vector> | false
+sysgetpasswdentry(<user name/id>, true) -> <string>  | false
+sysgetpasswdentry(<user name/id>, <vector>) -> <vector> | false
+sysgetpasswdentry(<user name/id>, {<integer>})
+    -> <field of passwd file> | false
+
+This procedure, only available on UNIX, takes either the name (a string)
+or identification number (an integer) of a user, and either TRUE or a
+vector.
+
+It searches in the passwd file for information about that user. If the
+name/id is not found it returns false. If it is found, the result
+depends on the arguments given.
+
+If given a single argument, a user name or id, SYSGETPASSWDENTRY returns
+a nine element vector containing password and login details for that
+user. This vector corresponds to the password structure used by the UNIX
+'getpwent' library routines (see MAN GETPWENT(3)). The components of the
+vector are:
+
+    vector(1)   Name (login name, contains no upper case), a string.
+    vector(2)   Encrypted password, a string.
+    vector(3)   User's identification, a number.
+    vector(4)   User's group identification, a number.
+    vector(5)   This is called 'pw_quota' but is always 0 at present
+    vector(6)   This is called 'pw_comment' but is always an empty string.
+    vector(7)   User's real name, office, phone extension etc.
+    vector(8)   Initial working directory (home directory), a string.
+    vector(9)   Program to use as login Shell, a string.
+
+
+If the second argument to SYSGETPASSWDENTRY is the boolean TRUE, then it
+returns a string representing the entry in the passwd file. This does
+not include fields 5 and 6.
+
+If the second argument to SYSGETPASSWDENTRY is a one-element vector
+containing an integer N, then a string or integer comprising the Nth
+field of the password entry is returned.
+
+If the second argument to SYSGETPASSWDENTRY is a vector of N elements,
+where 1 < N < 10, then the first N fields are inserted into the vector,
+which is returned.
+
+
+--- Note specific to Suns ----------------------------------------------
+
+This procedure will make use of the "yellow pages" routines for those
+password files that are using networked password databases.  However due
+to problems with the SUN routines modifications to the entry done on the
+local machine will not be reflected in the vector returned.  See MAN
+PASSWD(5).
+
+
+--- Examples -----------------------------------------------------------
+
+    sysgetpasswdentry('imposter') =>
+    ** <false>
+
+    sysgetpasswdentry(popusername) ==>
+    ** {'mark'
+        'a3.@:aJ'
+        45
+        10
+        0
+        ''
+        'Mark Rubinstein,AE329,2407'
+        '/cog/mark'
+        '/bin/csh'
+        }
+
+    sysgetpasswdentry('aarons', true) =>
+    ** 'aarons:A5kEAmKs:12:10:Aaron Sloman,AD411,8294:/cog/aarons:/bin/csh'
+
+    sysgetpasswdentry('aarons', {7}) =>
+    ** 'Aaron Sloman,AD411,8294'
+
+    sysgetpasswdentry('joes', {1 2 3 4 5 6 7}) ==>
+    ** {'joes' '7POPkEApBBcs' 7 10 0 '' 'Joe Smith,Chem424,6398'}
+
+
+A related utility, on UNIX only, is SYSGETUSERNAME. This takes a login
+name or user id and returns the user's full name, extracted from the 7th
+field:
+
+    sysgetusername('aarons') =>
+    ** 'Aaron Sloman'
+
+    sysgetusername(12) =>
+    ** 'Aaron Sloman'
+
+
+
+--- C.unix/help/sysgetpasswdentry --------------------------------------
+--- Copyright University of Sussex 1987. All rights reserved. ----------

@@ -1,0 +1,169 @@
+HELP AUTOLOAD                                    John Williams, Jan 1991
+
+This file explains the POP-11 "autoload" facility.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Introduction
+ -- POPAUTOLIST
+ -- SYS_AUTOLOAD
+ -- SYSLIBCOMPILE
+ -- POP_AUTOLOAD
+ -- PRAUTOLOADWARN
+ -- Note On Filenames
+ -- Related Files
+
+
+-- Introduction --------------------------------------------------------
+
+When the POP-11 compiler, or the procedure *VALOF, comes across an
+undeclared identifier, it will attempt to "autoload" a definition of
+that identifier. This involves searching the directories listed in the
+variable *POPAUTOLIST for a file whose name (apart from the '.p' suffix)
+matches the identifier. The file (which should contain a definition of
+the identifier) is then compiled.
+
+For example, if
+
+    (a) the file 'extrafeature.p' defines a procedure or other object
+        called "extrafeature"
+
+    (b) the file 'extrafeature.p' is in a directory whose name is in
+        POPAUTOLIST
+
+then any of the following may cause that file to be compiled if the
+variable "extrafeature" has not already been declared.
+
+    valof("extrafeature") =>
+
+    extrafeature(x, y);
+
+    extrafeature -> foo;
+
+Since autoloading can involve searching a number of directories, and
+attempts will be made to autoload a file whenever an undeclared
+identifier is met by the compiler, using variables without first
+declaring them can slow down compilation considerably.
+
+If an identifier has been declared using *VARS, then it will not be
+autoloaded. If declared using *LVARS then it will not be loaded if read
+within the scope of the declaration.
+
+
+-- POPAUTOLIST --------------------------------------------------------
+
+POPAUTOLIST should contain a list of strings which are the names of
+directories. Its default value (on UNIX systems) is something like:
+
+    [ '$poplocalauto' '$popautolib' '$popvedlib' '$popvedlib/term'
+        '$usepop/pop/lib/database' '$usepop/pop/lib/turtle']
+
+You can modify POPAUTOLIST in your INIT.P file, which is automatically
+loaded when you start POP-11. (See HELP * INITIAL). This makes it
+possible for a group of users to share a set of directories that extend
+POP-11's libraries.
+
+POPAUTOLIST can also contain procedures, identifiers, and embedded
+lists. These are explained in HELP * POPAUTOLIST.
+
+
+-- SYS_AUTOLOAD --------------------------------------------------------
+
+Autoloading is done by the procedure SYS_AUTOLOAD, defined thus:
+
+    sys_autoload(WORD) -> TRUE, DIR or FALSE
+
+It returns TRUE if WORD is already declared as an identifier, otherwise
+it tries loading WORD from a directory in POPAUTOLIST, returning the
+library directory if found, and returns FALSE otherwise.
+
+
+-- SYSLIBCOMPILE -------------------------------------------------------
+
+SYS_AUTOLOAD makes use of the procedure *SYSLIBCOMPILE (as does the LIB
+command). SYSLIBCOMPILE is called like this:
+
+    syslibcompile(WORD, DIR_LIST) -> DIR or FALSE
+
+This looks for a file named 'WORD.p' in each of the directories in
+DIR_LIST (in left-to-right order). If such a file is found, it is
+compiled, and the directory in which it was found is returned as the
+result. If a file called 'WORD.p' couldn't be found, SYSLIBCOMPILE
+returns false.
+
+SYS_AUTOLOAD calls SYSLIBCOMPILE with POPAUTOLIST as its second
+argument. The LIB and USES commands call SYSLIBCOMPILE with *POPUSESLIST
+as the second argument.
+
+
+-- POP_AUTOLOAD --------------------------------------------------------
+
+Autoloading can be temporarily or permanently suppressed by:
+
+    false -> pop_autoload;
+
+although this should normally be done locally inside a procedure with
+
+    dlocal pop_autoload = false;
+
+
+-- PRAUTOLOADWARN ------------------------------------------------------
+
+If SYSLIBCOMPILE successfully locates a library file, then just before
+it is compiled, the procedure held in the variable *PRAUTOLOADWARN is
+applied to the identifier name.
+
+The default value of PRAUTOLOADWARN is the procedure ERASE, which does
+nothing with its argument. If the procedure SYSPRAUTOLOADWARN is
+assigned instead, then a warning message will be printed out.
+
+
+-- Note On Filenames ---------------------------------------------------
+
+On most systems there is a limit to the length of file names whereas
+there is no limit to the length of POP-11 identifiers. Hence there can
+be a problem finding the file defining an identifier with a long name.
+The autoload mechanism copes with this by truncating the identifier name
+(on the right) until it is short enough, after adding the suffix '.p' to
+be a legal file name. (For Prolog the suffix added is '.pl').
+
+The (possibly truncated) name with the suffix is then used in searching
+the directories given in POPAUTOLIST. (In earlier versions of VMS POPLOG
+the underscore character was translated to the digit '9' since VMS did
+not accept underscores in file names. This changed in VMS version 4.0.)
+
+Notice that on VMS 'sign' variables, such as '++', cannot be autoloaded
+because of restrictions on file names. UNIX is more flexible.
+
+The main problem at present is that versions of AT&T UNIX (System V and
+derivatives) allow file names with only up to 14 characters. This makes
+it impossible to use autoloading for POP-11 identifiers longer than 12
+characters if two or more identifiers differ only after the 12th
+character. On Berkeley Unix 4.2 or later, the length allowed is 256
+characters, which normally suffices. On VMS 39 characters are allowed in
+the file name and a further 39 in the suffix. That also normally
+suffices.
+
+Notice that the truncation of file names, used on some machines, may
+have unfortunate side effects. Suppose there is file in the library
+which contains the definition of FOOBAZGRUMMING then the file name will
+be FOOBAZGRUMMI.P (truncated so that after '.P' is added the total is 14
+characters.) If the user uses a variable FOOBAZGRUMMIT without first
+declaring it then the POP-11 system will 'autoload' the file
+FOOBAZGRUMMI.P in order to see whether this declares FOOBAZGRUMMIT.
+
+
+-- Related Files -------------------------------------------------------
+
+See also
+    REF * LIBRARY               - Full explanation of autoloading
+    HELP * LIBFILES             - Overview of built-in libraries
+    HELP * LOAD                 - Command for loading a file
+    HELP * LIB                  - Command for loading a library
+    HELP * USES                 - Another command for loading a library
+    HELP * POPAUTOLIST           - Search list for autoloadable files
+    HELP * POPUSESLIST          - Search list for all POP-11 libraries
+
+
+--- C.all/help/autoload
+--- Copyright University of Sussex 1991. All rights reserved. ----------

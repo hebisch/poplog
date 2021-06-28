@@ -1,0 +1,195 @@
+HELP VSH                                           R.Evans November 1986
+
+
+Lib VED_VSH provides facilities for running arbitrary Unix programs
+taking input from, and writing output to a VED buffer. VSH is a more
+advanced version of CSHFILE (see *VED_CSHFILE) with several new
+features, including the ability to run interactive programs, C-shell job
+control and asynchronous output.
+
+NB: VSH is currently available only for Berkeley 4.2 systems, and
+    systems derived therefrom. Using the library on any other system is
+    likely to generate a mishap.
+
+[This and related bsd facilities referred to below are unsupported, and
+therefore included in the $usepop/pop/lib/lib directory.
+    See DOC * SYSSPEC.
+
+It is therefore necessary to compile ved_vsh explicitly e.g. with one of
+the following commands
+    uses ved_vsh
+    lib ved_vsh
+The latter will print a warning message.
+
+It is hoped that although the facility is unsupported it will serve as
+a useful programming example.]
+
+See also *VED_CSHFILE *PTYFORK *VEDMUX *MUX.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Starting up VSH: <enter> vsh
+ -- Controlling VSH subprocesses
+ -- Finishing VSH: <enter> vend
+ -- vedvshdefaults
+ -- Prompts
+ -- Echoing
+ -- Interrupting VSH Output
+
+-- Starting up VSH: <enter> vsh ---------------------------------------
+                    <enter> vsh <args>
+
+A VSH window is created with the command <enter> vsh, with optional
+arguments. This command creates a VED buffer and a Unix process
+whose input and output are associated with it. If no arguments are
+given, the Unix process runs the command specified in the environment
+variable $SHELL, or '/bin/csh' if that is not defined. If arguments are
+given to VSH, the first is taken as the name of the command to run, and
+the remainder are passed as 'command line' arguments. (NB: the command
+name must be a full pathname, as needed by *SYSEXECUTE).
+
+Normal communication with the VSH process proceeds as follows: to send
+input text to it, type the text into the ved buffer and then use the
+'load marked range' (see *LMR), or 'load current line' facility. This
+causes the marked text to be sent to the VSH process. (NB: no 'immediate
+mode' version of VSH is available yet.) Unlike CSH_FILE, you do not have
+to wait for the VSH process to produce a response to your command before
+you can carry on editing. Instead, VED returns almost immediately, with
+'DONE' on the command line (signifying only that the command has been
+sent to the VSH process, not that it has yet been executed), and you can
+continue with other pursuits. When any output from the VSH process
+arrives, it is placed in the VED buffer 'in between' you typing at the
+keyboard. Often, of course, you will give a command which can be
+executed quickly, and so you will probably wait for the output before
+doing anything else, but if you give a command that takes a long time,
+you need not wait for it to complete.
+
+Also unlike CSH_FILE, VSH allows you to run interactive commands within
+the buffer. Thus, for example, if you are running an ordinary C-shell
+(generally, by giving VSH no arguments), you can give commands such as
+'mail', 'pop11', 'rlogin xxx' as you could with an ordinary shell
+process. (See below, however, for comments about command echoing.)
+
+You may have as many VSH windows as you like, until you run into
+system-wide limits on file-descriptors or processes  (generally, you
+will not run into these limits).
+
+-- Controlling VSH subprocesses ---------------------------------------
+
+Each command you execute inside a VSH shell will create a Unix
+subprocess. Several standard 'process control' functions, normally
+available from the keyboard, may be given with the following special
+enter commands:
+
+    <enter> vintr   send interrupt   (like ctrl C)
+    <enter> veof    send end-of-file (like ctrl Z)
+    <enter> vsusp   send 'suspend'   (like ctrl \)
+    <enter> vquit   send 'quit'      (like ctrl Y)
+
+'vintr' and 'veof' are particularly useful, for example it is often not
+possible to leave various interactive Unix commands without sending 'end
+of file'. Generally, these commands are ignored by the VSH process
+itself (that is, if you are not running a command subprocess). However,
+this may not be true if you are running something other than a shell in
+your VSH window.
+
+Another two commands are provided to make interaction with certain
+utilities (eg 'more', terminal exchanges) easier:
+
+    <enter> vsp     send a space
+    <enter> vcr   send a carriage return
+
+More generally the command:
+
+    <enter> vctrl  <c1> <c2> ...
+
+allows you to send arbitrary characters to VSH directly. This is
+sometimes useful for sending explicit newlines, for example. The
+characters <c1> <c2> ... can be numbers (character codes), or characters
+in pop11 syntax (eg `\n`).
+
+
+-- Finishing VSH: <enter> vend ----------------------------------------
+
+The command <enter> vend terminates a VSH process cleanly (<enter> veof
+is usually ignored by VSH shell processes).  It does not quit the
+associated VED buffer, but this becomes an ordinary file once the VSH
+process has terminated. It is not necessary to terminate VSH processes:
+exiting from POPLOG (even abnormally) will cause the VSH process to die
+tidily.
+
+Technical note: if you have 'vend'ed all your VSH processes, but are
+still in POPLOG, you may wish to give the command <enter> nomux, which
+stops VED from doing input multiplexing (see *VEDMUX). This will result
+in a slight speed-up in VED's processing of input characters, and a new
+VSH will turn multiplexing on again if needed.
+
+
+-- vedvshdefaults -----------------------------------------------------
+
+VSH provides a user-definable procedure vedvshdefaults which is used to
+set up properties of each VSH buffer it creates. The default version
+makes the file non-writeable, sets the tab indentation to 8 and turns
+off line-break.
+
+
+-- Prompts ------------------------------------------------------------
+
+Most shells (and other programs) prompt you for input and you type the
+next command on the same line as the prompt. This is slightly
+problematic for a utility like VSH, because it normally sends whole
+lines to the VSH process (all the lines in the marked range),
+but if the line has a prompt on it, it should not send the prompt
+characters.
+
+Some other POPLOG utilities, notably the 'immediate mode' package, use a
+special character to mark the end of the prompt, so they can work out
+where the 'real' input starts. VSH uses a different approach, simpler
+and more flexible, but not quite so reliable. Whenever the VSH process
+sends output to the buffer, VED remembers the last line sent. Then when
+you next send some input (to VSH), it looks to see if the saved last
+line of output is part of the line you are sending (NB: it only does
+this if you send exactly one line of input.). If so, it assumes the last
+output line was a prompt and so does not send it back. Thus by using
+'load current line' you can maintain a natural interaction with the VSH
+process, regardless of what prompts it sends back to you. But if you try
+sending input on a line already containing an old prompt, different from
+the last one ouput, VSH will not detect it properly.
+
+
+-- Echoing ------------------------------------------------------------
+
+When VSH starts up, it turns 'command echoing' off for the VSH process
+it creates. Normally, when you type to the computer, it sends back the
+characters you type so you can see them on the screen. In VSH this is
+inappropriate, since the command you type is already on the screen, in
+the buffer. However, some commands turn echoing on again. This is not
+a big problem, but it is a little annoying - every time you send
+something to VSH, it promptly sends you back a copy. Culprits
+encountered so far are:
+
+    rlogin  -  this is easy to put right: just do %stty -echo to the
+               shell running on the remote host.
+
+    pop11   -  use the macro -noecho- to turn off echoing
+               once inside pop11 (see HELP NOECHO).
+
+-- Interrupting VSH Output --------------------------------------------
+
+If you give a command to VSH which generates a lot of output, you may
+want to interrupt it before it finishes. There are two ways to do this.
+Firstly, try doing ctrl-C. If you catch VSH actually outputting to the
+buffer, ctrl-C will send an interrupt to VSH and so stop the command
+that is generating all the output. However, sometimes, the ctrl-C will
+occur in one of the gaps BETWEEN VSH output lines, in which case it will
+be seen by VED and simply ignored. If ctrl-C doesn't work, try doing
+<enter> vintr <return>. You may find it difficult to do this, given than
+VSH keeps producing output between the characters you type, but VED will
+keep track of what you are doing, so just type them slowly and
+carefully. Once you hit <return>, the VSH process will be interrupted
+and its output will stop.
+
+
+--- C.unix/help/vsh
+--- Copyright University of Sussex 1992. All rights reserved. ----------

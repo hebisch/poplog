@@ -1,0 +1,242 @@
+HELP USES                                           John Gibson Aug 1995
+
+This file describes the Pop-11 uses construct for loading library files.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Ordinary uses
+  2   Syntax of uses
+  3   uses-by_name
+  4   uses-now
+  5   Popc Compilation
+      5.1   Ordinary uses
+      5.2   uses-now
+      5.3   uses-by_name
+      5.4   Using Identifiers Independently of Files
+  6   See Also
+
+
+-----------------------------------------------------------------------
+1  Ordinary uses
+-----------------------------------------------------------------------
+
+In Pop-11, the normal way to load libraries that are not autoloadable is
+with the syntax construct uses, which looks for library files in the
+directories given by * popuseslist.
+
+uses works on the assumption that a library file 'foo.p' will define a
+corresponding identifier foo. If foo is already defined, uses takes this
+to mean the library is already loaded. Thus
+
+        uses foo;
+
+may occur in multiple program files, but only the first occurrence will
+actually load the library.
+
+The basic syntax of uses is just a comma-separated list of library names
+terminated by a semicolon, e.g.
+
+        uses foo, baz, ... ;
+
+where the names refer to library files foo.p, baz.p, ... defining (at
+least) identifiers foo, baz, ... etc.
+
+(Note that from within Ved, the command <ENTER> uses libname may be used
+for a single library.)
+
+For normal interactive compilation, nothing further than the above is
+usually required. However, uses has two variants, uses-by_name and
+uses-now, plus additional syntax; these are described below.
+
+
+-----------------------------------------------------------------------
+2  Syntax of uses
+-----------------------------------------------------------------------
+
+The general syntax of uses is
+
+    uses          -
+    uses-by_name  |  lib-spec1, lib-spec2, ... ;
+    uses-now      -
+
+where each lib-spec consists of a library name, optionally preceded by
+the keyword from, and optionally followed by a comma-separated list of
+other identifier names enclosed in parentheses:
+
+    [ from ]  lib-name  [ ( ident-name1, ident-name2, ... ) ]
+
+lib-name is both the name of a library file and an identifier defined by
+that file: it may be a simple name, or a section pathname for a non
+top-level identifier, e.g.
+
+        uses foo, $-sect$-baz;
+
+A identifier pathname such as $-sect$-baz is assumed to correspond to a
+filename
+
+        S-sectS-baz.p
+
+that is, the corresponding filename is got by replacing `$` characters
+in the identifier pathname with `S`. (Note that you must specify the
+full identifier pathname starting with $-, since the current section is
+not taken into account.)
+
+When other identifier names are present following lib-name, they refer
+to other identifiers defined by the same file. (Again, non top-level
+identifiers must be specified by full section pathnames.) These other
+identifiers (and the optional from keyword) are mainly relevant to
+uses-by_name.
+
+
+-----------------------------------------------------------------------
+3  uses-by_name
+-----------------------------------------------------------------------
+
+Sometimes, a Pop-11 program file may use an identifier 'by name' only,
+that is, refer to it only via a quoted word (or quoted word-identifier).
+This usually involves * valof applied to the word, or using a Poplog VM
+code-planting procedure such as * sysCALL on the name of a procedure.
+
+In these cases, uses-by_name may be employed instead of an ordinary
+uses:
+
+        uses-by_name foo, baz, ... ;
+
+The effect of this is to delay the loading of each library file until
+such time as the corresponding identifier is actually fetched from its
+name (by a call to valof etc). In effect, uses-by_name makes the
+corresponding identifier autoloadable (regardless of whether the file
+defining it is in one of the normal autoloadable directories given by
+* popautolist).
+
+Where a library file defines other identifiers in addition to the main
+(i.e. library name) one, you can also specify these as being used-by-
+name in a list following the main name, e.g.
+
+        uses-by_name foo (mary, joe, fred);
+
+As with foo itself, the identifiers mary, joe, and fred then become
+autoloadable (any of them will load foo.p). Alternatively,
+
+        uses-by_name from foo (mary, joe, fred);
+
+specifies that only the other identifiers are used by name, not the
+library name itself. Thus mary, joe, and fred become autoloadable, but
+not foo.
+
+Unless you specifically want delayed loading, uses-by_name has no
+particularly advantage over uses for ordinary compilation; however, its
+use is more important for files that need to be compiled with Popc (see
+below).
+
+(N.B. uses-by_name operates by assigning to the * sys_autoload_action of
+the words declared.)
+
+
+-----------------------------------------------------------------------
+4  uses-now
+-----------------------------------------------------------------------
+
+Some library files define code for use at compile-time, such as
+
+        # Pop-11 syntax constructs or macros
+        # extensions to library and documentation search lists, etc
+
+When a Pop-11 program file uses such a library (and the library is not
+autoloadable) the program file should specify uses-now for the library
+rather than uses. For example,
+
+        uses-now popxlib;
+
+This reflects the fact the code from the library must actually be
+executed at compile-time, i.e. before or during compilation of the
+program file.
+
+However, this distinction is irrelevant for normal interactive
+compilation, and only matters if the Popc compiler is to be used on the
+program file.
+
+
+-----------------------------------------------------------------------
+5  Popc Compilation
+-----------------------------------------------------------------------
+
+This section describes the way in which the Pop-11 object-module
+compiler Popc interprets the different variants of uses. See REF * POPC
+for more information.
+
+
+5.1  Ordinary uses
+------------------
+In Popc compile mode, an ordinary uses statement
+
+        uses foo, baz, ... ;
+
+does not actually cause any files to be loaded; rather, it merely
+records that the identifiers foo, baz, ... have been 'used'. At link
+time, this will force the extraction of the library modules defining the
+identifiers (even if they have not actually been referred to anywhere in
+the program being linked).
+
+
+5.2  uses-now
+-------------
+Thus the Popc behaviour of an ordinary uses is not appropriate when the
+libraries referred to define syntax words, macros, or other code which
+must actually be executed at compile-time. In this case, uses-now must
+be employed:
+
+        uses-now foo, baz, ... ;
+
+This is effectively the same as surrounding an ordinary uses with
+normal_compile ... end_normal_compile, i.e. Popc compile mode is
+temporarily turned off, and the files are compiled as normal. (In normal
+compilation, uses-now is therefore the same as uses.)
+
+
+5.3  uses-by_name
+-----------------
+In Popc, uses-by_name behaves like uses in that it forces identifiers to
+be extracted at link-time, but additionally ensures they are present in
+the run-time dictionary (so procedures like valof will work correctly
+when applied to the identifier name).
+
+
+5.4  Using Identifiers Independently of Files
+---------------------------------------------
+To inform Popc that identifiers are being 'used' regardless of which
+files define them, uses and uses-by_name may also be given identifier
+names directly, enclosed in parentheses:
+
+    uses (ident-name1, ident-name2, ...);
+
+This usage is ignored in ordinary compilation.
+
+
+-----------------------------------------------------------------------
+6  See Also
+-----------------------------------------------------------------------
+
+HELP * LIBRARIES
+ REF * LIBRARY
+    Summary of library facilities in Poplog.
+
+HELP * LOAD
+    Loading a file.
+
+HELP * ECHOLOAD
+    'Echoes' a file on the terminal while loading it.
+
+HELP * AUTOLOAD
+    The automatic compilation of files.
+
+HELP * INITIAL
+    Initialising the Poplog system.
+
+ REF * POPC
+    The Pop-11 object module compiler
+
+
+
+--- C.all/help/uses
+--- Copyright University of Sussex 1995. All rights reserved.

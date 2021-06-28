@@ -1,0 +1,202 @@
+HELP SYSFORK (UNIX)                                    A.Sloman Nov 1986
+                                         Revised: Adrian Howard Jun 1992
+
+Facilities for spawning sub-processes in Unix POPLOG.
+
+    sysfork() -> PID OR -false-
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- OVERVIEW
+ -- ENSURING THAT THE CHILD EXITS CLEANLY
+ -- VIRTUAL FORKS
+ -- SPAWNING A NON-POPLOG PROCESS
+ -- WAITING FOR A CHILD TO FINISH
+ -- AVOIDING "ZOMBIES"
+ -- I/O CHANNELS
+ -- DESTROY ACTIONS IN THE CHILD PROCESS
+ -- SEE ALSO
+
+
+
+-- OVERVIEW -----------------------------------------------------------
+
+-sysfork- forks the current POPLOG process, producing a new '_____child'
+process that is almost an exact copy of the current one (the '______parent'
+process.) The two processes then run concurrently, under the Unix
+scheduler. The only difference, initially is that in the parent, the
+call of -sysfork- returns with the PID (process identification number)
+or the child whereas in the child it returns -false-. Thus it is often
+used in constructs like:
+
+    if sysfork() ->> child_pid then
+        <action in parent>
+    else
+        <action in child>
+    endif;
+
+
+
+-- ENSURING THAT THE CHILD EXITS CLEANLY ------------------------------
+
+If the parent has VED files that need writing, devices open, or a
+special value for *POPEXIT (a procedure invoked when POPLOG terminates,
+e.g. via a call of *SYSEXIT), then the child will inherit the files,
+etc. Often it will be necessary for the child to perform some task then
+die cleanly. It may therefore be desirable to invoke a procedure
+something like:
+
+    define cleanexit();
+        identfn -> popexit;
+        [] -> vedbufferlist;
+        false -> vedediting;
+        sysexit()
+    enddefine;
+
+
+
+-- VIRTUAL FORKS ------------------------------------------------------
+
+-sysvfork-, available only in Berkeley Unix, does a "virtual' fork. It
+also forks the current process, but the whole POPLOG process is not
+copied, and this sets certain important limitations on its use. In
+particular it should normally be followed almost immediately by a call
+of -sysexecute-, to start up a new program, since otherwise the child
+process can interfere with the parent process. See HELP *SYSEXECUTE.
+(See REF *SYSUTIL for full details). There is some evidence that the
+VFORK system call does not always work properly, so if mysterious access
+violations occur (reported as 'STACK EMPTY' errors), then it is best to
+use -sysfork- rather than -sysvfork-.
+
+
+
+-- SPAWNING A NON-POPLOG PROCESS --------------------------------------
+
+To spawn a non-POPLOG process use -sysfork- to create a child process
+then call -sysexecute- in the child to run the new process. For example,
+to spawn a sub-process to run the Unix 'man' command with an argument:
+
+    define unix_man(name);
+        lvars name child_pid;
+        if sysfork() ->> child_pid then
+            ;;; wait for child to die
+            until syswait() == child_pid do enduntil;
+        else
+            pr(newline);
+            sysexecute('/bin/sh',['sh' '/usr/bin/man' ^name], false);
+            ;;; will return only if there is an error in sysexecute
+            cleanexit();    ;;; as a precaution (defined above)
+        endif;
+    enddefine;
+
+
+
+-- WAITING FOR A CHILD TO FINISH --------------------------------------
+
+The child PID is needed to compare with the result of -syswait-, as in
+the above example.
+
+    syswait() -> <child_pid> or false
+
+-syswait- returns the PID of a child child process produced by -sysfork-
+or -sysvfork- that has already terminated. If there is no child that has
+died, then it waits for one to die, whereupon it returns the newly
+deceased PID.
+
+However, it can return -false- if an interrupt of some kind occurs. Thus
+if a parent needs to wait until a particular child has finished doing
+something, then the <action in parent> should repeatedly call -syswait-
+until the desired PID is returned, as in the example above.
+
+If there are several children that must all die before the parent
+continues then put PIDs into a list and repeatedly call -syswait-,
+removing the resulting child_pid from the list, until it is empty. For a
+solution to a related problem see LIB *PIPEOUT.
+
+
+
+-- AVOIDING "ZOMBIES" -------------------------------------------------
+
+When a child process dies, it remains in the process tables until the
+parent has "______waited" for it, and then it is cleared. If the parent
+continues without waiting for the child to finish, then after the child
+dies it could become a "zombie" process that refuses to die, because its
+parent doesn't attend to it. (The 'ps' command shows such processes as
+<exiting>.)
+
+This situation can be avoided by ensuring that when the child dies its
+parent does not exist (or dies shortly after). A dead child whose parent
+has died will be removed automatically. To achieve this, create and wait
+for an intermediate 'dummy' process which spawns the required child
+process then dies without waiting. E.g.
+
+    if sysfork() ->> dummy then
+        until syswait() == dummy do enduntil;   ;;; not long to wait
+        <action in parent>
+    else
+        ;;; in dummy process
+        if sysfork() then
+            ;;; die quickly -- using procedure defined above
+            cleanexit();
+        else
+            <action in child> ;;; end with sysexecute or clean exit
+        endif
+    endif
+
+
+
+-- I/O CHANNELS -------------------------------------------------------
+
+After a call of -sysfork- (or -sysvfork-) all input and output channels
+are inherited by the child.
+
+The updaters of the active variables *POPDEVIN, *POPDEVOUT and
+*POPDEVERR can be used to reassign standard I/O after a fork.
+
+
+
+-- DESTROY ACTIONS IN THE CHILD PROCESS -------------------------------
+
+_______Destroy _______actions are special procedures (stored in a _______destroy ________property)
+which are executed when a data-structure is _______garbage _________collected (see HELP
+*SYSGARBAGE). For full information on destroy properties see REF *PROPS.
+
+Occasionally you do not want the destroy action for an data-structure to
+be run in the child process. To allow for this there is a special
+destroy property called -sys_process_destroy_action-. This property is
+cleared after a fork so destroy actions stored in that property will
+only apply to the current process. For full information see
+*SYS_PROCESS_DESTROY_ACTION.
+
+
+-- SEE ALSO -----------------------------------------------------------
+
+*SYSEXECUTE --- Runs a specified file in place of the current POPLOG
+                image
+
+*SYSEXIT    --- Exits from the current POPLOG process
+
+*POP_STATUS --- Exit status of a child which has just been waited for
+                with -syswait-
+
+*POPPID     --- The PID of the current POPLOG process
+
+*POPDEVIN
+*POPDEVOUT
+*POPDEVERR  --- The standard input, output, and error channels in POPLOG
+
+*SYS_PROCESS_DESTROY_ACTION --- Process specific destroy actions.
+
+REF *SYSUTIL --- Full information on Unix processes in POPLOG
+REF *SYSIO   --- Full information on input, output, and error channels
+
+For examples of process handling in POPLOG see:
+
+    LIB *CSH_COMPILE    (See HELP *IMCSH)
+    LIB *PIPEOUT        (See HELP *PIPEUTILS)
+    LIB *VED_SEND       (See HELP *SEND)
+
+
+
+--- C.unix/help/sysfork
+--- Copyright University of Sussex 1992. All rights reserved. ----------

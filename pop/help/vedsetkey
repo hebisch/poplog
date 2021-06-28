@@ -1,0 +1,269 @@
+HELP VEDSETKEY                                    Aaron Sloman  Jan 1991
+
+    vedsetkey(<string>, <procedure|string|ident|word>);
+
+VEDSETKEY changes VED's character tables, so that the set of characters
+in STRING maps onto the item given as second argument.
+
+NOTE: since Poplog Version 13.7 there has been an alternative mechanism
+available which does not require knowledge of Pop-11 syntax. It is
+described in HELP * VEDSET
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Overview
+ -- Examples
+ -- Warning: using vedsetkey in vedinit.p
+ -- How it works
+ -- How vedprocesschar works
+ -- Defining a key sequence to invoke a procedure
+ -- Defining a key sequence to insert a string
+ -- WARNING: abbreviations can generate infinite loops
+ -- See also
+
+
+-- Overview -----------------------------------------------------------
+
+vedsetkey(<string>, <procedure|string|ident|word>);
+
+If the second argument is a procedure, then in future when VED reads the
+characters in the <string> it runs the procedure.
+
+If the second argument is a string, then when the characters in the
+first argument are typed in VED acts as if the characters in the second
+argument had been typed.
+
+If the second argument is a word or identifier, then it should be either
+the name/identifier of a procedure or a VED character table. If it is a
+procedure then the procedure will be invoked whenever the characters in
+<string> are typed in. If the word/identifier refers to a character
+table, then the action is more complicated, as described below.
+
+
+-- Examples -----------------------------------------------------------
+
+To make the sequence CTRL-B followed by CTRL-A go to the beginning of
+the marked range in VED do
+
+    vedsetkey('\^B\^A',ident vedmarkfind);
+
+To make the sequence CTRL-B followed by `a` set the current line as
+beginning of marked range, do
+
+    vedsetkey('\^Ba',"vedmarklo");
+
+To make the sequence CTRL-X followed by `h` equivalent to
+    <ENTER> help vedcomms
+
+do
+
+    vedsetkey('\^Xh',
+        procedure;
+            'vedcomms' -> vedargument;
+            ved_help()
+        endprocedure);
+
+or, more simply, partially apply -veddo- to 'help vedcomms' and use
+the result as second argument to vedsetkey:
+
+    vedsetkey('\^Xh', veddo(%'help vedcomms'%));
+
+Defining some abbreviations, all starting with CTRL-X
+
+Make CTRL-X  d     insert two newlines then 'define '
+    vedsetkey('\^Xd', '\n\ndefine ');
+
+Make CTRL-X  e     insert one newlines then 'enddefine;'
+    vedsetkey('\^Xe', '\nenddefine;');
+
+Make CTRL-X l     insert a newline, a tab then 'lvars ';
+    vedsetkey('\^Xl', '\n\tlvars ');
+
+
+-- Warning: using vedsetkey in vedinit.p ------------------------------
+
+The new VED startup mechanisms in use since Poplog V13.7 imply that
+in some cases the terminal customisation procedures are not run until
+after the vedinit.p file has been compiled. In some cases this can
+over-ride key bindings set up in your vedinit.p file using -vedsetkey-
+or -vedset- (See HELP * VEDSET).
+
+In order to avoid this you should put such commands inside a definition
+of a procedure called -vedinit-. E.g.
+
+    define vedinit();
+        ....
+        vedsetkey( ..., ... );
+        vedsetkey( ..., ... );
+        ....
+        identfn -> vedinit;   ;;; Reclaim space taken by this procedure
+    enddefine;
+
+(See also HELP * INITIAL, REF * VEDTERMINALS)
+
+
+-- How it works -------------------------------------------------------
+
+-vedsetkey- alters VED's character tables, which are used as follows.
+
+While VED is running the procedure -vedprocess- repeatedly calls the
+procedure -vedprocesschar- to read in character codes from the current
+input stream. It does this using -vedinascii-.
+
+The character codes read in are used to access VED's character tables. A
+sequence of characters typed by the user can be mapped onto either
+
+- a procedure to be invoked
+- a new character table (requiring a further character to be read in)
+- an identifier for a procedure or character table
+- a word which is the name of a procedure or character table identifier
+- a string to be re-inserted in the input stream used by -vedinascii-
+
+The top-level table (a vector held in the variable -vednormaltable-)
+associates most ordinary printing characters (e.g. letters, numerals,
+etc) with the procedure -vedinsertvedchar- which simply inserts the last
+character typed into the ved buffer (i.e. the value of ved_last_char).
+
+Some characters will be mapped on to special purpose procedures. E.g.
+the <DEL> character (ASCII 127) is normally mapped onto the procedure
+-vedchardelete- which deletes a character to the left of the cursor.
+
+Some characters initiate key sequences, so they are then mapped on to
+further tables rather than directly onto procedures. E.g. <ESC> is
+usually mapped on to a table (-vedescapetable-) that is then accessed by
+the code of the character typed in after <ESC>.
+
+Some function keys generate sequences of three or more characters. This
+requires a succession of tables. An N character sequence requires N-1
+tables, the last one containing the procedure, word, or string that
+specifies the action to be performed.
+
+
+-- How vedprocesschar works -------------------------------------------
+
+When a character is read it it is used to access the top level character
+table, where it is associated with an item. The item may be a procedure,
+a word, a string or undef.
+
+If the item is a procedure, or the identifier/name of a procedure, then
+the procedure is invoked. (It can use ved_last_char to refer to the last
+character typed).
+
+If the item is a string, then the string is inserted into the current
+input stream used by -vedinascii-. (See HELP * VEDINASCII, * VEDINPUT).
+This can be used to define abbreviations. (See HELP * DK).
+
+If the item found in the character table is the word "undef" then that
+is treated as an indication that the character sequence just typed in is
+undefined, and VED will call -vedscreenbell-  clear the current input
+stream, and go back to the top level loop in -vedprocess-.
+
+If the item is another character table, or the identifier or name of a
+character table, then VED uses vedinascii to read in another character,
+and uses that to access an item from the table. This continues until
+something other than a character table is found.
+
+If you need to know what a key sequence is currently mapped onto without
+actually invoking it, the procedure -vedgetproctable- can be given a
+string S as argument, and it will return the procedure or string if
+an initial sequence of S is mapped onto something in VED's tables,
+otherwise it returns -undef-
+
+
+-- Defining a key sequence to invoke a procedure ----------------------
+
+For example, suppose you have a key on your keyboard which generates the
+sequence <ESC> ? Q and you wish to make this sequence cause the screen
+to be refreshed. You could include the following command in your
+definition of procedure -vedinit- in your vedinit.p file.
+
+        vedsetkey('\e?Q', vedrefresh);
+or
+        vedsetkey('\e?Q', ident vedrefresh);
+or
+        vedsetkey('\e?Q', "vedrefresh");
+
+(note that \e in a Pop-11 string represents the character <ESC>, as
+explained in HELP * ASCII).
+
+If the procedure to be associated with the sequence is a system constant
+then use the procedure directly as in the first example above.
+
+Otherwise, it is generally better to use the identifier rather than the
+procedure itself (second example), as the second argument to
+-vedsetkey-; this will allow the procedure to be temporarily or
+permanently re-defined, and the key sequence given in the first argument
+will always get the current version.
+
+Use the quoted name of the procedure (third example) where the procedure
+is autoloadable and you only want it to autoload when actually used
+(rather than at the time of the -vedsetkey-.)
+
+
+-- Defining a key sequence to insert a string -------------------------
+
+If you wished the character CTRL-E to insert a line containing
+
+        enddefine;
+
+you could do
+
+        vedsetkey('\^E', '\renddefine;\r');
+
+For information on how to represent control characters in strings see
+HELP * ASCII, *STRINGS.
+
+
+-- WARNING: abbreviations can generate infinite loops -----------------
+
+If you try to use vedsetkey to define abbreviations in the obvious way
+it will not work, e.g.
+
+        vedsetkey('def', 'define');
+
+When you type 'def' VED will put 'define' into its input stream. So it
+will read 'def' and put 'define' into its input stream, and so on!
+However, you can start abbreviations with a character which you do not
+normally use, e.g.
+
+        vedsetkey('\edef', 'define');
+
+It is a good idea not to use a string containing three ESC's in a row,
+since this is used in places by VED procedures. See HELP * VEDKEYS for
+more information on existing character sequences.
+
+To simplify use of VEDSETKEY a VED command ENTER DK can be used for
+defining new keys.
+
+See HELP * VEDMACROS, *DK.
+
+-- See also -----------------------------------------------------------
+
+HELP * VEDKEYS
+    The default key bindings
+HELP * VEDSET
+    Describes a more "user friendly" syntax for tailoring VED
+HELP * TERMINAL
+    Overview of VED customisation
+REF  * VEDTERMINALS
+    Explains VED's terminal recognition mechanism and documents
+    the underlying procedures.
+HELP * DK
+    An interactive procedure for defining key bindings
+HELP * INITIAL
+    Poplog initialisation and customisation facilities
+HELP * STRINGS
+HELP * ASCII
+HELP * VEDINASCII
+HELP * VEDINPUT
+HELP * VEDDO
+REF  * VEDPROCS
+    defines many of the procedures referred to above
+REF  * VEDCOMMS
+    Overview of VED ENTER commands
+HELP * LOGICAL_KEYS
+    Defines VED's logical names for keys.
+
+
+--- C.all/help/vedsetkey
+--- Copyright University of Sussex 1993. All rights reserved. ----------

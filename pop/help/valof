@@ -1,0 +1,242 @@
+HELP VALOF                             Updated A.Sloman, December 1986
+
+VALOF and CALLER_VALOF
+These procedures are for accessing and updating values of variables via
+words naming the identifiers:
+
+    valof(<word>) -> <value>
+    <value> -> valof(<word>)
+
+    caller_valof(<word>, <procedure|integer|false>) -> <value>
+    <value> -> caller_valof(<word>, <procedure|integer|false>)
+
+These procedures access or alter the value of a "permanent" i.e.
+non-lexical identifier, given a word which is its name. "Permanent"
+identifiers, declared using "VARS" are sometimes referred to as
+"dynamically scoped" as opposed to "lexically scoped". (For information
+on lexical variables see HELP *LEXICAL.)
+
+In order to understand how these work it is important to be aware of the
+distinction between:
+- a WORD, which is a globally accessible entity defined by a set of
+  characters, and stored in a central dictionary, or symbol table,
+  (See HELP *WORDS for the syntax of word formation)
+
+- an IDENTIFIER, which is an entity with syntactic properties (e.g. it
+  may be a macro, a syntax identifier, a procedure identifier, an active
+  identifier, etc.) and
+
+- a VALUE which is an arbitrary object associated with the IDENTIFIER.
+
+There are thus two links between a word and its value:
+
+           link1                            link2
+    word -----------------> identifier --------------------> value
+
+Link1, corresponding to the procedure IDENTOF, is set up when an
+identifier is declared either explicitly by the user or by autoloading a
+library file (see HELP *AUTOLOAD), or because the identifier has been
+used without being declared. Link1 changes depending on which section is
+the "current" section, since in different sections the same word can map
+onto quite different identifiers.
+
+Applying * SYSCANCEL to a word removes the link between the word and the
+identifier, if there is one. (See HELP *SECTIONS). Any identifiers
+associated with the word will remain if they are accessed by procedures
+already compiled. By contrast if * SYSCANCELWORD is applied to a
+word, it removes it completely from the dictionary, though again this
+will not affect compiled references to any associated identifier.
+
+Link2, corresponding to the procedure IDVAL, is set up or changed when
+a value is assigned to the identifier, either
+
+- explicitly using the assignment arrow "->" or "= <value>" in
+  declarations, or using the updater of VALOF or CALLER_VALOF, or
+
+- implicitly when a procedure is invoked with arguments: the actual
+  arguments are implicitly assigned to the identifiers specified in
+  the procedure definition.
+
+
+Not all languages make these distinctions. The word "variable" is often
+used in a vague or ambiguous fashion, sometimes referring to the word,
+sometimes to the identifier, sometimes to the location where the value
+is stored, and sometimes to a combination of these.
+
+Given the above, it should be clear why 'valof(w)' is functionally
+equivalent to
+                idval(identof(w))
+
+IDENTOF(<word>) returns the permanent  identifier currently attached to
+ <word> (declaring it if necessary).
+
+IDVAL(<identifier>) returns or updates the value cell of the
+identifier.
+
+-- Examples of the use of valof ---------------------------------------
+
+We can declare some identifiers and give them values which are
+themselves words or identifiers.
+
+    vars v1;  "v" -> v1;
+    vars v2;  "v1" -> v2;
+    vars i1; identof(v1) -> i1;
+    vars i2; identof(v2) -> i2;
+
+    v1=>
+    ** v
+    v2=>
+    ** v1
+    valof("v2")=>
+    ** v1
+    valof(v2)=>
+    ** v
+
+    valof("v1") =>
+    ** v
+    valof(v1)=>                     ;;; equivalent to valof("v")
+    ;;; DECLARING VARIABLE v
+    ** <undef v>
+
+    i1=>
+    ** <ident <undef v>>
+    idval(i1) =>
+    ** <undef v>
+    idval(i2)=>
+    ** v
+
+    3 -> v1;
+    valof("v1")=>
+    ** 3
+    valof(valof("v2")) =>
+    ** 3
+
+    idval(idval(v2)) =>         ;;; equivalent to   idval("v1")
+    ;;; MISHAP - IDENTIFIER NEEDED
+    ;;; INVOLVING:  v1
+
+    66 -> valof("v1");
+    valof(v2) =>
+    ** 66
+
+
+-- Accessing local variables ------------------------------------------
+If a non-lexical identifier is declared as local to a procedure then the
+value is saved on the procedure calling stack whenever the procedure is
+activated and the old value is restored when the procedure exits. (If
+the variable is accessed in a process, then values may be saved in a
+process record when the process is not active. See HELP * PROCESS).
+
+The assignment arrow, IDVAL and VALOF access or update only the value of
+the identifier in the scope of the most recently invoked procedure that
+uses it as a local identifier.
+
+So
+    vars x;
+    99-> x;
+
+    define f2;
+        vars x;
+        77 -> x;
+        [in f2: ^x ^(valof("x"))]=>
+    enddefine;
+
+    define f1;
+        vars x;
+        88 -> x;
+        [in f1- before calling f2: ^x ^(valof("x"))]=>
+        f2();
+        [in f1- after calling f2: ^x ^(valof("x"))]=>
+    enddefine;
+
+    x=>
+    ** 99                           ;;; the global value
+
+    f1();
+    ** [in f1 - before calling f2 : 88 88]
+    ** [in f2 : 77 77]
+    ** [in f1 - after calling f2 : 88 88]
+    x =>
+    ** 99                           ;;; the global value reset
+
+-- caller_valof -------------------------------------------------------
+
+CALLER_VALOF is like VALOF except that it can be used to access or alter
+the value of a variable local to a procedure higher up the calling chain
+than the currently active procedure. It takes two arguments, the WORD
+whose value is to be accessed or updated, a procedure, or integer, or
+FALSE, indicating the CALLER. When the caller is a procedure, it simply
+looks up the control chain for the first occurrence of that procedure,
+and then scans up until it finds a value for the identifier local to a
+procedure at or above that point. When the caller is an integer N, it
+scans up the control chain to the N'th caller (see HELP * CALLER).
+When the caller is FALSE, it accesses the global value of the
+identifier. The following examples may make all this clear:
+
+     vars x,y;
+    99-> x;
+    55 -> y;
+
+    define f2;
+        vars x;
+        77 -> x;
+        [in f2: value of x in f1 ^(caller_valof("x",f1))]=>
+        [in f2: value of y in f1 ^(caller_valof("y",f1))]=>
+        [in f2: global value of x ^(caller_valof("x",false))]=>
+        33 -> caller_valof("x",false);
+    enddefine;
+
+    define f1;
+        vars x;
+        88 -> x;
+        [in f1 - x before calling f2: ^x]=>
+        [in f1 - y before calling f2: ^y]=>
+        f2();
+        [in f1 - x after calling f2: ^x]=>
+    enddefine;
+
+    f1();
+    ** [in f1 - x before calling f2 : 88]
+    ** [in f1 - y before calling f2 : 55]
+    ** [in f2 : value of x in f1 88]
+    ** [in f2 : value of y in f1 55]
+    ** [in f2 : global value of x 99]
+    ** [in f1 - x after calling f2 : 88]
+    x=>
+    ** 33       ;;; the global value was changed in f2
+    y =>
+    ** 55       ;;; global value unchanged
+
+If VALOF or CALLER_VALOF is given a word whose *IDENTPROPS is *UNDEF,
+then it looks in the system library for a file of the same name as the
+variable. If such a file exists it is loaded (or 'auto-loaded'). If no
+such file exists, the variable is given 'normal' identprops (i.e. zero)
+and is given a default value (an UNDEF object). A warning message is
+also printed in this event, (by * PRWARNING) for example
+
+    valof("hat") =>
+    ** <undef hat>
+    ;;; DECLARING VARIABLE hat
+
+
+See also the following HELP FILES
+*VARS          - on variables and their declaration
+*IDENTIFIERS   - summary of use and recognition of identifiers in POP-11
+*SYSSYNONYM    - associates two words with the same identifier
+*LEXICAL       - lexically scoped identifiers
+*AUTOLOAD      - describes autoloading
+
+
+See the following REF files for more technical details
+REF *WORDS
+    - the representation of words, and procedures that operate on them
+REF *IDENT
+    - identifiers, their types, and procedures that operate on them
+REF* VMCODE
+    - procedures that declare identifiers or plant virtual machine
+      instructions for accessing or updating them. Information about
+      lexical identifiers
+
+
+--- C.all/help/valof
+--- Copyright University of Sussex 1991. All rights reserved. ----------

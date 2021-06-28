@@ -1,0 +1,387 @@
+HELP VEDFILECOMPLETE                               A.Sloman October 1990
+                                                    Updated January 1995
+
+LIB VEDFILECOMPLETE
+A file-name completion program, that also works on patterns. When the
+library is compiled it maps the procedure -vedfilecomplete- onto the
+key sequence ESC F by default (See HELP * VEDKEYS). (Previously ESC 3
+was used. This may still work if it has not been overwritten by a
+terminal key binding.)
+
+In January 1995 the procedure vedfilecomplete was modified to allow
+selection to be made by typing a single character in the manner
+described in the section: "Options in a separate VED file", below.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Making the program available
+ -- What vedfilecomplete does
+ -- Examples
+ -- What it does
+ -- Options on the status line
+ -- Options in a separate VED file
+ -- -- Selection by typing a character
+ -- -- Selection by re-invoking vedfilecomplete in the options file.
+ -- What you can do when the options file is created
+ -- If there is no text to left of cursor initially
+ -- Use on the statusline
+ -- Finding out what is in a directory
+ -- Using vedcomplete_display to control how options are displayed
+ -- Using vedcomplete_exclude to control display of backup files
+ -- WARNING: the options file can get out of date
+
+
+-- Making the program available --------------------------------------
+
+As explained in HELP * VEDKEYS the "filecomplete" facility in VED is
+mapped onto the key sequence
+    ESC F
+
+This invokes the procedure vedfilecomplete. You may also find that it
+works with the sequence ESC 3. You can, if you prefer, use vedsetkey or
+vedset to map it onto a function key.
+    (See HELP * VEDSETKEY, * VEDSET, * INITIAL)
+
+
+-- What vedfilecomplete does ------------------------------------------
+
+This procedure enables you easily to find out which possible ways of
+continuing a file name that you have begun to type in VED correspond to
+files that actually exist. For example if you have a file whose name
+starts with foo, and you cannot remember how it continues, type foo then
+invoke -vedfilecomplete- and it will show you the options available. If
+you select one of them it will complete the name for you.
+
+At present it looks only for files on disk. It could be extended to
+include files in the VED buffer, but * VEDFILESELECT (often ESC e)
+already provides that facility.
+
+It can also handle patterns. For instance if you know that the file you
+want is a program file with extension ".p" and a name that includes
+"foo" in the middle, but you can't remember the name then type:
+*foo*.p and invoke -vedfilecomplete- to discover which files match that
+pattern. You can then select the one you want and the name will replace
+the pattern.
+
+You can invoke -vedfilecomplete- whether typing on the command line, or
+in a VED file.
+
+If there are no characters to the left of the cursor, the set of options
+you will get is the full set of filenames in your current directory.
+
+You can specify other directories by giving path names, either absolute
+or relative, including patterns.
+
+On Unix systems the options displayed will indicate directory names
+by appending "/" to the name.
+
+Note VMS users can use Unix file name formats for convenience, as
+sys_file_match will translate them. (See REF * sys_file_match)
+
+By default vedfilecomplete will not display full path names, only the
+file name part (including "version" information). You can make it
+display the full path name by changing the procedure vedcomplete_display
+as described below.
+
+-- Examples -----------------------------------------------------------
+
+Several examples are given below. In each case, try putting the VED
+cursor to the right of the text indicated by the "^" symbol, then type
+ESC F (or ESC 3) and see what happens. In some cases it will simply
+complete the file name. In others it will give you some options for
+completion, either on the status line, or in another VED file, as
+described below. If the options have numbers or letters associated with
+them, try selecting an option by typing the number or letter.
+
+The first example will tell you about all files whose names start with
+"a" in the current directory (if any). The second will tell you about
+all files that include '.p' in their names (if there are any)
+
+Example 1:
+                       a
+Put the VED cursor here ^ and type ESC F. NB the cursor must be
+immediately to the right of the "a".
+
+Example 2:
+    (ignore stuff)   *.p
+Put the VED cursor here ^ and type ESC F. Stuff preceding the first
+space on left of the cursor is ignored.
+
+Example 3:
+    $usepop/pop/lib/ved/vedfileco
+                            here ^
+or
+    $usepop/pop/lib/ved/vedfilewi
+                            here ^
+
+    These two are likely to have unique completions.
+
+Example 4:
+    $usepop/pop/lib/ved/ved*z*
+                         here ^
+    This will have a small number of completions, given on the
+    status line. Select one by typing the number.
+
+Example 5:
+    $usepop/pop/lib/
+               here ^
+    In this example you will be given several completion options
+    which are directory names. Choose one by typing the letter given,
+    then after the file name is extended type ESC F (or ESC 3) again
+    to be shown the files in the directory. Or first type a character
+    after the directory name, then do ESC F, to see which files start
+    with that character.
+
+Example 6:
+    $usepop/pop/lib/ved/ved*z*  (ignore stuff to right)
+                         here ^
+
+    Text to the right of the point where vedfilecomplete is invoked
+    is ignored.
+
+Example 7:
+           <---- To the left of this
+    here ^
+    If there is no text to the left of the cursor, then all the files
+    in the current directory will be listed.
+
+
+-- What it does -------------------------------------------------------
+
+The behaviour of -vedfilecomplete- when invoked with some text
+immediately to the left of the VED cursor is as follows.
+
+1. The sequence of characters to the left of the cursor is examined and
+treated as an initial substring of a file specification. The start of
+the sequence is delimited by a space or other non-printing character, or
+by one of the quote characters (' or "). It may include "/" in Unix, or
+"[" "]" in VMS. This string is called the "key-name" in what follows. It
+may include pattern elements, e.g. "*" and "?".
+
+2. All file names that start with the key-name or start with a name
+matching the key-name pattern (if it contains pattern elements) are
+found, and a list of strings representing those names is created. Which
+of the matching files are included in this list can be further
+constrained by use of the variable vedcomplete_exclude described below;
+by default, Unix backup files -- those ending in "-" -- are excluded.
+
+3.a. If there is exactly one such file, then the file name is completed,
+unless it is the same as the key-name, in which case vedscreenbell() is
+invoked.
+
+3.b. If there are no such file names, then vedscreenbell() is invoked.
+
+3.c. If there are two or more file names and they all share some
+characters in common after the key-name, and the key-name is not a
+"pattern", then those characters are inserted and vedfilecomplete is
+run again, giving one of the following options.
+
+3.d. If there are two or more such file names, and they all differ in
+the next character after the key-name then the user is given a display
+of the options available for extending the key-name. Exactly how much of
+each matching path name is displayed is controlled by the variable
+vedcomplete_display, described below.
+
+The options are displayed on the status line or in a new temporary file,
+depending on how many options there are.
+
+
+-- Options on the status line -----------------------------------------
+
+3.d.1. If the options can be displayed on the status line, in the manner
+of -vedfileselect- they will be, labelled with numerals. If one of the
+numerals is typed, then that option is used to complete the key-name. If
+RETURN is pressed, it is left unchanged.
+
+
+-- Options in a separate VED file -------------------------------------
+
+3.d.2. If the set of options is too long to be displayed on the status
+line, then a temporary file is created showing the options, arranged in
+columns. Under unix, those that are directories are indicated with "/"
+at the end. There may be a pause while the options are being inserted,
+if there is a very long list.
+
+-- -- Selection by typing a character
+
+If there are few enough options to be indicated by a quick selection
+character code, then each option is preceded by the code followed by a
+")". The range of codes will depend on how many options there are. E.g.
+if there are fewer than 10 the codes will be 1) 2), etc. If there are
+fewer than 29, the codes will be a), b), etc. Otherwise a mixed
+collection of characters will be used. NB case is significant.
+
+For example the options file might look like this:
+
+  5 POSSIBLE COMPLETIONS FOR:  ad
+  EITHER select option by typing code before ")" OR
+  Select name (chardown & ESC Tab) then Redo "COMPLETION" command (ESC 3)
+  1)addr                  2)addup.p               3)adm/
+  4)advent_objectclass    5)advent_objectclass.p
+
+If you then type "4" the name will be expanded to: advent_objectclass.
+
+If no selection character is typed then the procedure exits leaving the
+VED cursor in that file (the "options file"). It is then possible to
+make a selection as follows.
+
+-- -- Selection by re-invoking vedfilecomplete in the options file.
+
+Where there are too many options to be identified by a selection code,
+or when not all the codes are visible, the user has the further option
+of moving the VED cursor onto the required option and then re-invoking
+vedfilecomplete (i.e. type the same key sequence as before).
+
+The display file will be removed, and the key-name in the original file
+will be transformed into the full file name.
+
+In order to help you select the require option with few keystrokes, the
+variable -vedindentstep- is set to the column width in the options file.
+
+That means that the VED function VEDTABRIGHT will move the cursor a
+column at a time. (This is usually mapped onto ESC tab). However, you
+can move the cursor any way you wish, including using the mouse if
+available, before making your selection by re-invoking vedfilecomplete.
+
+-- What you can do when the options file is created -------------------
+
+Summary, when the options file listing possible expansions is presented,
+the user has the following possibilities:
+
+(a) Quit the options file and ignore it (using ENTER q, or ESC q)
+
+(b) Select an option by typing its selection code (if there is one).
+
+(c) Put the cursor on the required option and then re-invoke
+    vedfilecomplete.
+
+(d) You can leave the options file temporarily, and come back to it
+    later and then do (c) (but not (b)).
+
+NOTES:
+
+(1) If the options file is left, and -vedfileselect- is invoked again,
+    then the options file may be overwritten in order to display a new
+    set of options.
+
+(2) If you quit the original file in which you invoked -vedfileselect-
+    and then come back to the options file, attempting to make a
+    selection will produce an error message saying that the original
+    file is no longer in VED.
+
+
+-- If there is no text to left of cursor initially --------------------
+
+If there is a space to the left of the cursor, or if it is at the
+beginning of a line (either on the command line or in a VED buffer),
+then -vedfilecomplete- will still work, but the list of options will be
+all the file names in the current directory.
+
+
+-- Use on the statusline ----------------------------------------------
+
+-vedfilecomplete- works whether it is invoked with the cursor on
+the status line or in an ordinary VED buffer.  For example if you
+wish to edit a file whose name starts with "lib" and you can't remember
+how it continues do
+
+    ENTER ved lib
+
+Then press ESC 3, and select the appropriate completion. You may need to
+do it more than once, e.g. if the file is in a sub-directory.
+
+Some of the error messages will not be readable if you invoke
+-vedfileselect- while on the status line. However, they should be easy
+enough to guess: you have probably typed a number that does not
+correspond to an option available. Simply re-invoke -vedfilecomplete-
+again and try another key.
+
+-- Finding out what is in a directory ---------------------------------
+
+If you want to find all the files in a particular directory, then
+type the directory pathname and, in Unix a final "/". Then
+-vedfilecomplete- will present you with a list of the files in the
+directory. You can also use this to go UP the directory tree. E.g.
+to get names of files in the directory above the current directory,
+do (in Unix)
+
+    ../
+
+for two levels up do
+
+    ../../
+
+etc.
+
+
+-- Using vedcomplete_display to control how options are displayed -----
+
+The user-definable -vedcomplete_display- is used to select the portion
+of the pathname to be displayed in the options file or on the status
+line. Its default value is -sys_fname_namev - which displays only the
+file name part and version part if present, of the path name. (It is
+defined in REF * SYSUTIL).
+
+If you always want the full path name to be displayed you can assign
+identfn to vedcomplete_display, e.g. in your vedinit.p
+
+    vars procedure vedcomplete_display = identfn;
+
+It is easy to define different procedures that all use vedfilecomplete,
+but which locally assign different procedures to vedcomplete_display.
+These can then be used to give different ways of displaying the options.
+
+-- Using vedcomplete_exclude to control display of backup files -------
+[UNIX ONLY]
+
+The user-assignable variable vedcomplete_exclude holds a list containing
+strings or procedures indicating that filenames ending in those strings
+should be excluded.
+
+If S is a string in the list and a filename ends with S then that
+file name will not be included. By default the list contains only the
+string '-', so that VED backup files are not displayed.
+
+If P is a procedure in the list or a procedure whose name is in the
+list, then if P applied to the file name yields a non-false result then
+the file name will NOT be displayed.
+
+If you always wish to be able to see all files that "complete" the given
+string, including VED backup files, then in your vedinit.p file do
+
+    vars vedcomplete_exclude = [];
+
+See HELP * INITIAL
+
+It is possible to define procedures corresponding to different versions
+of vedfilecomplete, which exclude different things, by using different
+versions of vedcomplete_exclude locally.
+
+
+-- WARNING: the options file can get out of date ----------------------
+
+If you temporarily leave the file displaying the options, and edit the
+original file and then return to the options file, selecting the option
+may produce odd results, as it assumes that the line and column number
+immediately to the right of the key-name has not changed. If any lines
+or characters have been inserted or deleted prior to that location (in
+the original file) then the the "completion" will go in the wrong place.
+
+Similarly, if you edit the options file, and then try to use it to
+make a selection you may get wrong results, because it uses the column
+and row position of the cursor to calculate which selection was chosen,
+rather than the actual contents of the file.
+
+In order to show options as compactly as possible, the options file
+does not display full path names, since normally the leading path name
+is the same for all options, and only the file name at the end differs.
+However, if a path-name pattern is used with "*" or "?" in the directory
+part, then there may be more than one directory matching. This will
+not be evident in the options file and two or more options may look
+the same. If this is a problem use ved_dired, which displays full path
+names corresponding to patterns. (See HELP * DIRED).
+
+
+--- C.all/help/vedfilecomplete
+--- Copyright University of Sussex 1995. All rights reserved. ----------

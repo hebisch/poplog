@@ -1,0 +1,187 @@
+HELP VARS                                          A.Sloman March 1989
+
+    vars <variable1>, <variable2>, <variable3> = <initalisation>,  ...;
+
+For the present, commas may be omitted except after an initialisation,
+but it is recommended that they be used.
+
+For a tutorial introduction to variables, see TEACH *VARS.
+
+VARS is used to declare dynamically scoped variables. Lexically scoped
+variables are also available in POP-11, and are declared with LVARS,
+described in HELP *LVARS. (See HELP *EFFICIENCY for information on the
+difference.) Additional facilities are provided by LCONSTANT and DLVARS,
+explained in the section on lexical scoping in REF *VMCODE.
+
+VARS is used to declare variables of various kinds. See HELP *CONSTANT
+for declaring constant identifiers. See also HELP *GLOBAL.
+
+VARS is the first word of a variable declaration for dynamically scoped
+variables, local or global. Undeclared input or output locals in
+procedure definitions are assumed to be dynamically scoped, as if
+declared using VARS.
+
+For example
+
+    vars x, y;
+
+tells the compiler that you want to use two ordinary variables called x
+and y (the POP-11 compiler distinguishes between upper and lower case
+names for variables). If the declaration occurs within a procedure
+definition then the variables are also declared as local to that
+procedure. Any number of variables can be declared in a single VARS
+statement, but the list must be terminated by a semicolon.
+
+Variables can also be given a precedence, allowing them to be used as
+'infix' operators. For example
+
+    vars 5 ++;
+
+declares '++' to be a variable of precedence 5. This means that an
+expression like
+
+    x ++ y;
+
+will mean 'apply ++ to X and Y'. If the precedence of '**' is 4, as it
+would be if we executed
+
+    vars 4 **;
+
+then the expression
+
+    x ++ y ** z;
+
+will mean 'apply ++ to X and the result of applying ** to Y and Z'.
+Variables can also be declared as type *MACRO, for example, the
+statement
+
+    vars macro d;
+
+declares D to be a macro. When the compiler reads in a macro word it
+applies its value (which, therefore, had better be a procedure). The
+procedure may return results which are spliced into the compiler input
+in place of the macro call.
+
+    vars procedure foo;
+
+declares FOO to be a procedure variable. Attempts to assign anything but
+a procedure to it thereafter will cause an error. Uses of FOO in other
+procedures will by-pass the type-check for a procedure, and will
+therefore be more efficient.
+
+Finally, words can be declared as syntax words, for example:
+
+    vars syntax enddo;
+
+This declares ENDDO to be a syntax word (see HELP *SYNTAX). This won't
+have much effect unless a SYNTAX procedure somewhere makes use of this
+new word. The advantage of declaring such a word as a syntax word, if
+for example it is meant to be a closing bracket, is that more
+informative error messages will occur when illegal syntax is used.
+
+A declaration does not alter the value of any variables - it only
+signifies that the variable is going to be used. See HELP *DEFINE, for
+the implications of this for local variables.
+
+The only time a declaration can change the value of a variable is when
+the initialisation and declaration of a variable are performed at the
+same time, e.g.,
+
+     vars x;
+     [goodbye]-> x;
+     x=>
+     * [goodbye]
+
+     vars x = [hello];
+     x=>
+     ** [hello]
+     vars y = x, p = [goodbye], n = [how are you];
+     y=>
+     ** [hello]
+     n=>
+     ** [how are you]
+     p=>
+     ** [goodbye]
+
+
+-- WORDS, IDENTIFIERS and VARIABLES -----------------------------------
+Strictly speaking, it is important to distinguish
+    1. the WORD, e.g. "+", "enddo", "x",
+    2. the IDENTIFIER which is (currently) associated with that word
+       and defines its syntactic character for POP-11 (e.g. whether it is
+       a macro, a syntax word, an ordinary identifier, an infix
+       operator, etc.)
+    3. the variable, which is a location in memory where the value is
+       stored.
+
+The relationship between a word and the identifier depends on which
+SECTION is the current one. See HELP * SECTIONS for details. Changing
+from one section to another may cause a word to be associated with an
+entirely different identifier.
+
+The procedure *IDENTPROPS when applied to a word returns the syntactic
+category of the associated identifier in the currently active section.
+*IDENTTYPE provides more information. The procedure *SYSSYNONYM
+enables a word to be associated with the identifier already associated
+with another word. So this gives the new word the same syntactic
+properties as if it had been declared in the same way as the old word,
+as well as enabling it to refer to the same thing.
+
+The VARIABLE associated with an identifier is the only object that needs
+to exist when the programs using the variables run. The word and the
+identifer are required when the program is being compiled, or if the
+user later wishes to access the value of the variable by typing in the
+name, or using *VALOF. At present POP-11 uses a part of the identifier
+record as the variable, but in principle this could change, in order to
+save space in situations where identifiers are not preserved. Computing
+terminology generally confuses words, identifiers and variables, and
+many of the POPLOG help files do so too. Fortunately it is normally
+clear from the context which is meant. See HELP *IDENTIFIERS
+
+-- Using VARS in declarations -----------------------------------------
+Declarations may specify a type, then all identifiers of that type in
+parentheses,e.g.
+
+    vars procedure(proc1, proc2, proc3), 5 (++, op2), x, y;
+
+similarly with 'constant' instead of 'vars'.
+
+Variable names can be of any length but must obey the following rules:
+
+(1) A variable name that starts with a letter can have any sequence of
+letters, digits or underscore (ie '_') following it.
+
+(2) A variable name that starts with a sign letter, ie one of the characters
+
+    ! # $ & = - ~ ^ | \ @ + * : < > ? /
+
+can contain only sign letters.
+
+The following are valid:
+
+    +               ***             ---         -<+         ==
+    cat             goat        x23         x1b2c3      cat_lover
+
+But not
+
+    23x             cat-lover           cat:lover       :a:
+
+
+
+-- ASSOCIATED DOCUMENTATION -------------------------------------------
+
+TEACH VARS       - tutorial introduction to POP-11 variables.
+REF  *REFFILES   - lists REF files describing POP-11 identifiers
+HELP *VEDVARS    - variables controlling the behaviour of VED
+HELP *ACTIVE_VARIABLES - active variables
+HELP *CONSTANT   - on the use of constant identifiers
+HELP *GLOBAL     - on the declaration and use of global identifiers
+HELP *MACRO      - on defining macros in POP-11
+HELP *DEFINE     - on the form and content of procedure definitions
+HELP *SYNTAX     - a brief overview of POP-11 syntax
+
+REF *POPSYTAX    - Pop-11 syntax
+REF *VMCODE      - describes relevant poplog virtual machine instructions
+
+--- C.all/help/vars ----------------------------------------------------
+--- Copyright University of Sussex 1987. All rights reserved. ----------

@@ -1,0 +1,249 @@
+HELP ACTIVE_VARIABLES                                  A.Sloman Nov 1986
+
+Active variables allow variables to store multiple values, and allow
+side effects to be associated with the access or updating of a variable.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Formats for declaring active variables
+ -- Description
+ -- Example - an active identifier of multiplicity 3
+ -- Accessing the nonactive value
+ -- Making an active identifier local: DLOCAL
+ -- WARNING - use "dlocal" not "vars"
+ -- System active identifiers
+ -- Multiplicity and identprops of active identifiers
+ -- identof(WORD) -> IDENT;
+ -- idval(IDENT) -> ITEM
+ -- nonactive_idval(IDENT) -> ITEM
+ -- valof(WORD) -> ITEM
+ -- nonactive_valof(WORD) -> ITEM
+ -- RELATED DOCUMENTATION
+
+
+-- Formats for declaring active variables -----------------------------
+
+    vars active a_var;
+    vars active:N a_var;
+    define active:N a_var ; .... enddefine;
+    define updaterof active:N a_var (v1,v2,..vN); ... enddefine;
+
+Where N specifies the 'multiplicity' of the active identifier "a_var"
+(defaulting to 1 if omitted). Since activeness is an independent
+attribute of identifiers, it may be specified in conjunction with other
+identprops, e.g.
+
+    vars active macro a_var;
+
+However, this is ONLY allowable for a multiplicity of 1, i.e.
+
+    vars active:2 macro a_var;
+
+is illegal.
+
+
+-- Description --------------------------------------------------------
+
+Active variables, which strictly speaking should be called active
+identifiers, are those whose names are used as if they were ordinary
+identifiers, but which in fact are associated with procedures.
+
+The base procedure is run when the identifier is used normally and the
+updater is run when the identifier occurs on the right of "->".
+
+This makes it possible to associate side-effects with the process of
+accessing or updating the identifier. E.g. the updater can call the
+error handler if the wrong type of object is assigned. Alternatively the
+procedures can keep track of the number of accesses.
+
+An active identifier has a multiplicity specifying how many results it
+produces when accessed, and how many items have to be supplied when it
+is updated. When active identifiers are made local to a procedure
+with * DLOCAL, the multiplicity is used to determine storage
+requirements for the saved values.
+
+
+-- Example - an active identifier of multiplicity 3 ---------------------
+
+The identifier AV3 will be defined to store three values, and to count
+the number of accesses in the permanent variable ACC_AV3 and the number
+of updates in the permanent variable UPD_AV3. The three values will be
+stored in an inaccessible vector held in a lexical identifier VEC_AC3.
+
+    vars acc_av3 = 0, upd_av3 = 0;
+
+    lconstant vec_av3 = {1 2 3};
+
+    define active:3 av3;
+        acc_av3 + 1 -> acc_av3;
+        explode(vec_av3)
+    enddefine;
+
+    define updaterof active:3 av3(x1,x2,x3);
+        lvars x1,x2,x3;
+        fill(x1,x2,x3,vec_av3) ->;
+        upd_av3 + 1 -> upd_av3;
+    enddefine;
+
+    av3 =>
+    ** 1 2 3
+
+    4,5,6 -> av3;
+
+    av3 =>
+    ** 4 5 6
+
+    av3 + 4 -> av3;
+
+    av3 =>
+    ** 4 5 10
+
+How many times has AV3 been accessed?
+    acc_av3 =>
+    ** 4
+
+and updated?
+    upd_av3 =>
+    ** 2
+
+In this example the values are stored in a vector. The active variable
+mechanism does not presuppose this. For example the values might be
+obtained from a generator function, or read in from a file. Values given
+to the updater might be output to a device by the updater. In that case
+the active variable would function as a stream. All that is required is
+that for an active variable of multiplicity N, the base procedure
+produces N results and the updater takes N arguments. There need not be
+any relationship between what they do.
+
+Notice that in the above example the use of the "top level" declaration
+
+    lconstant vec_av3 = {1 2 3};
+
+depends on the fact that Pop-11 supports lexical identifiers that are
+not local to a procedure but are local to a compilation stream,
+sometimes referred to as "file_local lexicals".
+
+If the variables acc_av3 and upd_av3 were never to be accessed directly
+by users, but only by procedures, they could have been declared as
+lvars.
+
+
+-- Accessing the nonactive value --------------------------------------
+
+The syntax word "nonactive", analogous to "nonmac", "nonop" and
+"nonsyntax" can be used immediately before an active identifier to
+suppress its invocation, e.g. to discover the real value, as opposed to
+its active value:
+
+    nonactive av3=>
+    ** <procedure av3>
+
+
+-- Making an active identifier local: DLOCAL --------------------------
+
+If an active identifier is to be used as local to a procedure it must be
+declared local using "dlocal". E.g
+
+    define test;
+        dlocal av3=(99,100,101);
+        av3
+    enddefine;
+    test() =>
+    ** 99 100 101
+
+    av3 =>
+    ** 4 5 10
+
+
+-- WARNING - use "dlocal" not "vars" ----------------------------------
+
+"vars" should not be used to declare an identifier as dynamically local.
+This is because
+
+    vars av3;
+
+would re-declare "av3" as an ordinary non-active identifier, and prevent
+it working properly as an active identifier thereafter. (Note that you
+can use "dlocal" to declare all variables, lexical or permanent, as
+dynamically local: use of "vars" statements inside procedures is thus
+unnecessary and should be avoided.)
+
+
+-- System active identifiers --------------------------------------------
+
+Examples of active identifiers in the system are:
+  *CURRENT_DIRECTORY, *CURRENT_SECTION
+  *POPDEVERR *POPDEVIN *POPDEVOUT *POPDEVRAW
+  *POP_CALLSTACK_LIM
+and
+  DLOCAL_PROCESS DLOCAL_CONTEXT, defined in REF * VMCODE/dlocal_context
+  POP_HASH_LIM (defined in HELP * SYSHASH/POP_HASH_LIM)
+
+see also
+
+    $usepop/pop/lib/data/ved_what/popactive
+
+for a list of active variables, their function and values.
+
+
+-- Multiplicity and identprops of active identifiers --------------------
+
+An active identifier has a multiplicity N, an integer specifying the
+number of results returned by its base procedure and required as
+arguments by its updater: this defaults to 1 if not specified. The
+procedure "isactive" returns the multiplicity of an active identifier,
+or false if it not active, e.g.
+
+    isactive("av3") =>
+    ** 3
+
+    isactive("acc_av3") =>
+    ** <false>
+
+Note that the *IDENTPROPS of an active identifier are whatever else it
+was declared as, and do not reveal its activeness.
+
+Procedures that can operate on active identifiers include the following,
+described in REF * IDENT
+
+
+-- identof(WORD) -> IDENT;
+
+    Returns the permanent identifier currently attached to WORD.
+
+
+-- idval(IDENT) -> ITEM
+
+   ITEM -> idval(IDENT)
+    Returns or updates the value cell, running the relevant procedure or
+    its updater if the identifier is active. The updater checks the
+    value of ITEM against the *IDENTTYPE of IDENT
+
+
+-- nonactive_idval(IDENT) -> ITEM
+
+   ITEM -> nonactive_idval(IDENT)
+    Does not run the procedure associated with an active identifier.
+
+
+-- valof(WORD) -> ITEM
+
+  ITEM -> valof(WORD)
+        This is functionally equivalent to idval(identof(WORD))
+
+
+-- nonactive_valof(WORD) -> ITEM
+
+  ITEM -> nonactive_valof(WORD)
+        This is functionally equivalent to nonactive_idval(identof(WORD))
+
+
+-- RELATED DOCUMENTATION ----------------------------------------------
+
+HELP *VARIABLES - overview of variables available in POPLOG
+REF  *IDENT, *VMCODE, *WORDS
+HELP *VARS, *LEXICAL, *DLOCAL, *ISACTIVE
+
+
+--- C.all/help/active_variables ----------------------------------------
+--- Copyright University of Sussex 1987. All rights reserved. ----------

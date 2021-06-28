@@ -1,0 +1,178 @@
+HELP METAFLAVOURS                           Mark Rubinstein  April 1986
+                                            Updated A.Schoter June 1991
+
+Metaflavours are part of the flavours package.  For details of the package
+see TEACH * FLAVOURS.  For details of the messages that metaflavours
+respond to see REF * METAFLAVOUR_FLAVOUR
+
+Metaflavours are instances that represent flavours.   When you first
+define a new flavour an instance of the appropriate metaflavour (usually
+flavour) is created to hold the description of the flavour environment.
+Whenever a new flavour is defined the message "initialise" is sent to the
+instance with an empty list as argument.  Whenever a flavour is changed
+the message "flavour_changed" is sent (with no argument).  The default
+method for "flavour_changed" is to do nothing.
+
+The system provides three different metaflavours: metaflavour, mixin and
+flavour.  For details on how to define new metaflavours see TEACH *
+FLAVOURS /Metaflavours. See HELP * FLAVOUR_LIBRARY for details of how
+flavour protocols are documented.
+
+The diagram shows 3 kinds of metaflavour that are provided in the system -
+these are metaflavour, used as the metaflavour of metaflavours (it is its
+own metaflavour), flavour which is what is created by default, and mixin
+which is the class of flavours which encapsulate a useful feature but
+which are not of themselves sensible to instantiate.  The diagram also
+shows too examples of flavours (person_flavour) and (professor_flavour).
+This is NOT a diagram of the inheritance network.
+
+
+                       +-+
+                       V |
+                   +-----+-----+
+                   |metaflavour|
+                   +-----------+
+                     ^       ^
+                     |       |
+               +-----+       +----+
+           +---+---+           +--+--+
+           |flavour|           |mixin|
+           +-------+           +-----+
+             ^   ^                ^
+             |   |                |
+       +-----+   +--+             |
+    +--+---+   +----+----+    +---+---+
+    |person|   |professor|    |vanilla|
+    +------+   +---------+    +-------+
+
+So both person_flavour and professor_flavour are instances of
+flavour_flavour which is an instance of metaflavour_flavour, while
+vanilla_flavour is an instance of mixin_flavour which is an instance of
+metaflavour_flavour. Metaflavour_flavour is an instance of itself.
+
+(For interest, mixin and flavour inherit from metaflavour and metaflavour
+inherits from vanilla.)
+
+One of the methods that is only defined in flavour (but not in
+metaflavour) is "new" which will return an instance of the flavour.  This
+is what -make_instance- uses before it sends the message initialise to the
+object.   For example:
+
+    vars judith;
+    person_flavour<-new -> judith;
+    judith <- initialise([name judith age 21 sex female]);
+    ** [new person called judith is born]
+
+When you define a new flavour you can specify that its metaflavour should
+be something other than flavour by using the keyword "a" after the name of
+the flavour.  (This should come before any "isa" inheritance statement or
+the keyword "novanilla".)  For example suppose you want to define a mixin
+that provides a dated feature.  This could be mixed with other flavours
+but you could not create an instance of it.
+
+    flavour dated_object a mixin;       ;;; inherit only from vanilla.
+    ivars creation_date;
+        defmethod after initialise;
+            sysdaytime() -> creation_date;
+        enddefmethod;
+    endflavour;
+
+    flavour person isa dated_object;    ;;; mix dated_object with person
+    endflavour;
+
+    vars tom = make_instance([person name tom age 25 sex male]);
+    ** [initlist is [name tom age 25 sex male]]
+    ** [new person called tom is born]
+
+    tom <- creation_date =>
+    ** Wed Apr 16 16:59:51 GMT 1986
+
+You may wish to skip over the next bit to the SELF and MYFLAVOUR section.
+
+-- Defining a Metaflavour ----------------------------------------------
+
+You can define you own metaflavours too.  It is wise for metaflavours to
+inherit from the flavour metaflavour, since it provides many methods that
+are useful for manipulating flavours.  For details of the methods that
+metaflavour provides see REF * METAFLAVOUR_FLAVOUR. One of the methods
+that you can provide in a metaflavour is "precedence_list".  If you
+define such a method then it will be used for creating the precedence
+list of its instances.  For example suppose you wanted to create a funny
+kind of flavour where the most general method is used instead of the
+most specific you could do something like this (note that for
+simplicities sake we are only dealing with single inheritance here).
+
+    ;;; flavour inherits from metaflavour so no need to specify it.
+    flavour sillyflavour a metaflavour isa flavour;
+        defmethod precedence_list;
+        lvars complist superf;
+            ;;; construct a single inheritance precedence list and then
+            ;;; reverse it to give most general first.
+            ;;; get my components (the method components is provided
+            ;;; by metaflavour
+            self<-components -> complist;
+            [%  self;           ;;; precedence lists include the flavour
+                until null(complist) do
+                    hd(complist) -> superf;
+                    superf;
+                    superf<-components -> complist;
+                enduntil;
+            %].rev;     ;;; reverse the list
+        enddefmethod;
+        defmethod printself;
+            printf('<sillyflavour %p>', [^name]);
+        enddefmethod;
+    endflavour;
+
+    sillyflavour_flavour =>
+    ** <metaflavour sillyflavour>
+
+    ;;; make a simple flavour
+    flavour general;
+        defmethod m;
+            [m in general] =>
+        enddefmethod;
+        defmethod before m;
+            [before m in general] =>
+        enddefmethod;
+        defmethod after m;
+            [after m in general] =>
+        enddefmethod;
+    endflavour;
+
+    ;;; make a silly flavour;
+    flavour specific a sillyflavour isa general;
+        defmethod m;
+            [m in specific] =>
+        enddefmethod;
+        defmethod before m;
+            [before m in specific] =>
+        enddefmethod;
+        defmethod after m;
+            [after m in specific] =>
+        enddefmethod;
+    endflavour;
+
+    specific_flavour  =>
+    ** <sillyflavour specific>
+
+    vars i = make_instance([specific]);
+    i <- m;
+    ** [before m in general]        ;;; reverse order from normal
+    ** [before m in specific]
+    ** [m in general]
+    ** [after m in specific]
+    ** [after m in general]
+
+NOTE: currently it is not possible to change the precedence list of
+metaflavours themselves (i.e. defining a precedence_list method in
+metaflavour will have no affect).
+
+-- Communicating with a Metaflavour ------------------------------------
+
+You can send messages to metaflavours in the same way as normal instances.
+For details of the messages that metaflavours will respond to and how they
+respond, see REF * METAFLAVOUR_FLAVOUR
+
+--- C.all/help/metaflavours
+----<Copyright University of Sussex 1986.  All rights reserved.>-------

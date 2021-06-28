@@ -1,0 +1,457 @@
+HELP VEDBLOCKS                                    A.Sloman December 1989
+                                                       Updated June 1991
+
+LIB VEDBLOCKS provides a collection of VED commands for manipulating
+rectangles of text (text-blocks in VED. Text may be deleted, inserted,
+copied or moved, either in static or dynamic mode.
+
+It is partly inspired by LIB CHUNKS, a local library package developed
+by Chris Thornton at Sussex University, who made useful comments on a
+draft version.
+
+CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Introduction
+ -- Specifying the text-block
+ -- Commands available
+ -- Copying or moving a text-block
+ -- <ENTER> dtb
+ -- <ENTER> sdtb
+ -- <ENTER> mtb
+ -- <ENTER> smtb
+ -- <ENTER> ttb
+ -- <ENTER> stb
+ -- Re-inserting text previously stored
+ -- <ENTER> ytb
+ -- <ENTER> sytb
+ -- <ENTER> yotb
+ -- Insert spaces into a text-block
+ -- <ENTER> itb
+ -- <ENTER> sitb
+ -- Utility procedures
+ -- Global variables
+ -- Tutorial examples
+ -- Composite commands
+ -- WARNING
+ -- See also
+
+-- Introduction -------------------------------------------------------
+
+To make the program available do
+
+    lib vedblocks;
+
+This provides a set of operations on "text-blocks" i.e. rectangular
+portions of the current VED buffer. For instance, there are commands to
+remove a block of text from the buffer, copy a text-block, insert the
+last text-block removed, overwrite a text-block with spaces, insert a
+block of spaces, justify a text block, etc.
+
+A later section of this file provides some examples of the use of the
+package.
+
+
+-- Specifying the text-block ------------------------------------------
+
+For commands that operate on a text-block, three methods are available
+for specifying the required block of text to be cut out, copied, moved,
+or filled with spaces.
+
+1. <four integers>
+VED <ENTER> commands may be given four integers representing:
+        line1 column1 line2 column2
+
+The relevant text-block is then the rectangular block of text between
+those two locations. The first two and the last two numbers are taken to
+define opposite corners of a rectangle. The order is immaterial. I.e. if
+l1, c1, l2 and c2 are all integers, then the following quadruples all
+define the same rectangle:
+    l1 c1 l2 c2,  l1 c2 l2 c1, l2 c2 l1 c1, l2 c1 l1 c2
+
+2. <two integers>
+VED <ENTER> commands may be given two integers in the command line,
+representing: lines down, columns along
+
+The current cursor location is taken as the top left corner of the
+text-block, and the two integers are added (minus 1) to vedline and
+vedcolumn respectively, to define the bottom right corner of the
+text-block.
+
+3. <two stacked positions>
+Two cursor locations may be "pushed" onto vedpositionstack, e.g.
+using VEDPUSHKEY. These two positions define a pair of diagonally
+opposite corners of a rectangle in the VED buffer. (Any two opposite
+corners may be used, in either order). If a command is given without an
+argument, then it is assumed that this mode of specification is
+intended. (See the warning below.)
+
+In the first two command formats, integers may be separated either by
+spaces or commas.
+
+NOTE: if there are tabs within the rectangular block then sometimes
+the effect of the operations described below may be to produce text in
+an unexpected format. See the warning notes in
+
+    HELP * VEDCUTBLOCK, HELP * VEDYANKBLOCK
+
+
+-- Commands available -------------------------------------------------
+-- Copying or moving a text-block -------------------------------------
+
+DELETE A TEXT-BLOCK
+-- <ENTER> dtb
+   <ENTER> dtb <two or four integers>
+    This removes a rectangular block from VED. Text to the right of the
+    text-block is shifted left to fill the space.
+    The text removed is saved in vvedblockdump in a vector of
+    strings.
+    If VEDSTATIC is true, text to the right is not shifted, and the
+    deleted block is replaced with blanks.
+
+In STATIC mode, DELETE TEXT-BLOCK (FILL THE BLOCK WITH SPACES)
+-- <ENTER> sdtb
+   <ENTER> sdtb <two or four integers>
+    This is like dtb with VEDSTATIC true. I.e. the text copied into
+    vvedblockdump is replaced by spaces. Text to the right is not
+    altered.
+
+MOVE A TEXT-BLOCK
+-- <ENTER> mtb
+   <ENTER> mtb <four integers>
+    Equivalent to dtb followed by ytb. In the first format the
+    portion cut is defined by the last two stacked positions. The
+    location to which it is yanked is the current cursor location.
+    The text moved by mtb is saved in vvedblockdump.
+
+IN STATIC MODE MOVE A TEXT BLOCK
+-- <ENTER> smtb
+   <ENTER> smtb <four integers>
+    Equivalent to mtb with VEDSTATIC TRUE. The text removed is replaced
+    by spaces, and at the new location it overwrites existing text.
+    The text moved by mtb is saved in vvedblockdump.
+
+TRANSCRIBE A TEXT-BLOCK
+-- <ENTER> ttb
+   <ENTER> ttb <two or four integers>
+    Equivalent to stb (see below) followed by ytb. In the first format
+    the portion cut is defined by the last two stacked positions. The
+    location at which it is re-inserted is the current cursor location.
+    The original text-block is left unchanged.
+    The text transcribed is saved in vvedblockdump.
+    If VEDSTATIC is strue, then the inserted text replaces an existing,
+    block and text to the right is not shifted.
+
+SAVE A TEXT-BLOCK BY COPYING INTO vvedblockdump
+-- <ENTER> stb
+   <ENTER> stb <two or four integers>
+    This is just like dtb, except that the block of text in the VED
+    buffer is left unchanged. It could be defined as dtb followed by
+    ytb, though a more efficient method is used. Text to the right is
+    not shifted.
+    The text copied by stb is saved in vvedblockdump in a vector of
+    strings.
+
+
+-- Re-inserting text previously stored -------------------------------
+
+YANK THE LAST SAVED TEXT-BLOCK
+-- <ENTER> ytb
+    Starting at the current cursor location, insert the text last
+    saved in vvedblockdump into the VED buffer. Text to the right of the
+    inserted text-block will be shifted right, unless VEDSTATIC is true.
+
+    ytb can be used to undo the effect of dtb. (And vice versa, if the
+    correct arguments are given.)
+
+In STATIC mode YANK THE LAST CUT TEXT-BLOCK
+-- <ENTER> sytb
+    Overlay the last saved text-block. Equivalent to ytb with VEDSTATIC
+    set TRUE. That is, the block will over-write text instead of being
+    spliced in. Text to the right of the inserted block will not move.
+    sytb can be used to undo the effect of sdtb.
+
+OVERLAY EXCEPT FOR SPACES
+-- <ENTER> yotb
+    This is like sytb, except that if there are any spaces in the
+    last saved text block then they are not used to over-write the
+    contents of the file. So if a text block of the form
+
+        The cat on
+        the mat
+
+    Is overlaid on
+
+        ############
+        ############
+
+    The result is
+        The#cat#on##
+        the#mat#####
+
+The same text may be repeatedly re-inserted using ytb, sytb and yotb.
+
+
+-- Insert spaces into a text-block ------------------------------------
+
+INSERT SPACES IN TEXT-BLOCK AND SHIFT RIGHT
+-- <ENTER> itb
+   <ENTER> itb <two or four integers>
+    Insert a blank rectangle in the text-block defined by the same
+    arguments as for ytb. If two integers are given, current cursor
+    location is taken as the top left corner of the block to be filled.
+    If four integers or two stacked positions are used, the block is
+    defined as a rectangle with the two given ved locations as opposite
+    corners. Text to the right of the area filled is shifted right.
+
+STATIC INSERT SPACES IN TEXT BLOCK
+-- <ENTER> sitb
+   <ENTER> sitb <two or four integers>
+    Like itb except that the blanks will overwrite existing text
+    instead of pushing existing text to the right.
+
+
+-- Utility procedures -------------------------------------------------
+These are used by the VED commands described below
+
+getblockargs() -> line1 -> col1 -> line2 -> col2;
+    This procedure is called by VED ENTER commands to work out which
+    text-block they are to operate on. It returns four integers
+    representing two line numbers and two column numbers.
+    If two numbers are given in vedargument they are used to define the
+    number of lines down and columns across starting from the current
+    cursor location. If four numbers are given, they define start line,
+    start column, end line end column. If no arguments are given then
+    the top two positions on vedpositionstack are used, but if
+    vedchattyblocks is true then the program checks that the user
+    intended this.
+
+    If necessary, the numbers returned are re-ordered so that:
+        line1 <= line2 and col1 <= col2
+
+
+The following utilities are provided as separate autoloadable library
+procedures:
+
+vedfillblock(line1,col1,line2,col2,char);
+    Insert a rectangle filled with character char in the VED buffer.
+    Move everything to the right if VEDSTATIC is false, otherwise
+    overwrite text. Uses vedrefreshblock to redisplay text.
+    See HELP * VEDFILLBLOCK
+
+vedrefreshblock(line1,col1,line2,col2,dotail);
+    Refresh the portion of the screen showing the text-block specified.
+    If dotail is true then everything to the right of the
+    text-block is refreshed also.
+    See HELP * VEDREFRESHBLOCK
+
+
+vedcutblock(line1,col1,line2,col2,boolean) -> vector;
+    Removes a rectangular block of text and returns a vector of strings.
+    (It locally sets * VEDHARDTABS to be false.)
+    See HELP * VEDCUTBLOCK
+
+vedblockrepeater(vector_of_strings) -> procedure;
+    If vector_of_strings is the kind of thing produced by vedcutblock,
+    and normally stored in vvedblockdump, then a procedure is returned
+    that is actually a character repeater for the text block. It is
+    assumbed that all the strings are of the same length.
+
+vedyankblock(vector_of_strings);
+    Inserts a vector of strings into VED, of the kind produced by
+    vedcutblock.
+    See HELP * VEDYANKBLOCK
+
+vedoverlayblock(vector_of_strings);
+    Like vedyankblock (with vedstatic true) except that if any of
+    the strings contain spaces they are not overlayed. This is used
+    to implement ved_yotb
+
+-- Global variables ---------------------------------------------------
+
+vedstatic
+    This general purpose VED variable affects several of the procedures.
+    When it is true (default is false), then the procedures which delete
+    or move a text block will over-write it with spaces and not shift
+    text left. Similarly procedures which yank, copy, move or fill text
+    blocks will overwrite existing text if vedstatics is true.
+
+vvedblockdump
+    This holds a vector (possibly empty) of strings last removed from
+    VED, ready to be re-inserted by ved_ytb, etc.
+
+vedchattyblocks
+    If this is true (default is false) check with user before using
+    stacked positions. Display line and column numbers on status line
+    and ask if they are OK. User responds "y" or "n". <RETURN> is
+    treated as "y".
+    (This is a precaution against the wrong stacked positions being
+    used by accident, and may be replaced by a different mechanism.)
+
+
+-- Tutorial examples --------------------------------------------------
+
+First load the library. You can then try the following examples.
+
+Choose any diagonally opposite pair of asterisks surrounding the block
+of "a"s below. Put the cursor on them in either order and press
+VEDPUSHKEY each time, to define the bounds of the rectangle.
+(Two diagonaly opposite corners suffice for this.) Read on.
+----X-----------|-----------|---------------|-----------------
+    *aaaaaaaaaaa*           +++++++++++++++++  <- this lot will be
+    +aaaaaaaaaaa+           +++++++++++++++++     shifted left when
+    *aaaaaaaaaaa*           +++++++++++++++++     you do dtb, and
+                                        restored when you do ytb.
+
+When you have pushed the locations of two corners, type:
+    <ENTER> dtb
+to delete the text block. The indicated rectangle will disappear. It can
+be retrieved. Place the cursor immediately below the "X" above and type
+    <ENTER> ytb
+This will 'yank' back the last text block stored.
+
+    In order to re-copy the
+    text last removed, put      This is really
+    the cursor here   --->      just some
+    and do <ENTER> ytb          dummy text
+                                to be shifted right.
+
+    After that, move            This is more dummy text. It will be
+    the cursor here   --->      over-written by the 'sytb' command
+    and do <ENTER> sytb         instead of being
+                                simply shifted right.
+
+NB 'ytb' with VEDSTATIC mode on is the same as doing 'sytb'.
+
+Try the above again with 'stb' instead of 'dtb'. The block will be
+copied without being changed. I.e. stb 'saves' the textblock in
+vvedblockdump.
+
+'<ENTER> ytb' and '<ENTER> sytb' can be used repeatedly to re-insert
+the block of text cut out by dtb, stb, and similar commands.
+
+The two stacked positions can be on the same line. So ved_dtb and
+ved_ytb can be used to do the same as ved_cut and ved_splice, within
+a line. E.g. try moving these 'XXXXXX's to after here ->, using dtb
+followed by ytb.
+
+'<ENTER> mtb' is equivalent to '<ENTER> dtb' followed by '<ENTER> ytb'.
+Try using mtb to move the X's (above) back to where they were, or into
+another line.
+
+After a mtb command has been used to move a block, subsequent 'ytb'
+or 'sytb' commands can be used to make copies of it elsewhere.
+
+Instead of stacked positions, try using two numbers to indicate the
+text-block, relative to the cursor position. Put the cursor somewhere in
+the previous paragraph and do:
+        <ENTER> dtb 3 5  or <ENTER> stb  3 5
+then
+        <ENTER> ytb     or <ENTER> sytb
+in various places.
+
+dtb 3 5 followed by ytb will restore the text to its original state,
+provided the cursor is not moved in between.
+
+In order to delete a block leaving the space filled with blanks and
+text to the right not shifted left, push two positions then do
+    <ENTER> sdtb
+(In static mode delete text block) Try it on the rectangle of b's below.
+----X-----------|-----------|---------------|-----------------
+    *bbbbbbbbbbb*           +++++++++++++++++  <- this lot will NOT be
+    +bbbbbbbbbbb+           +++++++++++++++++     shifted left when
+    *bbbbbbbbbbb*           +++++++++++++++++     you do sdtb
+
+Put the cursor under the X and Use '<ENTER> sytb' to undo the effect
+of sdtb.
+
+Alternatively sdtb can have two numbers as arguments. E.g. put the
+cursor on the top left asterisk below and give the command to remove 4
+columns from 2 lines: <ENTER> sdtb 2 4
+    *ccccccccccc*           This text will not be shifted left
+    +ccccccccccc+           by the sdtb command.
+    *ccccccccccc*           Use <ENTER> sytb to restore things.
+
+NB
+The 'sdtb' command is equivalent to 'dtb' with VEDSTATIC set true.
+
+Now put the cursor on the asterisk below and do
+    <ENTER> itb 3 5
+to insert a 3 line by 5 column rectangular block of spaces, shifting
+characters right to make room.
+    |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+    ||||| -->* ||||||||||||||||||||||||||||||||||||||||||||||||
+    |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+    ||||||||||||||||||||||||||| -->X ||||||||||||||||||||||||||
+    |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+    |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+
+Then put the cursor over the X and try something like:
+    <ENTER> sitb 2 6
+to overlay spaces in the 2 line by 6 column text-block. Instead of using
+numbers you can as before use the PUSHKEY in two locations, to specify
+the area to be blanked.
+
+The commands that can take two stacked positions, or two integers
+relative to the cursor location, can also take four integers. Jump
+back to line 5 and do
+    <ENTER> dtb 5 2 10 20
+follwed by 'ytb' etc.
+
+
+-- Composite commands -------------------------------------------------
+There are various combinations of the above for which procedures have
+not been defined. It is very easy to define new procedures. E.g.
+
+    define ved_smotb;
+        ;;; move text block to other file in static mode
+        ved_sdtb();
+        vedswapfiles();
+        ved_sytb();
+    enddefine;
+
+For a command that is required only on one occasion, it is possible to
+use <ENTER> do followed by several commands delimited by some character
+(e.g. semi-colon) not in any of them, e.g.
+
+    <ENTER> do;sdtb 3 5;ml -4; mc 5;sytb
+
+This will cut out a 3 line by 5 column block of text replacing it with
+blanks, move 4 lines up and 5 characters right, then overlay the cut out
+text. the REDO key can be used to do this several times.
+
+
+-- WARNING ------------------------------------------------------------
+
+If you invoke dtb and similar commands without arguments, and without
+first PUSHing two cursor positions, then if there are two previously
+stacked positions they will be used, with potentially disastrous
+results. To reduce the risk, all commands using format 3 (two stacked
+positions) will check with you before doing anything. To suppress this
+checking, assign FALSE to VEDCHATTYCUT.
+
+Also '<ENTER> cps' (or ved_cps()) can be used to Clear the Position
+Stack, as a precaution.
+
+
+-- See also -----------------------------------------------------------
+REF  * VEDCOMMS
+    (An overview of commands available in VED)
+
+REF  * vedstatic
+REF  * ved_cut, * ved_splice
+REF  * ved_d, * ved_y
+
+HELP * VEDKEYS/PUSHKEY
+    (information on key presses associated with saving current position)
+
+REF  * vedpositionpush, * vedpushkey
+
+Additional HELP files concerned with rectangular blocks
+HELP * VEDCUTBLOCK  * VEDYANKBLOCK  * VEDREFRESHBLOCK  * VEDFILLBLOCK
+HELP * VEDOVERLAYBLOCK
+HELP * VEDBLOCKREPEATER
+
+An UNDO facility should be added.
+
+--- C.all/help/vedblocks
+--- Copyright University of Sussex 1993. All rights reserved. ----------

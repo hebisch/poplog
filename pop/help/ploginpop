@@ -1,0 +1,127 @@
+HELP PLOGINPOP                                 John Williams, April 1987
+
+
+The library LIB * PLOGINPOP provides some syntactic sugar for using the
+mechanisms described in HELP * PLOG_GOALS.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Constructing Prolog Goals
+  2   Applying Prolog Goals
+  3   Iterating Over the Solutions to a Prolog Goal
+  4   See Also
+
+
+-----------------------------------------------------------------------
+1  Constructing Prolog Goals
+-----------------------------------------------------------------------
+
+The syntax construct |< ... >| is used to construct plog_goal objects.
+Between the brackets, normal Prolog syntax is used, with two exceptions.
+First, the operator ? causes a Pop-11 variable -> Prolog variable
+mapping to be added to the plog_goal_env of the plog_goal being built.
+Second, the operator ^ splices the value of arbitrary Pop-11 code into
+the term. Unless this Pop-11 code is just a single word, the code must
+be quoted with '.
+
+For example:
+
+    uses ploginpop;
+
+    :- library(useful).
+
+    |< append(?x, ?y, [1, 2, 3, 4, 5]) >| -> g;
+
+Note that LIB PLOGINPOP changes the class_print of plog_goal objects:
+
+    g =>
+    ** |< append(_1, _2, [1, 2, 3, 4, 5]) >|
+
+    plog_goal_env(g) =>
+    ** [<ident <undef y>> <prologvar _2> <ident <undef x>>
+            <prologvar _1>]
+
+
+-----------------------------------------------------------------------
+2  Applying Prolog Goals
+-----------------------------------------------------------------------
+
+A plog_goal may be applied as if it were a procedure. For example:
+
+    |< atomic(^popautolist) >| () =>
+    ** <false>
+
+    |< atomic(^pop_max_filename_len) >| () =>
+    ** <true>
+
+
+-----------------------------------------------------------------------
+3  Iterating Over the Solutions to a Prolog Goal
+-----------------------------------------------------------------------
+
+The syntax
+
+    plogwhile <plog_goal> do ... endplogwhile
+
+may be used to iterate over the solutions to a plog_goal. For example:
+
+    define test();
+        lvars x y;
+        plogwhile |< append(?x, ?y, [a, b, c, d, e]) >| do
+            spr(x);
+            npr(y);
+        endplogwhile
+    enddefine;
+
+    test();
+
+    [] [a b c d e]
+    [a] [b c d e]
+    [a b] [c d e]
+    [a b c] [d e]
+    [a b c d] [e]
+    [a b c d e] []
+
+(Note how ? copes properly with lexical variables).
+
+plogwhile loops may be quit with quitloop, restarted with nextloop, etc.
+For example:
+
+    |< append(?a, ?b, [1, 2, 3, 4, 5]) >| -> g;
+
+    plogwhile g do
+        quitif(hd(b) > 3);
+        b =>
+    endplogwhile;
+
+    ** [1 2 3 4 5]
+    ** [2 3 4 5]
+    ** [3 4 5]
+
+Further invocations of the plog_goal g will resume from the last
+solution generated:
+
+    plogwhile g do
+        spr(a), npr(b)
+    endplogwhile;
+
+    [1 2 3 4] [5]
+    [1 2 3 4 5] []
+
+
+-----------------------------------------------------------------------
+4  See Also
+-----------------------------------------------------------------------
+
+LIB * PLOG_GOALS
+
+HELP * PLOG_GOALS
+
+LIB * DEFINE_PROLOG
+
+HELP * DEFINE_PROLOG
+
+
+
+--- C.all/help/ploginpop
+--- Copyright University of Sussex 1989. All rights reserved.

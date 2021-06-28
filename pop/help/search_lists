@@ -1,0 +1,148 @@
+HELP SEARCH_LISTS                                John Williams, Jan 1991
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Introduction
+ -- SYSSEARCHPATH
+ -- Search list format
+ -- How VED uses annotated directory names
+ -- Manipulating search lists
+ -- Related documentation
+
+
+-- Introduction --------------------------------------------------------
+
+Some POPLOG components, such as program libraries and documentation, are
+normally referred to by incomplete filenames, which do not include any
+directory information.
+
+For example, the commands
+
+    lib flavours
+    help news
+
+refer to a library file named "flavours", and a HELP file named "news",
+but do not specify the directory in which those files might be found.
+
+Commands like LIB and HELP use "search lists" to fill in the missing
+directory information. A search list defines the set of directories in
+which to look for a given file. POPLOG includes many built-in search
+lists, including
+
+    *POPAUTOLIST             Auto-loadable library directories
+    *POPUSESLIST            All library directories (used by *SHOWLIB)
+    *VEDHELPLIST            HELP file directories
+    *VEDTEACHLIST           TEACH file directories
+    *VEDREFLIST             REF file directories
+
+The rest of this file discusses the format of search lists, and the
+procedures available for using them.
+
+IMPORTANT NOTE: In the current version of POPLOG (V14), library search
+lists and documentation search lists have slightly different formats.
+This file concentrates on documentation search lists. Library search
+lists are discussed in HELP * POPAUTOLIST, and REF * LIBRARY.
+
+
+-- SYSSEARCHPATH -------------------------------------------------------
+
+The "core" procedure for examining a search list is *SYSSEARCHPATH. This
+procedure takes two arguments, a search list, and the name of a library,
+or document. It examines the directories in the search list one by one,
+from left to right, looking for the desired file. If it finds it, it
+stops, and returns the full name of the file. If the file can't be
+found, SYSSEARCHPATH returns FALSE.
+
+A simple example:
+
+    syssearchpath(['/dev' '/etc' '/usr'], 'passwd') =>
+    ** /etc/passwd
+
+(Note for VMS users: /etc/passwd is the standard Unix "password" file).
+
+*SYSSEARCHPATH is documented fully in REF * LIBRARY.
+
+
+-- Search list format --------------------------------------------------
+
+In the above example, the search list consisted of a list of strings,
+each string being the name of a directory. However, search lists may
+contain other types of object: words, identifiers, procedures, and
+embedded lists. Their significance is described below.
+
+A string in a search list is taken to be the name of a directory (e.g.
+'$usepop/pop/lib/database' (Unix) or USEPOP:[POP.LIB.DATABASE] (VMS)).
+
+A word or identifier occuring in a search list is interpreted as a
+pointer to another, embedded, search list. For example, POPUSESLIST
+includes <ident popautolist>. This ensures that POPUSESLIST is always a
+superset of POPAUTOLIST.
+
+A list occuring in a search list is considered to be an "annotated"
+directory name. The first element of the list should be an ordinary
+directory name (i.e. a string); the rest of the list is extra
+information for VED. (More details below).
+
+Procedures occuring in search lists are used to "compute" full
+pathnames. This rarely used feature is discussed fully in REF * LIBRARY.
+
+
+-- How VED uses annotated directory names ------------------------------
+
+Annotated directory names are used to specify appropriate values for
+*VEDFILEPROPS and *SUBSYSTEM to files in a particular directory. In
+other words, an annotated directory name defines the "documentation
+category" (HELP, REF, TEACH etc), and "subsystem" (Lisp, Prolog, PML,
+etc). For example, the main Lisp HELP directory is denoted by:
+
+    ['$usepop/pop/lisp/help/' help "lisp]
+
+The second element of the list is the value for VEDFILEPROPS.
+
+The third element, which is optional, is the value for SUBSYSTEM
+(preceded by " to indicate a quoted word).
+
+If SYSSEARCHPATH locates a file via an annotated directory name, it
+returns an annotated filename, i.e. a copy of the list, with the full
+pathname of the file inserted in place of the directory name. For
+example:
+
+    syssearchpath([[^vedhelpdirectory help]], 'news') =>
+    ** ['/csunb/pop/v13.91/S.sun3/pop/help/news' help]
+
+The standard documentation search lists *VEDHELPLIST, *VEDTEACHLIST,
+*VEDREFLIST, *VEDDOCLIST and *VEDSRCLIST all contain annotated directory
+names. See HELP * VEDSYSFILE.
+
+
+-- Manipulating search lists -------------------------------------------
+
+The following two procedures may be useful in manipulating search lists:
+
+    flatten_searchlist(SEARCH_LIST) -> LIST
+
+    extend_searchlist(DIR, SEARCH_LIST) -> SEARCH_LIST
+
+The first, *FLATTEN_SEARCHLIST, "flattens" complex search lists like
+POPUSESLIST and VEDHELPLIST (which contain identifiers, lists etc) into
+a simple list of directory names.
+
+*EXTEND_SEARCHLIST is used to add a new directory to a search list,
+unless the directory is already present.
+
+These procedures are documented fully in REF * LIBRARY.
+
+
+-- Related documentation -----------------------------------------------
+
+See also
+
+    REF * LIBRARY               - Full explanation of search lists
+    HELP * AUTOLOAD             - The POP-11 autoloading mechanism
+    HELP * POPAUTOLIST           - Search list for autoloadable files
+    HELP * POPUSESLIST          - Search list for all POP-11 libraries
+    HELP * VEDSYSFILE           - How VED finds documentation files
+
+
+--- C.all/help/search_lists
+--- Copyright University of Sussex 1991. All rights reserved. ----------

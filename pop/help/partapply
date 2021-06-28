@@ -1,0 +1,157 @@
+HELP PARTAPPLY                                      A Sloman, April 1985
+
+    partapply(<procedure>, <list>) -> closure
+
+This procedure produces a closure  of an existing procedure (which may
+itself be a closure). It takes two arguments - a  procedure and a list;
+its result is a new procedure based upon the given procedure, but
+requiring fewer arguments, the rightmost of the arguments of the new
+procedure being supplied by the values in the list at the time PARTAPPLY
+is called.
+
+Some examples are presented in TEACH * PERCENT.
+
+If the procedure being partially applied has an updater then the
+resulting closure will have an appropriate updater too. Here is an
+example of the use of PARTAPPLY:-
+
+     define f(x,y,z);
+         [%x,y,z%]
+     enddefine;
+
+     f(1,2,3) =>
+     ** [1 2 3]
+
+     f(4,5,6) =>
+     ** [4 5 6]
+
+     vars g; partapply(f,[3]) -> g;
+
+     g(1,2) =>
+     ** [1 2 3]
+
+     g(4,5) =>
+     ** [4 5 3]
+
+     partapply(f,[10 20]) -> g;
+
+     g(4) =>
+     ** [4 10 20]
+
+Some 'syntactic sugar' is provided so that
+
+    partapply(f,[3])
+
+can be written as:
+
+    f(%3%)
+
+In fact, both of these make use of the more primitive construct
+
+    consclosure(f,3,1)
+
+described in REF * PROCEDURE
+
+Partial application is a useful technique in a variety of situations.
+The most common is to make a general procedure more specific. For
+example:
+
+     vars iscolour;
+     member(%[red blue green yellow]%) -> iscolour;
+
+     iscolour("red") =>
+     ** <true>
+
+     iscolour("apple") =>
+     ** <false>
+
+A procedure to find an element of a list satisfying a predicate:
+
+    define findone(list,predicate);
+        if  list = []
+        then    false
+        elseif  predicate(hd(list))
+        then    hd(list)
+        else    findone(tl(list),predicate)
+        endif
+    enddefine;
+
+     findone([apple red house], iscolour) =>
+     ** red
+
+Special cases of findone can be created by partial application:
+
+     vars getcolour; findone(%iscolour%) -> getcolour;
+
+     getcolour([apple red house]) =>
+     ** red
+
+Another use of PARTAPPLY is to ensure that when a procedure P1 using a
+variable, say X, is given as argument to another procedure P2, which
+also uses the variable X, then when P1 runs inside P2 it doesn't get
+P2's value of X, but the value in the caller of P2. For example, try the
+following:
+
+    define p2(p1);
+        ;;; gives x a value, then runs its argument
+        vars x;
+        99 -> x;
+        p1();
+    enddefine;
+
+    define test(x);
+        ;;; run p2, giving it a procedure to run
+        p2(procedure; x => endprocedure);
+        ;;; you might expect this to print the value of x in test
+    enddefine;
+
+    test(33);
+    ** 99
+
+When P2 is running it has a value for X, so its argument, which uses X
+NON-locally, gets the value of X in P2, when it runs inside an
+activation of P2. (This is a consequence of local variables using
+dynamic binding by default.) To prevent this, define TEST thus, using
+partial application:
+
+    define test(x);
+        p2(procedure(x); x => endprocedure(%x%))
+    enddefine;
+
+    test(33);
+    ** 33
+
+The expression
+
+        procedure(x); x => endprocedure(%x%)
+
+creates a POP-11 closure, which is in effect a procedure with a
+'built-in' value for X, namely the value X had when the closure was
+CREATED, as opposed to the value X has when the closure is RUN. By
+contrast the procedure
+
+        procedure; x => endprocedure
+
+gets whatever value X had just before the procedure was run. If the
+procedure P2 had been defined using LVARS instead of VARS, it would not
+have been necessary to use partial application, since a non-local
+variable used in the anonymous procedure in TEST cannot access a
+'lexically scoped' variable in procedure P2. But sometimes dynamic
+scoping is needed for variables that are accessed non-locally by lots of
+procedures, e.g. CUCHAROUT, INTERRUPT, PRMISHAP. Partial application
+can be used to freeze the current value of a dynamically scoped variable
+into a procedure which is to be called later, using that value.
+
+See REF *PROCEDURES for more detailed information on procedures in
+POP-11.
+
+See also HELP
+*PERCENT  - summarises the syntax for partial application
+*FROZVAL  - to access values frozen into closures
+*PDPART   - returns the procedure on which a closure is based
+*CLOSURES - on the construction of closures in POP-11
+*VARS     - on the use and declaration of dynamically scoped variables
+*LEXICAL *LVARS    - on lexically scoped variables
+
+--- C.all/help/partapply -----------------------------------------------
+--- Copyright University of Sussex 1988. All rights reserved. ----------

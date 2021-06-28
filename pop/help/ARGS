@@ -1,0 +1,318 @@
+HELP ARGS                                          Aaron Sloman Oct 1997
+                                                Suggested by Brian Logan
+                                                     Revised 20 Jan 2003
+
+ARGS <required arguments> &OPTIONAL <optional arguments>
+
+ARGS is an autoloadable macro which can be used to simplify defining
+procedures which have some required arguments and some optional ones.
+
+
+CONTENTS
+
+ -- Introduction
+ -- WARNINGS
+ -- Example in "ordinary pop-11"
+ -- The same example using ARGS
+ -- Using more complex tests
+ -- Using nested definitions
+ -- See also
+
+-- Introduction -------------------------------------------------------
+The format
+
+    ARGS x, y, z, &OPTIONAL A:isword, B:isinteger, C:islist;
+
+(note the commas) expands to something like:
+
+    repeat
+        if islist(z) then
+            (x, y, z) -> (x, y, z, C)
+        elseif isinteger(z) then
+            (x, y, z) -> (x, y, z, B)
+        elseif isword(z) then
+            (x, y, z) -> (x, y, z, A)
+        else
+            quitloop()
+        endif
+    endrepeat;
+
+-- WARNINGS -----------------------------------------------------------
+
+1. For reasons that will become clear below, the last of the
+non-optional arguments (the value of z above) must never be the same as
+one of the types of the optional arguments. I.e in this case it must
+never be a word, an integer or a list. But it could be a procedure, an
+array a string, a decimal number, etc.
+
+The reason is that the type check is used (at run time) to tell whether
+optional arguments have been provided.
+
+2. A procedure using ARGS must have at least one non-optional argument.
+That is because only then can the procedure tell that no optional
+arguments have been provided, by checking the type of the non-optional
+argument.
+
+
+-- Example in "ordinary pop-11" ---------------------------------------
+
+E.g. suppose you want to define a procedure which takes two lists, p and
+q, and optionally also a boolean A, which defaults to false if not
+supposed and a number B, which defaults to 0. If the boolean is true it
+returns the first list with the number added, and if false the second
+list with the number added.
+
+You could use this sort of construction in Pop-11 to test for the
+optional extra arguments, A and B.
+
+define silly(p, q) -> result;
+
+    ;;; Set up default values
+    lvars A = false, B = 0;
+
+    ;;; test if optional arguments provided
+
+    repeat
+        if isnumber(q) then
+            (p, q) -> (p, q, B)
+        elseif isboolean (q) then
+            (p, q) -> (p, q, A)
+        else
+            ;;; no more optional arguments
+            quitloop()
+        endif;
+    endrepeat;
+
+    if A then
+        B :: p
+    else
+        B :: q
+    endif -> result
+enddefine;
+
+silly([cats], [dogs]) =>
+** [0 dogs]
+
+silly([cats], [dogs], 5) =>
+** [5 dogs]
+
+silly([cats], [dogs], true) =>
+** [0 cats]
+
+silly([cats], [dogs], true, 99) =>
+** [99 cats]
+
+silly([cats], [dogs], 99, true) =>
+** [99 cats]
+
+-- The same example using ARGS ----------------------------------------
+
+This is how the procedure would be abbreviated using the autoloadable
+macro ARGS.
+
+
+define silly(p, q) -> result;
+
+    ;;; Set up default values
+    lvars A = false, B = 0;
+
+    ;;; test if optional arguments provided
+    ARGS p, q, &OPTIONAL A:isboolean, B:isnumber;
+
+    if A then
+        B :: p
+    else
+        B :: q
+    endif -> result
+enddefine;
+
+
+The above tests should now produce the same results as before.
+
+Note that this works only if the second non-optional argument is NEVER
+of type boolean or number.
+
+-- Using more complex tests -------------------------------------------
+
+It would be possible in principle to extend the ARGS macro to accept
+more complex expressions where more complex tests are required to
+recognise the extra arguments. However, at present this is not
+permitted, and providing a more complex test requires defining a new
+predicate.
+
+For example if you wanted a procedure to have an optional extra argument
+which must be a colour word, you could define this:
+
+define iscolour(word) -> result;
+    if isword(word) then
+        if member(word, [red orange yellow green blue indigo violet])
+        then
+            true -> result
+        else
+            mishap('Colour word needed', [^word])
+        endif;
+    else
+        false -> result;
+    endif;
+enddefine;
+
+define describe(things) -> result;
+
+    lvars colour = false;
+
+    ARGS things, &OPTIONAL colour:iscolour;
+
+    if colour then
+        colour :: things
+    else
+        things
+    endif -> result
+enddefine;
+
+describe([big cats])=>
+** [big cats]
+
+describe([big cats], "blue") =>
+** [blue big cats]
+
+describe([big cats], "dogs") =>
+;;; MISHAP - Colour word needed
+;;; INVOLVING:  dogs
+;;; DOING    :  mishap iscolour describe ....
+
+
+-- Using nested definitions -------------------------------------------
+
+If the recogniser procedure is not to be used anywhere except inside
+one procedure, then it can be defined inside that procedure using
+lconstant. This will make the code slightly more efficient and more
+modular. However, the nested definition must precede its use in an ARGS
+expression.
+
+define describe(things) -> result;
+
+    define lconstant iscolour(word) -> result;
+        if isword(word) then
+            if member(word, [red orange yellow green blue indigo violet])
+            then
+                true -> result
+            else
+                mishap('Colour word needed', [^word])
+            endif;
+        else
+            false -> result;
+        endif;
+    enddefine;
+
+
+    lvars colour = false;
+
+    ARGS things, &OPTIONAL colour:iscolour;
+
+    if colour then
+        colour :: things
+    else
+        things
+    endif -> result
+enddefine;
+
+NOTE: since Poplog version 15, the "lconstant" is unnecessary as that is
+the default interpretation of nested "defines".
+
+It is also possible to use a closure where a simple test without any
+error checking will suffice.
+
+
+define describe(things) -> result;
+
+    lconstant
+        iscolour =
+            member(%[red orange yellow green blue indigo violet]%);
+
+    lvars colour = false;
+
+    ARGS things, &OPTIONAL colour:iscolour;
+
+    if colour then
+        colour :: things
+    else
+        things
+    endif -> result
+enddefine;
+
+describe([big cats])=>
+** [big cats]
+
+describe([big cats], "blue") =>
+** [blue big cats]
+
+;;; This no longer mishaps, but behaves incorrectly, ignoring
+;;; the list, which is left on the stack.
+describe([big cats], "dogs") =>
+** [big cats] dogs
+
+
+The use of "lconstant" means that the closure of member is created only
+once, at compile time.
+
+The disadvantage of doing this, compared with using a nested procedure,
+is that if you want the list of colour_words to change the change will
+not be noticed in this procedure. You could use lvars for the closure
+and an externally defined list of colour words;
+
+vars colour_words = [red orange yellow green blue indigo violet];
+
+define describe(things) -> result;
+
+    lvars procedure iscolour = member(%colour_words%);
+
+    lvars colour = false;
+
+    ARGS things, &OPTIONAL colour:iscolour;
+
+    if colour then
+        colour :: things
+    else
+        things
+    endif -> result
+enddefine;
+
+
+The use of "lvars" rather than "lconstant" means that the closure is
+created every time the procedure runs. In general the cost of that is
+intolerable, so it is better to use a nested lconstant procedure
+definition which invokes member.
+
+I.e. this is more efficient:
+
+define describe(things) -> result;
+
+    define lconstant iscolour(word);
+        member(word, colour_words);
+    enddefine;
+
+    lvars colour = false;
+
+    ARGS things, &OPTIONAL colour:iscolour;
+
+    if colour then
+        colour :: things
+    else
+        things
+    endif -> result
+enddefine;
+
+
+-- See also -----------------------------------------------------------
+HELP * DEFINE
+
+TEACH * STACK
+
+HELP * LVARS, LEXICAL, * LCONSTANT
+
+For experts only: For full information on lexical scoping see
+    REF * VMCODE/'Lexical Scoping'
+
+
+--- $poplocal/local/help/ARGS
+--- Copyright University of Birmingham 2003. All rights reserved. ------

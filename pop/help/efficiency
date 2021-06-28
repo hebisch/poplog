@@ -1,0 +1,959 @@
+HELP EFFICIENCY                                   A. Sloman June 1991
+
+                          EFFICIENCY
+                          ==========
+
+CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Efficiency in General
+ -- Efficiency in POP-11
+ -- Equality tests:  = and ==
+ -- LVARS - Lexically scoped variables
+ -- Using typed identifiers
+ -- Using constant procedure names
+ -- Avoiding garbage
+ -- Increasing POPMEMLIM
+ -- Using SYS_LOCK_HEAP and SYS_LOCK_SYSTEM
+ -- Avoid compound numbers (e.g. ratios, ddecimals, bigintegers)
+ -- How to avoid compound numbers
+ -- Use CONSTANT list and vector expressions
+ -- Using SYSSTRING
+ -- Avoid adding things to the right hand end of a list
+ -- Use conspair instead of ::
+ -- Using NCREV instead of REV
+ -- Using NC_<> instead of <>
+ -- Fast Procedures
+ -- Fast integer "fi_" procedures
+ -- Using integers instead of decimals
+ -- Using "fast_for" with integer loop counters
+ -- Avoiding 'null' 'hd' 'tl' and 'FOR ... IN ... DO'
+ -- Don't use numerical indexing to iterate over a list
+ -- Using fast_for with lists
+ -- Call updaters explicitly
+ -- For sophisticated users (compile_mode)
+
+-- Efficiency in General ---------------------------------------------
+
+There are many aspects of writing efficient programs which are general
+to all programming languages, and, indeed are pure common sense. E.g.
+don't re-compute a value each time round a loop when you can compute it
+once before the loop and use the result in the loop. Similarly it may
+be clear (to some) to write
+
+    if isok(myanalysis(process(resultof(test)))) then
+        myanalysis(process(resultof(test))) -> result
+
+but doing the 'myanalysis(....)' twice could waste a great deal of
+time, especially if this portion of the program is executed frequently.
+
+In general the first place to look for improvements in efficiency is
+in any loop which the program goes round very often, or recursive
+programs which rapidly get deep into recursion. All this requires the
+sort of analysis of your program which any sensible programmer should
+do anyway.
+
+-- Efficiency in POP-11 ----------------------------------------------
+
+There are some features of POP-11 programs which are not inferrable
+merely using common sense. Some of these features can be important for
+efficiency.
+
+Very often POP-11 programs run more slowly than necessary because
+programmers do not know about facilities available for increasing speed,
+or are unaware of implementation features that affect the relative
+efficiency of different ways of doing things.
+
+The rest of this file contains a few pointers to some of the most
+common ways of improving speed. The topic is potentially vast, and the
+file will be extended from time to time.
+
+One common source of inefficiency is the use of a general mechanism when
+a more specific one will do. It is often better programming style to use
+the general mechanism (e.g. "=" rather than "==" or "HD" rather than
+"FRONT", as explained below) since that allows you to extend your
+program later. But when the design has been frozen and a program is
+required to do a specific task, tailoring it to that application can
+produce significant improvements in speed.
+
+
+-- Equality tests:  = and == ------------------------------------------
+
+POP-11 has two equality testing operators, "==" and "=". The former
+invokes a very fast comparison, and the result is TRUE only if the two
+arguments are exactly the same entity.
+
+"X = Y" does a more sophisticated comparison, and will produce the
+result TRUE if either "X == Y" is true, or X and Y are structures of the
+same kind and their components are identical, using the same test
+recursively. Thus
+
+    [a b c] = [a b c] =>
+    ** <true>
+
+    [a b c] == [a b c] =>
+    ** <false>
+
+On circular lists, "=" can continue forever.
+
+Thus in a loop where you are looking for a particular object, and
+not something isomorphic to a given object, use "==" in the termination
+test, e.g.
+
+    until x == [] do
+not
+    until x = [] do
+
+For more on this see HELP * EQUAL
+
+-- LVARS - Lexically scoped variables ---------------------------------
+
+HELP LVARS describes a late addition to POP-11, making it possible to
+declare lexically (statically) scoped variables. These came too late for
+documentation in the book on POP-11 by Barrett, Ramsay and Sloman. Their
+use can not only provide an alternative to partial application
+(See * PARTAPPLY), but also increase clarity and efficiency of
+programs.)
+
+Using lexical variables reduces the overhead on procedure exit, although
+there are some limitations on their use, compared with dynamically
+scoped variables.
+
+For instance, it would not be possible for user assignable variables
+like PRMISHAP, CUCHAROUT, INTERRUPT, POPPROMPT etc. to be declared
+as LVARS.
+
+Also the first N lvars declared in a procedure will be allocated to
+registers, reducing the number of memory accesses required. N is
+2 on a VAX, but may be different on other machines. Changing from
+VARS to LVARS in the procedure TEST defined below produced a significant
+additional saving, though not as much as using the fast integer
+procedures explained below.
+
+To illustrate, the following procedure uses non-lexical variables.
+    define f1;
+        vars a b c d e f g h i j k l m n o p q r s t u v w x y z;
+    enddefine;
+
+Calling it 100000 times on a VAX 750 takes about four times as long as
+the equivalent procedure using "lvars" instead of "vars". Of course,
+there would not be such a spectacular ratio if the procedure did
+anything interesting beside start up and exit, or had fewer locals.
+
+See HELP * LVARS for a warning about the possible reductions in
+efficiency in some cases were nested procedure definitions access
+lexical variables declared outside them - this situation can cause
+excessive garbage collections.
+
+One of the main disadvantages of using LVARS, is that during an error
+break, or user interrupt, it is not (at present) possible to interrogate
+or alter these variables. Tools will be provided for this. (See
+HELP LEXICAL). So for debugging purposes it may be necessary sometimes
+to use VARS. However, some programs will alter their behaviour, if the
+same name is used both for an LVARS variable and one accessed
+non-locally in another procedure.
+
+Similarly pattern variables accessed by the pattern matcher (i.e. the
+variables prefixed by "?" or "??" in a pattern) cannot be declared as
+LVARS. (See HELP * MATCHES). Neither can a variable whose value you
+wish to access or update using VALOF. E.g. in:
+
+    define fff();
+        lvars x;
+            .....
+
+        valof("x") =>
+    enddefine;
+
+the call of VALOF will not produce the value of the local lexical
+variable x, but the value of the ordinary variable x in its most recent
+activation.
+
+The use of "lvars" can reduce the need for sections (see * SECTIONS).
+For instance, suppose the procedure applist, which applies a
+given procedure to every element of a list, were not already defined.
+The following definition could cause trouble:
+
+    define dotolist(list, proc);
+        vars item;
+        for item in list do proc(item) endfor
+    enddefine;
+
+Trouble would occur if the second argument was a procedure which used
+any of "list", "proc", or "item" non-locally. For instance, you might be
+tempted to write a procedure to check if a list contained an element
+satisfying some predicate:
+
+    define satisfies(list, proc) -> result;
+        false -> result;
+        dotolist(list,
+                    procedure (x);
+                        if proc(x) then true -> result; exitto(satisfies)
+                        endif
+                    endprocedure)
+    enddefine;
+
+Attempting to use this to check if a list contains an integer
+    satisfies(list, isinteger)
+
+would cause infinite recursion, due to the wrong binding of "proc", when
+called by the procedure given as second argument to dotolist. It would
+refer to it. You could get round this by defining dotolist in a special
+section, and 'exporting' only the procedure name. Then procedures
+defined outside the section would be able to access the local variables
+of the same name used in the section. But switching sections can slow
+down compilation and take up space. So it is much simpler to use
+"lvars", in place of "vars". Don't forget that input variables need to
+be declared explicitly as "lvars", as they default to "vars".
+
+    define dotolist(list, proc);
+        lvars item proc list;
+        for item in list do proc(item) endfor
+    enddefine;
+
+Note, however, that 'for item in list' does checking which may not be
+needed, as explained below.
+
+-- Using typed identifiers --------------------------------------------
+
+POP-11 does not use typed variables, like PASCAL and other conventional
+languages. This means, as already indicated, that checks have to be done
+at run time. The name of a procedure is, in POP-11, just like any other
+variable, and so every time the procedure is called, a check has to be
+made that the value of the variable is in fact a procedure. To get round
+this, POP-11 allows you to declare a variable to be of type 'procedure'.
+
+If you define a low level procedure foo invoked very often in a loop,
+then instead of:
+
+    define foo(    )
+
+use
+    define procedure foo(   )
+
+This declares the variable foo to have type procedure, and will
+remove the run-time type-check which would otherwise have to occur
+on every call of foo. See HELP * PROCEDURE. You can force all procedure
+definitions in a particular file to work like this by doing:
+
+    true -> popdefineprocedure;
+
+This has the effect that you will get an error message if you try to
+assign a non-procedure to a variable already used as a procedure name.
+The default value of POPDEFINEPROCEDURE is FALSE because this has proved
+to be less confusing to naive users.
+
+Since POPDEFINEPROCEDURE is local to POP11_COMP_STREAM it cannot be made true
+globally simply by assigning to it in your init.p file. Instead, assign
+to the global value thus:
+
+    true -> caller_valof("popdefineprocedure",false)
+
+This can be done for local variables in a procedure. For example if a
+procedure foo takes an argument proc which is to be a procedure to be
+applied many times in a loop in foo, then do something like:
+
+    define foo(x,y,n,proc);
+        lvars x,y,n,procedure proc;
+        repeat ...
+                proc(.....)     ;;; this call does not check
+        endrepeat
+    enddefine;
+
+In this case the declaration of "proc" as being of type procedure, means
+that the check that a procedure has been given as argument to foo is
+done once, on entry to foo, and then the calls of proc need not check.
+
+If 'proc' is made one of the first two lvars, then a fast register will
+be used for it.
+
+
+The procedure fast_apply can be used to plant calls to procedures
+without checking. See REF * FASTPROCS.
+
+
+-- Using constant procedure names -------------------------------------
+
+    define constant foo
+
+makes foo a constant, and saves an indirection when the procedure is
+invoked (though it saves less time than avoiding the run time check as
+described above).
+
+Using constant procedures can interfere with debugging as you can't
+recompile foo and expect already compiled procedures which call it to
+call the new version. So this should be used only for thoroughly tested
+and debugged programs. Further, it is not possible to * TRACE a constant
+procedure.
+
+To make all procedure definitions work like this do:
+
+    true -> popdefineconstant
+
+at the top of a file that contains fully debugged procedures to be
+compiled as constants.
+
+The default is FALSE, since that is most convenient most of the time.
+You could make it TRUE whilst compiling your library utilities.
+
+See HELP * CONSTANT
+
+-- Avoiding garbage --------------------------------------------------
+
+POP-11 has a 'garbage collector' that reclaims space that has been
+used temporarily and is no longer accessible by the program. This space
+can then be re-used. The user does not have to do anything to make this
+happen: the memory allocation mechanism automatically runs the garbage
+collector when there is no more space available.
+
+This feature can save an enormous amount of programmer effort in keeping
+track of re-usable data-structures. It is therefore possible in POP-11,
+Prolog, Lisp, other AI languages, and some versions of ALGOL-68, to
+write programs which in a different language would soon grind to a halt,
+because they use up more and more of the available memory until there is
+none left.
+
+In POP-11, and other languages with a garbage collector, instead of
+grinding to a halt (and producing a 'RUN OUT OF SPACE' error), these
+programs will trigger the garbage collector by attempting to create a
+new structure when the all the "heap" has been allocated. The garbage
+collector can then determine whether some of the space is no longer
+accessible, in which case it can be re-used. Note that in POPLOG, ALL
+the data-structures that users can create, including procedures (Lisp
+functions), are garbage collectable, unlike some LISP systems. This
+means that less space is wasted by POPLOG.
+
+When a garbage collection occurs POPLOG may need temporarily to expand
+its memory allocation to provide extra work-space.
+(See HELP * POPMEMLIM)
+
+If grabage collections happen often, a lot of time can be spent doing
+garbage collections, and sometimes this is quite unnecessary.
+
+It is unnecessary in cases where POP-11 makes a copy of some structure,
+e.g. a list, when the original might have been used without copying. In
+these cases, in addition to the time taken in garbage collection there
+may also be wasted time spent making the copies. In the next few
+sections we indicate some of the most common ways in which unnecessary
+garbage collections can be produced.
+
+It is worth noting, however, that in SOME cases it is essential to copy
+because the list is going to be changed, and part of the program needs
+the old contents while another part needs the new contents.
+
+
+-- Increasing POPMEMLIM -----------------------------------------------
+
+If you know that your program is going to cause frequent garbage
+collections because it is essential to create temporary structures then
+discard them often, you can minimise the amount of time spent in the
+garbage collection by ensuring that POP-11 does not run out of space too
+often. This is done by giving the variable POPMEMLIM a larger value.
+(See HELP * POPMEMLIM).
+
+The garbage collection algorithm used by POP-11 (at least on machines
+with virtual memory, like VAXEs and the SUN workstation) is the "stop
+and copy" type. Memory is temporarily expanded, the used items in the
+heap are copied to the new memory space, in a compact form, then copied
+back. As a result the time taken for a garbage collection depends only
+on the amount of store still in use, not on the total store size.
+
+If you make POPMEMLIM very large, then programs which go on
+using up more and more space wrongly will run for a longer time before
+you get an error message.
+
+Also, as explained in HELP * POPMEMLIM, if you make POPMEMLIM too big,
+then when a garbage collection is required there may not be enough space
+left within the maximum process size allowed on your computer. If
+necessary persuade the system manager to increase the limit in the
+interests of efficiency! Sometimes this is counter productive because
+it causes too much paging when the garbage collections do occur.
+Experiment to find a good value. (*POPGCTRACE can be set TRUE to tell
+you when garbage collections occur.)
+
+On a machine with a large virtual memory and little physical memory, the
+use of a large value for POPMEMLIM can cause the process to expand
+until it doesn't fit into the physical memory, in which case a lot of
+extra "paging" can occur which will slow things down.
+
+POPMEMLIM is a maximum value upto which the system should expand; it
+will not necessarily use this amount unless garbage collections are
+taking a significant amount of time relative to the time taken by your
+program. However, if you wish to FORCE the system to expand to any given
+amount, you can assign a new value to the variable POPMINMEMLIM; the
+system will immediately expand up to this value at the next garbage
+collection.
+
+
+-- Using SYS_LOCK_HEAP and SYS_LOCK_SYSTEM ----------------------------
+
+Calling the procedure SYS_LOCK_HEAP tells the store manager that all the
+structures allocated so far are required permanently, so the presently
+used part of the heap can be "locked". (It is wise to call SYSGARBAGE
+first, to remove garbage.) Locking the heap at a certain stage means
+that only structures created thereafter need to be shuffled around by
+the garbage collector. It also means that less memory is required for
+doing a garbage collection. So the program will run with less memory
+available, and can spend less time doing garbage collections.
+  (See * SYS_LOCK_HEAP)
+
+Using SYS_LOCK_SYSTEM (described in REF *SYSTEM) to create saved images
+rather than * SYSSAVE also causes the heap to be locked, in the saved
+image.
+
+We turn now to ways of avoiding unnecessary construction of new
+data-structures (e.g. by unnecessary copying of lists) and thereby
+saving time in garbage collections.
+
+
+-- Avoid compound numbers (e.g. ratios, ddecimals, bigintegers) -------
+
+POPLOG has two major kinds of numbers (see also REF * DATA and
+HELP * MATH). Simple numbers do not cause garbage collections, whereas
+compound numbers can.
+
+1. Simple numbers are integers and decimals. These fit into a machine
+long word and therefore programs and structures referring to them can
+contain the representation of the number. The procedures ISSIMPLE,
+ISINTEGER and ISDECIMAL recognise these data types.
+
+2. Compound numbers are bigintegers, ratios, ddecimals and complex
+numbers. These all require too much space to fit into one machine
+word, and therefore they have to be stored in records in the POPLOG
+heap. Programs that refer to them contain pointers to such records.
+A program that creates a lot of them temporarily, e.g. in a loop,
+may cause garbage collections to happen frequently. In some cases this
+is unavoidable, e.g. because the extra precision of bigintegers or
+ddecimals is required, or because the algorithm used requires complex
+arithmetic or ratios.
+
+If compound numbers are unavoidable then time spent on garbage
+collection can be reduced by locking as much of the heap as possible
+and making popmemlim sufficiently large that garbage collections happen
+rarely, but not so large that there is no swap space for garbage
+collections.
+
+
+-- How to avoid compound numbers --------------------------------------
+
+The most common way of unwittingly creating compound numbers is to
+divide one integer by another which does not divide it exactly.
+
+Before the introduction of ratios this used to produce a decimal (or a
+ddecimal if popdprecision is true). Now it will produce a ratio.
+See HELP * MATH. If you always divide by 3.0 rather than by 3 you can
+ensure that the result is a decimal rather than a ratio (if
+popdprecision is false). So instead of X / 3 use X / 3.0 .
+
+Bigintegers can be created unwittingly by operations on integers.
+Whereas previously certain operations might have caused integer overflow
+or produced a decimal number, they will now produce a big integer:
+
+E.g.
+    33 ** 27 =>
+    ** 99971538734896047460249499950752967950177
+
+It is therefore important to analyse your algorithms carefully and
+apply tests if necessary, e.g.
+
+    if iscompound(x) then mishap('Integer overflow',[^x]) endif;
+
+Similarly, you may unwittingly create complex numbers by applying SQRT
+to a negative number or using ** with a non-integer second argument:
+
+    sqrt(-66) =>
+    ** 0.0_+:8.12404
+
+    -33 ** 3.5 =>
+    ** 0.0_-:206442.0
+
+The moral is: always analyse your algorithms carefully.
+
+See also the section below on using integers instead of decimals.
+
+-- Use CONSTANT list and vector expressions ---------------------------
+
+If you use POP-11 syntax for building a list, e.g. [1 2 3] or a vector,
+e.g. {1 2 3} inside a procedure, then you may want a new list to be
+created every time the procedure runs. That is what happens by
+default. However, often you will want to use the same list in a
+test, e.g.
+    if list = [1 2 3]
+
+or
+
+    if list matches [ == ?x is a ?y == ]
+
+In these cases there is no point reconstructing the list on the right
+every time the procedure is called. Worse, if that does happen, then in
+addition to the extra construction time, there will be additional
+'garbage collection' time, as the 'heap' of space for structures will
+be used up more quickly. This can be avoided by doing:
+
+    true -> popconstruct;
+
+(the default is FALSE). A corollary is that if you build a list in
+a procedure, then alter the contents of the list, the next time the
+procedure is used it will have the same list with the new contents.
+This can produce behaviour which is useful, and it can also be totally
+obscure. For an example see HELP *POPCONSTRUCT.
+
+Note that some lists must not be constructed at compile time since
+their contents depend on the value of a variable, or the result of some
+computation, e.g. if the following symbols are used in the list* "^",
+"^^", or "%". (See TEACH ARROW for more on this.) Thus, the list
+    [the sum of ^x and ^y is ^(x + y)]
+
+needs to be rebuilt every time there is an activation of the procedure
+in which the expression occurs, since the user will expect the list to
+contain the values of x, y, and x + y at RUN time. So, for such, lists
+making POPCONSTRUCT TRUE has no effect.
+
+In principle the compiler could be made clever enough to discover that
+portions of such lists can be built at compile time, e.g. the five
+element tail of
+
+    [^x is the value of x]
+
+This enhancement may be provided at a later date.
+
+For more on creation of structures inside procedures at COMPILE time,
+see HELP * HASH_, which explains how to use #_< .... >_# in procedure
+definitions to include instructions to be executed at compile time.
+
+Declaring a lexical local variable with lconstant can give it a constant
+value. For example if the procedure foo needs to have a string to use
+as a buffer then:
+
+    define foo ...;
+        lvars string;
+        inits(512) -> string;
+        ....
+    enddefine;
+
+will cause a new string to be created EVERY time foo runs, whereas the
+following creates a string only when the procedure is compiled, and uses
+the same string each time.
+
+    define foo ...;
+        lconstant string=inits(512);
+        ....
+    enddefine;
+
+The disadvantage is that if foo is very rarely invoked, it nevertheless
+has the string permanently allocated, taking up space on the heap.
+
+-- Using SYSSTRING ----------------------------------------------------
+
+For procedures that need to use a string as a character buffer, the
+library constant SYSSTRING is provided. It should not be used by any
+procedure that might call another procedure than could use it! For
+details SHOWLIB * SYSSTRING.
+
+For an example of its use: SHOWLIB * DISCAPPEND
+
+
+-- Avoid adding things to the right hand end of a list ----------------
+
+If your program is building up a list of items, by repeatedly adding
+something to the right hand end of the list, it might include something
+like the following in a loop or recursive procedure:
+
+    [^^list ^item] -> list;
+
+or, equivalently:
+
+    list <> [^item] -> list;
+
+The expression on the left of the assignment is constructed by
+making a COPY of list, with the new item added at the right hand end.
+As soon as the assignment is done, there will generally be nothing
+pointing to the previous value of list. Hence the old list will just
+be 'garbage' using space on the heap, and the new list will also
+be on the heap taking up space. It will then be discarded and a new
+copy made the next time round the loop.
+
+This sort of program then both wastes time making more and more copies
+which are discarded, and also doing garbage collections to reclaim the
+space when the heap is exhausted. The solution is always to add new
+items at HEAD of the list.
+
+    [^item ^^list] -> list;
+
+or, almost equivalently:
+
+    item :: list -> list;
+
+which can also be written:
+
+    cons(item,list) -> list;
+
+(See section on conspair, below)
+
+Adding items on the left, has the effect that at the end the items will
+not be on the list in the order they were added, but in reverse order.
+To handle this, at the end you can do:
+
+    rev(list) -> list;
+
+This will make a copy in reverse order, and the old list will be
+garbage. (See section on ncrev, below).
+
+
+-- Use conspair instead of :: -----------------------------------------
+
+The list constructing operator "::" (equivalent to CONS) checks
+that its second argument is a list and if it is not a list produces an
+error message. If you are sure that the second argument will be a list
+then use the procedure CONSPAIR to avoid wasting time on the check:
+
+    conspair(item,list) -> list;
+
+rather than:
+
+    item :: list -> list
+or
+
+    [^item ^^list] -> list
+
+
+-- Using NCREV instead of REV ----------------------------------------
+
+If done very frequently, reversing of lists using REV can be inefficient
+because it essentially copies the list instead of using the same list
+links. So if no other portion of the program requires the original list
+to remain accessible with its elements in the same order, then a
+non-copying version may be used:
+
+    ncrev(list) -> list;
+
+Do not use this or other "efficient" procedures if you are using dynamic
+lists.
+
+See HELP * NCREV. Note the warning about the dangers of non-copying list
+modifiers. There is also a fast non-checking version: FAST_NCREV.
+
+
+-- Using NC_<> instead of <> ------------------------------------------
+
+If you really can't let the list be in the wrong order during the
+course of construction, because something is examining intermediate
+states of the list, you can use the non-copying list concatenator
+within the loop, i.e. instead of
+
+    list <> [item] -> list
+do
+    list nc_<> [item] -> list;
+
+Using NC_<> does not produce an entirely new list, but alters the final
+link in the first list so that instead of its tail being [] it is the
+second argument. Like using NCREV, this can be dangerous if some other
+variable still points to the original list on the assumption that it has
+not changed.
+
+Note that NC_<> has to run down the chain of list links to get to
+the last link, so that if you are frequently adding something to the
+right of a very long list it may pay first to reverse the list (using
+NCREV) then do all the additions at the front, then reverse the list
+again.
+
+'ncjoin' was once used instead of 'nc_<>'. The old name will survive in
+an autoloadable synonym definition.
+
+NB Whereas <> works on many different datastructures, and procedures,
+nc_<> is designed only for lists. In other cases it just calls <>.
+
+
+-- Fast Procedures ----------------------------------------------------
+
+HEALTH WARNING:
+    Using 'fast procedures' can corrupt your program!!!
+    Using 'fast procedures' can mean failing to detect errors!!!
+
+Many operations in POP-11 have to test at run time that they are given
+the correct type of argument, since POP-11 variables are (mostly)
+type-free, and types cannot be checked at compile time, or at the time
+values are assigned to variables. These run-time type checks can slow
+down programs which, for example, do a lot of arithmetic in loops, or
+frequently access components of known structures.
+
+In some cases the checks can be avoided by using 'fast' versions of the
+procedures, which are designed for use in programs which have already
+been thoroghly checked out. Checking is essential, because the use of the
+fast procedures can cause errors to go undetected, and meaningless
+results to be produced which may not look meaningless. Worse still, if
+you use the updaters of fast procedures to alter the contents of lists,
+vectors or strings, etc. you may inadvertently corrupt your program and
+lose a lot of work, whereas the slower version would have detected that
+something was wrong, and caused an error instead of allowing the
+corruption.
+
+
+-- Fast integer "fi_" procedures --------------------------------------
+
+Several non checking fast integer procedures are available, listed in
+REF * FASTPROCS. NB they do not work on bigintegers.
+
+To illustrate, here is a simple procedure which counts down from
+100000.
+
+    define test();
+        vars x;
+        100000 -> x;
+        while x > 0 do
+            x - 1 -> x;
+        endwhile
+    enddefine;
+
+This took 7.6 secs CPU time on a VAX 750 under medium load. Changing ">"
+to "fi_>" and changing "-" to "fi_-" (i.e. the Fast_Integer versions)
+brought the time down to: 2.48 secs. Replacing "vars" with "lvars" (see
+above) produced a further reduction to 1.95 secs. (These times are very
+dependent on loading, under UNIX.)
+
+
+-- Using integers instead of decimals -----------------------------------
+
+It is sometimes possible to save time by using integers instead
+of decimals. A procedure may take decimal inputs and produce decimal
+results, but operate within a range of values that enables all the
+calculations to be done by integer arithmetic. E.g. if all the
+numbers used lie in the range -10 to +10 and only four decimal
+places are significant, then multiply the arguments by 100000,
+round them, use fast integer procedures, and divide the result
+by 100000. This can enormously speed up some algorithms.
+
+
+-- Using "fast_for" with integer loop counters --------------------------
+
+The fi_ procedures can be invoked in a structured fastion by using the
+syntax word "fast_for":
+
+    define test();
+        lvars x;
+        fast_for x from 100000 by -1 to 1 do endfor
+    enddefine;
+
+NB fast_for must not be used unless the loop variable will take only
+integer values in the loop. (It can also be used with lists, as
+indicated below.)
+
+The fast procedures are described in REF FASTPROCS. Their use can be
+temporarily negated for debugging purposes by loading LIB SLOWPROCS.
+For details do SHOWLIB SLOWPROCS.
+
+
+-- Avoiding 'null' 'hd' 'tl' and 'FOR ... IN ... DO' --------------
+
+To understand this section, you need to know about the representation of
+lists in POP-11. See TEACH WAL ('What Are Lists'). See HELP * CONSPAIR
+and REF LISTS for more technical details. It helps to know about dynamic
+lists (used for 'lazy evaluation'). See * PDTOLIST .
+
+It is often elegant and readable to use NULL to test whether you have
+reached the end of a list, in a loop. For instance
+
+    define dotolist(list,.....);
+        until null(list) do
+            ........hd(list).....;
+            tl(list) -> list;
+        enduntil
+    enddefine;
+
+However, NULL does quite elaborate tests, since it has to be able to
+handle the case of a dynamic list as well as ordinary lists. It also
+makes sure that its argument is a list. (See HELP * NULL).
+
+If, in the same loop, you use HD and TL, on the same list, then each of
+these procedures will repeat the same tests performed by NULL. This is
+clearly wasteful. You could reduce the amount of unnecessary repetition
+by using DEST, instead of both HD and TL, though this is not always
+convenient. In fact, if NULL has already been used you can safely
+instead use FRONT and BACK, or even FAST_FRONT and FAST_BACK. This is
+because if the argument is not a proper list at all, NULL will detect
+this and produce an error.
+
+Moreover, even if its argument is a dynamic list, NULL will 'expand' it
+so that it starts with an ordinary list link. (A really clever compiler
+would detect such cases and optimise them automatically.) So the
+following would be significantly faster than the above code:
+
+    define dotolist(list,.....);
+        until null(list) do
+            ......fast_front(list).......;
+            fast_back(list) -> list;
+        enduntil
+    enddefine;
+
+You can also sometimes save time by invoking fast_destpair instead of
+calling fast_front and fast_back, e.g.
+
+    define dotolist(list,.....);
+        lvars item;
+        until null(list) do
+            fast_destpair(list) -> list ->item;
+            ......item.......;
+        enduntil
+    enddefine;
+
+
+If you use the 'for ... in ...' construction, as in:
+
+    define dotolist(list,.....);
+        lvars item;
+        for item in list do
+            ......item.......;
+        endfor
+    enddefine;
+
+This uses NULL and FAST_DESTPAIR. This call of NULL is wasteful if you
+happen to know that you are never using dynamic lists. For instance, the
+following will be quicker, since ISPAIR is much quicker than NULL:
+
+    define dotolist(list,.....);
+        lvars item;
+        while ispair(list) do
+            fast_destpair(list) -> list ->item;
+            ......item.......;
+        endwhile;
+        if list /== [] then mishap('LIST NEEDED', [^list]); endif;
+    enddefine;
+
+Alternatively use 'until atom(list) do...enduntil'.
+
+However, all this can still be wasteful if you KNOW that your list will
+always be an ordinary list, ending with the empty list [], for instance,
+since the list is created earlier in the same procedure using list
+brackets. In that case, it can save a lot of time to do, instead
+
+    define dotolist(list,.....);
+        lvars item;
+        until list == [] do
+            fast_destpair(list) -> list ->item;
+            ......item.......;
+        enduntil
+    enddefine;
+
+To illstrate the effects of these different constructs, a small test
+program was run on a VAX-750, which ran down a 10000 element list 10
+times, while the machine was under medium load.
+
+Using FOR ... IN list DO, the time was (approximately) 8.3 to 8.5 seconds
+
+Using UNTIL ATOM(list) DO, the time was about 4.45 seconds.
+
+Using UNTIL list == [] DO, the time was about 2.5 seconds.
+
+All use fast_destpair. The second and third are unsafe if some of the
+lists may be dynamic (i.e. created using PDTOLIST). The third is unsafe
+if any of the list-links in the list could possibly have as their BACK,
+something other than [] or another list cell. (I.e. another pair).
+
+-- Don't use numerical indexing to iterate over a list ----------------
+
+A typical naive program does something like this:
+
+    for n from 1 to length(list) do
+
+        list(n) -> item;
+
+        .... item ....
+
+    endfor;
+
+This is silly because list(n) accesses the n'th element of -list- by
+counting down all the list links starting at the the beginning of the
+list EVERY time. So each time round the loop it will take longer and
+longer, as more of the list has to be counted through. If the list has
+length K, this requires the following number of steps:
+
+    1 + 2 + 3 + 4 ... + K
+
+            K * (K + 1)
+i.e.        ----------      steps
+                2
+
+
+In other words, the time taken depends on the square of the length of
+the list. The answer is to use the following format instead:
+
+    for item in list do
+        ....item.....
+    endfor;
+
+See HELP * FOR, HELP * LOOPS
+
+The next section explains how to speed up certain "for" loops.
+
+
+-- Using fast_for with lists ------------------------------------------
+
+The syntax procedure "fast_for" is provided to deal with the last
+case in a structured fashion. Either "endfor" or "endfast_for" can be
+used as closing bracket, e.g.
+
+    fast_for x in list do .....  endfor
+
+    fast_for x in list do .....  endfast_for
+
+    fast_for x on list do ...... endfor
+
+
+-- Call updaters explicitly -----------------------------------------
+
+See HELP * UPDATER for information on updaters.
+
+If you have defined a procedure f with an updater, and you are invoking
+the updater repeatedly in a loop using the assignment arrow
+
+        -> f(...)
+
+this requires POP-11 to access first f, then its updater, every time
+round the loop. (If you have not defined 'f' as a procedure variable,
+using 'define procedure' as explained above, it will also have to check
+each time that the value of 'f' is a procedure.)
+
+You can avoid the time taken to get at the updater each time, by using
+'updater' in the procedure to get the updater, assigning it to a local
+variable, preferably an 'lvars' variable then calling the updater
+explicitly. For example, instead of
+
+    define test(x);
+        lvars x;
+        until .... do 0 -> f(x) enduntil;
+    enddefine;
+
+you can do something like:
+
+    define test(x);
+        lvars x procedure upd;
+        updater(f) -> upd;
+        until .... do upd(0, x) enduntil;
+    enddefine;
+
+On a simple test using a VAX 750 this sort of change reduced the time
+taken for a 100000 repetitions of a simple operation from about 6.4
+seconds to about 5.8 seconds. Not a fantastic reduction.
+
+There is no point doing this for updaters of system procedures like
+FRONT, BACK, etc. Calls of these are already optimised.
+
+If 'f' is defined by 'define constant f' then the compiler ought to be
+able to do this optimisation itself, but it doesn't yet.
+
+-- For sophisticated users (compile_mode)
+
+The file LIB * COMPILE_MODE and others referenced there explains how
+users can specify various compile time options including both additional
+compile time checks and, where desired increased speed by removing
+some run-time checks. For example, turning procedure-entry checks and
+backward jump checks can produce considerably faster code, (that may
+be hard to interrupt). For more information see
+
+    INCLUDE * vm_flags.ph  * pop11_flags.ph
+
+where various compile-time options are described.
+
+To be continued ...
+
+--- C.all/help/efficiency
+--- Copyright University of Sussex 1990. All rights reserved. ----------

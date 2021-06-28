@@ -1,0 +1,79 @@
+HELP SHOWCODE                       Jonathan Laventhol, 30th January 1984
+                                    Updated Mark Rubinstein February 1986
+
+    lib showcode;
+
+This library package makes the intermediate-code planting instructions
+(such as sysSYNTAX) print tracing information.  This is useful for
+debugging compilers.
+
+It alters the planting procedures to print information when the variable
+POP_SHOW_CODE is true.  The procedures run as normally apart from this.
+
+Note that calls to the code-planting procedures compiled BEFORE the
+loading of the library file will not be affected.
+
+The tracing for these calls
+
+    sysSYNTAX("hello", "procedure", false);
+    sysLABEL(sysNEW_LABEL());
+    sysERASE("dummy");
+    sysERASE("dummy");
+
+will print
+
+            SYNTAX  hello procedure <false>
+    label_2
+            ERASE   dummy
+            ERASE   dummy
+
+note that the leading "sys" isn't printed, and the special printing for
+calls to sysLABEL.
+
+    false -> pop_show_code;         ;;; switch printing off
+    true -> pop_show_code;          ;;; switch it on
+
+You can use LIB *SHOWCODE to do something other than print a trace of
+the code planting procedures by redefining the variable procedure
+-popshowcodepdr- (default: popshowcodesyspdr).  The procedure should
+take two arguments, the name of the code planting procedure and a vector
+of arguments.
+
+For example if you want to keep a list of the code for procedures in a
+property called -vmcodefor- (see HELP * NEWPROPERTY) then:
+
+    vars
+        vmcodefor = newproperty([], 32, true, false),
+        current_codelist = [],
+
+    define popshowcodepdr(name, args);
+        lvars name args;
+        if name == "sysPASSIGN" then
+            ;;; second argument will be the variable being assigned to
+            rev(current_codelist) -> vmcodefor(args(2))
+        else
+            if name == "sysPROCEDURE" then
+                [] -> current_codelist;
+            endif;
+            ;;; strip off the "sys"
+            [% allbutfirst(3, name), args %] :: current_codelist
+                -> current_codelist;
+        endif;
+    enddefine;
+
+(NOTE: the above procedure is a little simplified as it will not cope
+with nested procedures).
+
+See REF *VMCODE for more information on the code planting procedures
+which are affected:
+
+sysAND, sysCALL, sysCALLQ, sysCALLS, sysCOMPILE, sysCONSTANT, sysDUMMY,
+sysDUMMY_PREOP, sysENDPROCEDURE, sysERASE, sysEXECUTE, sysGLOBAL,
+sysGOTO, sysGO_ON, sysIFNOT, sysIFSO, sysLABEL, sysLCONSTANT, sysLOCAL,
+sysLVARS, sysNEW_LVAR, sysOR, sysPASSIGN, sysPLOG_RESTORE, sysPLOG_SAVE,
+sysPOP, sysPROCEDURE, sysPUSH, sysPUSHQ, sysPUSHS, sysSYNTAX, sysUCALL,
+sysUCALLQ, sysUCALLS, sysUPASSIGN, sysVARS, sysNEW_LABEL.
+
+
+--- C.all/help/showcode
+--- Copyright University of Sussex 1992. All rights reserved. ----------

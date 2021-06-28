@@ -1,0 +1,587 @@
+HELP DLOCAL                               A.Sloman, John Gibson Mar 1990
+                                            Updated John Gibson Mar 1996
+
+dlocal is a syntax word used within a procedure to specify dynamic local
+variables or expressions, that is expressions whose values are saved on
+entry and restored on exit -- whether by a normal or abnormal exit. For
+full details of the mechanisms involved see REF * VMCODE/sysLOCAL.
+
+Some tutorial examples, problems and solutions are presented below.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+  2   Example Formats
+  3   An Example Using a dlocal Expression
+  4   Multiplicity
+  5   Example of an Exit Action
+  6   vars vs dlocal
+  7   File-local Lexicals
+  8   dlocal_context: Controlling Entry and Exit Actions
+  9   Example using dlocal_context
+ 10   Do Not use Initialised Local Variables in dlocal Expressions
+ 11   Use of dlocal_context to Avoid an Extra Procedure Call
+ 12   Exit Actions to Tidy Up Variables
+ 13   Related Documentation
+
+
+-----------------------------------------------------------------------
+1  Introduction
+-----------------------------------------------------------------------
+
+A dlocal declaration within a procedure may specify that the value of
+any of the following may be saved and restored:
+
+    1. an ordinary variable
+    2. an active variable (see * ACTIVE_VARIABLES)
+    3. an arbitrary expression, indicated between "% ... %".
+
+The declaration may also specify a value to be assigned to the
+expression when the procedure is run.
+
+NOTE that although a dlocal declaration may appear anywhere inside a
+procedure, the localisation of the variable or expression always applies
+to the procedure as a whole; only the assignment part (if supplied)
+follows the normal flow of control. Thus for example, in
+
+    define foo();
+        if condition then
+            dlocal X = value;
+        endif;
+    enddefine;
+
+there is no sense in which X will be localised only if condition is
+true, although the assignment will done only in that case. Thus the
+above is identical to
+
+    define foo();
+        dlocal X;
+        if condition then
+            value -> X;
+        endif;
+    enddefine;
+
+A dlocal declaration may also be used outside of a procedure, to make
+the variable or expression local to the current compilation stream, e.g.
+the current file. (Used in this way, the expression actually becomes
+local to the current call of the Poplog VM procedure * sysCOMPILE).
+
+
+-----------------------------------------------------------------------
+2  Example Formats
+-----------------------------------------------------------------------
+
+Individual dlocal declarations may be separated by commas, thus:
+
+    dlocal
+        var1, active_var1,      ;;; ordinary or active identifiers
+        var2 = expression,      ;;; initialise var2 with <expression>
+        nonactive active_var2,  ;;; nonactive value of active identifier
+        active_var3=(3,4,5),    ;;; does:    3,4,5 -> active_var3
+        %expr%,                 ;;; expression to be saved and restored
+        %expr1% = expr2,        ;;; expr1 initialised (after saving)
+        3 %expr%,               ;;; expression multiplicity 3
+        2 %expr% = (e1,e2),     ;;; does:   e1,e2 -> expr on entry
+        3 %expr1,expr2%,        ;;; different expression run on exit
+        0 %, expr2%;            ;;; only an exit action
+
+Note that when only one expression is given between % ..... % then the
+updater of its main procedure or operator is run when the procedure
+exits. So
+
+    dlocal 3 %f(x,g(y))% = (a,b,c);
+
+Means
+
+    1. on entry save the three results of 'f(x,g(y))'
+
+    2. do:   a,b,c, -> f(x,g(y))
+
+    3. On exit do:  <saved values> -> f(x,g(y))
+
+
+-----------------------------------------------------------------------
+3  An Example Using a dlocal Expression
+-----------------------------------------------------------------------
+
+The procedure test below saves and restores the value of the expression
+'hd(tl(list))', where list is a global identifier.
+
+    vars list =[1 2 3];
+
+    define test();
+        dlocal %hd(tl(list))%;
+        [original list ^list]=>
+        5 -> hd(tl(list));
+        [updated list ^list] =>
+    enddefine;
+
+    test();
+    ** [original list [1 2 3]]
+    ** [updated list [1 5 3]]
+
+But the value of hd(tl(list)) has been restored on exit:
+
+    list =>
+    ** [1 2 3]
+
+It would also be restored if the procedure call terminated abnormally,
+e.g. as a result of a mishap or call of interrupt.
+
+
+-----------------------------------------------------------------------
+4  Multiplicity
+-----------------------------------------------------------------------
+
+Dynamic local expressions have a multiplicity specifying how many values
+are to be saved on entry or restored on exit. In the case of an
+expression the multiplicity M may be specified explicitly
+
+    dlocal M %expression%;
+
+(where M is 0 - 255), or defaults to 1 if not specified. For an
+identifier, the multiplicity is always known to the compiler (1 for a
+ordinary nonactive variable, or M for an active variable of multiplicity
+M).
+
+If the procedure to be run on exit is not the updater of that to be run
+on entry, then it may occur after a comma between % ... %.
+
+If nothing precedes the comma then there will be no values saved on
+entry, and only the exit action will be run on exit.
+
+
+-----------------------------------------------------------------------
+5  Example of an Exit Action
+-----------------------------------------------------------------------
+
+    define test();
+        dlocal 0 %,('leaving test'=>)%;
+        'in test' =>
+        interrupt();
+        'still in test' =>      ;;; never executed
+    enddefine;
+
+    test();
+    ** in test
+    ** leaving test
+
+
+-----------------------------------------------------------------------
+6  vars vs dlocal
+-----------------------------------------------------------------------
+
+Prior to the introduction of dlocal, only permanent variables (i.e.
+those declared with vars) could be made dynamically local to a
+procedure, and this had to be done with a vars statement inside the
+procedure. However, this was unsatisfactory inasmuch as a vars
+statement, being committed to declaring a permanent variable with the
+identprops supplied (in case it is not already declared) may alter the
+identprops of a previous permanent declaration. (In other words, vars
+statements inside procedures have the appearance of making the
+identprops of variables local to the procedure, when in fact they do
+not.)
+
+dlocal however enables both permanent and lexical variables to be made
+dynamically local to a procedure (without any redeclaration), and thus
+means that the use of vars statements inside procedures can be avoided
+altogether; all permanent variables can be declared outside of
+procedures, and then made procedure-local with dlocal, e.g.
+
+    vars v1, v2;
+
+    define p();
+        dlocal v1, v2;
+        ...
+    enddefine;
+
+Note that this way of doing things makes permanent and lexical variables
+declared at top level in a file interchangeable, except insofar as the
+lexical variables can be accessed only in
+
+    (a) the file in which they are declared, or
+    (b) a file spliced into the current compilation stream using
+        #_INCLUDE. (See REF * PROGLIST/#_INCLUDE).
+
+I.e Pop-11 supports what are sometimes called "file-local" lexical
+scoping.
+
+
+-----------------------------------------------------------------------
+7  File-local Lexicals
+-----------------------------------------------------------------------
+
+So the above example could just as well have used 'lvars v1, v2;'
+instead of 'vars v1, v2;'.
+
+    lvars v1, v2;
+
+    define p();
+        dlocal v1, v2;
+        ...
+    enddefine;
+
+No procedure invoked by p would then be able to access v1 or v2 unless
+declared in the same file, or in a file spliced in using #_INCLUDE.
+See HELP * LEXICAL.
+
+
+-----------------------------------------------------------------------
+8  dlocal_context: Controlling Entry and Exit Actions
+-----------------------------------------------------------------------
+
+Besides normal entry and exit, a procedure's environment may be left
+because of a call of * chain or another procedure that "chains" out of
+one or more procedures, e.g. * exitfrom, * exitto, * chainfrom,
+* chainto, * throw. A procedure can also be left because a process is
+suspended, as explained in HELP * PROCESSES.
+
+The environment can also be re-entered when a process is resume-ed.
+(See HELP * RESUME.)
+
+In order to distinguish all these cases, the active variable
+dlocal_context is provided. It has an integer value, the integer
+defining the context. Moreover the active variable dlocal_process points
+to the process undergoing suspension or resumption, if there is one.
+
+Here are the contexts that can be indicated by the value of
+dlocal_context
+
+        value   context         applies to
+        -----   -------         ----------
+          1     normal entry      access
+                normal exit       update
+
+          2     abnormal exit     update
+
+          3     suspend           access
+                                  update
+
+          4     resume            access
+                                  update
+
+In contexts of type 1, i.e. normal procedure entry, the access code to
+save the value of a dlocal expression is planted BEFORE any instructions
+to initialise formal parameters from the stack. This can cause problems
+discussed at the end of this file.
+
+In the case of suspend and resume, the current process record is also
+available to the code from the active variable dlocal_process. The value
+this returns is defined only for contexts 3 and 4, and is UNDEFINED for
+the other two.
+
+So procedures specified by dlocal to be run on entry or exit from a
+procedure can use dlocal_context and dlocal_process to determine what
+actions to perform.
+
+
+-----------------------------------------------------------------------
+9  Example using dlocal_context
+-----------------------------------------------------------------------
+
+    define foo(...);
+
+        define lconstant Inout_check(context, process);
+            lvars context, process;
+            if context == 1 then
+                ... actions for normal entry ....
+            elseif context == 3 then
+                ... access actions for suspending a process ...
+            elseif context == 4 then
+                ... access actions for running or resuming a process ...
+            endif
+        enddefine;
+
+        define updaterof Inout_check(context, process);
+            lvars context, process;
+            if context == 2 then
+                ... update actions for abnormal exit (e.g. chain)...
+            elseif context == 3 then
+                .... update actions for resuming a process ...
+            endif
+        enddefine;
+
+        dlocal 0 % Inout_check(dlocal_context, dlocal_process) % ;
+
+        .... body of foo ....
+    enddefine;
+
+Note that the identifiers dlocal_context and dlocal_process cannot be
+used except in the context of a dlocal expression. This is why their
+values have to be passed in as parameters to the procedures.
+
+The Pop-11 trace facility uses this kind of mechanism to give different
+trace printing in different contexts.
+
+For further details see REF * VMCODE/dlocal_context.
+
+The remainder of this file describes a complication that can occur when
+dlocal expressions are used.
+
+
+-----------------------------------------------------------------------
+10  Do Not use Initialised Local Variables in dlocal Expressions
+-----------------------------------------------------------------------
+
+In order to understand this section, users must know how formal
+parameters in Pop-11 procedures get their values from the user stack, as
+explained in TEACH * STACK.
+
+Because of the sequence in which code corresponding to dlocal
+expressions and input variable initialisation is executed, it is
+possible to produce errors that can be hard to understand. The reason,
+as stated in REF * VMCODE, is that access code for dlocal expressions is
+run BEFORE popping procedure formal arguments from the stack (and update
+code is run AFTER pushing formal result variables).
+
+So the code that saves the current value of a dynamic local expression
+is run BEFORE any local variables are initialised, including any formal
+parameters.
+
+In consequence, the body of an dynamic local expression should not
+include any local variable initialised in the current procedure,
+including input variables. A failure to remember this is a common source
+of errors, as illustrated by the following procedure, which takes a list
+and some other item, and is supposed to save the contents of the head of
+the list on entry and restore it on exit.
+
+    define test(list,item);
+        lvars list, item;
+
+        dlocal %hd(list)%;  ;;; save hd(list) on entry, restore on exit
+
+        item -> hd(list);
+        list =>
+
+    enddefine;
+
+Unfortunately, the dlocal expression uses the local lexical variable
+"list", and this will not have been given a value at the time that the
+expression "hd(list)" is evaluated in order to save the value. As a
+result, there will be an error when the procedure is run. E.g.
+
+    vars testlist = [a b c d];
+    test(testlist, "cat");
+
+    ;;; MISHAP - LIST NEEDED
+    ;;; INVOLVING:  0
+    ;;; DOING    :  hd test compile
+
+I.e. the lexical variable "list" happens to have the value 0 when an
+attempt is made to apply hd to it. So an error results.
+
+It is possible to overcome this problem by using an extra level of
+procedure call, and embedding the dlocal declaration within the extra
+nested procedure, thus:
+
+    define test(list,item);
+        lvars list, item;
+
+        define lconstant sub_test();
+            dlocal %hd(list)%;      ;;; embedded dlocal declaration
+
+            item -> hd(list);
+            list =>
+        enddefine;
+
+        sub_test();
+
+    enddefine;
+
+The embedded procedure is defined as "lconstant" for the reason
+explained in HELP * LEXICAL, namely to prevent unnecessary creation of
+temporary closures of the nested procedure, thereby avoiding unwanted
+garbage collections. The modified procedure can be tested thus:
+
+    vars testlist = [a b c d];
+
+    testlist =>
+    ** [a b c d]
+
+    test(testlist, "cat");
+    ** [cat b c d]
+
+    ;;; Now check that the head of the list has been re-set
+    testlist =>
+    ** [a b c d]
+
+The restriction on using the values of local variables does not apply to
+initialisation code. E.g.
+
+    vars data = [a b c d];
+    define test2(item);
+        lvars item;
+
+        dlocal %hd(data)% = item;   ;;; use item to change data
+
+        data =>
+    enddefine;
+
+    data =>
+    ** [a b c d]
+
+    test2(99);
+    ** [99 b c d]
+
+    data =>
+    ** [a b c d]
+
+
+This works because the code for the initialisation instruction to set
+the value of hd(data), i.e. in effect the instruction:
+
+    item -> hd(data)
+
+is run AFTER the procedure's input locals are popped off the stack. So
+the sequence is:
+
+    1. procedure entry
+    2. set up lexical locals with undefined values
+    3. save values of dlocal expressions (see note below)
+    4. get values for input parameters from stack
+    5. run dlocal initialisations, and user initialisations of local
+        variables
+    6. run body of procedure
+    7. push values of output locals
+    8. restore saved values of dlocal expressions (see note below)
+
+NOTE: for use with processes the situation is more complex than this, as
+code has to be planted for saving and restoring dlocal values on
+suspending and resuming processes too. Full details are to be found in
+REF * VMCODE.
+
+The next section describes an alternative solution to the problem.
+
+
+-----------------------------------------------------------------------
+11  Use of dlocal_context to Avoid an Extra Procedure Call
+-----------------------------------------------------------------------
+
+It is possible to use a dlocal expression to initalise the variables
+that would otherwise be used as input variables. However, this must be
+restricted to the case where dlocal_context == 1, and in access mode
+only. So the next procedure, instead of having "list" and "item" as
+formal parameters initialises them in a dlocal expression:
+
+    define test3(/* list, item */) with_nargs 2;
+        lvars list, item;
+
+        dlocal 0 % if dlocal_context == 1 then -> (list, item) endif, % ;
+        dlocal %hd(list)%;  ;;; save hd(list) on entry, restore on exit
+
+        item -> hd(list);
+        list =>
+
+    enddefine;
+
+Notice the comma after "endif" implying that the conditional is run only
+in access mode, on entry.
+
+    test3([1 2 3], 99);
+    ** [99 2 3]
+
+Because the above looks rather clumsy it is possible to define a macro
+dlocal_args as follows, to conceal the complexity.
+
+    define macro dlocal_args;
+        ;;; Used to declare arguments that are initialised before other
+        ;;; dlocal expressions are executed
+
+        lvars list = [], item;
+
+        ;;; read in the identifiers, and build a list
+        until (readitem() ->> item) == ";" do
+            unless item == "," then
+                conspair(item,list) -> list
+            endunless
+        enduntil;
+
+        ;;; construct the dlocal expression
+        dl( #_< [dlocal 0 ^("%")if dlocal_context == 1 then] >_#);
+            for w in list do
+                "->", w,
+            endfor;
+        dl(#_< [endif, ^("%") ;] >_#);
+    enddefine;
+
+Now test this new construct:
+
+    define test4(/* list, item */) with_nargs 2;
+        lvars list, item;
+
+        dlocal_args list, item;
+
+        dlocal %hd(list)%;  ;;; save hd(list) on entry, restore on exit
+
+        item -> hd(list);
+        list =>
+
+    enddefine;
+
+    test4([1 2 3], 999);
+    ** [999 2 3]
+
+
+-----------------------------------------------------------------------
+12  Exit Actions to Tidy Up Variables
+-----------------------------------------------------------------------
+
+A dlocal exit action may be used to 'tidy up' the value of a local
+variable that may or may not get set during the execution of a
+procedure. For example, suppose the procedure opens a file with sysopen,
+and you wish to ensure the file is closed whenever the procedure exits
+(either normally or abnormally). Assuming the device for the file is
+assigned to the variable dev, this can be done as follows:
+
+     dlocal 0 % if dlocal_context == 1 then false -> dev endif,
+                if dlocal_context <= 2 and dev then
+                     sysclose(dev)
+                endif
+              %;
+
+Here dev is initialised to false by the entry action on normal entry
+(i.e. dlocal_context == 1), and the exit action on normal or abnormal
+exit (i.e. dlocal_context <= 2) then uses sysclose only if dev has been
+set to a device.
+
+An essential element of the above is that the system guarantees that the
+exit action will not be run unless the entry action has been run (see
+REF * VMCODE).
+
+NOTE that you should always guard entry and exit actions like the above
+with tests for dlocal_context having the correct value. (That is, guard
+them against being performed inadvertently on process suspension and
+resumption. Although you may not be explicitly using processes in your
+program, the Ved editor makes heavy use of them, and your procedures may
+in fact be run as part of a process in some Ved contexts.)
+
+
+-----------------------------------------------------------------------
+13  Related Documentation
+-----------------------------------------------------------------------
+
+HELP * VARS
+
+HELP * LVARS
+
+HELP * ACTIVE_VARIABLES
+    (includes an example using dlocal)
+
+HELP * LEXICAL
+
+REF * dlocal_context
+
+REF * VMCODE/Dynamic
+
+REF * VMCODE/sysLOCAL
+
+HELP * TRACE
+
+REF * IDENT
+
+REF * POPSYNTAX
+
+
+
+--- C.all/help/dlocal
+--- Copyright University of Sussex 1990. All rights reserved.

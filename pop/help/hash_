@@ -1,0 +1,49 @@
+HELP #_<                                                     John Gibson Oct 84
+
+#_< is a macro which allows a sequence of POP statements (usually inside the
+text of a procedure) to be evaluated at compile-time, rather than at run-time.
+It is used as follows:
+
+            #_< statement-sequence >_#
+
+i.e. the statement sequence is 'bracketed' with #_< and >_# .  #_< compiles
+and executes the statement sequence immediately, and any results left on the
+stack are inserted back into the input item stream (i.e. put back on
+PROGLIST).  It is therefore a kind of 'instant' macro definition.
+
+For example, suppose you wanted a procedure that associated with any word a
+string whose characters were the word prefixed by some given prefix (but it
+must always return the SAME string for a given word and prefix). It would NOT
+work to define this as
+
+            define prefixed(prefix, word) -> result;
+                lvars prop prefix word result;
+                newassoc([]) -> prop;
+                unless prop(word) ->> result then
+                    prefix >< word ->> prop(word) -> result
+                endunless
+            enddefine;
+
+because you get a completely NEW property every time the procedure is called.
+Without using #_<, the definition would have to be modified to use a global
+variable for prop:
+
+            vars prop;
+            newassoc([]) -> prop;
+
+            define prefixed(prefix, word) -> result;
+                lvars prefix word result;
+                unless prop(word) ->> result then
+                ...
+            enddefine;
+
+However, use of #_< round the newassoc avoids this, since the expression
+'newassoc([])' is then evaluated only once at compile-time:
+
+            define prefixed(prefix, word) -> result;
+                lvars prop prefix word result;
+                #_< newassoc([]) >_# -> prop;
+                unless prop(word) ->> result then
+                    prefix >< word ->> prop(word) -> result
+                endunless
+            enddefine;

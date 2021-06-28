@@ -1,0 +1,165 @@
+HELP RUN_UNIX_PROGRAM                            John Williams, Oct 1994
+
+The procedure run_unix_program (defined in LIB * RUN_UNIX_PROGRAM)
+enables you to run Unix programs from within Poplog; send input to such
+a program, and receive any output it produces.
+
+It takes six (!) arguments, and returns five results, and should be
+called as:
+
+    run_unix_program(name, arglist, input, output, errs, wait)
+                        -> (indev, outdev, errdev, status, pid);
+
+The possible argument and result values are described below.
+
+-----------------------------------------------------------------------
+1  Argument Values
+-----------------------------------------------------------------------
+
+The first argument, name, is the name (as a string) of the Unix program
+to be run. If name starts with a '/', e.g. '/bin/csh', it is assumed to
+be the full name of the Unix program file. Otherwise, run_unix_program
+uses * sys_search_unix_program  to locate the command in the Unix
+environment variable $PATH. An error is signalled if the command cannot
+be found.
+
+arglist is a list of argument strings to pass to the program named by
+name. (For example, if name were 'csh', arglist might be ['-f']).
+arglist may of course be the empty list [].
+
+The arguments input and output specify the standard input and standard
+output of the Unix program. These arguments can take one of four values:
+a filename, a device record, the boolean true, or the boolean false.
+
+If a filename (or device), then standard input and/or standard output
+will be bound to that file (or device). For example, the call
+
+    run_unix_program('wc', ['-w'], 'foo', 'baz', false, false)
+
+will count the number of words in the file foo and output the count to
+the file baz.
+
+If the argument input is true, then run_unix_program will return, as the
+value of indev, a device record which when written to sends input to the
+running Unix program. Similarly, if output is true, outdev will be a
+device which when read returns the output of the program. See below for
+an example.
+
+The fifth argument, errs, controls where error messages produced by the
+program should be sent. Like the input and output arguments, its value
+may be either a filename, device, or boolean. In the case of a filename
+or device, error messages are written to that file or device. If errs is
+true, the result errdev will be a device from which the error output of
+the program can be read.
+
+In addition to these four values, errs can also take the value 1,
+signifying that error output should be sent to the same place as normal
+output. In particular, if output is true and errs is 1, the values of
+the results outdev and errdev are the same device, and so you can read
+the standard output and error output of the Unix program together. This
+is probably the most useful value for the errs parameter.
+
+Supplying false as the value for input, output, or errs indicates that
+the standard input and/or standard output and/or error output for the
+Unix program will be inherited from the parent Poplog process.
+
+Finally, the wait argument indicates whether run_unix_program should
+wait for the Unix program named by name to complete execution. Note that
+if either input, output, or errs is true, run_unix_program will not
+wait, regardless of the actual value of the wait argument.
+
+
+-----------------------------------------------------------------------
+2  Result Values
+-----------------------------------------------------------------------
+
+The values of the results indev, outdev, and errdev depend on the values
+of the corresponding arguments input, output, and errs. If the argument
+value is true, then the result value will be a device for sending input
+to, or receiving output from, the running Unix process. Otherwise, the
+result value will be false. (See below for an example).
+
+The result status will be an integer representing the Unix program's
+exit status if the wait argument is true, and false otherwise. The exit
+code 0 normally indicates succesful execution of the program.
+
+Finally, the result pid will be the Unix process identification number
+of the Unix process created by this call to run_unix_program. This
+result is only useful if the wait argument is false, since otherwise the
+Unix process will have terminated by the time the pid result is returned
+from the call to run_unix_program.
+
+
+-----------------------------------------------------------------------
+3  Examples
+-----------------------------------------------------------------------
+
+The following example uses run_unix_program to create a Unix C shell
+process from Poplog, send commands to it, and then receive the output.
+
+First we create the csh process:
+
+    vars indev, outdev, errdev, status, pid;
+
+    run_unix_program('csh', ['-f'], true, true, 1, false)
+        -> (indev, outdev, errdev, status, pid);
+
+We define two procedures to simplify communication with the running csh
+process:
+
+    define send(input, dev);
+        lvars input, dev;
+        syswrite(dev, 1, input, length(input));
+        sysflush(dev)
+    enddefine;
+
+    define rec(dev) -> output;
+        lvars dev, output, n;
+        lconstant buff = inits(127);
+        '' -> output;
+        while sys_input_waiting(dev) do
+            sysread(dev, 1, buff, 127) -> n;
+            output <> substring(1, n, buff) -> output
+        endwhile
+    enddefine;
+
+We can now send the shell command "date" to the csh process, via the
+device indev:
+
+    send('date\n', indev);
+
+And we can retrieve the output from the "date" command via the device
+outdev:
+
+    pr(rec(outdev));
+
+Also, any errors produced will be sent to outdev (because the value 1
+was given for the errs parameter in the original call to
+run_unix_program). For example:
+
+    send('foo\n', indev);
+    pr(rec(outdev));
+
+Note that if you call rec to retrieve the output too soon after sending
+the command, no output may appear. This is because the command has not
+finished executing.
+
+When you have finished using the C shell process it is a good idea to
+terminate it using * syskill:
+
+    syskill(pid) =>
+
+
+-----------------------------------------------------------------------
+4  Related documentation
+-----------------------------------------------------------------------
+
+run_unix_program uses the lower level procedure sys_fork to actually
+fork the child Unix process. This is described in REF * SYSUTIL, as is
+the procedure sysobey which is much simpler to use if you just want to
+execute a single C-shell command.
+
+
+
+--- C.unix/help/run_unix_program
+--- Copyright University of Sussex 1994. All rights reserved.

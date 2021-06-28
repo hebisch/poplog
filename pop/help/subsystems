@@ -1,0 +1,334 @@
+HELP SUBSYSTEMS                             Robert Duncan, November 1990
+
+An introduction to the Poplog language subsystems.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   The Standard Subsystems
+
+  2   Mixing Subsystems
+
+  3   Subsystem Compilers
+
+  4   Switching Subsystem Compiler
+
+  5   Subsystem Documentation
+
+  6   Subsystems in Ved
+
+  7   Ved Subsystem Commands
+
+  8   Related Documentation
+
+
+-----------------------------------------------------------------------
+1  The Standard Subsystems
+-----------------------------------------------------------------------
+
+There are four languages provided as standard components of Poplog:
+
+    Pop-11              (HELP * POP11)
+    Prolog              (HELP * PROLOG)
+    Common Lisp         (HELP * CLISP)
+    Standard ML         (HELP * PML)
+
+Pop-11 is the core language of Poplog and is always available; the other
+languages are defined by the libraries
+
+    LIB * PROLOG
+    LIB * CLISP
+    LIB * PML
+
+Each language is implemented as a separate subsystem. The main purpose
+of a subsystem is to define a compiler for the language it implements:
+the compiler may be used both to load program files and as a top-level
+loop, evaluating interactive input. A subsystem will also typically make
+available a set of documentation relevant to the language, and may
+redefine certain system procedures (such as Ved commands) to tailor them
+to the language.
+
+Individual subsystems are identified by name: the names of the four
+standard subsystems are
+
+    Language            Subsystem Name
+    --------            --------------
+    Pop-11              pop11
+    Prolog              prolog
+    Common Lisp         lisp
+    Standard ML         ml
+
+Strictly speaking, there are two subsystems defined for Prolog: "prolog"
+and "top". This reflects the fact that Prolog supports two distinct
+modes of compilation: a "(re)consult" mode, in which terms are read as
+clauses to be added to the database, and a "top-level" mode, in which
+input terms are read as goals to be executed. For most circumstances
+however, the "prolog" subsystem is the one to use.
+
+For full details of the subsystem mechanism, see REF * SUBSYSTEM. This
+will be of interest mainly to experienced users who want to tailor the
+existing subsystems or build new ones.
+
+
+-----------------------------------------------------------------------
+2  Mixing Subsystems
+-----------------------------------------------------------------------
+
+Multiple subsystems can coexist in the same Poplog process: you can, for
+example, load all three language libraries without conflict. To find out
+whether a particular subsystem has been compiled, use the procedure
+
+    is_subsystem_loaded(ss_name) -> bool
+
+One subsystem has always to be selected as the "primary" (or "default")
+subsystem: its name is contained in the variable subsystem. Try loading
+the following line to find out the primary subsystem for your process:
+
+    subsystem =>
+
+The primary subsystem determines the interactive compiler used outside
+Ved, and the default documentation directories to search in response to
+HELP, TEACH and REF commands.
+
+The standard Shell and DCL commands for running the Poplog languages:
+
+    prolog
+    clisp
+    pml
+
+have the necessary subsystem libraries pre-compiled, and the
+corresponding language subsystem chosen as the primary subsystem. You
+can make your own saved images containing any mixture of languages and
+with your choice of primary subsystem with the library * MKIMAGE.
+
+
+-----------------------------------------------------------------------
+3  Subsystem Compilers
+-----------------------------------------------------------------------
+
+The main purpose of a subsystem is to define a compiler for the language
+it implements. A compiler is simply a procedure which takes an input
+source (typically a file name or a device) as argument. The standard
+subsystem compiler procedures are:
+
+    Subsystem       Compiler            File Extension
+    ---------       --------            --------------
+    pop11           pop11_compile       .p
+    prolog          prolog_compile      .pl  (or .pro)
+    lisp            lisp_compile        .lsp (or .lisp, .l, .cl)
+    ml              ml_compile          .ml  (or .sig)
+
+You can call these compilers directly from Pop-11, but should rarely
+need to do so: each language has its own particular method of compiling
+files.
+
+The above table also indicates an implicit association of subsystems
+and their compilers with program files, based on the extension (or
+"type") of the file name. The procedure loadcompiler is a "generic"
+compiler which uses this association to determine automatically the
+specialised compiler to use on any particular file. loadcompiler is
+invoked by the Pop-11 syntax construct load, so that
+
+    load afile.p
+
+compiles "afile.p" using pop11_compile, but
+
+    load afile.pl
+
+calls the Prolog compiler instead. This is true also of the Ved command
+
+    <ENTER> load file
+
+A similar strategy is employed in regard to library files. Each
+subsystem has a different set of library files, and while again each
+language will provide special syntax for loading or examining these
+files, the generic procedure loadlib uses the file extension on its
+argument (if there is one) to determine the appropriate library
+directories to search as well as the compiler to use. loadlib is called
+both by the Pop-11 syntax construct lib and by the Ved lib command; the
+Ved showlib command also uses the file extension to help locate library
+files.
+
+See REF * loadcompiler, * loadlib for more information.
+
+
+-----------------------------------------------------------------------
+4  Switching Subsystem Compiler
+-----------------------------------------------------------------------
+
+You can change from one subsystem compiler to another with the procedure
+
+    ss_name -> sys_compiler_subsystem(`c`);
+
+(where the argument `c` means change the `current' subsystem.)
+
+"Switching subsystem" means abandoning the currently executing subsystem
+compiler and replacing it with an invocation of the selected compiler.
+In an interactive session, you'll see the prompt change, and find
+yourself talking a different language; used within a file, it means only
+that the rest of the file will be compiled with the new compiler,
+leaving the outer subsystem unchanged.
+
+The macros
+
+    prolog
+    clisp
+    pml
+
+defined by the language libraries are useful abbreviations for
+
+    "top"  -> sys_compiler_subsystem(`c`);
+    "lisp" -> sys_compiler_subsystem(`c`);
+    "ml"   -> sys_compiler_subsystem(`c`);
+
+respectively.
+
+sys_compiler_subsystem is a Pop-11 procedure, so can be called directly
+only from the "pop11" subsystem. However, in every language the word
+
+    pop11
+
+typed to the prompt switches into the "pop11" subsystem from which any
+other subsystem can be reached. Also, some languages provide a more
+direct interface: in Prolog, for example, the directive
+
+    :- prolog_language(ss_name).
+
+behaves identically to
+
+    ss_name -> sys_compiler_subsystem(`c`);
+
+
+-----------------------------------------------------------------------
+5  Subsystem Documentation
+-----------------------------------------------------------------------
+
+A subsystem also provides documentation particular to the language
+concerned. This documentation will normally be kept in a directory (or
+directory tree) separate from the main Poplog documentation. When you
+use a command such as
+
+    help topic
+
+the appropriate help file is sought first amongst the documentation
+relevant to the primary subsystem, before being sought in the general
+pool (determined by * vedhelplist). This is also true of the other
+documentation commands, such as TEACH, REF, DOC, ??, etc.
+
+From inside Ved, you can always get hold of documentation relevant to a
+particular subsystem by prefixing the appropriate command with the
+subsystem name. For example, you can view documentation on the Prolog
+error handler by doing
+
+    <ENTER> prolog help error
+
+or on the Common Lisp flet special-form with
+
+    <ENTER> lisp ref flet
+
+These will work even when the Prolog and Lisp compilers aren't loaded.
+
+Using the subsystem name as a command prefix is a special case of a more
+general facility described below.
+
+
+-----------------------------------------------------------------------
+6  Subsystems in Ved
+-----------------------------------------------------------------------
+
+Ved uses the same association of file extensions and subsystems
+discussed above to select a subsystem appropriate to each edit buffer.
+The association is in fact based on the * vedfiletypes mechanism, so you
+can tailor it to your own taste.
+
+The command
+
+    <ENTER> subsystem
+
+reports the subsystem associated with the current buffer. You can assign
+a different subsystem by adding an argument to the command: e.g.
+
+    <ENTER> subsystem prolog
+
+makes "prolog" the subsystem for the current buffer.
+
+Certain Ved commands will behave differently depending on the subsystem
+selected, particularly commands which invoke a compiler: the command
+
+    <ENTER> lmr
+
+(see HELP * LMR) will load the marked range using the compiler for the
+selected subsystem; the immediate-mode command
+
+    <ENTER> im
+
+(see HELP * IM) uses the buffer subsystem to determine which compiler to
+run in the interactive window. You can run different immediate-mode
+compilers simply by using files with different extensions: the commands
+
+    <ENTER> im output.p
+    <ENTER> im output.pl
+
+will bring up two interactive windows, one for Pop-11 and one for
+Prolog.
+
+Further details of the way Ved is adapted for different languages can be
+found in
+
+    HELP * PLOGVED
+    HELP * LISPVED
+    HELP * PMLVED
+
+
+-----------------------------------------------------------------------
+7  Ved Subsystem Commands
+-----------------------------------------------------------------------
+
+Regardless of the subsystem currently associated with a file, you can
+choose to run any Ved command relative to a particular subsystem by
+prefixing the command with the subsystem name.
+
+This has already been demonstrated in connection with getting hold of
+documentation for particular subsystems, so that the command
+
+    <ENTER> prolog help topic
+
+will search for any Prolog-specific documentation on the given topic.
+
+The facility has a more general applicability however. For example, the
+command
+
+    <ENTER> prolog lmr
+
+will compile the marked range as a Prolog program, while
+
+    <ENTER> lisp f insert
+
+will locate the definition of the Lisp function insert. Such commands
+are useful for mixed-language programming, where a single file may
+contain fragments of code written in various languages. However, unlike
+the documentation examples, these do require that the corresponding
+subsystem compiler (Prolog or CLisp in this case) has been loaded.
+
+Entering a subsystem name as a command with no arguments takes you out
+of Ved and runs the top-level for that subsystem, making it the primary
+subsystem: so
+
+    <ENTER> prolog
+
+takes you out of Ved and into the Prolog top-level.
+
+
+-----------------------------------------------------------------------
+8  Related Documentation
+-----------------------------------------------------------------------
+
+REF * SUBSYSTEM
+    Detailed information about subsystems.
+
+HELP * MKIMAGE
+    Making a saved image including subsystems.
+
+
+--- C.all/help/subsystems
+--- Copyright University of Sussex 1996. All rights reserved.

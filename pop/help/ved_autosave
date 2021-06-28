@@ -1,0 +1,315 @@
+HELP VED_AUTOSAVE                                 Aaron Sloman June 1991
+                                                        Revised Nov 1995
+ENTER autosave <number>
+ENTER autosave off
+ENTER autosave
+ENTER autosave reset
+
+NOTE: the "per session" autosave mechanism was changed in November 1995
+by introducting vedautosave_max, as described below in the section:
+    vedautosave_preserve: The "per session" backup mechanism
+
+LIB VED_AUTOSAVE
+
+This library extends (or replaces) the * VEDAUTOWRITE facility, by
+enabling VED to write all altered files at regular specified intervals,
+keeping an extra backup file for each one per session if necessary.
+
+This considerably enhances the security of VED in contexts where there
+is a risk of a crash, or a disastrous editing error.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Introduction
+ -- Running ved_autosave
+ -- ENTER autosave <number>
+ -- ENTER autosave off
+ -- ENTER autosave
+ -- ENTER autosave reset
+ -- Setting up your vedinit.p, and altering defaults
+ -- vedautosave_minutes: time interval between activations
+ -- vedautosave_min_write: minimum change required for saving
+ -- vedautosave_preserve: The "per session" backup mechanism
+ -- vedautosave_max: controlling total number of backup files
+ -- vedautosave_min_preserve: minimum number of lines for extra backup
+ -- vedset_autosave: Running the timer under program control
+ -- vedautosave_write: the procedure that saves the files
+ -- vedautosaving: temporarily suppressing autosaving
+ -- Relationship with vedautowrite
+ -- Putting the library into a saved image
+ -- See also
+
+-- Introduction -------------------------------------------------------
+
+
+This library is intended as an improvement to * VEDAUTOWRITE
+
+The default * VEDAUTOWRITE mechanism saves a file ONLY when the number
+of changes on that particular file exceeds the value of the variable
+vedautowrite, which means that if the system crashes after you have made
+a large number of small changes on different files without writing them
+you can lose a lot of work.
+
+LIB VED_AUTOSAVE provides a mechanism for automatically saving files
+that have been changed. It uses a timing mechanism instead of simply
+counting changes in each file. It can save all current VED files to
+disk at regular time intervals, coping with the situation where you have
+made several changes to lots of files, none of them exceeding
+vedautowrite.
+
+This library uses * SYS_TIMER.
+
+Note: files for which -vedwriteable- is false are NOT saved.
+
+Users can control the behaviour of -ved_autosave- in various ways, e.g.
+
+  - Specifying the interval at which saving is invoked
+    (see vedautosave_minutes)
+
+  - Specifying whether an extra backup file should be kept for each file
+    changed during a Poplog session, and if so, how it should be done
+    (see vedautosave_preserve)
+
+  - Specifying whether all changed and writeable files are saved each
+    time or only those with a minimum number of changes
+    (see vedautosave_min_write)
+
+  - Redefining the procedure invoked by the timer to save files.
+    (see vedautosave_write)
+
+These options and additional facilities are described in more detail
+below. For full details examine the code: SHOWLIB * VED_AUTOSAVE
+
+
+-- Running ved_autosave ----------------------------------------------
+
+The library can be invoked interactively by using one of the commands:
+
+-- ENTER autosave <number>
+
+    Assigns <number> to vedautosave_minutes, to set the timer interval,
+    and displays the current setting and tells you how much time is
+    left. <number> can be integer or decimal, representing the number of
+    minutes between saves. E.g. to make it save every 7 and a half
+    minutes do
+
+    ENTER autosave 7.5
+
+
+-- ENTER autosave off
+
+    This turns off automatic saving of files. Turn it on again by giving
+    the command with a number of minutes, or with no argument.
+
+-- ENTER autosave
+
+    Shows the current setting and tells you how much time is left, or
+    tells you if the automatic saving has been turned off.
+
+
+-- ENTER autosave reset
+
+    This clears the property that remembers which files have had their
+    "per session" backup. This means that if any of them are altered
+    again they will receive an extra "per session" backup.
+
+Alternatively you can use the following mechanism to start it up.
+
+-- Setting up your vedinit.p, and altering defaults -------------------
+
+If you want autosaving to operate whenever you run VED, then put the
+following into your vedinit.p to load the program:
+
+    uses ved_autosave;
+
+The variables defined below can then be set as required, e.g. assigning
+a number to vedautosave_min_write can be used to suppress autosaving of
+files with very few changes.
+
+
+-- vedautosave_minutes: time interval between activations ------------
+
+vedautosave_minutes -> <number>                       [active variable]
+<number> -> vedautosave_minutes
+
+This active variable has a value that defaults to 5 minutes. Updating it
+changes the timer interval. If you want to make it 2.5 minutes do:
+
+    2.5 -> vedautosave_minutes;
+
+in your vedinit.p
+
+However, you can do this only AFTER you have loaded the library, not
+before. E.g.
+
+    uses ved_autosave
+    2.5 -> vedautosave_minutes;
+
+
+-- vedautosave_min_write: minimum change required for saving ---------
+
+This is an integer, specifying the minimum value of -vedchanged- in each
+file below which the file should not be written.
+
+So if you don't want changed files written unless they have more than 50
+changes then do
+
+    50 -> vedautosave_min_write;
+
+The default is 0 meaning that files with any changes at all will be
+written.
+
+NOTE: changes are counted by the global variable * vedchanged. Some
+procedures, like ved_gs make many changes but increment vedchanged
+only by 1.
+
+
+-- vedautosave_preserve: The "per session" backup mechanism -----------
+
+vedautosave_preserve -> <item>                                [variable]
+<item> -> vedautosave_preserve
+
+This variable, whose value should be a boolean, a string, an integer or
+a procedure, controls whether the automatic saving mechanism creates an
+initial EXTRA backup file for each writeable file edited (changed)
+during the current session, provided that the file has more than
+vedautosave_min_preserve lines in the buffer. (See below)
+
+The decision concerning EXTRA backup is taken as follows:
+
+-   If -vedautosave_preserve- is false, then no special action is taken.
+
+    Otherwise an extra backup file is created for each file containing
+    more than vedautosave_min_preserve lines, when it is first saved, in
+    the following way:
+
+-   If vedautosave_preserve is a string that names a directory then the
+    first time any file is saved in a particular Poplog session the
+    current version on disk is copied to that directory. If necessary
+    the usual Poplog backup version will be created for the copied file.
+    (I.e. the extra backups are themselves backed up.)
+
+-   If it is a string but not a directory (e.g. '.bak', or '~~') then
+    the first time any file is saved in a particular Poplog session the
+    current version on disk is copied to a file with the same pathname,
+    but with that string appended. If that suffix was used in a previous
+    session then the usual Poplog backup version will be created for
+    that file (with "-" appended on UNIX).
+
+-   If it is an integer, then that is temporarily assigned to
+    -pop_file_versions- so that up to that  number of backup versions
+    will be created (depending on how many existed previously).
+
+-   If it is a (user-defined) procedure, then the procedure is applied
+    to the file's path name. E.g. the procedure could make a copy in a
+    backup directory that differs for different files.
+
+-   If it is anything else (e.g. -true-, the DEFAULT) then on the first
+    save a backup copy will be made with an additional version suffix,
+    (e.g. '--', or '---' on UNIX or '__' or '___' on VMS) corresponding
+    to 1 plus the value of -vedversions- if set, otherwise the value of
+    -pop_file_versions-. If there is already a backed up copy, then
+    that will be backed up also, subject to the upper limit determined
+    by vedautosave_max.
+
+    Thus, the FIRST time a file is autosaved in each Poplog session, an
+    extra copy will be made that is not altered by the normal backup
+    mechanism when VED saves the buffer contents. The variable,
+    vedautosave_max (default 3) controls the total number of backup
+    copies, including normal VED backups and those produced by
+    ved_autosave.
+
+NOTE: the command
+
+    ENTER autosave reset
+
+will re-start "per session" backups for the current session. I.e. on the
+next occasion after the timer interval ALL changed files currently in
+VED will have an extra "long term" backup.
+
+
+-- vedautosave_max: controlling total number of backup files
+
+The role of this variable in controlling the total number of backup
+files, both normal and long term, is described above. The default is 3.
+
+Thus if pop_file_versions has the value 2 (the default) and vedversions
+is false (the default), then normally VED will keep the file and one
+backup, i.e. two versions.
+
+If vedautosave_max is 3 then two more backup copies are allowed. Thus
+normal writes and saves will leave the current file and the previous
+version, whereas per-session saves will leave two more older backup
+copies.
+
+-- vedautosave_min_preserve: minimum number of lines for extra backup
+
+The role of this variable is described in connection with the use of
+vedautosave_preserve.
+
+-- vedset_autosave: Running the timer under program control ---------
+
+vedset_autosave(<boolean>)                                  [procedure]
+
+This procedure takes a boolean argument. If the argument is -true-, it
+starts the timer, using the current value of vedautosave_minutes. If the
+argument is -false- it turns automatic saving off. It can be turned
+on again either using this procedure or using
+    ENTER save <number>
+
+-- vedautosave_write: the procedure that saves the files --------------
+
+vedautosave_write()                                          [procedure]
+
+The user-definable procedure -vedautosave_write- is invoked at regular
+intervals defined by the value of -vedautosave_minutes-. This is the
+procedure that takes account of the variables -vedautosave_preserve-
+and -vedautosave_min_write-.
+
+Users considering altering it should look at the default definition of
+-vedautosave_write- in LIB * VED_AUTOSAVE
+
+
+-- vedautosaving: temporarily suppressing autosaving ------------------
+The global variable vedautosaving is set true whenever autosaving is
+turned on. The procedure that writes files will do nothing if it is
+false. Thus, any procedure that needs temporarily to suppress autosaving
+can include the following:
+
+    dlocal vedautosaving = false;
+
+
+-- Relationship with vedautowrite -------------------------------------
+
+If you wish to disable the ordinary vedautowrite mechanism described in
+HELP * VEDAUTOWRITE, which is triggered by number of changes in the
+current file do
+
+    false -> vedautowrite;
+
+Alternatively assign a fairly large number as a precaution, e.g. 2000.
+
+
+-- Putting the library into a saved image -----------------------------
+
+When it is compiled LIB * VED_AUTOSAVE concatenates the procedure
+
+    vedset_autosave(%true%)
+
+with -pop_after_restore- so that the timer is properly initialised when
+saved images are started up.
+
+
+-- See also -----------------------------------------------------------
+
+HELP * VEDAUTOWRITE
+HELP * VEDVERSIONS
+HELP * POP_FILE_VERSIONS
+REF  * TIMES/sys_timer
+
+
+--- C.all/help/ved_autosave
+--- Copyright University of Sussex 1991. All rights reserved. ----------
+
+--- $poplocal/local/help/ved_autosave
+--- Copyright University of Birmingham 1995. All rights reserved. ------

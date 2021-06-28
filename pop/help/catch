@@ -1,0 +1,116 @@
+HELP CATCH                                             Ros Barrett, 1984
+
+    catch(<procedure>, <catch_procedure>, <spec>);
+    throw(<argument>);
+
+The first argument, <procedure>, is a procedure, which is called
+immediately. If, while this procedure is running, the procedure THROW is
+called with an argument that matches <spec>, and if <catch_procedure> is
+a procedure, control unwinds to this call of CATCH and <catch_procedure>
+is run. The matching is done using MATCHES. (If <catch_procedure> is not
+a procedure, it is simply left on the stack.) After this control returns
+from the call of CATCH. If THROW'S argument does not match <spec>,
+control unwinds until a call of CATCH whose <spec> does match is found.
+This makes it possible to embed procedures which use CATCH and THROW
+inside one another, and yet for each instance of THROW to be able to
+specify which instance of CATCH it is aiming at.
+
+Here is an example. The procedure TEST takes three arguments - a list of
+lists of numbers, a number specifying a lower bound, and a number
+specifying an upper bound. It immediately calls CATCH. The procedure
+given to CATCH as argument, CHECKLIST, is run. CHECKLIST recursively
+checks to see if any of the numbers in the tree fall outside the bounds
+specified. If a number is outside the bounds then THROW is called. The
+argument given to THROW in both cases matches the third argument of
+CATCH, namely [NOGOOD ?CULPRIT ?REASON], so control unwinds to CATCH,
+and the second argument of CATCH, the procedure CATCHER, is run.
+
+    define checklist(tree, Lo, Hi);
+        vars x;
+        ;;; recursively check if elements of tree are in bounds
+        if islist(tree) then              ;;; if argument is a tree
+            for x in tree do              ;;; then check each component
+               checklist(x, Lo, Hi)       ;;; which may itself be a tree
+            endfor;
+        elseif tree > Hi then             ;;; else see if it's too big
+            throw([nogood ^tree toobig])  ;;; unwind to catch if so
+        elseif tree < Lo then             ;;; see if it's too small
+            throw([nogood ^tree toolow])  ;;; unwind to catch
+        else
+            tree =>                       ;;; OK - print out
+        endif
+    enddefine;
+
+    define test(tree, Lo, Hi);
+        vars culprit reason;
+
+        define catcher();
+            ;;; This will be run if a number is out of bounds
+            [rejected ^culprit because ^reason] =>
+        enddefine;
+
+        ;;; recursively examine the tree and complain if necessary
+        tree, Lo, Hi;
+        ;;; Arguments for CHECKLIST put on stack
+        catch(checklist, catcher, [nogood ?culprit ?reason])
+    enddefine;
+
+trace checklist throw test;
+
+test([1 2 [2.5] 3], 0, 6);      ;;; All elements in bounds
+>test [1 2 [2.5] 3] 0 6
+!>checklist [1 2 [2.5] 3] 0 6
+!!>checklist 1 0 6
+** 1                            ;;; When CHECKLIST gets an OK number
+                                ;;; it prints it out
+!!<checklist
+!!>checklist 2 0 6
+** 2
+!!<checklist
+!!>checklist [2.5] 0 6
+!!!>checklist 2.5 0 6
+** 2.5
+!!!<checklist
+!!<checklist
+!!>checklist 3 0 6
+** 3
+!!<checklist
+!<checklist
+<test
+
+vars tree;
+[3 [3.3 3.4 [3.45 2.6 [9]] [2 4.6]]] -> tree;
+test(tree, 1, 3.4);
+>test [3 [3.3 3.4 [3.45 2.6 [9]] [2 4.6]]] 1 3.4
+!>checklist [3 [3.3 3.4 [3.45 2.6 [9]] [2 4.6]]] 1 3.4
+!!>checklist 3 1 3.4
+** 3
+!!<checklist
+!!>checklist [3.3 3.4 [3.45 2.6 [9]] [2 4.6]] 1 3.4
+!!!>checklist 3.3 1 3.4
+** 3.3
+!!!<checklist
+!!!>checklist 3.4 1 3.4
+** 3.4
+!!!<checklist
+!!!>checklist [3.45 2.6 [9]] 1 3.4
+!!!!>checklist 3.45 1 3.4
+!!!!!>throw [nogood 3.45 toobig]
+** [rejected 3.45 because toobig]
+<test
+
+The use of CATCH and THROW has enabled us to define CHECKLIST so that it
+reacts immediately it finds something it doesn't like. We have not had
+to worry about how control returns from CHECKLIST when this happens -
+the call of THROW looks after it for us.
+
+For other non-standard control structures, see HELP *CHAIN, *CHAINTO,
+*CHAINFROM, *EXITTO, *EXITFROM, *JUMPOUT.
+
+See also HELP
+    *CALLER    - For accessing the stack of currently active procedures
+    *INTERRUPT - On POP-11 interrupt procedures
+    *CONTROL   - For a summary of control structures in POP-11
+
+--- C.all/help/catch ---------------------------------------------------
+--- Copyright University of Sussex 1987. All rights reserved. ----------

@@ -1,0 +1,435 @@
+HELP PROFILE                                Robert Duncan, February 1996
+
+    uses profile;
+
+LIB * PROFILE shows how much time a program spends executing each of its
+procedures.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+  2   Using the profiler
+  3   How the profiler works
+  4   Why profiling may be inaccurate
+  5   Counting all active callers
+  6   Choosing which procedures get profiled
+  7   Customising the report
+  8   Using profile_display
+  9   Getting a graphical report
+ 10   Tracing garbage collections
+
+
+-----------------------------------------------------------------------
+1  Introduction
+-----------------------------------------------------------------------
+
+LIB * PROFILE helps you determine where a program is spending its time
+by showing how long it takes executing inside each procedure. For
+example, look at this simple but time-consuming program:
+
+    define example();
+        define procB();
+            repeat 1e7 times endrepeat;
+        enddefine;
+        define procA();
+            repeat 1e7 times endrepeat;
+            procB();
+        enddefine;
+        procA();
+    enddefine;
+
+To run this under the profiler do:
+
+    uses profile;
+
+    profile example();
+
+This will execute the example program and produce a report like this:
+
+    Number of interrupts: 598
+    CPU time: 6.00 seconds, GC time: 0.00 seconds
+
+                  -Cumulative-
+    Count  %Time  Count  %Time
+      310   51.8    310   51.8  procB
+      288   48.2    598  100.0  procA
+
+This shows that the program took exactly 6 seconds to run and that the
+time was divided pretty much equally between executing the two local
+procedures procA and procB.
+
+If you try this example now, the precise figures you get will be
+different depending on the machine you are running on, but the
+percentage values should remain much the same.
+
+
+-----------------------------------------------------------------------
+2  Using the profiler
+-----------------------------------------------------------------------
+
+To use the profiler you must first load the library with the command
+
+    uses profile;
+
+This defines two entry points to the profiler: a macro profile
+(demonstrated above) and a procedure profile_apply. The macro is more
+convenient for interactive use. It has the form:
+
+    profile expression
+
+where the expression extends to the end of the line. The expression is
+evaluated under the control of the profiler.
+
+The procedure profile_apply works like ordinary apply except that the
+application is done under the control of the profiler. The profile macro
+expands to a call to profile_apply.
+
+To profile the application
+
+    test(arg1, arg2)
+
+use either of the forms
+
+    profile test(arg1, arg2);
+
+    profile_apply(arg1, arg2, test);
+
+
+-----------------------------------------------------------------------
+3  How the profiler works
+-----------------------------------------------------------------------
+
+The profiler uses a sampling technique to estimate the time distribution
+of a program. It sets a timer to interrupt the program at regular
+intervals and at each interrupt increments a counter for the procedure
+which is executing at that moment. Over one complete run of a program,
+the counts accumulated against each procedure give an estimate of the
+relative amounts of time spent inside each one.
+
+The first line of the report shows how many interrupts were counted
+during the program's execution:
+
+    Number of interrupts: 598
+
+The higher this number, the more accurate the rest of the results are
+likely to be. The default interrupt interval is 1/100th of a second; you
+can change this by assigning
+
+    N -> profile_interval;
+
+where N is the time in microseconds, but the minimum interval is limited
+by the resolution of the system clock (see REF * sys_timer).
+
+The main body of the report shows the results for individual procedures:
+
+                  -Cumulative-
+    Count  %Time  Count  %Time
+      310   51.8    310   51.8  procB
+      288   48.2    598  100.0  procA
+
+The first column contains the raw count data and is sorted with the most
+frequently occurring procedure at the top. The next column shows the
+count divided through by the total number of interrupts, to give an
+estimate of the percentage of time spent within that procedure. The last
+two columns simply accumulate the counts and percentage times.
+
+The standard report shows results for no more than 10 procedures because
+typically these will account for the major proportion of work within the
+program, with the remainder contributing insignificant amounts. To
+change the maximum number of results displayed to N do
+
+    N -> profile_show_max;
+
+or make it <false> to show results for all procedures.
+
+
+-----------------------------------------------------------------------
+4  Why profiling may be inaccurate
+-----------------------------------------------------------------------
+
+Using a sampling technique means that you can profile any program
+without having to compile it specially for profiling, but it does have
+disadvantages.
+
+Like any sample-based tool, the profiler can only show an approximation
+to reality, and while that approximation is likely to get better as the
+number of interrupts increases, there is no guarantee that this will be
+so because the sampling method is not statistically sound. Every program
+has a pattern of execution unique to itself, and it is quite possible
+that the profiler's pattern of regular interrupts could interlock with
+the program's execution path in such a way as to consistently or
+frequently miss significant execution steps, biasing the results.
+
+Also, the interrupts are rarely serviced at the precise moment at which
+they arise. This is a property of all asynchronous events within Poplog:
+they can only be handled at discrete execution points where it is known
+to be safe to do so. Many system procedures don't service interrupts at
+all and so will never appear in the profile report. And user procedures
+only allow for interrupts at specific points: typically, once on entry
+to the procedure and once on each pass through a loop. So the execution
+points at which the profiler gets to examine the execution state are not
+randomly distributed at all.
+
+The fact that many system procedures don't service interrupts is
+generally a good thing, because it's not often that the time spent
+inside a particular system procedure is of much interest: it's usually
+better that the time should be allocated to the procedure's caller, and
+that's typically what the profiler will do.
+
+The problem with user procedures is more disruptive. A procedure which
+does a lot of work but which doesn't contain any loops has at most one
+chance to be interrupted on procedure entry. An interrupt arriving after
+that but while the procedure is still executing will not be serviced
+until the procedure returns or until another interruptable procedure is
+called; in either case, the interrupt will be charged to a procedure
+other than the one actually doing the work. As an extreme example,
+consider the loop:
+
+    while expression do work() endwhile
+
+where work() is an expensive but loop-free procedure call. It is most
+likely that interrupts occurring during the execution of work() will be
+serviced on its return, in the interrupt check of the while loop, and
+the time taken by work() will be charged to its caller.
+
+In defence of the profiler it may be argued that it is rare to find
+procedures which do significant amounts of work but which contain no
+loops (recursion is OK, because each recursive call will do an interrupt
+check) and that generally the profiler will work better for programs
+constructed from lots of small procedures, which many would consider to
+be good programming style. But all in all, profiling results should be
+taken as an indication rather than the last word.
+
+
+-----------------------------------------------------------------------
+5  Counting all active callers
+-----------------------------------------------------------------------
+
+A different kind of profile can be generated by setting the variable
+profile_count_all. If this is non-false, then at each interrupt the
+profiler will increment a counter not just for the procedure which is
+actually executing at that point, but for all procedures which are
+active in the call chain. Returning to the original example:
+
+    true -> profile_count_all;
+
+    profile example();
+
+    Number of interrupts: 597
+    CPU time: 5.98 seconds, GC time: 0.00 seconds
+
+                  ---Active---
+    Count  %Time  Count  %Time
+      281   47.1    597  100.0  procA
+        0    0.0    597  100.0  example
+      316   52.9    316   52.9  procB
+
+The first two columns of this modified report are as before -- though no
+longer sorted -- but the third column now shows the number of times that
+each procedure was found to be active in the call chain, expressed as a
+time percentage in column four.
+
+To see the difference, observe how this table includes an entry for the
+main example procedure which did not appear before. This is because
+example does no real work itself -- it calls procA to do it. But example
+is clearly active throughout the whole execution of the program, and
+that is properly reflected here. The active time records not only the
+time spent executing a procedure's own code, but also that of any other
+procedures it calls. So the active time for procA is also recorded at
+100%, made up of 47% from executing its own loop code and 53% from
+calling procB. Only the results for procB are similar to before, because
+it is a leaf procedure and makes no other calls.
+
+The profile_count_all option gives a more top-down view of program
+execution. It treats each procedure as a black box and shows the amount
+of time allocated to each irrespective of what may be going on inside.
+Collecting this information can be expensive: profiling with the
+count-all option can be any amount slower than without, depending on the
+maximum depth of the call graph.
+
+
+-----------------------------------------------------------------------
+6  Choosing which procedures get profiled
+-----------------------------------------------------------------------
+
+You can focus attention on particular procedures in a program by
+excluding or ignoring those procedures which are of no interest.
+
+Excluding and ignoring mean different things: both will stop a procedure
+from appearing in the final report, but they differ in what happens to
+its profile count. If a procedure is excluded, its count is added to
+that of its caller (or its caller's caller if the caller is itself
+excluded, and so on) whereas if it is ignored the count is discounted
+from the report altogether. For a given program, excluding a procedure
+will not change the (average) number of profile interrupts recorded, but
+just redistribute those interrupts between the remaining procedures;
+ignoring a procedure will reduce the number of interrupts overall,
+because interrupts occurring while the ignored procedure is executing
+will not be counted.
+
+In the normal case the profiler determines which procedures are to be
+excluded and ignored by looking at the global variables
+
+    profile_exclude_list
+    profile_ignore_list
+
+Both of these are user-assignable. The profiler excludes all anonymous
+procedures and those whose names occur in profile_exclude_list and
+ignores those named in profile_ignore_list.
+
+You might add to profile_exclude_list the names of frequently-called
+utility procedures whose times you would prefer to have allocated to
+their point of call. On this basis, the default value of
+profile_exclude_list already contains the procedure null:
+
+    profile_exclude_list =>
+    ** [null]
+
+null is called frequently from Pop-11 code, often from unexpected
+places, and the time it takes is of little interest in most programs.
+(While there are many other system procedures which are equally
+uninteresting, they are effectively always excluded by virtue of their
+not servicing interrupts so there's no need to list them all
+explicitly.)
+
+Use profile_ignore_list for procedures which spend much of their time
+waiting (for user input, asynchronous events, etc.) or printing. Waiting
+time is not counted as part of execution time (CPU time) but will
+distort the profiling figures because the profile interrupts will occur
+just as often -- and possibly more often -- while waiting as they do
+when doing useful work. The default value of profile_ignore_list is
+empty:
+
+    profile_ignore_list =>
+    ** []
+
+You can discount most interactive (terminal) I/O time by assigning:
+
+    [charin charout rawcharin rawcharout cucharout pr syspr pretty
+        sysflush] -> profile_ignore_list;
+
+although in Ved immediate mode there will be various Ved procedures to
+take account of too.
+
+For more sophisticated effects you can redefine the procedures
+
+    profile_include(p) -> item
+
+    profile_ignore(item) -> bool
+
+In deciding whether to exclude or ignore a particular procedure p, the
+profiler first calls profile_include and then passes any non-false item
+it returns to profile_ignore. In the standard definitions, the returned
+item is the procedure name (its pdprops) which is checked against
+profile_exclude_list and profile_ignore_list respectively. But you can
+redefine these procedures to be more selective about what they accept
+and reject. Some examples:
+
+(a) To exclude all Ved procedures
+
+        define profile_include(pdr) -> props;
+            lvars props = pdprops(pdr);
+            if isword(props) and isstartstring("ved", props) then
+                false -> props;
+            endif;
+        enddefine;
+
+(b) To exclude all system procedures (NB: this category includes
+    anything locked into an image with sys_lock_system)
+
+        define profile_include(pdr);
+            isinheap(pdr) and pdprops(pdr);
+        enddefine;
+
+(c) To restrict profiling to a particular section of a program, entered
+    through the procedure MyProc
+
+        define profile_ignore(x);
+            not(iscaller(MyProc));
+        enddefine;
+
+
+-----------------------------------------------------------------------
+7  Customising the report
+-----------------------------------------------------------------------
+
+Profile output is generated by the procedure
+
+    profile_report(cpu_time, gc_time, counts, active_counts)
+
+You can redefine this to produce your own kind of report. The arguments
+are:
+
+    cpu_time
+    gc_time
+        The CPU time and GC time used by the program, in hundredths of a
+        second (derived from *systime and *popgctime).
+
+    counts
+        The raw count data collected by the profiler. A property.
+
+    active_counts
+        The active count data collected by the profiler. A property if
+        profile_count_all is true, or <false> otherwise.
+
+Arguments to the counts property are not the procedures themselves but
+the results returned by profile_include, typically the pdprops. This
+means that all procedures with the same pdprops will get combined into a
+single count. If you want to have the procedures themselves in the
+counts property, you must redefine profile_include accordingly.
+
+Confusingly, arguments to the active_counts property (if present) are
+always procedures; to combine this data with the standard counts you
+must run them through profile_include first.
+
+A redefined version of profile_report need not produce any output: it
+could, for example, save away the results to be combined over a number
+of runs. If you want to generate the standard report at any time, use
+the procedure:
+
+    profile_print(cpu_time, gc_time, counts, active_counts)
+
+This is sensitive to the variables profile_show_max and profile_include
+so make sure these are defined as you would like them before you call
+it.
+
+
+-----------------------------------------------------------------------
+8  Using profile_display
+-----------------------------------------------------------------------
+
+Older versions of LIB * PROFILE used the procedure
+
+    profile_display(cpu_time, counts)
+
+to produce their reports. This is no longer part of the library, but if
+you have redefined it as part of some existing customisation, the
+default value of profile_report will call it in preference to
+profile_print.
+
+
+-----------------------------------------------------------------------
+9  Getting a graphical report
+-----------------------------------------------------------------------
+
+You can obtain a graphical display of the results of profiling by
+loading the library LIB * PROFILE_GRAPHICAL. The results are presented
+as a horizontal bar chart in a Ved window. See HELP * PROFILE_GRAPHICAL
+for full details.
+
+
+-----------------------------------------------------------------------
+10  Tracing garbage collections
+-----------------------------------------------------------------------
+
+If *popgctrace is set while profiling, the profiler will print a message
+after each garbage collection showing which procedure was executing when
+the garbage collection occurred. You can arrange for popgctrace to be
+always set during profiling by doing
+
+    true -> profile_gc_trace;
+
+
+--- C.all/help/profile
+--- Copyright University of Sussex 1996. All rights reserved.

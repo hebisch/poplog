@@ -1,0 +1,155 @@
+HELP VEDWINSUN                                  Ben Rubinstein, Feb 1986
+                                         Updated by R.J.Duncan, Oct 1990
+
+Using VED in a SunView "shelltool" window.
+
+
+    CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Introduction
+ -- VED Window Commands
+
+
+-- Introduction -------------------------------------------------------
+
+When you run VED in a "shelltool" window, it will normally recognise
+this fact automatically and adjust the size of its display to fit the
+size of the window. This does not require any special initialisation:
+shelltool sets the value of the TERM environment variable to "sun" and
+this in turn (without any instructions to the contrary) causes VED to
+load LIB * VEDSUN. This library configures VED for use with the Sun
+terminal emulator and defines a keymap appropriate to the Sun keyboard:
+see HELP * VEDSUN for more details. The library works out for itself
+whether it is being run from the console or from a shelltool window and
+determines the initial window size.
+
+If this doesn't seem to be working, check first of all that the TERM
+environment variable is correctly set and that there is nothing in your
+"vedinit.p" file which is causing VED to load some other library in
+preference to VEDSUN. If neither of these apply, it may be that VED is
+failing to communicate properly with the terminal emulator. You can
+force VED to configure itself for shelltool by calling the procedure
+
+    vedwinsun();
+
+Adding this command into your "vedinit.p" file will make VED configure
+itself for a shelltool window every time it is invoked.
+
+Once the configuration has been properly completed, VED will recompute
+the window size (and adjust the screen display if necessary) each time
+it is called from the POPLOG top-level, and whenever it is re-entered
+from the shell after a suspend. VED will not respond automatically to
+window-size changes which occur whilst editing: you must explicitly
+request a resize in this case, by using either the command
+
+    <ENTER> adjust
+
+(described below) or the procedure
+
+    vedsunrefresh();
+
+If you are using the left-hand keypad with VED, this procedure is
+normally bound to the key sequence ESC L4.
+
+
+-- VED Window Commands ------------------------------------------------
+
+The VEDWINSUN library defines three new VED commands for manipulating
+the shelltool window in which VED is running:
+
+    <ENTER> adjust
+
+    <ENTER> stretch
+
+    <ENTER> resize
+
+These are defined as follows:
+
+
+ved_adjust                                                   [procedure]
+        Interrogates the window  manager to  determine the  size of  the
+        shelltool window and adjusts  the display to  fit the new  size.
+        Use this command to redraw the screen after changing the  window
+        size.
+
+
+ved_stretch                                                  [procedure]
+        Allows you to change the size of the window using the mouse. The
+        effect is the same  as if you had  selected the 'Resize'  option
+        from the shelltool frame  menu, but VED  knows you have  changed
+        the window size and will adjust itself to fit automatically.
+
+
+ved_resize [ SIZE_SPEC ]                                     [procedure]
+        Resizes  the  shelltool  window  and  adjusts  the  VED  display
+        accordingly.
+
+        The SIZE_SPEC argument is optional: without it, the window  will
+        be changed to a default size, usually 34 rows by 80 columns. You
+        can change this default size in either of two ways:
+
+            (1) if the variable  -vedwin_default_size- is a  two-element
+                vector, then RESIZE will use  this as the default  size:
+                the first element will be taken as the number of  lines,
+                the second as the number of columns. So the declaration
+
+                    vars vedwin_default_size = {40 80};
+
+                will change  the  default size  to  be 40  lines  by  80
+                columns. Both elements in the  vector must of course  be
+                positive integers.
+
+            (2) if the  variable -vedwin_file_sizes-  is a  list, it  is
+                assumed to  describe  a  mapping  from  file  extensions
+                (strings) to  size  vectors (as  described  above).  The
+                RESIZE command  takes  as  the default  any  size  which
+                matches  the  extension   of  the   current  file.   The
+                declaration
+
+                    vars vedwin_file_sizes = ['wide' {10 132}];
+
+                causes RESIZE to use a default window size of 10x132 for
+                any file  whose name  ends  in '.wide'.  This  mechanism
+                takes   precedence   over    the   default   given    by
+                -vedwin_default_size-.
+
+        If SIZE_SPEC is  given, it should  be a pair  of numbers of  the
+        form:
+
+            LINES, COLUMNS
+
+        which determine how big the new display should be. For example,
+
+            <ENTER> resize 40, 132
+
+        sets the window size to display  40 lines, each of 132  columns.
+        Either of the  two components  of SIZE_SPEC may  be omitted,  in
+        which case the  corresponding dimension  of the  window is  left
+        unchanged, but where the number  of lines is omitted, the  comma
+        must still be given to prevent ambiguity. Thus
+
+            <ENTER> resize 72
+
+        adjusts the window to display 72 lines, while
+
+            <ENTER> resize ,72
+
+        adjusts the window to display 72 columns.
+
+        The RESIZE command may reduce the actual size of a window if the
+        requested size is too big to  be fully displayed on screen.  You
+        can find  out the  maximum window  size which  the command  will
+        allow by doing
+
+            <ENTER> resize ?
+
+        Computation of this  maximum size works  on the assumption  that
+        you are using the  standard font. If you  are using a  different
+        sized font, you can force RESIZE to try to determine the size of
+        font and adjust the maximum window size accordingly by doing
+
+            <ENTER> resize ??
+
+
+--- C.all/help/vedwinsun
+--- Copyright University of Sussex 1990. All rights reserved. ----------

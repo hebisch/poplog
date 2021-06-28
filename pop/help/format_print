@@ -1,0 +1,444 @@
+HELP FORMAT_PRINT                               John Williams, Aug. 1984
+
+    format_print(<string>, <vector | list>);
+
+This procedure is used to generate Formatted PRinting. Typically, the
+string (the "control-string") contains both ordinary portions of text,
+which are printed in the normal way, and "directives": instructions that
+specify how an item from the vector should be printed. Directives start
+with a tilde ~, and end with a non-numeric character that identifies the
+directive.
+
+FORMAT_PRINT provides a large number of complex formatting operations:
+there are over 30 basic directives, and most of these have several
+optional extras. You can even print numbers in Roman numerals (in two
+different styles !). Since most people will not need to use such
+esoteric directives, this HELP file has been divided into two parts. The
+first gives a brief summary of the most useful directives. If you can't
+find a suitable directive there, don't give up: try the second part of
+the file, which contains the full specification of FORMAT_PRINT. This is
+based on the Common Lisp function FORMAT (see G.L. Steele Jr's book:
+"Common Lisp, The Language", Digital Press, 1984).
+
+
+-- Summary -------------------------------------------------------------
+
+All the directives listed below print one object from the vector or list
+supplied to FORMAT_PRINT.
+
+
+Directive     Argument         Notes
+---------     --------         -----
+
+~A            any object       uses * PR
+~nA                            left-justifies in a field N columns wide
+~n@A                           right-justifies in a field N columns wide
+
+~K                             like ~A, but uses * SYSPR
+~S                             like ~A, but uses * SYS_SYSPR
+
+
+~D            integer          uses radix 10
+~nD                            right-justifies in a field N columns wide
+~n@D                           as ~nD; but ALWAYS prints sign of number
+~n:D                           as ~nD; prints commas every three digits
+
+~B, ~O,~X     integer          as ~D, but uses bases 2, 8, 16
+
+~nR           integer          prints in radix N
+~n,mR                          right-justifies in a field M columns wide
+~R                             prints number in English
+
+~F            (d)decimal       for printing floating point numbers
+~n,dF                          prints to D decimal places,
+                                right-justfied in a field N columns wide
+
+~E            (d)decimal       like ~F, but uses exponential notation
+
+
+~C            character code   see HELP * ASCII
+~:C                            gives the character a "name"
+                                (e.g Control-D)
+~@C                            prints character in re-readable form
+
+
+The following two directives do not consume an item from the vector
+supplied to FORMAT_PRINT:
+
+~:P            for adding plurals to words: prints "s" unless the next
+                item in the vector is 1
+~@P            as above, adding "y" (singular) or "ies" (plural)
+
+
+~(...~)        case-conversion: the output from the enclosed sub-string
+                (which may contain other directives) is converted to
+                lowercase
+~:@(...~)      as above, but output is in uppercase
+~:(...~)       as above, but each word is capitalized
+
+
+-- Examples ------------------------------------------------------------
+
+format_print('an object: ~A', {[a b c]});
+an object: [a b c]
+
+format_print('~5A and ~5@D is ~:B in base 2', [123 34 ^(123 + 34)]);
+123   and   +34 is 10,011,101 in base 2
+
+format_print('next year it will be ~R ad', [1985]);
+next year it will be one thousand, nine hundred and eighty five ad
+
+format_print('~:(i was born ~R year~:P ago~)', [25]);
+I Was Born Twenty Five Years Ago
+
+format_print('Type ~:C followed by ~:@C', {`a` `\n`});
+Type "a" followed by Control-J (the LF key)
+
+
+-- Full specification --------------------------------------------------
+
+THE SYNTAX OF DIRECTIVES
+
+A directive consists of a tilde (~), zero or more prefix parameters, and
+optional colon (:) and at-sign (@) modifiers; followed by a single
+character that identifies the directive. The case of the identifying
+character is ignored.
+
+Prefix parameters should be optionally signed decimal integers. They
+must be separated by commas, and precede any modifiers. It is not
+necessary to supply all the parameters to a directive: FORMAT_PRINT
+supplies default values for missing parameters automatically. It is,
+however, an error to supply excess parameters to a directive.
+
+Modifiers may be given in any order. It is not an error to specify
+irrelevant modifiers.
+
+
+Some examples:
+
+  '~S'            An "S" directive with no parameters or modifiers.
+
+  '~3,-4:K'       A "K" directive with two parameters: 3 and -4, and a
+                  colon modifier.
+
+  '~3,,2@R'       An "R" directive with its first and THIRD parameters,
+                  and an at-sign modifier. The second parameter has NOT
+                  been supplied (and hence takes on its default value).
+
+
+ASCII codes can be supplied as a parameters by quoting the desired
+character with "`". Thus '~`*S' and '~42S' are equivalent. Note this is
+NOT the full POP11 character quote syntax: constructs such as ~`*`S or
+~`\^[`S are not permitted.
+
+The characters "V" (or "v") and "#" may also be used as parameters. The
+former signifies the next item from the vector. If this item is FALSE,
+it is as if that parameter were omitted. The "#" sign represents the
+number of arguments in the vector yet to be processed.
+
+
+THE DIRECTIVES
+
+In the following table of currently available format directives, the
+term ARG refers to the next item from the vector or list given to
+FORMAT_PRINT.
+
+N.B. if a list is supplied, it is converted into a vector, so if one is
+efficiency conscious, use a vector in the first place!
+
+Directive       Parameters                              Modifiers
+---------       ----------                              ---------
+
+~A              mincol, colinc, minpad, padchar         @
+~K              mincol, colinc, minpad, padchar         @
+~S              mincol, colinc, minpad, padchar         @
+
+ARG is printed, using PR (~A), SYSPR (~K), or SYS_SYSPR (~S). The output
+is padded on the right (or the left if the @ modifier is specified) with
+at least MINPAD (default 0) copies of PADCHAR (default space) in COLINC
+(default 1) units. While the total number of characters output
+(including those making up the printed representation of ARG) is less
+than MINCOL (default 0), further COLINC lots of PADCHAR are output.
+
+
+
+~D              mincol, padchar, commachar              : @
+~B              mincol, padchar, commachar              : @
+~O              mincol, padchar, commachar              : @
+~X              mincol, padchar, commachar              : @
+
+ARG (if an integer) is printed in radix 10 (~D), 2 (~B), 8 (~O), or 16
+(~X). The @ modifier forces the printing of a sign, otherwise a sign is
+printed only if ARG is negative. If the colon modifier is specified,
+COMMACHAR (default ",") is output between groups of three digits. If ARG
+needs fewer than MINCOL (default 0) columns for its sign, commas, and
+digits, copies of PADCHAR (default space) are printed to the left of
+ARG. If ARG is not an integer, the directive '~mincol,,,padchar@A' is
+used.
+
+
+
+~R              radix, mincol, padchar, commachar       : @
+
+ARG (if an integer) is printed in base RADIX. The modifiers and other
+parameters (MINCOL, PADCHAR, and COMMACHAR) have the same significance
+as for the ~D directive. If ARG is not an integer, '~mincol,,padchar@A'
+is used.
+    If NO parameters are supplied, then ~R prints ARG as a cardinal
+English number, ~:R as an ordinal English number, ~@R as a Roman
+numeral, and ~:@R as an old style Roman numeral.
+
+
+
+~P                                                      : @
+
+Use for plurals. If ARG is NOT equal to 1, an "s" is printed. If an @
+modifier is specified, then if ARG is 1, then "y" is printed, otherwise
+"ies". In both cases, the colon modifier indicates that the previous ARG
+should be used.
+
+
+                                                        : @
+~C
+
+Without modifiers, CUCHAROUT(ARG) occurs (thus ARG should be a
+non-negative integer less than 128). The colon modifier causes the
+character to be "named". If both modifiers are present, information
+about how to input such a character is also printed. The @ modifier
+alone causes the character to be printed in re-readable form. To
+illustrate, imagine ARG is the escape character `\^[`:
+
+    ~C          
+    ~:C         Control-[
+    ~:@C        Control-[ (the ESC key)
+    ~@C         `\^[`
+
+
+
+~F              w, d, k, overflowchar, padchar          @
+
+ARG is printed as a floating-point number in a field W columns wide. D
+is the number of digits printed after the decimal point. K (default 0)
+is a scaling factor: ARG is multiplied by (10 ** K). As for the ~D group
+of directives, the @ modifier forces the printing of a sign, otherwise,
+a sign is printed only if ARG is negative. Padding, if necessary, is
+output before ARG; PADCHAR defaults to a space.
+    If ARG is an integer, it is converted to a decimal; if ARG is not a
+number, it is printed by '~w,,padchar@A'.
+    If printing ARG to D decimal places requires more than W columns,
+then W copies of OVERFLOWCHAR printed. If OVERFLOWCHAR is not specified,
+~F uses as many columns as necessary to print ARG.
+    If W is omitted, no padding is output, as many digits as necessary
+are printed before the decimal point, and D digits are printed after the
+decimal point.
+    If D is omitted, as many digits as possible are printed after the
+decimal point, subject to the width constraint imposed by W and the
+constraint that unnecessary trailing zeros are not printed.
+    If both W and D are omitted, ARG (and its sign) are printed in
+standard POP-11 format by SYS_SYSPR.
+     A leading zero is only printed if the integer part of ARG is 0 and
+there is room; trailing zeros only if the fractional part of ARG is 0
+and D was explicitly supplied.
+
+
+~E              w, d, e, k, overflowchar, padchar, expchar  @
+
+ARG is printed in W columns in exponential notation; K digits are
+printed before the decimal point, and D - K + 1 digits after the decimal
+point. E is the number of digits used to print the exponent; EXPCHAR
+(default "e") is the exponent symbol. The @ modifier, as for ~F, forces
+the printing of a a sign; otherwise, a sign is printed only if ARG is
+negative. Copies of PADCHAR (default space) are printed before ARG (and
+its sign) if ARG requires fewer than W columns.
+    If printing ARG would use more than W columns, then W copies of
+OVERFLOWCHAR printed. If OVERFLOWCHAR is not specified, ~E uses as many
+columns as necessary to print ARG.
+    If ARG is an integer, it is converted to a decimal; if ARG is not a
+number, it is printed by '~w,,padchar@A'.
+
+
+~G              w, d, e, k, overflowchar, padchar, expchar  @
+
+ARG is printed by either ~E or ~F as appropriate. The prefix parameters
+and @ modifiers have the same significance as for the ~E and ~F
+directives. If ARG is not a number, is is printed by the directive
+~w,,padchar@A.
+
+
+~$              d, n, w, padchar                        : @
+
+This directive is claimed to be particularly useful for printing
+quantities of money! The next ARG is printed in a field at least W
+(default 0) columns wide, with at least N (default 1) digits before the
+decimal point, and exactly D (default 2) digits after the decimal point.
+If the integer part of ARG is not large enough to require N columns,
+extra leading zeros are printed. If ARG requires fewer than W columns,
+extra PADCHAR's (default space) are inserted to the left of ARG, before
+its sign (or after the sign if the colon modifier were specified). The @
+modifier forces the printing of a sign, otherwise a sign is printed only
+if ARG is negative. If ARG is not a number, it is printed by
+'~w,,padcharA'.
+
+
+
+~%              n
+
+Outputs N (default 1) newline characters
+
+
+~&              n
+
+Like ~%, except that if the output stream is already at the beginning of
+a line, N - 1 newlines are output.
+
+
+~|              n
+
+Outputs N (default 1) form-feed characters
+
+
+~~              n
+
+Outputs N (default 1) tildes.
+
+
+~<newline>                                              : @
+
+Ignores the newline (unless @ specified), and any following white-space
+characters (unless colon specified). Thus ~:@<newline> does nothing.
+
+
+~T              colnum, colinc                          : @
+
+Without modifiers, spaces are printed in COLINC (default 1) lots until
+the cursor is at column COLNUM (default 1). If the cursor is already at
+or past column COLNUM, COLINC spaces are inserted. If the @ modifier is
+specified, COLNUM spaces are output, followed by the mininmum number of
+additional spaces necessary to move the cursor to a column that is a
+multiple of COLINC.
+
+
+~*              n                                       : @
+
+N (default 1) items in the vector are skipped. If the colon modifier is
+specified, the skipping is "backward": thus '~:*' allows the most
+recently processed ARG to be re-used. If the @ modifier is specified,
+the (N - 1)th item in the vector becomes the current ARG. So ~@* resets
+the ARG pointer.
+
+
+~?                                                     @
+
+With no modifiers, FORMAT_PRINT is called on the next two ARG's, which
+should therefore be a string and a vector or list respectively. With the
+@ modifier, only one ARG (a string) is directly consumed: the recursive
+call of FORMAT_PRINT gets ARG's from the same vector as its caller.
+
+
+~(str~)                                              : @
+
+Output resulting from the processing of the sub-string STR contained
+between the brackets is case-converted. Without modifiers, output is in
+lowercase, with both modifiers, output is in uppercase. The colon
+modifier alone capitalizes all words; the @ modifier alone capitalizes
+the first word and converts all other output to lowercase.
+
+
+~[str0~;str1~;...~]       n                          : @
+
+A conditional directive. If N is specified, the Nth "clause" is
+processed. The first clause is numbered 0. If N is not specified, the
+value of ARG determines which clause will be processed. Clauses are
+separated by the "~;" directive. If N (or ARG) is greater or less than
+the number of clauses in the conditional, nothing happens, unless the
+last clause is preceded by '~:;', in which case this "default" clause is
+processed. If the @ modifier is given, there should be only one clause,
+which is processed if ARG is not FALSE. If the colon modifier is
+specified, there should be two clauses: if ARG is FALSE the first is
+processed; otherwise the second is processed.
+
+
+~{str~}         n                                    : @
+
+An iterative construct. The sub-string STR is processed until ARG, which
+should be a vector or list, is empty. If N is specified, there will be
+at most N repetitions. If the closing ~} has a colon modifier, STR will
+be processed at least once, even if ARG is empty (though not if the
+prefix parameter N were explicitly given the value 0). If the colon
+modifier is given, ARG should be a vector (or list) of vectors (or
+lists); each time round the loop the next element of ARG becomes the set
+of arguments for proessing STR. If the @ modifier is specified, the
+remaining arguments to the top-level call of FORMAT_PRINT are used when
+processing STR. If both modifiers are present, the remaining ARG's in
+the vector should be vectors or lists; STR is processed on the next ARG
+each time round the loop. Thus:
+
+    format_print('~{...~}',   {{a b c}});
+    format_print('~:{...~}',  {{{a} {b} {c}}});
+    format_print('~@{...~}',  {a b c});
+    format_print('~:@{...~}', {{a} {b} {c}});
+
+are equivalent.
+
+
+~<str~>         mincol, colinc, minpad, padchar      : @
+
+This justifies the text produced by processing STR in a field at least
+MINCOL (default 0) columns wide. STR may be divided into clauses with
+~;, in which case the spacing is evenly divided between the resulting
+text segments. At least MINPAD (default 0) copies of PADCHAR (default
+space) are output between each clause. Padding is inserted in units of
+COLINC (default 1).
+    With no modifiers, the leftmost text segment is left justfied, and
+the rightmost segment right justified. If there is only one clause, it
+is right justified. The colon modifier causes spacing to be inserted
+before the first text segment, the @ modifier causes spacing to be added
+after the last.
+    If the first clause of a ~< is terminated with ~:;, then it is used
+in a special way. All of the clauses are processed, but the first one is
+not used in calculating the spacing. When the padded result is
+determined, it is output only if it will fit on the current output line.
+Otherwise, the text segment resulting from the first clause is output
+before the padded text. If the ~:; has a prefix parameter N, the padded
+text must fir on the current output line with N columns to spare if the
+printing of the first clause is to be prevented. If the ~:; has a second
+prefix parameter L, the line-width of the output stream is taken to be
+L.
+
+
+~^              x, y, z                              :
+
+A "QUITLOOP" or "RETURN" construct. If no parameters are supplied, the
+exit occurs if there are no ARG's to be processed. If X is supplied, an
+exit occurs if X is 0. If X and Y are supplied, an exit occurs if X ==
+Y. If X,Y and Z are supplied, an exit takes place if X <= Y <= Z.
+    Within a ~{~} construct, ~^ acts like QUITLOOP. If ~^ is used within
+a ~:{ construct, then it merely terminates the current iteration step;
+in effect, a NEXTLOOP. To terminate the entire iteration process, use
+~:^.
+    If ~^ does not occur within a bracketed directive, the processing of
+the CURRENT control-string is terminated. Thus if the ~^ occurs within a
+control-string processed via ~?, control returns to its "caller".
+    Within a ~< construct, only the text sgements prior to the ~^ are
+justified.
+    If ~^ appears within a ~[ or ~( construct, then all sub-strings up
+to the ~^ are properly selected or case-converted, and the outward
+search continues for a ~{ or ~< construct to be terminated.
+
+
+~]
+~}
+~>
+
+These closing bracket directives cause a MISHAP unless used as part of
+the bracketed constructs described above.
+
+
+~;
+
+The clause separator directive should only appear within a ~[ or ~<
+directive. Otherwise, a MISHAP occurs.
+
+
+--- C.all/help/format_print
+--- Copyright University of Sussex 1992. All rights reserved. ----------

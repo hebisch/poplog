@@ -1,0 +1,805 @@
+HELP INITIAL                          A. Sloman, Simon Nichols July 1982
+
+This file describes the process of starting up Poplog, and some
+preliminary setting up that has to be done. For more complete
+explanations see the Poplog installation guide, and Poplog User Guide.
+REF * SYSTEM gives more technical information on Poplog system startup
+procedures.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Environment variables
+  2   Setting up the environment
+  3   Search paths used when Poplog starts up
+  4   Directories
+  5   Running Poplog
+  6   Using initialisation files to tailor the system
+  7   Poplog Initialisation files
+  8   Over-riding system-wide initialisation: changing $popsys
+  9   Changing $poplib
+ 10   Tailoring Pop-11
+ 11   Tailoring Prolog
+ 12   Tailoring Common Lisp
+ 13   Tailoring PML
+ 14   Initialising Ved
+ 15   Warning: put Ved customisation in a procedure vedinit()
+ 16   Ved Search lists
+ 17   Tailoring Ved for Individual files
+ 18   Tailoring the way Poplog manipulates files
+ 19   Examples of tailoring and initialisation files
+ 20   Running saved images
+ 21   Layered saved images
+ 22   Running Unix saved images with no abbreviation facility
+ 23   Further reading
+
+
+-----------------------------------------------------------------------
+1  Environment variables
+-----------------------------------------------------------------------
+
+Operating systems provide mechanisms whereby the user can set certain
+environment variables (or logical names as they are called in VMS) to
+control the behaviour of programs. In what follows we shall refer to
+these as environment variables, and indicate them with a dollar prefix,
+e.g. $usepop, $popsavelib.
+
+The dollar prefix is dropped in VMS, but is essential in Unix systems.
+In VMS, the logical names are capitalised, but Poplog translates from
+lower to upper case, as does the VMS command file interpreter. (On VMS
+Poplog systems see HELP * UNIX_FILENAMES for detailed information on how
+Unix file names are translated into VMS names.)
+
+
+-----------------------------------------------------------------------
+2  Setting up the environment
+-----------------------------------------------------------------------
+
+Before you can do anything using Poplog you have to ensure that the
+device or directory on which Poplog resides has been assigned to the
+logical name (environment variable) $usepop. If this has not been done
+system-wide, you will need to do it (with help from your system manager)
+in your login initialisation file, whose name will depend on the
+operating system and monitor you are using:
+
+    Unix with c-shell(csh)      .login
+    Unix with shell  (sh)       .profile
+    VMS                         LOGIN.COM
+
+The logical name $poplocal should also be set in this file, if you do
+not want to use the default value for the device or directory on which
+local extensions to the Poplog system should reside (see DOC * SYSSPEC).
+
+Initialisation of Poplog makes use of environment variables assignable
+by the user. It is necessary to set the defaults by including in your
+login command file an instruction to use the Poplog login file provided.
+
+This is done by including in your login file:
+
+    source $usepop/pop/com/poplog   (in .login for csh) or
+    . $usepop/pop/com/poplog.sh     (in .profile for sh) or
+    $ @usepop:[pop.com]poplog       (in login.com for VMS)
+
+This will cause the Poplog login message to be printed out, assign
+various environment variables and define some useful commands and
+abbreviations. It will also run one or more other command files in the
+same directory.
+
+This directory $usepop/pop/com is known as the $popcom directory, as
+various initialisation command files and utilities are kept there. (The
+VMS directory $popcom is popcom:)
+
+It is possible to do some additional setting up either in your own login
+file, or a file in the shared Poplog local directory of command files:
+
+    $poplocal/local/com/      (Unix)
+    poplocal:[local.com]      (VMS)
+
+which is not supplied with Poplog and not over-written when the system
+is updated.
+
+The above command in your login file will also automatically invoke the
+following command file:
+
+    $usepop/pop/com/popenv      (Unix C Shell)
+    $usepop/pop/com/popenv.sh   (Unix Bourne Shell) or
+    usepop:[pop.com]popenv.com  (VMS)
+
+This will set up a collection of default values for environment
+variables (logical names) for Poplog users. Some of these may be altered
+by individuals in their login files. They are used to define search
+paths used when Poplog starts up, and also to specify directories where
+program libraries are kept.
+
+
+-----------------------------------------------------------------------
+3  Search paths used when Poplog starts up
+-----------------------------------------------------------------------
+
+The search paths described here are used for starting up a Poplog
+program. Search lists described below are set up within a Poplog program
+for accessing libraries and online documentation.
+
+A search path is a string of directory names separated by '|' in VMS,
+':' in Unix. For examples of the syntax used, see the 'popenv' file in
+the $popcom directory.
+
+Here are the environment variables naming Poplog search paths,
+represented using the Unix and internal Poplog convention of prefixing
+'$' and using lower case:
+
+ $popsavepath
+  - Directories where Poplog should search for saved images.
+    Default:    ':$poplib:$poplocalbin:$popsavelib'
+
+ $popcomppath
+  - Directories where Poplog should search for files to be loaded.
+    Default:    ':$poplib:$poplocalauto:$popautolib:$popliblib'
+
+The default values of these paths are set up in the afore-mentioned
+command files in $popcom. Similarly for the default directories listed
+below.
+
+
+-----------------------------------------------------------------------
+4  Directories
+-----------------------------------------------------------------------
+
+The main directories used are:
+ $popcom       [described above]
+  - where login command files and other command files are stored
+ $popsys
+  - where the main Poplog runnable image (called 'pop11') and some
+    other system files are stored.
+ $popsavelib
+  - where the main saved images are kept (e.g. Prolog, Lisp)
+ $poplocalbin
+  - where local saved images are normally kept
+ $poplocalauto
+  - the main directory for local library extensions to the system.
+ $popsunlib
+  - where facilities for use with SUN workstations are stored
+ $poplib
+  - where the user's extensions to Poplog are stored, e.g. autoloadable
+    programs, Poplog initialisation files (see below) and saved images.
+    The default $poplib is the user's login directory, but this may be
+    changed in the user's login command file. In particular, a group of
+    users working on a project, or a group of students doing the same
+    course, may share $poplib.
+ $popvedlib
+  - where library programs are stored extending or tailoring the editor
+    Ved. The files starting 'ved_' define extra Ved <ENTER> commands.
+ $poplocal
+  - the device or directory where a directory tree mirroring the Poplog
+    tree is located. This tree can be used to hold extensions to Poplog
+    local to your site. No files are supplied under this directory, the
+    default position is $usepop/pop.
+
+
+-----------------------------------------------------------------------
+5  Running Poplog
+-----------------------------------------------------------------------
+
+Poplog is invoked by running the core Pop-11 image (in the $popsys
+directory). It may be run in such a way that it includes extensions in
+the form of 'saved images'. The main saved images supplied are for
+Prolog, Common Lisp and Poplog Standard ML (PML), in the $popsavelib
+directory. (For information on saved images see HELP * SYSSAVE and
+REF * SYSTEM).
+
+The core system, which provides Pop-11 and Ved, is run with the command
+
+    pop11
+
+(assuming the environment has been set up as described above).
+
+Poplog may be run with command-line arguments, which affect its
+behaviour on startup (see HELP * PARAMETERS). The arguments fall into
+four categories, distinguished by the flag character which is the first
+character of the argument:
+
+1) If the argument begins with a `+` character, the remainder of the
+   argument (i.e., without the leading `+`) is taken to be the name of
+   a saved image to be restored when Poplog starts up. For example, to
+   run Prolog, Common Lisp or PML respectively, type:
+
+        pop11 +prolog
+
+        pop11 +clisp
+
+        pop11 +pml
+
+   Abbreviations for all of these are provided, namely:
+
+        prolog
+
+        clisp
+
+        pml
+
+   but it is possible that these commands may not been defined for your
+   installation owing to name clashes with other versions of the
+   languages. Check with the system manager if in doubt.
+
+   Note that the use of a `+` character to flag a saved image argument
+   works for both UNIX and VMS operating systems, in contrast to the
+   older (though still supported) convention of using a `/` character on
+   VMS and a `-` character on UNIX, as in
+
+        pop11 /prolog
+
+   and
+
+        pop11 -prolog
+
+2) If the argument begins with a `%` character, it is treated as a
+   "special" command line flag, which is one of the following:
+
+        %nobanner
+            prevents printing of the Poplog banner.
+
+        %noinit
+            prevents compilation of the initialisation files, "init.p",
+            "init.pl", "vedinit.p", etc.
+
+        %nort
+            prevents execution of "runtime actions" when Poplog starts
+            up. See REF * SYSTEM (especially the section entitled
+            'Runtime actions').
+
+        %x
+            tells Poplog to start-up under X. The %x may optionally be
+            followed by a bracketed list of X arguments, which may be
+            passed on to the X server. See REF * SYSTEM (especially the
+            section entitled "Starting up X windows facilities").
+
+3) If the argument begins with a `:` character (UNIX) or the string '":'
+   (VMS), the remainder of the argument is treated as a string of source
+   text and is executed. The source text is assumed to be in the the
+   language which is the primary subsystem (see HELP * SUBSYSTEM). Note
+   that initialisation files are not compiled first and that Poplog
+   exits after evaluating the argument. This behaviour may be
+   overridden: see HELP * PARAMETERS.
+
+4) The treatment of any other command line argument varies between
+   Pop-11 and the Prolog, Common Lisp and Standard ML saved images. The
+   language saved images check whether the argument is a Ved command
+   (one of "ved", "help", "teach", "ref", "doc" or "im") and if so
+   invoke Ved, HELP, etc. with any following command line argument as an
+   argument to the Ved command. If it isn't a Ved command, any remaining
+   argument is treated as the name of a program file to be compiled.
+   Pop-11 does not check for Ved commands, so all other arguments are
+   treated as the name of program files to be compiled.
+
+Notes:
+
+1) Both Pop-11 and the standard saved images Prolog, LISP and ML may
+   be run with the above arguments.
+
+2) It is possible to have a single argument list containing arguments
+   of kinds 1, 2 and 3 or of kinds 1, 2 and 4, but kinds 3 and 4 are
+   mutually exclusive.
+
+The initialisation files ("init.p", "init.pl", "init.lsp", "init.ml")
+are not compiled automatically if arguments of kinds 1, 3 or 4 are
+supplied. Therefore, user programs (including saved images) can decide
+whether to compile them or not. So, for example, the ML, Lisp and Prolog
+saved images are created in such a way that as soon as they are restored
+they do compile these files, but other saved images need not do so. As
+outlined above, the %noinit flag can be used to suppress the compilation
+of initialisation files when no argument is supplied.
+
+The command line arguments passed to Poplog are accessible in the Pop-11
+variable poparglist (see HELP * POPARGLIST), with the exception of saved
+image arguments (e.g. "+prolog") and special arguments (e.g. "%noinit").
+In addition, X arguments specified by means of the %x flag are available
+in the Pop-11 variable popunderx (see REF * popunderx).
+
+More information on how the Poplog system is set up can be read in the
+Poplog Installation Guide.
+
+
+-----------------------------------------------------------------------
+6  Using initialisation files to tailor the system
+-----------------------------------------------------------------------
+
+Just as the LOGIN command file tailors the environment for the operating
+system, Pop-11, Prolog, Lisp, PML and Ved all have their own mechanisms
+allowing the user to redefine global variables, extend search lists,
+compile programs, and generally tailor the environment. This is done by
+looking for an initialisation file that is compiled at the appropriate
+time.
+
+
+-----------------------------------------------------------------------
+7  Poplog Initialisation files
+-----------------------------------------------------------------------
+
+Different initialisation files are used for the different sub-systems:
+
+The relevant files are:
+
+    Pop-11   init.p
+    Prolog   init.pl
+    CLisp    init.lsp
+    PML      init.ml
+    Ved      vedinit.p (since Pop-11 programs are used to tailor Ved)
+
+The system first looks in the $popsys directory for the appropriate
+file, and if it exists, then the file is compiled. This can be used for
+system-wide tailoring of one of the languages or the editor. It is not
+recommended except for very homogeneous user communities. (See below on
+how individuals can over-ride system-wide initialisation).
+
+Whether or not an initialisation file was found in $popsys, one is
+sought in the user's $poplib directory. If found, it is compiled, and IF
+NOT FOUND it is sought in the current directory. Since a file can
+contain commands to look for and compile files in other directories,
+this mechanism is very general.
+
+As well as having specific initialisation files for each language, the
+user's init.p or vedinit.p file can test whether it is being compiled in
+a process that includes a particular language subsystem by using the
+procedure * is_subsystem_loaded. For example:
+
+    if is_subsystem_loaded("prolog") then
+        ;;; Prolog is included
+        ....
+
+If any of the Poplog commands are run with additional arguments, in
+order to run a specific program or restore a saved image, the
+initialisation behaviour is different. The initialisation behaviour can
+also be changed by the use of a command line argument. These issues are
+explained above, in the section on running Poplog.
+
+
+-----------------------------------------------------------------------
+8  Over-riding system-wide initialisation: changing $popsys
+-----------------------------------------------------------------------
+
+As explained above files called init.p, vedinit.p etc can be put into
+the $popsys directory, in which case they will always be compiled for
+all users who start up Poplog on that installation.
+
+An individual user who does not wish to use the system-wide defaults can
+overcome this by creating a different directory whose name is assigned
+to $popsys (after running the normal Poplog startup script in the login
+files). This will work provided that the user's $popsys directory
+contains either copies of all the executable images in the system
+$popsys directory or links to them. (Note that on Unix systems most of
+the files in that directory are linked to $popsys/pop11 in any case, as
+Poplog produces different behaviour if started up under a different
+name.) If you do this, make sure that your $popsys directory is one in
+which commands will be found (e.g. Unix users must put it on $PATH).
+
+
+-----------------------------------------------------------------------
+9  Changing $poplib
+-----------------------------------------------------------------------
+
+The environment variable $poplib can be assigned by the user, as a
+directory to be used for initialisation files or library files. The
+user's login directory is assigned as a default in the Poplog
+environment initialisation file in $popcom.
+
+Suppose you wished instead to use a subdirectory called mylib, of your
+login directory. You could then include in your login file:
+
+    setenv poplib $HOME/mylib           (for csh) or
+    poplib=$HOME/mylib                  (for sh) or
+    assign sys$login:[mylib]  poplib    (for VMS)
+
+You could then store any or all of your init.p init.pl init.lsp or
+vedinit.p files in your mylib directory.
+
+If you create any saved images (see HELP * syssave) which you wish to be
+found automatically you can save them in this directory too, as Poplog
+will search there before searching in public directories. (The searching
+is controlled by $popsavepath, as described in HELP * PARAMETERS
+
+
+-----------------------------------------------------------------------
+10  Tailoring Pop-11
+-----------------------------------------------------------------------
+
+Some examples of Pop-11 defaults that users can change in their
+initialisation files are given in the following HELP files:
+
+Program library search lists:
+ * popautolist (autoloadable)
+ * popuseslist (non-autoloadable)
+
+Global variables:
+ * popconstruct * popdefineconstant * popgctrace
+ * poplinemax * poplinewidth * popmemlim * popprompt
+ * popradians * popsyscall * pop_pr_ratios
+
+Procedures:
+ * interrupt * prmishap * prwarning * cucharerr
+
+For a complete list, see HELP * POPVARS.
+
+
+-----------------------------------------------------------------------
+11  Tailoring Prolog
+-----------------------------------------------------------------------
+
+When you run Prolog, if you have a file called 'init.pl' in your $poplib
+directory, or failing that in the current directory, it will be compiled
+(and assumed to contain Prolog code). It can cause Prolog files to be
+compiled if necessary.
+
+Prolog users should see HELP * POPTOPLOG, HELP * PLOGTOPOP and
+HELP * SUBSYSTEMS, for information on switching languages.
+
+The variable * prologliblist contains a list of the library directories
+searched by Prolog, which you can add to.
+
+
+-----------------------------------------------------------------------
+12  Tailoring Common Lisp
+-----------------------------------------------------------------------
+
+If you run Common Lisp with the command
+
+    clisp or
+    pop11 +clisp
+
+then if you have a file called init.lsp in your $poplib directory, or
+failing that in the current directory, it will be compiled. It can cause
+files to be compiled if necessary.
+
+
+-----------------------------------------------------------------------
+13  Tailoring PML
+-----------------------------------------------------------------------
+
+Each time you run PML it will try to compile an "init.ml" file from your
+$poplib directory (or failing that, from the current directory). This
+file may contain any top-level declarations or commands; in particular,
+it can contain commands to load other files and so provides a very
+general tailoring mechanism. Typically, an "init.ml" file might contain
+commands to load useful library files; open structures (to enlarge the
+initial environment) or to change the values of some of the system
+control variables described in the PML help files:
+
+    HELP * COMPILE, * MEMORY, * PRINTER, * SYSTEM
+
+For more information about starting up PML, see HELP * PML.
+
+
+-----------------------------------------------------------------------
+14  Initialising Ved
+-----------------------------------------------------------------------
+
+When Ved is called for the first time (whether from the command line or
+from inside Poplog) it runs the procedure vedsetup to perform its
+initialisation.
+
+vedsetup calls the variable procedure vedinitcomp, which looks in the
+$popsys directory for a file called 'vedinit.p' and if found compiles
+it. This facilitates system-wide enhancements or modifications to Ved,
+as explained above.
+
+vedinitcomp then looks for a user's vedinit.p file first in $poplib, and
+failing that in the current directory.
+
+(Note that the way  to create a saved  image with your  vedinit.p
+pre-compiled is to call vedinitcomp explicitly, and then  assign identfn
+to it, i.e.
+
+    vedinitcomp();
+    identfn -> vedinitcomp;
+
+This will stop Ved compiling it again on startup.)
+
+After calling vedinitcomp, vedsetup runs the user definable procedure
+vedinit, if it exists. (E.g. it could have been defined in the user's
+init.p)
+
+Users can define extensions to Ved using the vedinit.p file, or the
+vedinit procedure (either of which can cause yet more files to be
+compiled, e.g. to tailor Ved to the terminal used, or can cause a saved
+image to be restored).
+
+In particular, the values of various global variables can be altered to
+tailor the editor, including many defined in REF * VEDVARS such as
+vedautowrite, vednonbreakfiles, vednotabs, vedindentstep, and
+vedlmr_print_in_file (See HELP * LMR). See HELP * VEDFILETYPES
+
+EMACS users can tailor Ved to approximate EMACS as described in
+HELP * VEDEMACS by putting into their vedinit.p file the command:
+
+    uses vedemacs;
+
+Ved can be tailored and extended indefinitely, by defining new commands,
+and by mapping key-sequences onto actions. See HELP * VED, for an
+overview of documentation. Some of the most important facilities are
+described below. The programs in $popvedlib may also be examined,
+copied, and modified.
+
+An important part of Ved's initialisation is deciding what type of
+terminal you are using, and configuring itself correctly for that
+terminal. You can choose a terminal type for yourself by putting an
+appropriate entry in your "vedinit.p" file, but if you don't do this,
+Ved will try and work it out automatically. For full details, see
+HELP * TERMINAL, REF * VEDTERMINALS.
+
+On Unix systems Ved will use the $TERM environment variable and, if
+necessary, the "termcap" entry for your terminal.
+
+If you are using windowing versions of Ved that you may need to examine
+the variable vedusewindows. This is set to different values depending if
+normal terminal Ved or XVed is being used.
+
+
+-----------------------------------------------------------------------
+15  Warning: put Ved customisation in a procedure vedinit()
+-----------------------------------------------------------------------
+
+A consequence of the more flexible startup facilities introduced in
+Poplog Version 14 (See REF * VEDTERMINALS, HELP * TERMINAL) is that when
+Ved finally sets up the key bindings for the terminal it can over-ride
+uses of vedset keys, or vedsetkey included at top level in your
+vedinit.p file.
+
+This can be overcome by inserting all such instructions into the body of
+a procedure (of no arguments) called vedinit defined in your vedinit.p
+file. That procedure will be run after the basic terminal key bindings
+have been set up.
+
+(This means that if you use <ENTER> dk to define new key bindings in
+your vedinit.p file you can later move them inside the definition of
+vedinit.p, removing the define :ved_runtime_action parts.)
+
+To save space, you can make your vedinit procedure end with the line
+
+    identfn -> vedinit;
+
+So, your vedinit.p file could contain something of the following form:
+
+    define vedinit();
+
+        ....
+
+        vedset keys
+          ....
+        endvedset;
+
+        ....
+
+        identfn -> vedinit;
+    enddefine;
+
+
+-----------------------------------------------------------------------
+16  Ved Search lists
+-----------------------------------------------------------------------
+
+The variable vedsearchlist may be assigned a list of directory names.
+Ved will then search in those directories for a required file, if it is
+not found in the current directory. See REF * vedsearchlist. The full
+search list mechanism is explained in HELP * SEARCH_LISTS.
+
+The help, teach, ref, and doc commands, which use Ved for interrogating
+online documentation, also all use search lists that are user assignable
+(vedhelplist, vedteachlist, vedreflist, veddoclist). The
+showlib command, for reading program libraries into the editor, uses the
+same search list as the uses command for loading libraries, namely
+popuseslist.
+
+By altering these search lists, a group of users (e.g. a project team,
+or a group of students on a course) can share a local program library
+and documentation library that extends the basic Poplog libraries.
+Different groups of users can have different extensions, even on the
+same machine.
+
+
+-----------------------------------------------------------------------
+17  Tailoring Ved for Individual files
+-----------------------------------------------------------------------
+
+Every time a new file is started, or read in from disk, or an old file
+is given a new name, it is possible for user-defined procedures to
+perform some action.
+
+BEFORE a new file is read in, the following two actions occur, their
+behaviour being dependent mainly on the path name of the file, since its
+contents are unavailable.
+
+(a)    vedsetfiletypes(vedfiletypes)
+
+where vedfiletypes is a user-assignable list specifying how different
+files are to be treated by Ved. See HELP * vedfiletypes for details.
+
+(b) vedveddefaults()
+
+(more precisely, it runs the procedure that has been given as argument
+to vededit, which is vedveddefaults for user files, and vedhelpdefaults
+for HELP, TEACH, REF, LIBRARY files, etc. The default value of
+vedveddefaults is identfn a procedure that does nothing.
+
+Actions (a) and (b) occur BEFORE a new file has been read in, or a new
+empty buffer created in the case where the file does not exist, as they
+may be required to set up the environment that controls how the file is
+read in - e.g. whether tabs get replaced by spaces, or what the tab
+settings are etc.
+
+To allow the user to take some action AFTER a new file has been read in,
+based on the contents of the file rather than just the file path name,
+etc. a third action occurs, namely
+
+(c)     vedinitialise(item)
+
+where vedinitialise, (compare vedveddefaults) is a user-definable
+procedure, which defaults to erase. See REF * vedinitialise for details.
+It could be defined to include something like
+
+        vedsetfiletypes(vedinitialactions)
+
+where vedinitialactions is a list in the same format as vedfiletypes,
+but is required to be interpreted after the buffer has been created.
+
+Note that all of (a), (b) and (c) occur when a file is renamed using the
+<ENTER> name command (see REF * VEDCOMMS). If their behaviour is to be
+different during the latter, they can tell whether they are invoked by
+ved_name, using the test
+
+    if iscaller(ved_name) then ....
+
+
+In the case of Poplog library files, e.g. HELP, TEACH, REF, DOC and
+SHOWLIB files, the procedure vedhelpdefaults is run to ensure that Ved
+will not automatically write or compile them if they have been edited.
+It is defined to invoke vedveddefaults, so users can arrange settings
+for Ved variables (e.g. vedleftmargin and vedlinemax) for library files.
+
+
+Using vedfiletypes and vedveddefaults and vedinitialise, the user can
+set different defaults for different sorts of files, using the file
+extension (e.g. '.p', '.pl', '.s' etc.) to determine the type.
+
+See HELP * vedfiletypes and * vedveddefaults for more details.
+
+A second user-definable procedure vedinitfile, is run whenever any file
+is set on the screen, whether it has been in the editor for some time or
+not. So the behaviour of Ved, including the mapping of key-strokes onto
+procedures can be changed whenever particular files or sorts of files
+are displayed. See REF * vedinitfile.
+
+
+-----------------------------------------------------------------------
+18  Tailoring the way Poplog manipulates files
+-----------------------------------------------------------------------
+
+The following are items that can be controlled by assignments to global
+variables made in your 'init.p' file.
+
+Number of "old" or "backup" versions of files saved on the disk:
+
+ * vedversions
+
+The protection "mode" of newly created files:
+
+ * vedcreatemode (Unix only)
+
+(Many Unix users will not wish to use the default protection mode. At
+present the Unix "umask" setting for new files is ignored.)
+
+
+-----------------------------------------------------------------------
+19  Examples of tailoring and initialisation files
+-----------------------------------------------------------------------
+
+For examples of how some existing users have tailored the system see
+
+    HELP * INITIAL.EX
+
+
+-----------------------------------------------------------------------
+20  Running saved images
+-----------------------------------------------------------------------
+
+Users who have written large programs, or who have large files tailoring
+Ved and the  languages, do  not wish  to wait for  the files  all to  be
+compiled every time they start up.  For this reason Poplog provides  the
+'saved-image' facility already mentioned in connection with the standard
+language subsystems. Users can compile files, then create a saved  image
+(see HELP * syssave),  and later  run it  without having  to  re-compile
+everything. The saved image can be restored from a running program  (see
+HELP * sysrestore), or  by giving  a command  to the  operating  system.
+Saved images normally have the file-extension '.psv'. If you have  saved
+image called  myprog.psv either  in the  current directory,  or in  your
+$poplib directory, or in another directory in $popsavepath, then you can
+run the image with the command
+
+    pop11 +myprog
+
+For examples of user command files for creating saved images which take
+suitable action when they are restored, see HELP * INITIAL.EX. The files
+starting 'mk' in $popcom (e.g. mkeliza) and in the 'demo' subdirectory
+$usepop/pop/lib/demo/* also illustrate the techniques.
+
+
+-----------------------------------------------------------------------
+21  Layered saved images
+-----------------------------------------------------------------------
+
+If a group of users wish to share a collection of utilities whilst
+adding their own programs, they can build a common saved image, then add
+build saved images relative to that one. So the compiled common
+facilities will be stored in one place. REF * SYSTEM describes how to
+use sys_lock_system for that purpose in place of syssave. Using
+sys_lock_system also implies that the procedures and data structures
+already built in will never need to be garbage collected, so that in
+future garbage collections are faster.
+
+The Prolog, Clisp and PML images have been built in this way, so it is
+possible to make new saved images relative to them. Examples in $popcom
+are the mklogic file (mklogic.com in VMS) which builds a logic tutor
+program on top of Prolog and saves it in 'logic.psv', and mkct (mkct.com
+in VMS) which adds facilities to support the Prolog teach files
+TEACH * WHY and TEACH * TRACER.
+
+Because the logic.psv file is relative to the Prolog image it cannot be
+run with the command
+
+    pop11 +logic
+
+Instead it is necessary to do
+
+    pop11 +prolog +logic or
+    prolog +logic
+
+The second alternative works because 'prolog' has been defined as a
+suitable abbreviation. As many layers of saved images may be built as
+required. Users will normally define their own abbreviations in their
+login files, to avoid typing such clumsy commands.
+
+
+-----------------------------------------------------------------------
+22  Running Unix saved images with no abbreviation facility
+-----------------------------------------------------------------------
+
+Normally a saved image foo.psv in either the user's current directory or
+in a system directory in $popsavepath can be invoked simply by giving
+the command
+
+    pop11 +foo
+
+To enable this to be abbreviated to a single command on Unix systems
+that do not provide an abbreviation facility, Unix Pop-11 has the
+following mechanism. When it is invoked it looks to see with what name N
+it was invoked. If there is an environment variable pop_N with the same
+name then the value of that variable is treated as if pop11 had been
+involved with that string as argument.
+
+Poplog executable images reside in $popsys, and are made accessible by
+$usepop/pop/com/poplog, which adds $popsys to the environment variable
+PATH. All the images in $popsys are in fact just links to a single
+image, which interprets the name N under which it is run (arg0) from the
+translation of the environment variable "pop_N" (if it is defined). If a
+translation of pop_N is found, it replaces arg0 and the args are then
+shifted 'right' one place so that arg0 becomes arg1, etc.
+
+$usepop/pop/com/popenv therefore also sets up the "pop_" variables for
+the different links in $popsys.
+
+
+-----------------------------------------------------------------------
+23  Further reading
+-----------------------------------------------------------------------
+
+REF * SYSTEM        - general information on running and controlling
+                      Poplog, creating and running saved images, etc.
+REF * sys_lock_system - layered saved images
+REF * vedusewindows - whether a "windowing" Ved is being used
+HELP * PARAMETERS   - More details on starting up Poplog
+HELP * SYSSAVE      - creating saved images
+HELP * SYSRESTORE   - running them
+REF * SYSUTIL       - utilities for accessing the operating system.
+HELP * INITIAL.EX   - some examples of users' tailoring files
+DOC * SYSSPEC       - overview of Poplog's directory structure
+
+
+--- C.all/help/initial
+--- Copyright University of Sussex 1993. All rights reserved.

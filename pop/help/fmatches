@@ -1,0 +1,661 @@
+HELP FMATCHES                                         A.Sloman June 1991
+
+NOTE (8 Jan 2005):
+This is made redundant by the combination of the "!" pattern prefix
+See HELP READPATTERN
+
+=======================================================================
+LIB FMATCHES
+
+This is a version of the Pop-11 matcher that overcomes some of the
+deficiences of the standard matcher, defined in HELP * MATCHES, but at a
+cost, as explained below. It defines a number of syntax words, i.e.
+
+    fmatches, where, fmatching, endfmatching
+
+with the following patterns of use:
+
+
+    <list> fmatches <pattern> -> <boolean>
+
+    <list> fmatches <pattern> where <condition> -> <boolean>
+
+    fmatching <list> with <pattern> do <actions> endfmatching;
+
+    fmatching <list> with <pattern>
+    where <condition>
+    do <actions>
+    endfmatching;
+
+Details follow.
+
+
+-- Presuppositions ----------------------------------------------------
+
+It is assumed that the reader is familiar with the ordinary Pop-11
+pattern matcher described in HELP * MATCHES and TEACH *MATCHES. It is
+also useful to know something about sections (see HELP * SECTIONS) and
+the difference between "lexical" and "
+permanent" (or dynamic) variables, explained in HELP * LEXICAL.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Presuppositions
+ -- Overview
+ -- WARNING "fmatches" is not an ordinary operator
+ -- -- Section variables and lexical variables and the cost
+ -- -- Repeated embedded segment variables and the cost
+ -- Example of fmatches with section variables
+ -- Example importing a procedure into a section
+ -- Example of fmatches with lexical variables
+ -- Finding common sub-lists
+ -- Use of "where" to constrain matches
+ -- Using -fmatching- to iterate over possible matches
+ -- How it works
+ -- fmatches_domatch and fmatches_submatch
+ -- fmatches_listread
+ -- fmatches and embedded procedures
+ -- Tracing: only the sub-procedures can be traced
+ -- See also
+ -- Acknowledgement
+
+-- Overview -----------------------------------------------------------
+
+In order to make this procedure available give the command
+
+    lib fmatches
+
+OR
+
+    uses fmatches
+
+
+The syntactic operator -fmatches- (so-named originally because
+it does "full" matching of certain sorts of patterns) has three main
+benefits compared with -matches-.
+
+(a) It can be used with patterns containing lexical and section
+variables,
+
+(b) It finds some matches (involving repetitions of the same segment
+variable) that are not found by -matches-.
+
+(c) A post-match test on the values of the pattern variables can be
+added in a "where" expression, and if that returns -false- the matcher
+will backtrack and attempt another way to match the list and the pattern
+provided.
+
+Examples of all three features are given below The first two features
+have accompanying disadvantages.
+
+
+-- WARNING "fmatches" is not an ordinary operator ---------------------
+
+Because it is a syntactic operator it cannot be treated in the same
+way as "matches". So it cannot be partially applied, given as an
+argument to a procedure, stored in a data-structure, or traced.
+
+In spite of this some people will much prefer it to matches because
+it is more general and can be used to write "safer" programs, where
+the pattern variables are lexically scoped or section variables
+and therefore cannot clash with other variables having the same name.
+
+
+-- -- Section variables and lexical variables and the cost
+
+
+The main benefit of -fmatches- is that it allows section variables and
+lexically scoped identifiers to be used in the matcher. The cost is that
+it has to define "fmatches" as a syntax word that reads in the pattern
+at compile time, rather than as an infix procedure identifier like
+"matches" and "-->". This means that it cannot be passed as an argument
+to another procedure, or locally redefined or traced. However, it does
+use an auxiliary procedure -fmatches_domatch- that can be traced, passed
+as an argument. etc.
+
+The fact that a procedure cannot be provided with a pattern argument
+that is passed to -fmatches- at run time means that it cannot be used to
+define procedures like -present- as used in the Pop-11 database package.
+See HELP * DATABASE. Instead, it is necessary to define syntax words
+that read the patterns in replacing pattern variables with identifiers,
+and then call fmatches_domatch as necessary. SHOWLIB * FMATCHES for
+details.
+
+
+
+-- -- Repeated embedded segment variables and the cost
+
+-fmatches- also has the benefit that it copes with kinds of matches
+involving repeated "segment" variables in embedded patterns (i.e. "??"
+in nested lists). Some of these matches are not found by -matches-. The
+cost of this is that -fmatches- has to save "state" information about
+possible ways of varying a match that is later rejected. This slows the
+program down a little and can cause extra garbage collections.
+
+
+
+-- Example of fmatches with section variables ------------------------
+
+
+We define two procedures test1a, and test1b, inside section ss1. Both
+are exported for use outside the section. Each procedure is given a list
+as input and should return -false- if the list contains no words, and
+otherwise should return the word found. Both use a pattern containing
+the "permanent" (i.e. non-lexical) variable "element". -test1a- uses
+-fmatches- and -test1b- uses -matches-. Compare their behaviour:
+
+
+section ss1 => test1a, test1b;
+
+define test1a(list) -> element;
+    vars list, element;
+    unless list  fmatches [== ?element:isword ==] then
+        false -> element
+    endunless;
+enddefine;
+
+define test1b(list) -> element;
+    vars list, element;
+    unless list  matches [== ?element:isword ==] then
+        false -> element
+    endunless;
+enddefine;
+
+endsection;
+
+
+;;; Now we test both of them with two lists, outside the section ss1.
+
+test1a([1 2 3 ]) =>
+** <false>
+
+test1a([1 2 a 3 ]) =>
+** a
+
+
+test1b([1 2 3 ]) =>
+;;; DECLARING VARIABLE element
+** <false>
+
+test1b([1 2 a 3 ]) =>
+** <undef element>
+
+Notice that the first time it is used test1b causes the variable
+"element" to be declared. This is because -matches- uses valof applied
+to the word "element" in the list, and since it is no longer running
+inside the section ss1 where "element" was declared as a local variable,
+it is taken to be undeclared. It is therefore declared.
+
+Moreover test1b finds the match satisfied, and assigns the word "a" to
+the variable "element" that it has just declared. However the result
+returned is the value of "element" in the procedure, i.e. the output
+variable is the local variable declared in test1b. As nothing has been
+assigned to it, it returns the default undefined value.
+
+However, we can see what happened to the global (permanent) identifier
+OUTSIDE section ss1:
+
+element =>
+** a
+
+As this example shows, the procedure -matches- cannot safely be used in
+procedures that are defined in a section and used outside that section.
+However fmatches works fine and does not tamper with the value
+outside the section:
+
+test1a([1 2 new_word 3 ]) =>
+** new_word
+
+element =>
+** a
+
+test1b([1 2 newer_word 3 ]) =>
+** <undef element>
+
+element =>
+** newer_word
+
+So test1b not only returns the wrong result, it also tampers with
+a global variable instead of the one it was intended to use.
+
+
+-- Example importing a procedure into a section -----------------------
+
+Now see what happens if you import a procedure into a section, without
+importing the pattern variables used in it. We define two procedures.
+test1c uses fmatches and local variable pp, while test1d uses
+matches and local variable qq. Both are imported into section
+ss2, but without importing their local variables, and both are
+tested in that section. Each simply has the task of finding a word
+in the list given to it, and if found, to return it as a result,
+otherwise false.
+
+
+define test1c(list) -> pp;
+    vars list, pp;
+    unless list fmatches [ == ?pp:isword ==] then
+        false -> pp
+    endunless
+enddefine;
+
+define test1d(list) -> qq;
+    vars list, qq;
+    unless list matches [ == ?qq:isword ==] then
+        false -> qq
+    endunless
+enddefine;
+
+First test them outside any section:
+
+test1c([1 2 3 cat 4]) =>
+** cat
+
+test1d([1 2 mouse 3 4 5]) =>
+** mouse
+
+
+Now try them iimported into section ss2
+
+section ss2 test1c, test1d;
+
+test1c([1 2 3 cat 4]) =>
+** cat
+
+
+test1d([1 2 mouse 3 4 5]) =>
+;;; DECLARING VARIABLE qq
+;;; FILE     :  /csuna/home/aarons/fmatches   LINE NUMBER:  218
+** <undef qq>
+
+endsection;
+
+
+-- Example of fmatches with lexical variables -------------------------
+
+Now we try procedures that use two lexical local variables list1 and
+list2 as segment variables (preceded by "??") restricted to match lists
+of length 2 (followed by ":2"), and where the match succeeds the
+procedure should return a list containing the two sublists found. test2a
+uses -fmatches- and test2b uses -matches-.
+
+
+define test2a(list) -> result;
+    lvars list, result;
+
+    lvars list1 , list2 ;   ;;; pattern variables
+
+    if list fmatches [== ??list1:2 == ??list2:2 == ] then
+        [^list1 ^list2]
+    else
+        false
+    endif -> result
+enddefine;
+
+define test2b(list) -> result;
+    lvars list, result;
+
+    lvars list1 , list2 ;   ;;; pattern variables
+
+    if list matches [== ??list1:2 == ??list2:2 == ] then
+        [^list1 ^list2]
+    else
+        false
+    endif -> result
+enddefine;
+
+;;; Now test them and compare the results
+test2a([1 2 3 4]) =>
+** [[1 2] [3 4]]
+
+
+test2b([1 2 3 4]) =>
+;;; DECLARING VARIABLE list1
+;;; DECLARING VARIABLE list2
+** [0 0]
+
+Because -matches- uses "valof" it tries to access the values of the
+pattern variables, and "valof" can only get at values of non-lexical,
+i.e. permanent identifiers. (See HELP LEXICAL).
+
+Consequently it does not access the lexical variables list1 and list2.
+However, it will have declared and changed the values of two global
+variables:
+list1 =>
+** [1 2]
+
+list2 =>
+** [3 4]
+
+And this could interact very badly with another program using list1 and
+list2 as permanent variables.
+
+
+-- Finding common sub-lists -------------------------------------------
+
+Suppose you are given two lists
+    [ 1 2 3 a 4 5 6]
+and
+    [ 11 12 13 14 a 15]
+
+and you want to find if they have a common element, and if so which
+it is. You might try putting the two lists into a list, and then
+matching it against a pattern with a repeated pattern variable, leaving
+it to the matcher to find an appropriate way of decomposing the two
+lists, for example:
+
+define findcommon(list1,list2) -> common;
+    vars list1, list2, common;
+
+    unless [^list1 ^list2] matches [[== ?common ==] [== ?common ==]]
+    then
+        false -> common
+    endunless
+enddefine;
+
+Now try it:
+
+findcommon([ 1 2 3 a 4 5 6], [ 11 12 13 14 a 15]) =>
+** <false>
+
+It fails because once -matches- has found a way of attaching an element
+of list1 to the variable -common- it then tries to do the same to list2.
+But it happens to choose an element of list1 that is not in list2,
+so the attempt fails. But it cannot go back and try another element of
+list1, becuase it keeps no record of how far it had got, though it would
+succeed in this case where there's only one long flat list:
+
+[1 2 3 a 4 5 6 11 12 13 14 a 15]
+    matches [== ?common == ?common ==] =>
+** <true>
+
+common =>
+** a
+
+
+But if we redefine the procedure to use -fmatches- (calling it
+getcommon), it will work even with the embedded lists:
+
+define getcommon(list1,list2) -> common;
+    vars list1, list2, common;
+
+    unless [^list1 ^list2] fmatches [[== ?common ==] [== ?common ==]]
+    then
+        false -> common
+    endunless
+enddefine;
+
+Now try it:
+
+getcommon([ 1 2 3 a 4 5 6], [ 11 12 13 14 a 15]) =>
+** a
+
+It would work just as well with lexical variables:
+define getcommon(list1,list2) -> common;
+    lvars list1, list2, common;
+
+    unless [^list1 ^list2] fmatches [[== ?common ==] [== ?common ==]]
+    then
+        false -> common
+    endunless
+enddefine;
+
+getcommon([ 1 2 3 a 4 5 6], [ 11 12 13 14 a 15]) =>
+** a
+
+
+Here are some more cases where -matches- cannot cope but -fmatches- can:
+
+vars x,y;
+
+[[1 2 3 4 5] 1 2] matches    [[??x ??y] ??x] =>
+** <false>
+
+[[1 2 3 4 5] 1 2] fmatches    [[??x ??y] ??x] =>
+** <true>
+x,y =>
+** [1 2] [3 4 5]
+
+
+[[1 2 3 4][3 4 1 2]] matches [[??x ??y][??y ??x]] =>
+** <false>
+
+[[1 2 3 4][3 4 1 2]] fmatches [[??x ??y][??y ??x]] =>
+** <true>
+
+x, y=>
+** [1 2] [3 4]
+
+
+-- Use of "where" to constrain matches --------------------------------
+
+
+If you want to find a sublist of a list whose length is one of the
+elements in that sublist, you can do this:
+
+vars list;
+[5 4 8 3 6 15] fmatches [== ??list ==]
+     where member(length(list), list) =>
+** <true>
+
+list =>
+** [3 6 15]
+
+Or looking for two sub-sequences of at least 3 elements, one of which is
+the reverse of the other:
+
+
+[a 1 2 3 4 5 9 4 3 2 1 b]
+     fmatches [== ??x == ??y ==] where length(x) >= 3 and x = rev(y) =>
+** <true>
+
+x, y =>
+** [2 3 4] [4 3 2]
+
+
+-- Using -fmatching- to iterate over possible matches -----------------
+
+There are two formats for fmatching, one with and one without
+a "where" condition.
+
+    fmatching <list> with <pattern> do <actions> endfmatching;
+
+This causes all possible ways of matching the <list> against the
+<pattern> to be tried, and for each one of them the <actions> will be
+executed. This has a point only if the <pattern> has variables that are
+bound differently every time.
+
+An example:
+ Given the list [1 2 3 4] print out all pairs of consecutive non-empty
+sublists with exactly one element separating them:
+
+vars x, y;
+
+fmatching [1 2 3 4] with [== ??x = ??y == ] do
+    if x /== [] and y /== [] then
+        [^x ^y] =>
+    endif;
+endfmatching;
+** [[2] [4]]
+** [[1] [3]]
+** [[1] [3 4]]
+** [[1 2] [4]]
+
+
+The second format, using "where" can be used to express the condition
+under which the <actions> should be done. The general form is this:
+
+    fmatching <list> with <pattern>
+    where <condition>
+    do <actions>
+    endfmatching;
+
+
+To illustrate this, we remove the condition from the <actions> part of
+the last example, and put it in a where <condition>, thus:
+
+fmatching [1 2 3 4] with [== ??x = ??y == ]
+    where x /== [] and y /==[]
+do
+    [^x ^y] =>
+endfmatching;
+** [[2] [4]]
+** [[1] [3]]
+** [[1] [3 4]]
+** [[1 2] [4]]
+
+There is no difference in function between this version and the previous
+one: it is just a question of taste, whether the actions should be
+explicitly embedded in a conditional instruction, or whether the
+condition is separated out.
+
+
+-- How it works -------------------------------------------------------
+
+The syntax words -fmatches- and -fmatching- both read the pattern
+provided at compile time, checking for any occurences of "?" or "??"
+and replacing the following word with the corresponding IDENTIFIER
+record.
+
+When the matcher actually runs, it calls -fmatches_domatch- which uses
+-idval- and its updater to get at or change the values of the
+identifiers in the pattern.
+
+This is unlike -matches- which uses -valof- and its updater on words.
+Because identifiers have values directly stored in them, this is
+considerably faster than using valof, which has to check which
+identifier is associated with the word in the current section, which may
+be different from the section relevant to when the procedure was
+compiled. Also the mapping between a word and its value given by -valof-
+is relevant to which section is the current one when it runs, whereas
+the mapping between an identifier and its idval is unique, so problems
+of scoping do not arise.
+
+For information on identifiers and -idval- see REF * IDENT.
+
+
+-- fmatches_domatch and fmatches_submatch -----------------------------
+
+fmatches_domatch(<list>, <pattern>) -> <boolean>
+fmatches_domatch(<list>, <pattern>, <procedure>) -> <boolean>
+
+This procedure is called with either two arguments, a list and a
+pattern, or three arguments, in which case the third argument is
+a procedure to be run after each complete attempted match. If the
+procedure returns a non-false result the match succeeds, otherwise
+an alternative match will be attempted if there are any saved
+alternatives.
+
+Note that if it is called in the context of a where condition or in
+fmatching .... endfmatching, then it is always given an extra procedure
+argument. Unfortunately this means that if it is traced in that context
+it will print out only two arguments, the pattern and the procedure.
+
+
+fmatches_submatch(<list>, <pattern>) -> <boolean>
+This is the lower level procedure which is called recursively to do the
+actual matching. It too can be traced and will show the list and
+pattern being used.
+
+
+-- fmatches_listread --------------------------------------------------
+
+This procedure is used by the syntax procedures and syntactic operators
+to read in a pattern in the form of a list and replace the variables
+with corresponding identifiers. It works by replacing sysPUSHQ locally,
+so that if it is given a word as argument immediately following a call
+with "?" or "??", then it replaces the word with its identifier.
+(See * REF VMCODE).
+
+For reasons concerned with code planted to create a list containing
+identifiers it is not possible for the pattern to be a compile-time
+constant. I.e. the list will be created whenever the fmatches or
+fmatching expression is executed.
+
+It may be possible to extend the program to return such lists to a
+free list, e.g. using sys_grbg_list.
+
+
+-- fmatches and embedded procedures -----------------------------------
+
+Users who understand the complexities of lexical variables, as explained
+in REF * VMCODE, in the section on how they are implemented, may like to
+ponder the following example.
+
+
+Test that lexical pattern vars work with type 3 lvars. Define a
+procedure that returns two procedures p1 and p2. If p1 is given
+a list it checks to see if there is a repeated element. If there is
+it stores it in the "hidden" variable -item-. If p2 is run it returns
+as result the last thing stored in that variable.
+
+define test() -> (p1, p2);
+    lvars item = false, p1, p2;
+
+    procedure(list);
+        lvars list;
+        unless list fmatches [== ?item == ?item ==] then
+            false -> item
+        endunless
+    endprocedure -> p1;
+
+    procedure();
+        item
+    endprocedure -> p2;
+
+enddefine;
+
+;;; Use it to create a pair of related procedures (lexical closures)
+vars (p1, p2) = test();
+
+;;; check the stored value
+p2() =>
+** <false>
+
+;;; try to alter it
+p1([a mouse and the mouse trap]);
+
+;;; check
+p2() =>
+** mouse
+
+p1([a b c]);
+
+p2() =>
+** <false>
+
+-- Tracing: only the sub-procedures can be traced ---------------------
+
+Although fmatches cannot be traced, the following procedures can be:
+
+    fmatches_submatch(<datum>, <pattern>)
+
+    fmatches_domatch(<datum>, <pattern>, [<procedure>])
+
+When traced the latter will only show two arguments. So if used with
+"where" it will show the pattern and the procedure argument. For
+more informative tracing it will generally be useful to include
+print statements showing how variables have been bound.
+
+
+-- See also -----------------------------------------------------------
+
+
+HELP * MATCHES
+HELP * SECTIONS
+HELP * LEXICAL
+
+REF * IDENT
+REF * VMCODE
+
+
+-- Acknowledgement ----------------------------------------------------
+
+The state saving was originally implemented by Jon Cunningham. The
+technique of using "where" as a syntactic operator was originally, as
+far as I know, devised by Tom Khabaza. Steve Knight made useful
+comments and suggestions.
+
+
+--- C.all/help/fmatches
+--- Copyright University of Sussex 1991. All rights reserved. ----------

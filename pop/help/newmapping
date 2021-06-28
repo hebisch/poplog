@@ -1,0 +1,88 @@
+HELP NEWMAPPING                              Aaron Sloman, November 1986
+
+Creates a property table for arbitrary structures
+
+    newmapping(<list>, <integer>, <item>, <expand>) -> <property>
+
+Keywords: property, hash, map, garbage, table.
+
+NEWMAPPING creates a property, of initial size <integer>, initialised
+with the item/value pairs in <list>. <item> is used as the default value
+for objects not present in <property>. <expand> is a boolean; if TRUE
+the table will expand as the number of entries increases. This aids
+look-up speed, but does not affect the number of entries that can be
+stored in the table. If <expand> is FALSE, then the table will never
+expand.
+
+NEWMAPPING is very similar to *NEWPROPERTY but with an important
+difference. If t1 is a table produced by NEWPROPERTY and t2 a table
+produced by NEWMAPPING then for any x and y:
+
+    x == y   implies   t1(x) == t1(y)
+
+In other words identical keys get mapped onto identical values.
+But two lists of the form [a b c] would not necessarily map onto the
+same values, since the two lists are not ==.
+
+In some cases it is desirable for different structures having the same
+contents to map onto the same value. This is achieved by tables produced
+by NEWMAPPING. In the case of t2, SIMILAR things get mapped onto
+identical values. That is
+
+    x = y   implies    t2(x) == t2(y).
+
+Thus two lists with the same contents, would have the same value. This
+would not be achieved with NEWPROPERTY.
+
+NEWMAPPING is based on the system procedure *NEWANYPROPERTY, which
+provides a powerful and general mechanism for creating properties that
+map structures onto values. However, it offers a very wide range of
+options, which can be confusing. For many purposes something simpler
+will suffice, and NEWMAPPING provides that need.
+
+The information below explains how users can vary the behaviour of
+NEWMAPPING.
+
+-- Implementation -----------------------------------------------------
+
+The expression
+
+    newmapping(list, size, default, expand)
+
+is defined as equivalent to
+
+    newanyproperty(list, size,
+                   if expand then
+                       1, size
+                   else
+                       false, false
+                   endif,
+                   syshash, nonop =, false,
+                   default, false)
+
+As can be seen by studying *NEWANYPROPERTY, this means that the property
+table starts with size spaces. If <expand> is non false then whenever
+<size> items have been added the size of the table will be expanded. The
+hashing procedure used will be *SYSHASH, whose value does not depend on
+the address of its argument. Hence NEWANYPROPERTY is given a false
+gcflag argument. The equality test to be used is "=", and the default
+value whatever was given as third argument to NEWMAPPING. FALSE is
+provided instead of a default procedure.
+
+The behaviour of SYS_HASH and therefore of properties created by
+NEWMAPPING, can be altered by associating different hashing procedures
+with different classes. See * CLASS_HASH. There is more information on
+default hashing procedures in REF * PROPS/Hashing
+
+See also:
+REF * PROPS
+    This gives a detailed overview of properties in Poplog
+
+HELP *SYSHASH
+
+HELP *NEWPROPERTY, *NEWANYPROPERTY, *VIEWS
+
+TEACH * VIEWS
+
+--- C.all//help/newmapping
+--- Copyright University of Sussex 1991. All rights reserved. ----------

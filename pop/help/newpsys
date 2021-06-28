@@ -1,0 +1,2185 @@
+HELP NEWPSYS                                           A.Sloman Jan 1991
+
+LIB NEWPSYS
+
+This library program makes available a forward-chaining production-
+system interpreter with a number of advantages over LIB * PSYS
+and LIB * PRODSYS, including generality, flexibility and efficiency.
+
+It is written in such a way as to be readily tailorable by users, who
+may wish to alter parts of the code. However, a collection of global
+control variables makes a wide variety of behaviours possible. Extensive
+use is made of the Pop-11 pattern matcher. See HELP * MATCHES.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Introduction
+ -- Defining a condition-action rule (define :rule ....)
+ -- Adding extra checks to the rule compiler
+ -- psys_new_rule(<name>, <conditions>, <actions>, <type>)
+ -- psys_delete_rule(<name>, <type>)
+ -- psys_pr_rule(<name>, <list>)
+ -- Rule record format
+ -- Rule instance format
+ -- Conditions may be simple or complex
+ -- Types of conditions
+ -- -- Simple conditions (patterns)
+ -- -- OR conditions
+ -- -- NOT conditions
+ -- -- WHERE CONDITIONS
+ -- -- NOT_EXISTS and IMPLIES conditions
+ -- -- ALL conditions (for meta-rules)
+ -- Actions
+ -- Instantiation of actions
+ -- "popval" list elements
+ -- "apply" list elements
+ -- Built-in action types
+ -- -- [<data item>]
+ -- -- [ADDALL [<data item>] [<data item>] ...]
+ -- -- [SAY <message>]
+ -- -- [EXPLAIN <message>]
+ -- -- [STOP <message>]
+ -- -- [NOT <pattern>]
+ -- -- [POP11 <procedure>]
+ -- -- [POP11 <procedure name>]
+ -- -- [POP11 <pop11 instructions>]
+ -- -- [PUSH <item> <word>]
+ -- -- [POP <word>]
+ -- -- [DEL <integer> <integer> ...]
+ -- -- -- WARNING count only SIMPLE conditions for <integer>
+ -- -- [REPLACE <integer> <data item>]
+ -- -- [REPLACE <pattern> <data item>]
+ -- -- [MODIFY <integer> <key> <value> <key> <value> ...]
+ -- -- [MODIFY <pattern> <key> <value> <key> <value> ....]
+ -- -- [NULL .....]
+ -- -- [RULE TYPE <ruletype> <name> [<conditions>] [<actions>]]
+ -- -- [RULE <name> [<conditions>] [<actions>]]
+ -- -- SAVE and RESTORE actions
+ -- -- [FAIL <message>]
+ -- -- [PAUSE]
+ -- -- [READ <question> <??constraint??> <data item> <??explanation??>]
+ -- -- READ actions in detail
+ -- -- READ action constraints
+ -- -- [MENU <menu> <action list> <??explanation??>]
+ -- -- Structure of the <menu> vector
+ -- -- Structure of the menu [<options>] list
+ -- -- Structure of the menu [<mappings>] list
+ -- -- Printing out menus: psys_print_menu(message, options)
+ -- -- The menu <action list>
+ -- -- -- Example of a MENU action
+ -- -- [ADDALL <data item> <data item> ...]
+ -- User-defined action keywords and psys_action_type
+ -- Interactive commands
+ -- Rule manipulating procedures
+ -- Global variables
+ -- psys_rules (list of rules)
+ -- psys_database
+ -- psys_show_conditions (boolean)
+ -- Example of psys_show_conditions trace output
+ -- psys_chatty (boolean or integer)
+ -- psys_repeating (boolean)
+ -- psys_walk (boolean)
+ -- psys_pausing (boolean)
+ -- psys_allrules (boolean, or 1)
+ -- psys_recency (boolean)
+ -- psys_sortrules (false or procedure)
+ -- psys_remember (false or list)
+ -- psys_debugging (boolean)
+ -- psys_get_input (boolean for asynchronous input)
+ -- psys_backtrack (boolean)
+ -- psys_memlim (false or integer)
+ -- psys_max_conditions (integer)
+ -- psys_eval(action)
+ -- psys_eval_list(actions)
+ -- psys_finish(rules, database)
+ -- A format for defining psys_sortrules
+ -- Selecting on the basis of specificity
+ -- Sorting on the basis of the most recent condition made true
+ -- Turning tracing of individual rules on or off
+ -- Extended example: factorial
+ -- Extended example TEACH * PSYSRIVER
+ -- Extending ved_mcp to cope with new syntax
+ -- psys_copy_modify (DANGER)
+ -- See Also
+
+-- Introduction -------------------------------------------------------
+
+LIB NEWPSYS defines a forward-chaining production system interpreter,
+called psys_run, which is invoked with two arguments, a list of rules
+(defined below) and an initial (possibly empty) working memory, a list
+of lists.
+
+Each rule is defined by a list of conditions to be tested against
+the contents of the working memory, and a list of actions to be
+performed if all the conditions are satisfied.
+
+It is possible to have different rule-sets, with different sets made
+"current" at different times.
+
+On each cycle of the interpreter, all rules in the current rule-set that
+have all their conditions satisfied are found (or, if the variable
+psys_allrules has the value FALSE, then only the first such rule is
+found), and if there are two or more such "applicable" rules a
+user-definable selection procedure is run to determine which rule or set
+of rules should have their actions executed.
+
+There are several control variables that control the search strategy,
+the amount of trace printing, and the interaction with the user,
+including a limited "explanation" facility. It is possible either to
+specify that all rule activations should be traced interactively, by
+setting the global variable psys_walk TRUE, or else to selectively
+trace or untrace individual rules if psys_walk is FALSE.
+
+A typical invocation of the system would first define a collection of
+rules (using the syntactic form described below), held in the list
+psys_rules, and set up an initial working memory, held in the list
+psys_database, and then give the command
+
+    psys_run(psys_rules,psys_database)
+
+It is possible to have additional lists of rules, and some of the rules
+may perform actions that switch the current rule-set.
+
+The package provides a wide range of facilities for testing and
+debugging, and for tailoring the behaviour to different requirements,
+including limiting the size of the working memory, varying the strategy
+for selecting the most appropriate rule if several are applicable,
+allowing all applicable rules to run on each cycle, giving "canned" text
+for explanations, preventing the same rule from being used more than
+once if satisfied on the same data, allowing simple backtracking, and so
+on.
+
+There is a rich collection of built-in action types, including the
+powerful REPLACE action, and actions PUSH and POP for convenient
+manipulation of stacks in the working memory. In addition users can
+define their own action types, or else directly invoke Pop-11 procedures
+in actions.
+
+There is a simple default syntax procedure for defining rules. However,
+the mechanisms are easily extendable to use a different syntax or do
+far more checking.
+
+In order to get an overview of the mechanism it may be useful to look at
+the extended example in TEACH * PSYSRIVER and the factorial example
+below, before reading the detailed description that follows.
+
+-- Defining a condition-action rule (define :rule ....) ---------------
+
+Although it is possible to create a rule using the primitive constructor
+-conspsysrule- (see LIB * NEWPSYS), or the procedure -psys_new_rule-,
+described below, a convenient syntax is provided for defining a rule,
+giving it a name, and automatically adding it to the list psys_rules. A
+rule definition using this syntax looks like this:
+
+    define :rule <name> in <ruleset> <conditions> ;
+        <actions>
+    enddefine;
+
+or
+
+    define :rule <name> <conditions> ;
+        <actions>
+    enddefine;
+
+Where <conditions> is a sequence of lists, and <actions> is a sequence
+of lists, as described below.
+
+<ruleset> should be an identifier whose value is a list of rules. If "in
+<ruleset>" is missing, the <ruleset> defaults to psys_rules.
+
+Note that the separator between <conditions> and <actions> is a
+semi-colon in the format given above. This format allows VED's commands
+on current procedures to be used, e.g. <ENTER> mcp, jcp, and lcp. (See
+HELP * MARK).
+
+However, the syntax is flexible in that users can specify that the
+separator should be some other symbol. In fact any word in the user
+assignable list -psys_condition_terminators- is acceptable, and the
+default value contains ";", "-->" and "==>". So for example, the format
+
+    define :rule <name> <conditions> --> <actions> enddefine;
+
+will work, though the previously mentioned VED commands will no longer
+automatically work on the "current" rule. (See the section below on
+extending ved_mcp to cope with this.)
+
+An example
+
+define :rule rule3 in diagnose [patient ?x] [temperature high];
+    [say ?x is very ill]
+    [?x needs aspirin]
+enddefine;
+
+This will create a rule and add it to the list of rules -diagnose-, or
+replace a rule called "rule3" if there is one already in that list.
+
+If "in diagnose" left out, the list -psys_rules- is used instead.
+
+When a rule definition in this form is first compiled the rule is added
+to the end of the list (psys_rules or some other list). So rules are
+stored in the list in the order of their definition. However, if a rule
+definition is edited and re-compiled, the new version replaces the old
+in the same place in the list.
+
+-- Adding extra checks to the rule compiler ---------------------------
+
+There are two user-definable procedures used in reading in rule
+definitions. They are used to read in the list expressions defining
+conditions and actions, respectively:
+
+    psys_readcondition() -> list;
+        The default version is defined simply to call -listread- and
+        return the result.
+
+    psys_readaction() -> list;
+        The default version calls -listread- and returns the result
+        unless it starts with "POP11" in which case, if necessary, it
+        compiles the procedure in the tail of the list. See POP11
+        actions below.
+        (SHOWLIB * NEWPSYS/psys_readaction for full details)
+
+Users can redefine these to do extra syntax checking in rule
+definitions, e.g. if all conditions and all actions have to have certain
+formats.
+
+At present they do no checking, apart from requiring a list expression
+for each condition or each action. Because the internal structure of the
+lists is not checked, errors (e.g. wrong format for a "MODIFY" action)
+will be detected only at run time. Checking action formats can be
+achieved by re-defining -psys_readaction-.
+
+A possible extension of this package would be to redefine these two
+procedures to allow an English-like notation for expressing rules or
+actions. (Other languages could be used instead of English.)
+
+-- psys_new_rule(<name>, <conditions>, <actions>, <type>) -------------
+
+Given a word, a list of conditions, a list of actions, and a word that
+names a ruleset, this procedure does exactly the same as the "define
+:rule" form, i.e. it updates an existing rule in psys_rules, or creates
+a new one at the end.
+
+
+-- psys_delete_rule(<name>, <type>) -----------------------------------
+
+<name> should be the name of a rule that is in the list that is the
+value of the word <type>.
+
+If the location of a rule in the list is to be changed, the rule must
+first be removed from the list using psys_delete_rule.
+
+This can be done in an action of a rule, e.g.
+
+    [NULL [popval psys_delete_rule(?name)]]
+
+or
+
+    [NULL [apply psys_delete_rule ?name]]
+
+(See explanation of NULL actions, "popval" elements and "apply"
+elements, below).
+
+It would also be possible to define a new action type of the form
+
+    [DELETERULE ?name]
+
+as shown below in the section on "User-defined action keywords".
+
+-- psys_pr_rule(<name>, <list>) ---------------------------------------
+or
+    psys_pr_rule(<name>)
+
+The second argument, <list>, should be a list of rules. If it is not
+provided it defaults to psys_rules.
+
+This procedure gets the rule of that name from the list and prints it
+out in a format that allows it to be recompiled.
+
+
+-- Rule record format -------------------------------------------------
+
+Each rule is a record of type "psysrule", with four fields,
+psys_rulename, psys_conditions, psys_actions and psys_ruletype.
+
+
+-- Rule instance format -----------------------------------------------
+
+When a rule is found to be applicable, because all its conditions are
+satisfied, a rule instance, or rule activation, record is created. This
+is a record of type "psysactivation". The record has the following
+fields:
+    psys_ruleof
+        The rule record, an object of the type described above.
+    psys_varsof
+        A list of words occurring as variables in the conditions of
+        the rule.
+    psys_valsof
+        A list of the values bound to the variables as a result of
+        matching all the conditions to establish applicability.
+    psys_foundof
+        A list of the items in psys_database (the working memory) found
+        to correspond to the conditions of the rule (excluding WHERE
+        conditions
+    psys_recof
+        This is a vector of numbers, recording "recency" information for
+        the rule instance. There is one number for each condition. The
+        number is 0 if it is a WHERE condition or a NOT condition
+        or an ALL condition.
+        Otherwise it is a number >= 1 giving the relative "age" of the
+        item in the database found to match the condition.
+        The vector will be empty ({}) if psys_recency is false.
+        (See information about psys_forevery, below.)
+
+For example, if the conditions of the rule were
+
+        [Father ?x ?y] [WHERE isfemale(y)] [Mother ?y ?z]
+
+Then the psys_varsof field would contain the list [z y x], the
+psys_valsof field might contain [joe mary tom], the psys_foundof
+field
+    [[Father tom mary] [Mother mary joe]]
+
+and the psys_recof field the vector
+
+    {5 0 2}
+
+indicating that [Father tom mary] was the fifth most recent item added to
+the database and  [Mother mary joe] the second. This information allows
+a variety of recency-comparing algorithms to be defined for ordering or
+selecting applicable rules.
+
+WARNING: if a condition of type [ALL ?<variable>] is used to extend the
+conditions using patterns extracted from the database, as described
+below, this may also extend the psys_varsof and psys_valsof lists
+in instances of the rule.
+
+
+-- Conditions may be simple or complex --------------------------------
+
+Every rule has a (possibly empty) sequence of conditions determining
+when it is applicable. A condition may be simple or complex.
+
+A simple condition is just a pattern to be matched against the database,
+e.g.
+    [size ?object ?x]
+    [temperature ?t]
+
+A complex condition may have additional elements, including the key
+words described below, namely "NOT", "OR", "WHERE", "NOT_EXISTS",
+"IMPLIES", described below.
+
+A simple condition, i.e. a pattern, is a list, some of whose elements
+may be variable names preceded by "?" or "??", of the type used by the
+Pop-11 pattern matcher described in HELP * MATCHES and HELP * SYSMATCH.
+Patterns may contain embedded patterns, e.g.
+
+    [parts ?object == [?partnum == size 5 ==] == ]
+
+which would access objects with parts, containing at least one part
+with attribute size 5, and will b ind the variables object and partnum
+if such an object exists.
+
+Restriction procedures may also be used, e.g. ?x:isinteger, as described
+in HELP * MATCHES.
+
+The Pop-11 syntax using "^" and "^^" to insert the value of a variable
+is NOT supported in LIB NEWPSYS conditions and actions, since these
+require too much re-creation of list structures when rules are run.
+Instead two facilities are provided:
+
+First: the whole sequence of conditions has to be true simultaneously
+with the same bindings for the same variables. Thus the following can be
+used to identify two people, x and z, such that x is paternal
+grandfather of y (as in forevery - see HELP * FOREVERY)
+
+    [father ?x ?y] [father ?y ?z]
+
+I.e. it is not necessary to express the second condition as
+    [father ^y ?z]
+
+
+Second: WHERE conditions, described below, can be interspersed among
+ordinary conditions. These allow Pop-11 expressions to be evaluated
+in order to control testing for applicability. For example the
+following conditions will be satisfied by two people, a, and b, such
+that b is twice as old as a.
+
+    [age ?a ?x1] [age ?b ?x2] [WHERE x2 = 2 * x1]
+
+Note that in a WHERE condition, variables (e.g. x1 and x2 above) are
+used with whatever values they have got from previous conditions, and do
+not need to be prefaced with "?". However, words that are not variables
+need to be explicitly quoted, e.g.
+
+    [man isat ?place] [?thing isat ?place] [WHERE thing /= "man"]
+
+In addition "popval" elements, explained below, allow portions of
+an action to be evaluated.
+
+-- Types of conditions ------------------------------------------------
+
+Every condition is a list specifying conditions that must all be
+satisfied if the actions are to be executed.
+
+A <condition> takes one of the following forms:
+
+-- -- Simple conditions (patterns)
+[<pattern>]
+    True if [<pattern>] matches something in psys_database, the
+    working memory (consistently with variable bindings so far). Any
+    unbound variables will become bound if the condition is satisfied.
+
+    <pattern> may have any of the forms described in HELP MATCHES
+
+-- -- OR conditions
+[OR [<pattern>] [<pattern>] [<pattern>] ...]
+    True if one of the patterns matches something in the database.
+    For each successful match it will try to match remaining conditions
+    in the list, until all the remaining conditions match.
+
+NB: at present "OR" can only be followed by a list of patterns to be
+matched against the database. I.e. OR is followed by simple conditions,
+and complex conditions are not allowed, e.g. conditions using "NOT" or
+"IMPLIES".
+
+Because OR has this restriction, an OR condition actually functions
+as a simple condition in relation to various comments made below about
+restrictions on conditions. In particular, variables bound in an OR
+condition will be accessible in subsequent conditions and in ACTIONS.
+
+-- -- NOT conditions
+[NOT <pattern>]
+    True if [<pattern>] does NOT match anything in the working memory.
+    Initially unbound variables in the pattern may receive spurious
+    values as a result of partial matches.
+
+Like "OR", this can include only a simple conditions, i.e. a pattern to
+be matched against the database, not complex condition. (NOT_EXISTS,
+defined below, can have arbitrary conditions, including complex
+conditions.)
+
+Warning, although a NOT condition may contain variables, those variables
+should not be used (in the same rule) in subsequent conditions or in
+actions, as the values of the variables will be undefined if the NOT
+condition succeeds.
+
+-- -- WHERE CONDITIONS
+[WHERE <Pop-11 expression>]
+    True if the Pop-11 expression evaluates to something non-false.
+    WHERE conditions may contain some variables (indicated by
+    "?" and "??") which have been bound in a previous pattern. E.g. a
+    list of conditions might be something like
+
+        [age ?person1 ?n1] [age ?person2 ?n2] [WHERE ?n1 > ?n2]
+
+    However, the variables in a WHERE condition need not have "?", so
+    the above could be replaced by the following, with a slight increase
+    in efficiency.
+
+        [age ?person1 ?n1] [age ?person2 ?n2] [WHERE n1 > n2]
+
+
+    WHERE conditions do not have to come at the end of a condition
+    sequence. E.g. the above might be followed by
+
+        [cousin ?person1 ?person2]
+
+    in a rule that is applicable to a pair of cousins such that the
+    first is older than the second. Allowing WHERE conditions to
+    occur early in a conditionlist makes it possible to avoid wasted
+    effort finding matches that are later going to be rejected.
+
+    If the Pop-11 expression in a WHERE condition causes an error, e.g.
+    because not all the variables have appropriate kinds of values, then
+    this is equivalent to the WHERE expression being false. (The errors
+    are trapped. Such trapping is turned off by psys_debugging)
+
+-- -- NOT_EXISTS and IMPLIES conditions
+
+A particularly powerful type of condition allows a rule to be fired only
+if some generalisation is true. For example if you want a rule to fire
+if all known adult males are teachers you could use a condition of the
+following form:
+
+    [NOT_EXISTS [male ?x] [adult ?x] [NOT teacher ?x]]
+
+Because this can be hard for non-logicians to interpret, the following
+format is also accepted for the special case of a NOT_EXISTS condition
+that has only one NOT condition.
+
+    [IMPLIES [ [male ?x] [adult ?x] ] [NOT teacher ?x]]
+
+Note 1: Notice that "IMPLIES" is followed by only TWO components, the
+first being a LIST of conditions (i.e. the antecedents of the
+implication), and the last a single condition, the consequent.
+
+Note 2: NOT_EXISTS can have any number of conditions. If there is only
+one condition and that is simply a pattern, then it is equivalent to
+a "NOT" condition, though slightly less efficient.
+
+Unlike "NOT", "NOT_EXISTS" can be followed by any type of condition,
+simple or complex, whereas NOT can be used only with simple conditions.
+
+E.g. the following is legal
+
+    [NOT_EXISTS [OR [<pattern1>] [<pattern2>] ...] ]
+
+whereas the corresponding "NOT" condition would not work.
+
+WARNING: although the patterns in a NOT_EXISTS or IMPLIES condition may
+contain variables, and these variables may be repeated in other patterns
+in the same complex condition, the same variables should not be used (in
+the same rule) outside these conditions, as their values will be
+undefined.
+
+-- -- ALL conditions (for meta-rules)
+[ALL ? <variable1>]
+    This form of condition is provided to allow a list of patterns to be
+    dug out of the database and then checked as if they were part of the
+    list of conditions of the rule.
+
+Suppose, for example, that there is a goal in the database of the form
+
+    [goal [BlockA ison ?block] [?block ison =]] ]
+
+Than a rule that is to check whether that goal is satisfied might have
+the following two conditions
+
+    [goal ?goallist]
+    [ALL ?goallist]
+
+The first condition will dig out the goal. The second will check whether
+it is satisfied and if so bind the list of database items to the
+variable instances. Both the variable ?goallist and variables that occur
+in it can be used in actions of the rule. An example of this mechanism
+is shown in TEACH * PSYSRIVER
+
+
+-- Actions ------------------------------------------------------------
+
+Actions, like conditions, may be simple or complex. Complex conditions
+are lists which start with a known keyword (e.g. READ, SAY, MENU, DEL,
+MODIFY, POP11 etc -- all defined below). If there is no such initial
+keyword, the action is taken as a data-item, i.e. a list to be added to
+the working memory psys_database.
+
+Actions, like conditions, may include variables (preceded by "?" or
+"??") that have been bound by testing the conditions of the rule against
+the working memory. Any such variables will be replaced by their values
+before the actions are performed. (See the section on instantiation,
+below.) However, no such variable should be used in an action unless it
+also occurs in a simple condition, since it is only from a satisfied
+simple condition that a variable can acquire a value. Complex conditions
+like
+    [NOT ...]
+    [WHERE ....]
+    [NOT_EXISTS ....]
+
+cannot bind variables. The exception is an OR condition or ALL condition,
+which can.
+
+Actions may also include "popval" elements or "apply" elements, to be
+evaluated before the action is performed, as described below.
+
+Complex actions corresponding to initial keywords may either be of a
+built-in type or a user-defined type, as explained below.
+
+
+-- Instantiation of actions -------------------------------------------
+
+Before rule actions are executed they are instantiated. This means that
+any variables preceded by "?" or "??" that have been bound in the
+conditions of the rule are replaced by their values. Unbound variables
+and their prefixes are left uninstantiated. In addition "popval" and
+"apply" list elements are interpreted. The former by compiling and
+executing them, the latter directly. They are described below.
+
+
+-- "popval" list elements ---------------------------------------------
+
+Any element of an action, embedded at any depth may be a list of the
+form:
+
+    [popval <Pop-11 expression>]
+
+i.e. a list whose first element is "popval". During instantiation the
+<Pop-11 expression> is first instantiated, which will replace any bound
+variables and evaluate any embedded "popval" or "apply" elements. After
+that the expression is given to the Pop-11 function -popval- to be
+compiled and executed. Any results produced will be spliced into the
+enclosing action.
+
+E.g. the following could be an action.
+
+        [remember [popval ?x + ?y]]
+
+?x and ?y should already have values. If the values were 2 and 3
+respectively then this action would add the following to the working
+memory.
+
+            [remember 5]
+
+The use of "?" is optional. So
+
+            [remember [popval x + y]]
+
+Would have the same effect.
+
+Notice that the value of the expression is not put in an embedded list,
+unless the expression evaluates to a list. E.g. an action of the form
+
+    [... [popval 10//3 ] ...]
+
+evaluates to
+
+    [... 1 3 ...]
+
+not to
+
+    [... [1 3] ...]
+
+-- "apply" list elements -----------------------------------------------
+
+The popval mechanism is very general because it allows an arbitrary
+Pop-11 expression to be compiled and run. However, because it requires
+the compilation of a procedure it can be slow, and will add to garbage
+collection time. In some cases it is more efficient, though less
+readable, and less general, to use "apply".
+
+An "apply" list element is of the form
+
+    [apply <procedure name> <arg1> <arg2> .... ]
+
+Variables that are to be instantiated must be preceded by either "?" or
+"??". The named procedure will be applied to all the arguments. So in
+the previous examples, instead of
+
+            [remember [popval x + y]]
+
+use
+
+            [remember [apply + ?x ?y]]
+
+And instead of
+
+    [... [popval 10//3 ] ...]
+
+use
+
+    [... [apply // 10 3]...]
+
+
+-- Built-in action types ----------------------------------------------
+
+An <action> is one of the following (this list may be extended):
+
+-- -- [<data item>]
+[<data item>] is added to the working memory
+(Where <data item> does not start with any of the keywords indicated
+below.)
+
+-- -- [ADDALL [<data item>] [<data item>] ...]
+All the items are added to the database, in the order given. This means
+that the last one will be the most recent, which may be important if
+"recency" information is used for selecting rules.
+
+-- -- [SAY <message>]
+[<message>] is printed out. It can be a mixture of "canned" strings,
+variables preceded by "?" or "??",  [popval...] or [apply...] elements,
+or embedded lists. The variables that have been bound will be replaced
+before printing.
+
+
+-- -- [EXPLAIN <message>]
+This is exactly like SAY actions except that if psys_explain_trace is
+false then it is ignored. For example this can be used to suppress
+verbosity during development.
+
+
+-- -- [STOP <message>]
+This is exactly like a SAY action, except that after the <message> is
+printed out the production system run is halted.
+
+-- -- [NOT <pattern>]
+All items matching <pattern> are removed from the working memory.
+
+-- -- [POP11 <procedure>]
+-- -- [POP11 <procedure name>]
+-- -- [POP11 <pop11 instructions>]
+
+In the first two cases the procedure is run.
+
+In the current implementation, if the user defines the action to be
+of the form
+
+    [POP11 <pop11 instructions> ]
+
+then when the rule containing this is read in the instructions are
+compiled to a procedure and the action is just a two element list,
+containing the word "POP11" and the procedure. So it is possible to use
+this form to handle conditional actions efficienctly, instead of having
+separate rules for each case. An example might be:
+
+    vars temp; ;;; declare any variable used globally in a POP11 action.
+
+    define :rule temperature [temperature ?temp];
+
+        [POP11
+            psys_add(
+               if temp == 98 then [temperature normal]
+               elseif temp < 98 then [temperature low]
+               else [temperature high]
+               endif)
+        ]
+
+    enddefine;
+
+This could be expressed more clearly as three separate rules, but in
+some cases the loss in efficiency might be important.
+
+Note that the two procedures
+    psys_eval(<action>)
+and
+    psys_eval_list(<action list>)
+
+are available for use in the body of a POP11 action. The <actions> can
+be any items of the sort that can occur as actions of a rule, for
+example
+
+    [POP11 if ...  then psys_eval([DEL 2]) endif]
+
+would be equivalent to the action
+
+    [DEL 2]
+
+Similarly
+
+    [POP11 if .... then psys_eval_list([.....]) ....endif ]
+
+The only use for these procedures arises when the POP11 code calls the
+actions indirectly, e.g. inside a conditional.
+
+
+-- -- [PUSH <item> <word>]
+This assumes that there is in the database a list of the form
+    [<word> ....]
+
+This is replaced with
+
+    [<word> <item> ...]
+
+If psys_copy_modify is false, the old list-links are used, otherwise
+the old item is removed and a new one constructed. However, in either
+case the tail of the original list (represented by ....) is re-used.
+
+-- -- [POP <word>]
+This assumes that there is in the database a list of the form
+    [<word> <item> ....]
+
+This is replaced with
+
+    [<word> ...]
+
+I.e. the first item after the stack name (<word>) is removed. If
+psys_copy_modify is false, the old list-links are used, otherwise
+the old database item is removed and a new one constructed. However, in
+either case the tail of the original list (represented by ....) is
+re-used.
+
+NB Don't confuse POP actions and POP11 actions.
+
+-- -- [DEL <integer> <integer> ...]
+For each <integer> N, delete from the working memory the item that
+matched the N'th simple condition of the rule (i.e. excluding WHERE
+conditions, NOT conditions ALL conditions and other complex conditions).
+
+-- -- -- WARNING count only SIMPLE conditions for <integer>
+A common cause of errors is to count complex conditions in selecting the
+integers in DEL, REPLACE, or MODIFY actions (see belwo).
+
+-- -- [REPLACE <integer> <data item>]
+This is equivalent to [DEL <integer>][<data item>], but may be a little
+clearer to read in some contexts.
+
+Note the warning above about how to interpret the integer.
+
+-- -- [REPLACE <pattern> <data item>]
+This is equivalent to two actions
+    [NOT <pattern>]
+    [<data item>]
+
+Warning: don't use variables in <data item> that are assumed to be
+bound in  the <pattern>. If instantiated variables are to be used, then
+they must be bound in the conditions of the rule.
+
+-- -- [MODIFY <integer> <key> <value> <key> <value> ...]
+If the integer is N, this is equivalent to a command to remove the
+database item that matched the N'th SIMPLE condition, and replace it
+with a new copy in which the item following the occurrence of <key> is
+replaced by an occurrence of <value>, for each <key> <value> pair in the
+action.
+
+For example, if the first condition of a rule is [monkey == holds ?x ==]
+then the action [MODIFY 1 holds bananas] would mean that whatever
+matched x would be replaced by the word "bananas". This is useful when
+it is necessary to modify part of a database item whose complete
+structure is not known.
+
+If the first condition of the rule is of the form [NOT ...] and the
+second condition is [monkey == holds ?x ==], then the [MODIFY 1 ..]
+action would refer not to the [NOT ...] condition, since it is a complex
+condition, but to the [monkey ...] condition, which is simple (a
+pattern). See comment on DEL actions above.
+
+WARNING: do not use two MODIFY commands with the same <integer> in
+the actions of the same rule. E.g. don't do:
+
+    [MODIFY 2 age 20]
+    [MODIFY 2 wife mary]
+
+The second modify action will not find the original database item
+to modify. Instead do
+
+    [MODIFY 2 age 20 wife mary]
+
+This is more efficient in any case as it requires the modified item to
+be searched for in the database only once.
+
+WARNING: if one of the <key>s happens to be identical with one of the
+<value>s in the database item, then the item following the <value> may
+get replaced, causing obscure bugs. Checking for this would slow things
+down and require restrictions on formats used.
+
+
+-- -- [MODIFY <pattern> <key> <value> <key> <value> ....]
+As above, except that the modification is done to everything that
+matches the <pattern>.
+
+Warning: do not expect variables bound in the pattern to provide
+values for other variables in the action. See the comment on REPLACE
+actions.
+
+-- -- [NULL .....]
+If an action starts with "NULL" nothing is done, apart from
+instantiating it. This instantiation means that it can include variables
+that will be bound and [popval ...] items or [apply ...] items that will
+invoke Pop-11 procedures, e.g. to display the database or do some
+book-keeping. E.g.
+
+    [NULL [popval psys_database ==>]]
+
+will simply print out the whole database.
+
+An equivalent alternative might be:
+
+    [POP11 psys_database ==>]
+
+See POP11 actions below.
+
+
+-- -- [RULE TYPE <ruletype> <name> [<conditions>] [<actions>]]
+or
+-- -- [RULE <name> [<conditions>] [<actions>]]
+
+This creates a new rule (added to the front of the list of name
+<ruletype>), or a new definition of an old rule if it already exists
+in the list. If "TYPE <ruletype>" is not specified then it defaults to
+"psys_rules".
+
+WARNING: if the new rule is to include any variables preceded by "?" or
+"??" then make sure their names are different from any variables
+occurring in the rule containing the [RULE ...] action.
+
+For example the following detects any item containing an even number
+in the database, removes it, and creates a new rule that will abort
+the process if another even number turns up.
+
+    define :rule check_even
+            [== ?x:isinteger ==]
+            [WHERE x mod 2 = 0];
+
+        [DEL 1] ;;; delete it
+
+        [RULE
+            [popval gensym("rrr")]          ;;; new rule name
+            [[== ?y:isinteger ==] [WHERE y mod 2 = 0]]  ;;; conditions
+            [[STOP Found even number ?y]]]              ;;; actions
+
+    enddefine;
+
+
+-- -- SAVE and RESTORE actions
+It is possible to save or restore either the working memory, or the
+ruleset using these actions. The formats available are as follows:
+
+    [SAVE RULES <name>]
+        Equivalent to:  psys_rules -> valof(<name>)
+
+    [SAVE DATA <name>]
+        Equivalent to:  psys_database -> valof(<name>)
+
+    [RESTORE RULES <name>]
+        Equivalent to:  valof(<name>) -> psys_rules
+
+    [RESTORE DATA <name>]
+        Equivalent to:  valof(<name>) -> psys_database
+
+These actions can be combined, as follows:
+
+    [SAVE DATA <name1> RULES <name2>]
+
+    [RESTORE DATA <name1> RULES <name2>]
+
+
+If the ruleset is changed using [RESTORE RULES ...] any remaining rules
+in the currently applicable list are run.
+
+
+-- -- [FAIL <message>]
+This prints out <message> (after suitable instantiation - see SAY
+actions above), then restores the state to just before the last rule was
+activated. This may enable some other rule to fire.
+
+This is a difficult mechanism to use sensibly, and works only if
+psys_backtrack is true - otherwise the information required for a FAIL
+action is not saved.
+
+It is not clear that this is a useful facility.
+
+-- -- [PAUSE]
+
+This action will pause till the user presses the RETURN key, unless
+the variable psys_pausing has the value false. It is equivalent
+to a READ action of the form: [READ '' [==] []]
+
+This means that interactive commands can be given during the pause,
+as explained in the section on Interactive commands below.
+
+
+-- -- [READ <question> <??constraint??> <data item> <??explanation??>]
+
+The <constraint> is optional and may be omitted. The <explanation>
+is also optional and may be omitted. The forms of the elements of
+READ actions are described below.
+
+When a READ action is executed, the <question> is printed out, and the
+user types something in which is tested against the <constraint> (if
+provided).
+
+<question> may be a string or list or any other object that can be
+printed out.
+
+<data item> should be a list. It may contain the word "ANSWER", in which
+case that will be replaced by whatever the user types in, and the
+resulting <data item> will be added to the database, unless it is the
+empty list.
+
+The <constraint>, if present, should take one of the forms below, and if
+omitted it defaults to [==], which will match anything
+
+The <explanation> should be a vector containing strings, words or
+lists, which, if requested, will be printed out suitably instantiated.
+Strings are printed without alteration. A word is replaced by its
+current value. A list will be evaluated using psys_value, which will
+replace variables of the form ?x or ??x with their values, and
+lists of the form [popval <expression>] as explained below. So a
+READ action ending with an explanation may have the form:
+
+    [READ
+        ['Does' ?patient 'feel ill, well or soso?']   ;;; question
+        [OR ill well soso]              ;;; possible answers
+        [patient feels ANSWER]          ;;; to go in database
+        {'Because how' patient 'feels is relevant to the diagnosis'}]
+
+A more detailed account of READ actions follows.
+
+-- -- READ actions in detail
+
+The READ action of the above form does the following:
+    (1) <question> is printed out,
+    (2) A line is read in (using -readline-), but with an opportunity
+        for the user to ask questions as explained in the section
+        on interactive commands below.
+    (3) The answer is matched against <constraint> and if it matches then
+    (4) It is inserted in place of every occurrence of "ANSWER" in
+        <data item> and the latter is added to the database, unless
+        it is empty.
+
+    If the match fails at (3) the process restarts from (1).
+
+An empty action as in [READ <message> []] is useful for ensuring that
+the program pauses and gives the user the chance to invoke the
+interactive commands described below.
+
+
+-- -- READ action constraints
+
+If the constraint in a READ action is of the form [:<word>] then that
+implies that only one item should be typed in, and <word> is the name of
+a procedure that must be applied to that item and return a non-false
+result. E.g. in order to insist on an integer, use the constraint
+    [:isinteger]
+
+If the constraint is of the form [OR <item1> <item2> ...] then the user's
+input must be a single item identical with one of <item1> <item2> etc.
+
+If the constraint is of the form [LOR <item1> <item2> ...] then the
+user's input must be a list identical with one of <item1> <item2>
+etc.
+
+So the following two constraints are equivalent
+    [OR a b c]  [LOR [a] [b] [c]]
+
+However the second format allows [] to be one of the options, so that an
+empty reply is acceptable where a default can be used.
+
+If the user is to type in several items separated by spaces, and
+these are to be put in a list satisfying some condition, then the
+constraint could be of the form
+
+    [?? <variable> : <word>]
+
+where <word> is the name of a procedure, which will be applied to the
+list and should return true or false. E.g. if the procedure
+-isnumberlist- has been defined so that it checks whether its argument
+is a list of numbers or not and returns -true- or -false-, then the
+constraint might be something like:
+
+    [??numbers:isnumberlist]
+
+In that case the value of the variable "numbers" can be used in
+subsequent actions.
+
+Instead of an answer to the question the user may type "show", "why", or
+one of the other options specified in the section on interactive
+commands below.
+
+The default READ facility makes use of -readline- so all answers have
+to be typed on one line. (See HELP * READLINE)
+
+
+-- -- [MENU <menu> <action list> <??explanation??>]
+This is analogous to a READ action, except that it can offer users the
+option of a menu of answers to choose from, so that the user need simply
+reply by typing in a letter or number instead of having to type in the
+whole thing.
+
+As with READ actions, the <explanation> is also optional and may be
+omitted. The format for explanations is as described above for READ
+actions.
+
+When a MENU action is executed, the <menu> is printed out, and the
+user types something in which is tested to make sure it is one of the
+options provided in the menu. If it is, the appropriate action from
+the <action list> is executed. The <menu> and <action list> must have
+related structures as follows.
+
+The <menu> is a vector of two or three elements of the following form
+
+    {[<message>] [<options>] [<mappings>]}
+
+Where the last item is optional: it is useful only in the case where
+the action list is of the first form indicated below.
+
+The <action list> must be either a list containing a single action (in
+the form of a list, possibly including the word "ANSWER") or else a list
+mapping options to actions, as explained below.
+
+
+-- -- Structure of the <menu> vector
+
+In more detail the structure of a <menu> vector is this:
+
+The first element of the vector, [<message>] is a list of words or
+strings that can be printed to pose a question, prior to printing out
+the menu of possible answers. If the words are preceded by "?" or "??"
+they are assumed to be variables and their values are substituted
+instead. Any embedded "popval" elements or "apply" elements are
+evaluated as described above. So a possible example would be
+
+            ['How does' ?patient 'feel today?']
+
+
+-- -- Structure of the menu [<options>] list
+
+The second element of the <menu vector> [<options>] is a list of lists,
+one list for each option. Each list starts with a letter or number, to
+be typed to select that option and continues with information to be
+printed out to describe the option. An example of the options list might
+be:
+
+            [[1 very ill] [2 very well] [3 soso] [4 dont know]]
+
+
+-- -- Structure of the menu [<mappings>] list
+
+The third element of the <menu> vector, [<mappings>] is a list showing
+what value should be assigned to the variable ANSWER corresponding to
+each selection made. The list is of the form
+
+    [<key> <value> <key> <value> <key> <value> ....]
+
+where the <key> may be either a single item or a list of items, but each
+<value> must be an ATOMIC object, i.e. a word or a number that can be
+tested using "==". For example the list of mappings might be:
+
+            [ 1 ill 2 well [3 4] unknown]
+
+So if the user typed 1 the word "ill" would be assigned to ANSWER,
+if the user typed 2 the word "well" whereas if the user typed either 3
+or for the word "unknown" would be used.
+
+
+-- -- Printing out menus: psys_print_menu(message, options)
+
+The printing of a menu is done via the user-definable procedure
+psys_print_menu, which is given the message list and the options list
+as its arguments.
+
+The user responds by typing in one of the menu options, or one of the
+interactive commands described below (e.g. ".why", ".data" etc.). If no
+acceptable response is provided the program prints the menu out again.
+
+
+-- -- The menu <action list>
+
+When an appropriate menu option has been selected by the user, the
+program performs the appropriate action chosen from the action list.
+
+The <action list> has one of the following formats
+
+    [[<action>]]
+
+        e.g. [[Patient needs ANSWER]]
+
+or
+    [<key> [<action>] <key> [<action>]...]
+
+where each <key> is an item, or a list of alternative items, that the
+user may have typed in, or may have been derived from what the user
+typed in, on the basis of [<mappings>], e.g.
+        [
+            ill [?patient needs treatment]
+            [well unknown] [?patient needs tests]
+        ]
+
+
+In the first format, with a list containing a single action, the
+<action> may, as with READ actions, include the word "ANSWER", which
+will then be replaced either by what the user typed in, or by the item
+related to what the user typed in, according to the <mappings> list,
+described above.
+
+Each <action> can be any action type that can occur in a rule, including
+a further MENU action.
+
+
+WARNING: If the mappings list is provided, then each <value> must be
+an ATOMIC object, i.e. a word or number, not a list or string or vector.
+Then each <key> in the <actions> list should either be one of those
+<values> or a list of those <values>.
+
+The following would not work as expected:
+    Options list:
+            [[1 very ill] [2 very well] [3 soso] [4 dont know]]
+
+    Mappings list:
+            [1 [very ill] 2 [very well] [3 4] unknown]
+
+    Actions list:
+        [
+            [very ill] [?patient needs treatment]
+            [[very well] unknown] [?patient needs tests]
+        ]
+
+If the user typed in "1" the list [very ill] would be provided as the
+value from the mappings list, but this would not be matched against the
+first item in the actions list, rather it would be compared with the
+word "very" and with the word "ill", and the test would fail. If the
+value 2 were typed in by the user, then the mappings list would produce
+the value [very well] and this would not be recognised as a member
+of the second list of keys, because "lmember" is used, for speed, and
+it uses the test "==" not "=".
+
+So for communication between bits of a MENU action use words or numbers,
+not complex objects like lists or strings or vectors.
+
+
+-- -- -- Example of a MENU action
+
+The following example assembles the items discussed above:
+
+    [MENU
+        {
+            ;;;<message list>
+            ['How does' ?patient 'feel today?']
+            ;;; <options list>
+            [[1 very ill] [2 very well] [3 soso] [4 dont know]]
+            ;;; <mappings list>
+            [ 1 ill 2 well [3 4] unknown]
+        }
+
+            ;;; action list allowing keys "ill" "well" "unknown"
+        [
+            ;;; single key
+            ill [?patient needs treatment]
+
+            ;;; two possible keys associated with the same action
+            [well unknown] [?patient needs tests]
+        ]
+            ;;; explanation
+        {'Because how' patient 'feels is relevant to the diagnosis'}]
+
+
+An equivalent MENU action, not using a <mappings lsit> would be:
+
+    [MENU
+        {
+            ['How does' ?patient 'feel today?']
+            [[1 very ill] [2 very well] [3 soso] [4 dont know]]
+            ;;; no <mappings list>
+        }
+
+        ;;; action list using the numbers directly as keys
+        [
+            1 [?patient needs treatment]
+            [2 3 4] [?patient needs tests]
+        ]
+
+        {'Because how' patient 'feels is relevant to the diagnosis'}]
+
+Yet another equivalent would be
+    [MENU
+        {
+            ['How does' ?patient 'feel today?']
+            [[1 very ill] [2 very well] [3 soso] [4 dont know]]
+            [1 treatment [2 3 4] tests]
+        }
+
+        ;;; Single action format, using "ANSWER"
+        [
+             [?patient needs ANSWER]
+        ]
+
+        {'Because how' patient 'feels is relevant to the diagnosis'}]
+
+
+As the last two examples show, there is usually no point having a
+<mappings> list in the menu vector unless it is required to associate
+the user's choice with a value for ANSWER to be inserted in some data
+base item.
+
+
+-- -- [ADDALL <data item> <data item> ...]
+
+If the keyword is "ADDALL" the rest of the action should be a list of
+lists, which will all be added to the database, in that order. (I.e.
+the last item will be the newest item for subsequent rules.)
+
+
+-- User-defined action keywords and psys_action_type ------------------
+
+Users can define new complex action types associated with new keywords.
+
+To define a new action keyword "REPORT" do something like this:
+
+    define doREPORT(rule_instance, action);
+        ....
+    enddefine;
+
+    "doREPORT" -> psys_action_type("REPORT");
+
+Then any action starting with the word REPORT will invoke this
+procedure, by applying it to the current rule_instance (i.e. the current
+activation of the rule containing the action that starts with the
+keyword) and the instantiated action from the rule's action list.
+
+Storing the name, rather than the procedure, in the property
+psys_action_type allows the procedure to be redefined, or traced, during
+program development, without the need to replace the old version in the
+property.
+
+The test for whether an action is user-defined is done before
+recognising built-in types. This makes it possible for a user-defined
+type to over-ride the built in action type. I.e. after instantiating the
+action, as described above, the program first looks to see whether the
+initial word of the action has been associated with a procedure using
+the user-assignable property psys_action_type, in which case the
+procedure is run with the current rule and the current action as
+arguments. Otherwise, it checks to see whether the action is one of the
+built-in forms listed below.
+
+
+-- Interactive commands -----------------------------------------------
+
+During execution of READ actions and at interaction pauses resulting
+from -psys_walk- being true or a rule being traced (as described below),
+the user has the option of typing in any of the following interactive
+commands, all of which start with a dot or colon to indicate that what is
+typed in is not an answer to a question. (The full effects of these
+commands cannot be understood without reading later sections of this
+file describing the effects of variables like psys_show_conditions,
+psys_chatty, etc.
+
+ .show
+    This causes information about the current rule and the current
+    action from that rule to be printed out. The printing is done by
+    the user-definable procedure
+
+        psys_displayrule(action, rule_instance)
+
+    which is given the current (instantiated) action, and the current
+    rule instance from which it comes. (The form of a rule instance is
+    defined above.)
+
+ .why
+    This causes an explanation of the current action to be printed out,
+    if provided (i.e. in a READ action, as explained above). If "why"
+    is typed again, repeatedly, then information about previously
+    activated rules is printed out, until there are no more rules.
+    This "repeated why" option works only if the user has made the
+    global variable psys_remember a list initially (e.g. []), rather
+    than false. Otherwise the information about previous interactions
+    will not be stored for interrogation in this way.
+
+    For the current READ action "why" will cause a user-provided
+    explanation string to be printed out, if it is given in the fourth
+    element of the READ action. Otherwise psys_displayrule is used
+    to print out the action and the context, in answer to "why".
+
+ .data
+    This causes information in the working memory, psys_database, to be
+    printed out.
+
+ .data <pattern>
+    This causes all the data that match the pattern to be printed out.
+
+ .trace <rule names>
+    Causes tracing to be switched on for the named rules, like
+    psys_trace, described below.
+
+ .untrace <rule names>
+    Causes tracing to be switched off for the named rules, like
+    psys_untrace, described below.
+
+ .untrace all
+    Causes tracing to be switched off for all rules, and psys_walk
+    made false.
+
+ .show_conditions
+ .show_conditions true
+    Causes psys_show_conditions to be made true, so that testing of
+    rule conditions is shown in detail.
+
+ .show_conditions false
+    Turns the above off
+
+ .chatty
+ .chatty true
+    Either of these makes psys_chatty true
+
+ .chatty false
+    This makes psys_chatty false
+
+ .chatty <integer>
+    This assigns the integer to psys_chatty
+
+ .walk
+    This makes psys_walk true
+
+ .walk false
+    This makes psys_walk false
+
+ :<Pop-11 expression>
+    If the user types a colon followed by a Pop-11 expression, then the
+    Pop-11 expression is executed and if there is any result it is
+    printed out. This may be useful during debugging.
+
+ ? (or any unrecognised command)
+    This causes a help message to be printed out, listing the commands
+    available.
+
+
+
+-- Rule manipulating procedures ---------------------------------------
+
+Each rule is represented by a three element structure: the name, which
+is a word, the conditions, a list of lists, and the actions, another
+list of lists. A rule is created by
+
+    psys_consrule(<name>,<list of conditions>,<list of actions>)
+
+The following three procedures each takes a rule and returns the
+appropriate item. The last two have updaters.
+
+    psys_rulename
+    psys_conditions
+    psys_actions
+
+All three components are returned by
+
+    psys_destrule(rule) -> actions -> conditions -> name;
+
+The syntactic form
+
+    define :rule <name> <conditions>; <actions> enddefine;
+
+reads the <name>, the <conditions> and the <actions> checking that the
+latter are all lists, and puts the new rule at the end of the list
+psys_rules (see below). If there is already a rule with this name then
+its conditions and actions are replaced by the new ones. Thus this
+syntax makes it easy to edit and recompile a rule (unlike the library
+package LIB PRODSYS).
+
+If there is already a rule with the <name> then this replaces
+its conditions and actions. If there isn't a new rule is appended to
+psys_rules.
+
+-- Global variables --------------------------------------------------
+
+There are several global variables that users may find useful, along
+with procedures for manipulating them.
+
+-- psys_rules (list of rules) -----------------------------------------
+
+This is a list of rules to which new rules are appended by the
+
+    define :rule .... enddefine
+
+syntax, as described above. It is possible in principle to manipulate
+several lists of rules, by temporarily saving and restoring the value of
+psys_rules.
+
+The procedure
+
+    psys_rule_named(<word>, <list>) -> <rule>
+    psys_rule_named(<word>) -> <rule>
+
+Searches down the given <list> for the rule with the name. If not
+provided, <list> defaults to psys_rules.
+
+A list of the form of psys_rules is required as first argument to
+psys_run.
+
+-- psys_database ------------------------------------------------------
+
+This is used as the working memory when rules are running. It is
+the second argument of psys_run, and is accessed by a collection of
+procedures partly analogous to the Pop-11 database procedures described
+in HELP * DATABASE.
+
+psys_add(item);
+    Adds item to psys_database
+
+psys_present(pattern);
+    Returns false or the first item in psys_database matching pattern
+
+psys_flush(pattern);
+    Removes everything in psys_database that matches the pattern. If
+    psys_copy_modify is false then the removal is non-constructive,
+    i.e. database list links are re-used (to save garbage collections).
+
+psys_forevery(patternlist, proc);
+
+    "proc" is a procedure that takes two arguments, a vector and a
+    number, used for getting "recency" information about the items
+    satisfying the conditions of an action. The vector is a vector
+    of integers giving the locations of items in the database that
+    satisfied conditions in the rule. The number says how many such
+    numbers are recorded in the vector. E.g. if the vector is
+    { 3 1 9 2 ....} and the number is 4, then that says that the
+    first condition matched the third most recent item in the database,
+    the second condition matched the most recent item, the third one
+    matched the 9th most recent and the fourth one matched the second
+    most recent. Note that WHERE, NOT and ALL conditions get the number
+    0. (See the information about psys_recof, above.)
+
+    For every possible way of matching the patterns in paternlist
+    psys_forevery runs the procedure proc with the pattern variables
+    set. This is used to find all possible ways of instantiating the
+    conditions of each rule, in order to build a list of possible
+    applicable rules, to be sorted by psys_sortrules.
+
+
+psys_allpresent(patternlist) -> false or found_list
+    This is defined as follows
+
+        define psys_allpresent(patternlist) -> found;
+            lvars patternlist, found;
+
+            define lconstant procedure report_success( vec, num );
+                ;;; return the items found.
+                lvars vec, num;
+                ncrev(psys_found);
+                exitfrom(psys_allpresent)
+            enddefine;
+
+            psys_forevery(patternlist, report_success);
+            false -> found;
+        enddefine;
+
+-- psys_show_conditions (boolean) -------------------------------------
+
+If -psys_show_conditions- is true then whenever a rule is about to be
+tested, its name and all its conditions are printed out, then as each
+condition in turn is checked the result is printed. The printout can be
+a little confusing because newpsys will try all possible ways of
+matching conditions to the database. Indentation indicated by vertical
+bars is used to show the dependencies.
+
+If the conditions are C1, C2, C3, then information about whether C1 is
+satisfied is prefixed with "|". After C1 has been satisfied, information
+about C2 is printed out preceded by "||". If C2 is satisfied, then each
+information about satisfaction or non-satisfaction of C3 is prefixed
+with "|||".
+
+After that, any further reports on tests for a different way of
+satisfying C2 will be prefixed with "||". When all those have been
+exhaused, additional ways of satisfying C1 will be tested, and results
+prefixed with "|". If any are successful then new attempts will be
+made on C2, prefixed with "||", and so on.
+
+For every combination of conditions that is satisfied, the variables in
+the conditions will be printed out with the values assigned to them by
+the matcher in satisfying the conditions. (See example below.)
+
+Further trace information is controlled by psys_chatty and psys_walk.
+
+
+-- Example of psys_show_conditions trace output -----------------------
+
+The file TEACH PSYSRIVER describes a newpsys program that makes a plan
+for getting man, fox, chicken and grain across a river. One of the rules
+is called "complete_move" in the rule_set called "solve_rules". It has
+two conditions to be satisfied: [complete_move ?move] and [state ?state]
+
+If psys_show_conditions is set true the following illustrates the
+printout when this rule is tested for applicability:
+
+-----------------------------------------------------------------------
+
+** [Checking conditions for: complete_move in solve_rules]  ;;;rule
+** [[complete_move ? move] [state ? state]]                 ;;;conditions
+|** [SUCCESS [complete_move [move chicken]]]
+||** [SUCCESS [state [[chicken isat right]
+                      [fox isat left]
+                      [grain isat right]
+                      [man isat right]]]]
+|||** CONDITIONS SATISFIED: Variables bound:
+|||** state = [[chicken isat right] [fox isat left] [grain isat right]
+     [man isat right]] ; move = [move chicken] ;
+
+-----------------------------------------------------------------------
+
+In this case no other ways of satisfying the conditions will be
+attempted because psys_allrules is set -false- and the first applicable
+rule instance is therefore selected.
+
+A more complex example showing the attempt to find different ways
+of satisfying the conditions follows. The rule being tested is
+"move_thing" in the rule_set "solve_rules". It has seven conditions,
+one of them an OR condition, whose first disjunct fails, while its
+second succeeds in one case. The program tries to find something
+at the same side of the river as the man (in this case the right
+side). The first candidate is the man, but this falses the
+thing /= "man" test to fail. The second candidate is the grain, and
+that fails because the last move in the history list was moving
+the grain, so it eventually tries the third candidate, the chicken,
+and the rule is shown to be applicable, with "thing" bound to "chicken",
+etc.
+
+-----------------------------------------------------------------------
+** [Checking conditions for: move_thing in solve_rules]
+** [[man isat ? place]
+    [? thing isat ? place]
+    [WHERE thing /== " man "]
+    [OR [opposite ? place ? other] [opposite ? other ? place]]
+    [state ? state]
+    [NOT tried [move ? thing] ? state]
+    [NOT history [[move ? thing] =] ==]]
+|** [SUCCESS [man isat right]]
+||** [SUCCESS [man isat right]]             ;;; trying thing = "man"
+|||** [Tested WHERE [thing /== " man "]]
+|||** [Result is: <false>]
+||** [SUCCESS [grain isat right]]
+|||** [Tested WHERE [thing /== " man "]]
+|||** [Result is: <true>]
+||||** [SUCCESS [opposite right left]]
+|||||** [SUCCESS [state [[chicken isat right]
+                         [fox isat left]
+                         [grain isat right]
+                         [man isat right]]]]
+||||||** [SUCCESS [NOT tried
+                       [move grain]
+                       [[chicken isat right]
+                        [fox isat left]
+                        [grain isat right]
+                        [man isat right]]]]
+|||||||** [FAILED [NOT history [[move grain] =] ==]]
+|||||** [FAILED [state ? state]]
+||||** [FAILED [opposite ? place ? other]]
+||||** [FAILED [opposite ? other ? place]]
+||||** [FAILED [OR [opposite ? place ? other] [opposite ? other ? place]]]
+||** [SUCCESS [chicken isat right]]          ;;; trying thing = "chicken"
+|||** [Tested WHERE [thing /== " man "]]
+|||** [Result is: <true>]
+||||** [SUCCESS [opposite right left]]
+|||||** [SUCCESS [state [[chicken isat right]
+                         [fox isat left]
+                         [grain isat right]
+                         [man isat right]]]]
+||||||** [SUCCESS [NOT tried
+                       [move chicken]
+                       [[chicken isat right]
+                        [fox isat left]
+                        [grain isat right]
+                        [man isat right]]]]
+|||||||** [SUCCESS [NOT history [[move chicken] =] ==]]
+||||||||** CONDITIONS SATISFIED: Variables bound:
+||||||||** state = [[chicken isat right] [fox isat left] [grain isat right]
+     [man isat right]] ; other = left ; thing = chicken ; place = right
+     ;
+
+As this example illustrates, making -psys_show_conditions- true can
+produce an enormous amount of printout. But this is sometimes essential
+for debugging.
+
+
+-- psys_chatty (boolean or integer) -----------------------------------
+
+The variable psys_chatty controls trace printing while rules are
+running, as follows, depending on whether its value is false, true, or
+an integer.
+
+    if false, there is no trace printing (though rules can print things
+        out using SAY actions).
+    if true, causes minimal useful information to be printed out during
+        running
+    if the value is divisible by 2 then the list of rule-instances
+        already activated is printed out on every cycle, if
+        psys_repeating is false and the list is to be remembered.
+    if the value is divisible by 3 then all WHERE and ALL tests are
+        printed out
+    if the value is divisible by 5 then the database is printed out
+        on every cycle
+    if the value is divisible by 7 then checks on applicability
+        conditions for rules are printed out.
+        (Compare psys_show_conditions)
+    if the value is divisible by 11 then the list of applicable rules
+        found is printed on every cycle
+    if the value is divisible by 13 then information is printed out
+        concerning items added to or removed from the psys_database, and
+        truncation of the database is announced whenever its length
+        exceeds psys_memlim
+    if the value is divisible by 17 and psys_walk is false then every
+        rule that is activated is printed out, without an interactive
+        pause.
+    Default value of psys_chatty is false.
+
+
+For example, to make checks on applicability conditions printed out, and
+every rule that is activated printed out do
+
+    7 * 17 -> psys_chatty;
+
+The value of psys_chatty can be altered interactively as explained
+above.
+
+
+-- psys_repeating (boolean) -------------------------------------------
+
+Default is true.
+
+If this is set false the system will not trigger the same rule on the
+same psys_database items twice. Use of this option requires all rules
+that are fired to be remembered in association with the database items
+that triggered them. The actual database items are remembered for
+comparison with future items that make the condition in the rule true.
+This means that if rule R1 runs once with database item [r a b] making
+its condition true, then it may run again later if a new item [r a b] is
+added to the database.
+
+Setting psys_repeating false adds to the memory load of the program as
+well as requiring additional tests. See also the WARNING in connection
+with psys_copy_modify.
+
+In some cases, careful ordering of rules can make it unnecessary for
+psys_repeating to be made false.
+
+
+-- psys_walk (boolean) ------------------------------------------------
+
+If this is set true then the system pauses before doing each action of a
+rule that has been selected, and invites questions, using the procedure
+psys_interact, which allows questions to be asked. In particular
+
+    ".show"
+        displays the current rule and the action from that rule.
+
+See additional information about Interactive commands above.
+
+The default value for psys_walk is false.
+
+In order to distinguish pauses due to psys_walk being true from the
+pauses when real questions are being asked, a different prompt is
+used, namely:
+
+    Walking>
+
+
+-- psys_pausing (boolean) ---------------------------------------------
+
+If this is not false then PAUSE actions will work. If it is false
+they are ignored.
+
+-- psys_allrules (boolean, or 1) --------------------------------------
+
+If true, run all the rules whose conditions are true, not just the first
+rule found. More generally, if the list of conditions of a rule can be
+satisfied in more than one way (e.g. the pair
+
+    [father ?a ?b][mother ?b ?c]
+
+may have several instances), then all the instantiations of the rule
+will be found by psys_applicable on each cycle. These will be put into a
+list along with all applicable instantiations of other rules. The
+procedure psys_sortrules can be defined to sort such a list of
+applicable rules, as explained below.
+
+Trace -psys_applicable- to see which applicable rule instances are found
+on each cycle.
+
+If the value of psys_allrules is the integer 1, only one rule will be
+run on each cycle. Nevertheless, all applicable rules will still be
+given to psys_sortrules, and the first instance, after sorting, will be
+run. This is useful for debugging - in order to show all the applicable
+rules.
+
+Alternatively psys_allrules can be made true, and psys_sortrules can be
+made to return a list of only one rule.
+
+The default for psys_allrules is false. This means that only the first
+applicable rule that is found will be executed on each cycle. If the
+rule has more than one applicable instance (i.e. more than one way of
+matching the conditions against items in working memory), it is not
+defined which one will be selected.
+
+
+-- psys_recency (boolean) ---------------------------------------------
+
+If this is made true, then items in the list of possible rule
+activations given to psys_sortrules have an extra field representing the
+recency of addition to the database of all items matching conditions.
+Thus if the conditions C1, C2 and C3 match the fourth the first and the
+seventh items in psys_database, then the recency representation will be
+a vector of three numbers
+
+{4 1 7}
+
+If the condition is of type NOT or WHERE, no particular database item
+makes it trule, so the corresponding number in the vector of numbers
+will be 0.
+
+
+-- psys_sortrules (false or procedure) --------------------------------
+
+The default for this is false. If non-false, it is assumed to be a
+user-defined procedure that sorts rules that are applicable. This makes
+sense only if psys_allrules is non-false.
+
+psys_sortrules is given a list of possible rule activations and returns
+a list of possible rule activations.
+
+A possible rule activation is represented as a vector consisting of four
+or five elements. If psys_recency is false there are only four elements
+in each rule, namely:
+
+    - a rule whose conditions are satisfied
+    - a list of variables bound when the conditions were satisfied,
+    - a list of the corresponding values of the variables.
+    - a list of the database items matching the conditions
+
+If psys_recency is true then there is an extra element, a vector of the
+type described above in connection with psys_recency.
+
+Example definitions of psys_sortrules, corresponding to different search
+strategies are given below.
+
+
+-- psys_remember (false or list) ----------------------------------------
+
+If this is non-false, then in psys_run it is given a list as value, and
+then all activated rule-instances are added to the front of the list, in
+the form of a rule_instance record of the type described under
+psys_sortrules.
+
+The Default is false.
+
+psys_remember is used in connection with requests for explanations. (A
+very primitive explanation facility). It is also used if psys_repeating
+is false.
+
+
+-- psys_debugging (boolean) -------------------------------------------
+
+If true, extra information is printed out, and Pop-11 error messages
+that are caused in WHERE conditions are not suppressed. Default is
+false.
+
+
+-- psys_get_input (boolean for asynchronous input) --------------------
+
+If psys_get_input is true, then if user types anything during execution
+the whole line (terminated by RETURN) is read in as a list using
+readline() and added to the working memory. Then if appropriate it may
+trigger a rule on the next cycle. The test for whether there is any
+input waiting to be read in is carried out after each rule is activated.
+
+For example, suppose the variable is true, and the user types a line
+consisting of the character "d", followed by a space, followed by
+additional words etc, then if there is a rule of the form below it
+will be activated before the next rule, if selected by psys_sortrules:
+
+define :rule process_input [d ??rest];
+    ;;; delete the item
+    [DEL 1]
+    [SAY message ??rest received]
+    [READ 'OK?' []]
+enddefine;
+
+This will then pause on the READ action, allowing the user to
+interrogate the database, etc.
+
+
+-- psys_backtrack (boolean) -------------------------------------------
+
+If true this enables backtracking to be done using the [FAIL..] action,
+as described above. It defaults to false.
+
+
+-- psys_memlim (false or integer) -------------------------------------
+
+If made an integer > 0 then every time anything is added to
+psys_database its size is truncated to the length of psys_memlim by
+psys_add.
+
+-- psys_max_conditions (integer) --------------------------------------
+
+This integer defaults to 30 and represents the maximum number of
+conditions that a rule can have. It is used only if psys_recency is
+true. If it is changed lib newpsys will have to be re-compiled. However,
+it can be set before lib newpsys is compiled.
+
+
+-- psys_eval(action) --------------------------------------------------
+-- psys_eval_list(actions) --------------------------------------------
+
+These two procedures are explained above in connection with the
+    [POP11 ...]
+action type.
+
+
+-- psys_finish(rules, database) ---------------------------------------
+
+The user-definable procedure psys_finish is invoked by psys_run on
+completion. It is given the current values of psys_rules and psys_data
+as arguments. So it can be used to print out the final value of the
+working memory, or perhaps store it in a file, etc.
+
+Usually psys_rules will be no different from the original list given to
+psys_run, but in principle it is possible for programs to modify it, so
+the final value is also made available to psys_finish.
+
+
+-- A format for defining psys_sortrules -------------------------------
+
+Different search (conflict resolution) strategies can be defined for
+selecting between applicable rules by making psys_allrules true or 1,
+and defining the procedure psys_sortrules appropriately.
+
+If one of the criteria for ordering possible rules is the recency with
+which their conditions have become true, then psys_recency should be
+true in order that the recency information be recorded in the list of
+possible rules.
+
+All possible search strategies can be defined using a procedure
+psys_sortrules, of the following form, where psys_better is defined
+according to the preference strategy, as indicated below.
+
+    define psys_sortrules(possibles) -> possibles;
+        ;;; possibles is a list of applicable rule instances
+
+        syssort(possibles, psys_better) -> possibles;
+
+        if psys_allrules == 1 then
+            ;;; truncate possibles list to length 1
+            [] -> back(possibles)
+        endif
+
+    enddefine;
+
+The procedure psys_better will be applied to two rule instances at a
+time, and can use the following procedures to access their components:
+
+    psys_ruleof psys_varsof psys_valsof psys_foundof psys_recof;
+
+
+-- Selecting on the basis of specificity ------------------------------
+
+This is one way to define psys_better so that it gives priority to rules
+with most conditions satisfied, would be to assign the following to it.
+
+    define psys_more_specific(instance1, instance2);
+        lvars instance1, instance2;
+
+        listlength(psys_conditions(psys_ruleof(instance1)))
+            >=
+               listlength(psys_conditions(psys_ruleof(instance2)))
+    enddefine;
+
+If the two rules have the same number of conditions, then the first
+rule found will come first.
+
+-- Sorting on the basis of the most recent condition made true --------
+
+In order to ensure that recency information is recorded in the
+possibilities list do
+
+true -> psys_recency;
+
+Then define the sort procedure something like this
+
+    define psys_youngest(instance) -> num;
+        ;;; Given a rule instance find the "age" of the most recently
+        ;;; added item making one of its conditions true.
+        lvars n, instance, num=9999999;
+        for n in_vector psys_recof(instance) do
+            unless n == 0 then
+                min(num, n) -> num
+            endunless
+        endfor
+    enddefine;
+
+    define psys_more_recent(instance1, instance2);
+        ;;; given two rule instances return true if the first has the
+        ;;; most recent enabling condition
+        lvars instance1, instance2;
+        psys_youngest(instance1)
+            <=
+        psys_youngest(instance2)
+    enddefine;
+
+A more complex rule could compare the two recency vectors until there is
+a difference, and if there isn't one then use specificity, for instance
+
+    define psys_more_recent(instance1, instance2) -> boolean;
+        ;;; given two rule instances return true if the first has the
+        ;;; most recent enabling condition
+        lvars instance1, instance2, vec1, vec2, num1, num2, boolean;
+
+        define ages_list(vec) -> list;
+            ;;; produce a sorted list of the non-zero numbers in vec
+            lvars vec, list;
+            [%appdata(vec,
+                procedure (num); lvars num;
+                    unless num == 0 then num endunless
+                endprocedure)%] -> list;
+            sort(list) -> list
+        enddefine;
+
+        for num1, num2 in ages_list(vec1), ages_list(vec2) do
+
+            if num1 > num2 then
+                false -> boolean; return()
+            elseif num2 < num2 then
+                true -> boolean; return()
+            endif
+
+        endfor;
+        ;;; No difference in ages list, so compare specificity
+        psys_more_specific(instance1, instance2) -> boolean
+
+    enddefine;
+
+Naturally there is no uniquely best strategy: it is up to the user to
+define one.
+
+-- Turning tracing of individual rules on or off ----------------------
+
+If psys_walk is true, all rules will be traced. However, if it is false,
+information about individual selected rules can be provided, including
+interactive pauses before each action, by using the following
+facilities.
+
+psys_trace(<list of rule names>)
+    Specifies that those rules should be traced. What this means is that
+    the program will print out a message stating when the rule is being
+    checked for applicability, and will indicate if its conditions are
+    not satisfied. If they are satisfied and the rule is selected to be
+    run, then during execution it will pause before each action,
+    allowing the kind of interactive interrogation described above in
+    the section on user interaction.
+
+psys_untrace(<list of rule names>)
+    This undoes the effect of psys_trace. However individual rules will
+    still be stepped through if psys_walk is set true.
+
+psys_untrace("all")
+    Unsets tracing on all rules.
+
+-- Extended example: factorial ----------------------------------------
+
+This example computes the factorial of a number typed in by the
+user. It is fairly fast, but can generate a lot of garbage if
+given a large number (e.g. 1000), so it is best to set popmemlim
+and popminmemlim as high as possible. (See HELP *POPMEMLIM)
+
+The following code can be marked and executed:
+
+uses newpsys;
+;;; First clear list of rules
+[] -> psys_rules;
+
+;;; The first rule detects the termination condition - when the counter
+;;; value in the database is set to the number whose factorial is to be
+;;; computed, represented as [fact ?x]
+
+define :rule f1 [fact ?x] [counter ?x] [total ?y];
+    [STOP the answer is ?y]
+enddefine;
+
+;;; Rule f2 increments the counter and does the multiplication
+
+define :rule f2 [counter ?x] [total ?y] ;
+    [MODIFY 1 counter [popval x + 1]]
+    [MODIFY 2 total [popval y * x]]
+enddefine;
+
+;;; Rule f3 starts the process by asking the user for the number
+;;; whose factorial is to be found, and stores it as [fact ANSWER].
+
+define :rule f3;
+    ;;; This must be last rule if psys_repeating is true
+
+    ;;; Start things off by getting the input to factorial
+    [READ 'What number is the input?'
+        [:isinteger]
+        [fact [popval ANSWER + 1]]
+        ;;; next bit printed out in response to "why"
+        {'I need a number to compute factorial'}]
+
+    ;;; Initialise the database
+    [total 1][counter 1]
+enddefine;
+
+true-> psys_repeating;  ;;; OK because rule f3 is last.
+
+true -> psys_walk;      ;;; Make it false for a quicker answer!
+
+false-> psys_backtrack; ;;; Saves unnecessary storage.
+                        ;;; (Prevents use of FAIL actions)
+
+false -> psys_allrules; ;;; Prevent repeated firing of f3 if any
+                        ;;; other rule is applicable.
+
+false-> psys_chatty;    ;;; Make it true for more tracing
+
+false -> psys_remember; ;;; Saves storage, but prevents "why" questions
+                        ;;; going back to earlier rule activations.
+
+false-> psys_copy_modify;   ;;; Maximise efficiency. Can be risky
+
+psys_run(psys_rules, []);
+
+;;; End of example
+
+NOTE
+By replacing the two separate database items [counter ?x] [total ?y]
+with a single item [counter ?x total ?y] it is possible to speed
+this program up significantly. Rule f2 would need to be altered
+to use a single [MODIFY ....] action instead of two actions.
+
+
+-- Extended example TEACH * PSYSRIVER ---------------------------------
+
+This teach file defines a production system that can solve the
+river-crossing problem described in TEACH * RIVER. It includes a
+complete solution that can be run once LIB NEWPSYS has been compiled.
+
+
+-- Extending ved_mcp to cope with new syntax --------------------------
+
+As explained above, if rule definitions use something other than ";"
+to separate conditions from actions, the built in VED utilities for
+operating on the current definition will not work. This can be fixed
+as follows.
+
+If all occurrences of "define" and "enddefine" defining rules and
+top-level procedures start at the beginning of a line, then the
+following will re-define the procedures for finding and marking the
+beginnings and ends of definitions:
+
+define ved_mbp;
+    ;;; mark beginning of definition
+    vedcharright();         ;;; take cursor past the beginning of line
+    veddo('\\@adefine ');   ;;; search back for beginning
+    vedmarklo();            ;;; mark it
+enddefine;
+
+define ved_mep;
+    ;;; Mark end of definition
+    if vedcolumn == 1 then vedcharleft() endif;
+    veddo('/@aenddefine');
+    vedmarkhi();
+enddefine;
+
+After that, rule definitions like the following can be compiled using
+ved_lcp, or <ESC>-c in VED, as long as "-->" is in the list
+psys_condition_terminators and the initial and final lines are
+not indented.
+
+define :rule test_rule
+    [condition 1] [condition 2] --> [action 1] [action 2]
+enddefine;
+
+
+-- psys_copy_modify (DANGER) ------------------------------------------
+
+This defaults to true. If it is set false, then changes to the database
+are made without copying. I.e. the list-links in the database are
+re-used, reducing the frequency of garbage collections.
+
+This applies in particular to psys_flush and to MODIFY, REPLACE and DEL
+actions.
+
+WARNINGS:
+    (a) if this variable is set false then it is possible for data
+    saved by one rule to be corrupted by the action of another.
+    (b) this variable cannot be set false if psys_repeating is set
+    false, since the latter requires databse items to be remembered.
+
+The program attempts to minimise potential damage caused by making
+this variable false. In particular, if a rule adds something constant
+to the database then if psys_copy_modify is false, then a copy of the
+constant list is added, since otherwise later modification of the list
+could alter the rule itself!
+
+
+
+-- See Also -----------------------------------------------------------
+
+Further features are described in comments in the program library
+file. To examine it
+SHOWLIB * NEWPSYS
+
+TEACH * PSYSRIVER   - described above.
+TEACH * PSYS        - a very primitive production system interpreter
+TEACH * PRODSYS     - a more complex one, though not as flexible is
+                      LIB NEWPSYS, and much slower.
+TEACH * EXPERTS     - an introduction to expert systems and expert
+                      system shells
+
+
+--- C.all/help/newpsys
+--- Copyright University of Sussex 1991. All rights reserved. ----------

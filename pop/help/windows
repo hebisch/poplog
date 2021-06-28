@@ -1,0 +1,636 @@
+HELP WINDOWS                                  A. Sloman updated May 1986
+                                               Updated A.Sloman OCT 1990
+
+LIB WINDOWS
+This is a facility for using VED with more than two visible windows on
+the same VDU screen or Xterm window, etc. It is most convenient if the
+screen displays more than 30 lines.
+
+NB This was substantially improved for Poplog Version 14. For a list
+of improvements search for "V14" below.
+
+
+CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Introduction
+ -- Getting started
+ -- Switching on the new windows: ved_newmap
+ -- Formats for NEWMAP
+ --  <ENTER> newmap
+ --  <ENTER> newmap fred,12 help windows,18 showlib windows
+ --  <ENTER> newmap <num1> <name1>,<num2> <name2>,<num3> <name3> ...
+ -- More examples of <ENTER> newmap formats
+ -- Invoking ved_newmap from POP-11
+ -- Editing a new file
+ -- The "<ENTER> wed" command (Edit in window)
+ --  <ENTER> wed <number> <file>
+ --  <ENTER> wed <number>
+ --  <ENTER> wed <file>
+ --  <ENTER> |<number> <command>
+ -- OTHER "MOVE" facilities
+ -- <ENTER> xw <name|num>   (exchange windows)
+ -- Shifting window boundaries
+ --  <ENTER> wu <number>
+ --  <ENTER> wd <number>
+ -- Other commands and procedures
+ --  <ENTER> ved <name>
+ --  <ENTER> help <name>
+ --  <ENTER> teach <name>
+ --  <ENTER> ref <name>
+ --  <ENTER> doc <name>
+ --  <ENTER> showlib <name>
+ --  <ENTER> redraw (also <ESC> CTRL-v)
+ --  <ENTER> showmap
+ --  <ENTER> wstop
+ --  <ENTER> rb
+ --  <ENTER> q   (or <ESC> q)
+ -- <ENTER> newmap off     (Restore normal VED)
+ -- Procedures available
+ --  vednextwindow()     (also <ESC> ;)
+ --  Vedrefreshwindow(number)
+ --  vedswitchwindowsize()   (also <ESC> w)
+ -- Representation and manipulation of windows
+ --  vedfullname(<file structure>) -> <file name>  (string)
+ --  windowof_number(<number>) -> <window|false>
+ --  <window|false> -> windowof_num(<number>)
+ --  windowof_name(<string>) -> <window|false>
+ --  nameof_window(<window>) -> <string|false>
+ --  <string> -> nameof_window(<window>)
+ --  nameof_number(<integer>) -> <string|false>
+ --  numberof_name(<string>) -> <integer(i.e.window number)|false>
+ --  windowof_file(<file>) -> <window|false>
+ --  print_window(<window>)
+ --  invisible(<window>) -> <boolean>
+ --  visible(<window>) -> <boolean>
+ --  <boolean> -> visible(<window>)
+ --  vedsetupwindow(<number|name|window>)
+ --  vedsetfileinwindow(<file>, <number|name|window>)
+ --  Vedrefreshwindow(<number|name|window>)
+ --  vedgotowindow(<number>)
+ --  windowstart(<number|name|window>) -> <screen line>
+ --  windowend(<number|name|window>) -> <screen line>
+ --  appwindows(<procedure(number,window)>)
+ --  Vedwinsearch(<string>) -> <file|string>
+ -- Global variables
+ --  ved_full_screen
+ --  vedwindownum
+ --  veddefaultlength
+ --  time_out_time
+ -- Redfined VED procedures and key sequences
+ -- WARNING: altered key sequences
+ -- Changes for V14
+
+-- Introduction -------------------------------------------------------
+
+This is an EXPERIMENTAL extension to the VED window mechanism, allowing
+more than two windows on a VDU screen at once. This is specially useful
+on a VDU allowing more than the usual 24 lines, but can occasionally be
+useful on an ordinary VDU.
+
+Divisons between windows remain horizontal, as before, but the mechanism
+may later be extended to allow windows to have arbitrary rectangular
+boundaries on the screen.
+
+The main new feature is the ability to define a 'map' for the screen,
+specifying how many windows there should be and how deep each one should
+be. Commands are available for changing the size of a window, and even
+temporarily covering up another window, by shifting the upper or lower
+boundary up or down. The VED command works as normal except that it uses
+the current window. The WED (Window EDit) command accepts a numerical
+parameter to specify the window to be used. Windows are referred to by
+number, counting down from the top of the screen.
+
+You may have as many windows as you wish subject to the constraint that
+each window must have a status line and at least one other line visible,
+initially.
+
+On Unix it is particularly useful to be able to reserve a small window
+for a VED_IMCSH file, for Unix CSH commands and their printout.
+See HELP *IMCSH
+
+A window has a number, a file associated with it, a name, a start line
+and a finish line. It may be visible or invisible.
+
+As with normal VED there may be files in VEDBUFFERLIST that are not
+currently visible in a window. They may be made visible by taking over a
+window, using the VED command or WED command, the <ENTER>rb command or
+the 'q(uit)' command.
+
+There are commands for redefining the whole screen layout, i.e.
+specifying for each window its location and contents, commands for
+making a window switch between occupying the whole screen or only its
+'rightful' space, commands for moving from one window to another,
+commands for shifting the bounds of the current window (which may cause
+another to become invisible or visible), commands for reading a new file
+into the current window, commands for exchanging the contents of two
+windows.
+
+If the screen gets into a mess, type <ESC> CTRL-V or <ENTER> redraw
+to redisplay all windows.
+
+Most VED facilities, including function keys, will work as expected, but
+some of the interactions are quite complex, and there may still be some
+minor problems.
+
+A major difference from normal VED is that the default for reading in a
+new file is to use the current window concealing the existing file. The
+old file is not lost, however, and may be restored to view, e.g. using
+the <ENTER> rb (rotate buffers)
+
+-- Getting started ----------------------------------------------------
+
+Make sure you have set VEDSCREENLENGTH to correspond to the total number
+of lines available on the screen.
+
+The global variable VEDDEFAULTLENGTH may be set to a number determining
+default size of window. If this is not set by the user it will be
+
+    round(vedscreenlength/3)
+
+allowing three windows on the screen.
+
+Then, to compile the new facilities do
+    lib windows
+
+It should be possible to use VED and related facilities normally until
+NEWMAP described below has been invoked. After that the new window
+mechanism takes charge. This can be turned off by
+    false -> vednewmapped;
+
+-- Switching on the new windows: ved_newmap ---------------------------
+
+The mechanism can be turned on most conveniently if you are already
+inside VED.
+
+Use the <ENTER> NEWMAP command at least once in order to get the
+window facilities working. E.g. the first time try (including commas):
+
+    <ENTER> newmap help windows,,
+
+This will start up with three windows, one of which contains this help
+file. The others will be given names indicating anonymity.
+
+Since this command did not specify window locations, the sizes of the
+windows are controlled by the variable VEDDEFAULTLENGTH.
+
+-- Formats for NEWMAP -------------------------------------------------
+
+The command <ENTER> NEWMAP is used to (re-)define the window layout. It
+has several formats:-
+
+--  <ENTER> newmap
+If no arguments are provided, this redraws the whole screen using the
+previous map, and is equivalent to <ENTER> redraw.
+
+If newmap has not been used previously, this sets up three windows.
+If arguments are provided they are separated by commas, and specify
+start line number for a window and a file name or VED command. A VED
+command is recognised by having two items separated by a space, e.g.
+
+--  <ENTER> newmap fred,12 help windows,18 showlib windows
+
+Will get the user's file 'fred' in the first window, starting at the
+top, a HELP files starting at line 12, and a library file at line 18.
+
+The start line, if provided, is the number of lines counting down from
+top of screen.
+
+Either the line number or the file name or both may be omitted. Top of
+screen is line 1. Line number and file name must be separated by space.
+E.g. The full format is:
+
+--  <ENTER> newmap <num1> <name1>,<num2> <name2>,<num3> <name3> ...
+
+If there is a final comma an extra window is added, of size
+veddefaultlength, if space is available on the screen. <number1>, if
+omitted, defaults to 1. It may be given a different value if it is
+desirable to leave some previou printout visible at the top.
+
+If <numN> is omitted the size of window N-1 defaults to
+veddefaultlength lines, if there is space. (Default = vedscreenlength/3)
+
+The <name> fields may contain two item VED commands, as described below.
+(Occasionally such commands may confuse the editor and prevent the
+window mapping being completed.)
+
+If <name> is omitted then any unused file in vedbufferlist may be
+selected for the window. If there isn't one, a non-writeable file is
+created with a name indicting anonymity.
+
+NB If the screen is not big enough for all the windows requested only
+a subset may be created.
+
+-- More examples of <ENTER> newmap formats
+
+E.g. the following are legal
+   <ENTER> newmap 1, 5, 8, 15
+        create four windows, use files on vedbufferlist or files with
+        'anonymous' names.
+
+   <ENTER> newmap ,,,
+        create four windows, starting at lines determined by
+        vedefaultlength using existing files or anonymous files
+        (If veddefaultlength * 3 >= vedscreenlength, the last window
+        will not be visible.)
+
+   <ENTER> newmap foo.p, baz, help windows
+        Insted of file names, the commands HELP, TEACH, SHOWLIB, etc can
+        be used, provided that they have an argument.
+
+   <ENTER> newmap foo.p, 5 teach coffee, baz, 15 showlib assoc
+
+   <ENTER> newmap file1,file2
+        start a screen with two windows, the first taking only 1/3 of
+        the screen.
+
+   <ENTER> newmap file1, file2, do: im
+        Start a screen with three windows, the first two containing the
+        named files, the last one running the command "im", to set up
+        an "immediate mode" window. (See HELP * IM)
+
+NOTES:
+
+1. If an immediate mode window is to be set up using newmap, it must be
+the LAST window, as setting up immediate mode effectively causes an
+interrupt. (This also applies to imcsh and imsh (UNIX) and imdcl (VMS)
+
+2. If one of the line numbers is bigger than vedscreenlength, then that
+window and others are ignored.
+
+
+-- Invoking ved_newmap from POP-11 ------------------------------------
+
+The procedure NEWMAP may be invoked from outside VED by giving it
+a string as argument, where the string contains what would follow
+'<ENTER> newmap' on the command line. For example,
+    ved_newmap(',,')
+
+will run VED with three windows on the screen.
+
+-- Editing a new file -------------------------------------------------
+
+To edit a file in the CURRENT window, give normal ved commands, though
+bearing in mind tht if a file is already visible in another window VED
+will go to that rather than move the file.
+
+    <ENTER> ved <filename>
+    <ENTER> help <topic>
+
+These requests will read in a new file if necessary, or retrieve a file
+from vedbufferlist and put it on the current window. if the file is
+alredy visible in another window, the cursor will simply move there.
+
+-- The "<ENTER> wed" command (Edit in window) -------------------------
+
+This is like "<ENTER> ved" except that an optional window number can be
+given before the file name. The file will be edited in that window, no
+matter where it was before. If it was previously visible in a different
+window, a new file will be put there, but will not be visible until the
+cursor next goes to that window: so temporarily part of the previous
+file will still be visible.
+
+--  <ENTER> wed <number> <file>
+
+Go to the window with that number and read the file into it. If the file
+already exists in another window it will remain visible until the cursor
+is next moved to that window.
+
+If the number is larger  than the existing number of  windows, a
+new window will be  added if possible.  If not an error message is
+displayed.
+
+Occasionally strange behaviour may result. Clear with a command of the
+form
+   <ENTER> newmap <num1> <name1>,<num2> <name2>,<num3> <name3> ...
+
+which will re-map the window. Or simply
+
+   <ENTER> newmap <name>
+
+which will produce a single full screen window.
+
+
+--  <ENTER> wed <number>
+
+Move to the window with that number
+
+--  <ENTER> wed <file>
+
+Like <ENTER> ved, simply edit the file, wherever it is. If the file
+is not already in VED go to the "next" window and put it there.
+
+
+--  <ENTER> |<number> <command>
+
+The "|" facility allows the user to combine a command to go to a
+particular window and give a command there.
+    <ENTER> |3 help index
+
+I.e. read the index into window 3.
+
+    <ENTER>|2 rb
+
+Go to window 2 and 'rotate buffers'
+
+    <ENTER> |2
+
+Just go to window 2.
+
+
+-- OTHER "MOVE" facilities --------------------------------------------
+
+The key sequence <ESC> ; is redefined so as to pause and await a number.
+If a suitable number is typed, VED will go to that window. However, if
+no character is type within 'time_out_time' seconds then ved will simply
+go to the next window. It cycles round the windows in increasing order.
+
+The normal * VEDFILESELECT mechanisms remain un-touched, So <ESC>e can
+be followed within about a second with the number of the desired file.
+This works like VEDFILESELECT outside LIB WINDOWS, i.e. the number to be
+typed is not the window number but the position in VEDBUFFERLIST. i.e.
+typing N gets you the N-th last file accessed. This enables a file not
+in any window to be brought into the current winodw.
+
+-- <ENTER> xw <name|num>   (exchange windows)
+
+ENTER xw takes one argument which is the number of another window or the
+name of another file. Swaps the contents of the current widow with the
+contents of the other window.
+
+    <ENTER> xw <file name>
+
+Exchage contents with the window displaying the named file.
+
+    <ENTER> xw 2
+Exchange contents of current window with number 2.
+
+
+-- Shifting window boundaries -----------------------------------------
+
+Commands are provided to shift the upper or lower boundary of the
+current window up or down.
+
+--  <ENTER> wu <number>
+move the upper boundary of this window up <number> lines, down if
+negative. If no number defaults to 1.
+
+--  <ENTER> wd <number>
+move the lower boundary down <number> lines, up if negative If no
+number, defaults to 1.
+The above operations may render a file temporarily invisible, or may
+uncover a file, i.e. make it visible.
+
+-- Other commands and procedures --------------------------------------
+
+--  <ENTER> ved <name>
+
+Start editing the file named, in the current window, or in that files
+current window if it is already visible in one.
+
+
+--  <ENTER> help <name>
+--  <ENTER> teach <name>
+--  <ENTER> ref <name>
+--  <ENTER> doc <name>
+--  <ENTER> showlib <name>
+
+All the above behave like <ENTER> ved, though on library or
+documentation files. If the requested file is already displayed, the
+cursor will move to that window.
+
+--  <ENTER> redraw (also <ESC> CTRL-v)
+
+Re-draws whole screen.  The key sequence ESC CTRL-v does the same.
+
+--  <ENTER> showmap
+
+prints out information about each window
+
+--  <ENTER> wstop
+
+Suspends the POPLOG process and takes you back to CSH (if running). On
+re-entry redraws the whole screen.
+
+This is mapped onto the key sequence ESC 0
+
+--  <ENTER> rb
+
+Rotate buffers. Show next undisplayed file on vedbufferlist.
+Uses current window. Does not show files which are already in
+other windows.
+
+--  <ENTER> q   (or <ESC> q)
+
+Quit current file. Complain if writeable and changed. Read another file
+into the window, if there is one in vedbufferlist not already displayed.
+If there is no undisplayed file create a new empty non-writeable file
+called NONAME<N> where N is the number of the window. Then move to next
+window. If all remaining files have "noname" names and are non-writeable
+then leave VED and go back to POPLOG top level.
+
+-- <ENTER> newmap off     (Restore normal VED) -----------------------
+
+This will assign false to vednewmapped, and reset the window to its
+normal VED behaviour.
+
+
+-- Procedures available -----------------------------------------------
+
+--  vednextwindow()     (also <ESC> ;)
+Used to move to another window. If you type a number within
+time_out_time (default 50) hundredths of a second, then it will move
+to a file of that number. Otherwise it will go to the next window down
+the screen, or to the top window if already at the bottom window. If
+the next window is a "noname" window then it will try another one.
+Otherwise it will stay in the current window and print a message
+about there being no other files. If you then wish to go to another
+window, type a number after <ESC> ;, or use <ENTER> wed <number>.
+
+If you always want it only to cycle round the windows, without waiting
+for a number, assign 0 to time_out_time.
+
+--  Vedrefreshwindow(number)
+
+Displays the window of that number on the screen, and makes it the
+current window.
+
+--  vedswitchwindowsize()   (also <ESC> w)
+
+If ved_full_screen is false, then more than one window is on screen. In
+that case ved_full_screen is set true and the current window is expanded
+to fill the screen. Otherwise the reverse occurs and the current window
+is shrunk to its proper size and all others re-displayed. This procedure
+is mapped to <ESC> w.
+
+If vednewmapped is false, this behaves just like vedsetwindow.
+
+-- Representation and manipulation of windows -------------------------
+
+A window is represented by a record of type 'window' defined as:
+
+defclass lconstant procedure window
+    {winnameof,winfileof,winnumof:short,
+        winstartof:short,winendof:short,
+        winvisof,winrefreshed};
+
+I.e. it contains the full path name of the file, the file structure,
+the number of the window, its start and end positions
+on the screen, a boolean indicating whether it is visible and a boolean
+indicating whether it has been refreshed since last put on the screen.
+
+E.g. winfileof(W) returns the file associated with the window W.
+
+However, becauseof the "lconstant" the procedures will be inaccessible
+to users.
+
+Windows are mapped onto their numbers, and back, and onto names of files
+and back, etc. as follows. (Names of files are represented as strings
+givnig the FULL path name, and are created by vedfullname).
+
+--  vedfullname(<file structure>) -> <file name>  (string)
+
+--  windowof_number(<number>) -> <window|false>
+--  <window|false> -> windowof_num(<number>)
+Return or update the window corresponding to the number.
+
+--  windowof_name(<string>) -> <window|false>
+<window|false> -> windowof_name(<string>)
+    Return or update the window corresponding to the file name.
+
+--  nameof_window(<window>) -> <string|false>
+--  <string> -> nameof_window(<window>)
+
+--  nameof_number(<integer>) -> <string|false>
+
+--  numberof_name(<string>) -> <integer(i.e.window number)|false>
+
+--  windowof_file(<file>) -> <window|false>
+
+--  print_window(<window>)
+
+For debugging. This prints out information about the window, i.e. the
+numbers of its top and bottom lines on the screen and its name.
+
+
+--  invisible(<window>) -> <boolean>
+true if the window has been temporarily covered up
+
+--  visible(<window>) -> <boolean>
+--  <boolean> -> visible(<window>)
+
+(System procedure) report on or update visibility status of the window.
+
+
+--  vedsetupwindow(<number|name|window>)
+Sets up global VED variables, e.g. vedscreenlength - prepare to use the
+    window.
+
+--  vedsetfileinwindow(<file>, <number|name|window>)
+    Put the VED file structure into the window. Adjusts various links.
+
+--  Vedrefreshwindow(<number|name|window>)
+Make it the current window, and refresh it if it needs refreshing.
+
+--  vedgotowindow(<number>)
+Similar but copes with full screen mode
+
+--  windowstart(<number|name|window>) -> <screen line>
+--  windowend(<number|name|window>) -> <screen line>
+Return (or update) beginning or end of a window. If updated, then redoes
+screen as appropriate. Updaters can alter visibility of files. Used by
+ved_wu and ved_wd
+
+--  appwindows(<procedure(number,window)>)
+Applies the procedure to every number|window pair.
+
+--  Vedwinsearch(<string>) -> <file|string>
+For use with vedsearchlist: given a file name return the full path name
+that would correspond to the file that VED would access, given the
+directories in vedsearchlist to search in. If the file is already in
+vedbufferlist, it returns the file structure.
+
+
+-- Global variables ---------------------------------------------------
+--  ved_full_screen
+true when file occupies full screen switched by vedswitchwindowsize
+(ESC w), otherwise false.
+
+--  vedwindownum
+number of current window
+
+--  veddefaultlength
+default length for new window. (vedscreenlength/3 initially)
+
+--  time_out_time
+default 50 : time delay in hundredthsof a second while vednextwindow
+waits to see if a window number is typed before it goes to next window.
+If it is 0, vednextwindow just goes to next window.
+
+-- Redfined VED procedures and key sequences --------------------------
+The following VED procedures are redefined by LIB WINDOWS
+
+    ved_q ved_rb vedrestorescreen vedsetonscreen
+
+However, when vednewmapped is false these should work as before.
+
+
+-- WARNING: altered key sequences
+The following key sequences are altered by this package
+
+ESC CTRL-V
+    redraws whole screen. If vednewmapped false calls vedrefresh
+
+ESC x
+    vedswapfiles
+    (Previously called vednextwindow)
+
+ESC ;
+    calls vednextwindow. Type a number immediately, or wait.
+    If vednewmapped false, calls vedswapfiles
+
+ESC w
+    switch window between full screen and 'proper' location.
+    If vednewmapped false, calls vedsetwindow as usual.
+
+ESC 0
+    calls ved_wstop, to suspend the process so that it restarts cleanly.
+    (Unix only)
+
+
+-- Changes for V14 ----------------------------------------------------
+
+The new command
+    <ENTER> newmap off
+makes vednewmapped false and restores normal ved behaviour.
+
+Altered keybindings. ESC x reverts to vedswapfiles (using
+new version), ESC ; does the cycling round windows instead of
+ESC x as previously.
+
+Assigned ved_wstop to ESC 0, and made it work properly if
+    vednewmapped false
+
+Added top level macro -ved- to get back to mapped screen.
+
+Fixed various things that did not work right. Entailed major
+re-organisation of some bits.
+
+ved_q now works more naturally. E.g. if the only files left
+are "no-name" temporary files then it quits VED.
+
+ved_redraw now creates new temporary files if there are not enough
+files for the windows.
+
+Had to redefine vedrestorewindows for use with ved_sourcefile
+
+Had to redefine vedswapfiles to work properly with multiple windows.
+
+Altered behaviour of vedfileselect if it creates a new window with
+a list of files. In this situation it now sets "full" screen. Otherwise
+it could corrupt the screen.
+
+For more details SHOWLIB * WINDOWS
+
+
+--- C.all/help/windows
+--- Copyright University of Sussex 1990. All rights reserved. ----------

@@ -1,0 +1,522 @@
+HELP DEFINE_FORM                                      A.Sloman July 1988
+
+DEFINE_FORM
+
+This is a syntax word for specifying new "define....enddefine" syntax
+constructions, using the format:
+
+    define :define_form <form>; .... enddefine
+
+thereafter allowing:
+
+    define :<form> ..... enddefine;
+
+This makes it easier to define new syntactic constructs that are
+understood by old utilities, e.g. ved_f, ved_mcp, ved_lcp, ved_jcp.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Introduction
+ -- The use of "define :<form name>"
+ -- Defining a new form using:- define :define_form ...
+ -- Autoloading forms
+ -- Pre-defined forms
+ -- define :define_form <name> ; <body> enddefine;
+ -- define :define_form global <name> ; <body> enddefine;
+ -- Importing and exporting from sections
+ -- define <name> = <expression> enddefine;
+ -- Example: define :define_form class_print
+ -- Example: using define <name> = to assign a property to an identifier
+ -- Example: using define <name> = to define a prefix operation
+ -- Example: a special form for defining closures
+ -- Example: a form for declaring and initialising variables
+ -- Example: Making POP-11 procedures available from Prolog
+ -- Exercise: Defining procedures to operate on patterns
+ -- define_inline: inline macro expressions
+ -- See also
+
+-- Introduction -------------------------------------------------------
+
+The main use of the words "define" and "enddefine" is to define
+procedures whose body consists of program instructions to be executed.
+The differences between different types of procedure definitions are
+indicated by the "header" i.e. whatever occurs between "define" and the
+first semicolon.
+
+There are two main types
+- ordinary procedures and infix operations, whose instructions are
+    executed when the procedure is invoked by running another procedure,
+
+- macros and syntax words, whose instructions are executed when the name
+    is encountered by -itemread- in the compilation stream.
+    (See HELP * DEFINE, * MACRO, * SYNTAX, * OPERATION).
+
+POP-11 allows the user to define macros and syntax words to extend the
+syntax, for instance providing new forms of procedure definition or
+structure specification. Unfortunately if new opening and closing
+brackets are used then some existing utilities will not be able to cope
+with them, for instance editor utilities that know how to find the
+beginning and end of the "current" procedure definition, or know how to
+search for the definition of a given procedure.
+
+The facilities described in this file enable the user to extend the use
+of "define" and "enddefine" for new purposes, making it unnecessary to
+introduce new openers and closers.
+
+
+-- The use of "define :<form name>" ------------------------------------
+
+The key idea is that the word "define" can be followed by a "form"
+specification to indicate what sort of thing is being defined. The
+format used is
+
+    define :<form name> <remainder of header>;
+        <body>
+    enddefine;
+
+Here <form name> is a word which should have associated with it a
+procedure to be run instead of the ordinary "define" syntax procedure,
+to take over compilation of everything up to "enddefine".
+
+
+-- Defining a new form using:- define :define_form ... ----------------
+
+One use of the "define :<form name>" format is for defining new
+instances of the format. This is done using the <form name> "define_form"
+as follows.
+
+In order to introduce a new form, called "myproctype" use the following
+form of definition.
+
+    define :define_form myproctype;
+        <body>
+    enddefine;
+
+(The body should include instructions that can be used to read in and
+plant code for a definition of the required form.)
+
+This definition of "myproctype" is equivalent to:
+
+    define syntax define_myproctype; <body>  enddefine;
+
+Thereafter "myproctype" can be used in the role of <form name> to define
+instances of its form, thus:
+
+    define :myproctype foo....;
+        .....
+    enddefine;
+
+The initial portion "define :myproctype" invokes the "define_form"
+procedure -define_myproctype-, which might call the usual compiler and
+code planting routines defined in REF * VMCODE. Examples are given
+below.
+
+Note that if you wish a new define_form to be available in all sections,
+below the current section, then you must include the word "global" after
+"define_form", as in
+
+    define :define_form global foo ....
+
+This turns into the definition
+
+    define global syntax define_foo
+
+
+-- Autoloading forms --------------------------------------------------
+
+If there is an autoloadable library file whose name is define_foo.p
+defining a syntax procedure called define_foo, then the use of
+
+    define :foo .... enddefine;
+
+will autoload the syntax procedure.
+
+
+-- Pre-defined forms --------------------------------------------------
+
+The following options for <formname> are pre-defined.
+
+-- define :define_form <name> ; <body> enddefine; ---------------------
+
+This defines <name> as the name of a new syntax form. It is equivalent
+to the following Pop-11 instructions:-
+
+    define syntax define_<name>; <body>  enddefine;
+
+As a result of this, future occurrences of
+
+    define :<name> ..... enddefine;
+
+will invoke the code in <body>, which should consume all the instructions
+"....." up to "enddefine". I.e.
+
+    define :<name> .... enddefine;
+
+is thereafter equivalent to
+
+    define_name ..... enddefine;
+
+
+-- define :define_form global <name> ; <body> enddefine; --------------
+
+This is very similar except that the new syntax word is declared as
+global in the current section.
+
+
+-- Importing and exporting from sections ------------------------------
+
+To each define_form name N there corresponds a syntax procedure whose
+name is got by prefixing N with "define_". This makes it possible to
+import and export such facilities from sections.
+
+-- define <name> = <expression> enddefine; ----------------------------
+
+This is equivalent to
+
+    vars procedure <name>;
+    <expression> -> <name>;
+    "<name>" -> pdprops(<name>);
+
+I.e. it is used to assign the result of evaluating an expression
+to a new procedure name. The result assigned should be a procedure,
+closure or property. The name is stored in the pdprops of the procedure.
+
+The above is a special case of the more general form below, which allows
+the syntactic category of <name> to be declared.
+
+    define <declaration for <name>> <name> = <expression> enddefine;
+
+The declaration may be of any of the forms allowed in REF *POPSYNTAX
+for declaring a single identifier <name>, e.g. starting with any of
+
+    lvars dlvars lconstant vars constant global dlocal
+
+The above definition is equivalent to the following
+
+    <declaration for <name>>
+    <expression> -> <name>
+    "<name>" -> pdprops(<name>);
+
+Notice that the <expression> must produce a procedure type
+object (e.g. procedure, closure, array, property), since otherwise the
+updater of -pdprops- will report an error.
+
+
+-- Example: define :define_form class_print ---------------------------
+
+The following sort of thing is common. After defining a new record
+class, e.g.
+
+    recordclass triple first second third;
+
+it is useful to modify the default class_printer, e.g.
+
+    define print_triple(t);
+        lvars t;
+        pr('{triple:');
+        pr(first(t)); pr(",");
+        pr(second(t)); pr(",");
+        pr(third(t)); pr("}");
+    enddefine;
+
+    print_triple -> class_print(triple_key);
+
+We can make this a neater definition, as follows
+
+
+;;; first define a form:
+;;;     define :class_print (class);
+
+
+define :define_form class_print;
+    lvars classname, pdrname, keyname, declarators, next;
+    ;;; read in syntax words like lconstant, procedure, etc.
+    [%while isstartstring("syntax",identprops(readitem() ->> next)) do
+        readitem()
+    endwhile %] -> declarators;
+    next -> classname;
+    consword('print_' sys_>< classname) -> pdrname;
+    consword(classname sys_>< '_key') -> keyname;
+    if identprops(keyname) == undef or not(iskey(valof(keyname))) then
+        mishap(classname, 1, 'CLASS NAME NEEDED')
+    endif;
+    [define ^^declarators ^pdrname ^^proglist] -> proglist;
+    pop11_comp_expr();  ;;; compile the procedure definition
+    ;;; now make it the class_print procedure
+    sysPUSH(pdrname);
+    sysPUSH(keyname);
+    sysUCALLQ(class_print)
+enddefine;
+
+
+;;; We can now define the printer for the class triple, thus:
+
+define :class_print triple(t);
+    pr('{triple:');
+    pr(first(t)); pr(",");
+    pr(second(t)); pr(",");
+    pr(third(t)); pr("}");
+enddefine;
+
+vars t = constriple([cat],[dog],[mouse]);
+t =>
+** {triple:[cat],[dog],[mouse]}
+
+
+Note:
+Things like lconstant, global, etc can follow
+    define :class_print.
+
+A similar strategy could be used to define the class_apply. We
+may add define_class_print and define_class_apply to the library.
+See HELP NEWS
+
+
+-- Example: using define <name> = to assign a property to an identifier -
+
+define species =
+    newproperty([[fido dog][mickey cat][donald duck]], 10, false, true)
+enddefine;
+
+species =>
+** <property species>
+
+species("donald") =>
+** duck
+
+species("goofy") =>
+** <false>
+
+
+-- Example: using define <name> = to define a prefix operation -------------
+
+;;; The precedence of the operation iscolour is to be 1
+
+define global constant 1 iscolour =
+    member(%[red green blue yellow orange white]%)
+enddefine;
+
+identprops("iscolour") =>
+** 1
+
+iscolour "red" =>
+** <true>
+
+iscolour 99 =>
+** <false>
+
+
+-- Example: a special form for defining closures ----------------------
+
+;;; First a checking utility
+define check_closure(item) -> item;
+    ;;; test that top of stack is a closure, and if so leave it there
+    lvars item;
+    unless isclosure(item) then
+        mishap(item,1,'CLOSURE NEEDED')
+    endunless
+enddefine;
+
+;;; Now declare a new form :new_closure, used with format
+;;;     define new_closure <name>; <body> enddefine;
+define :define_form new_closure;
+    lvars name;
+    itemread() -> name;
+    sysSYNTAX(name, "procedure",false);
+    sysneed(";") ->;
+    pop11_comp_stmnt_seq_to("enddefine") ->;
+    ;;; check its a closure, and assign to the name
+    sysCALLQ (check_closure);
+    sysPOP(name);
+    ;;; now assign the name to the pdprops of the closure
+    sysPUSHQ(name);
+    sysPUSH(name);
+    sysUCALLQ(pdprops);
+enddefine;
+
+;;; Example of use of new_closure
+
+define :new_closure square_roots;
+    maplist(% sqrt<>round %)
+enddefine;
+
+square_roots =>
+** <procedure square_roots>
+
+square_roots([4 9 16 25])=>
+** [2 3 4 5]
+
+Note, since new_closure was not declared to be global, if it is
+to be imported into a section it will have to be referred to as
+define_new_closure.
+
+
+-- Example: a form for declaring and initialising variables -----------
+
+The idea here is to declare a variable, and specify the name before
+specifying the syntactic properties. The latter should come after "AS".
+
+The new format to be permitted is
+
+   define :new_ident <name> AS <identifier type>;
+       <body>    ;;; value to be assigned to <name>
+   enddefine;
+or
+   define :new_ident <name> ;
+       <body>    ;;; value to be assigned to <name>
+   enddefine;
+
+To make sure it will work in all sections below the current section,
+use "global" after "define_form"
+
+define :define_form global new_ident;
+    lvars name, stream, declarator, spec;
+    readitem() -> name;
+
+    pop11_need_nextitem([AS ;]) -> spec;
+    ;;; Check that there is a syntax word following. (Could list them)
+    readitem() -> declarator;
+    unless identprops(declarator) == "syntax"
+    and isprocedure(valof(declarator))
+    then
+        mishap(declarator,1,'"VARS"-TYPE SYNTAX WORD EXPECTED')
+    elseif declarator == ";" then
+        ;;; no type declaration - ordinary vars
+        sysSYNTAX(name, 0, false);
+    else
+        ;;; After "AS" -declarator- should be a word like "vars", "global" etc.
+        ;;; Find semi-colon in proglist
+        proglist -> stream;
+        until hd(stream) == ";" do back(stream) -> stream enduntil;
+        ;;; insert name before semicolon
+        name -> hd(stream);
+        conspair(";",tl(stream)) -> back(stream);
+        ;;; Now run the declarator, which should consume proglist to
+        ;;; the semi-colon
+        valof(declarator)();
+    endunless;
+    ;;; Compile the body
+    pop11_comp_stmnt_seq_to("enddefine") ->;
+    ;;; now assign to the name
+    sysPOP(name);
+enddefine;
+
+
+section testing;
+
+;;; Using form new_ident to define a global constant called number_list
+
+define :new_ident number_list AS global constant;
+    [1 2 3 4 5 6 7 8 9 ]
+enddefine;
+
+isconstant("number_list") =>
+** <true>
+
+number_list =>
+** [1 2 3 4 5 6 7 8 9]
+
+;;; define a 4th root prefix operator, root4
+define :new_ident root4 AS global vars 1;
+    sqrt <> sqrt
+enddefine;
+
+nonop root4 =>
+** <procedure>
+
+root4 16 =>
+** 2.0
+
+root4 256 =>
+** 4.0
+
+endsection; /*testing*/
+
+In some cases it would be useful to alter pop11_define_declare or
+pop11_define_props locally in a define_form type procedure.
+
+
+-- Example: Making POP-11 procedures available from Prolog ------------
+
+Define a define_form "prolog" syntax word so that
+
+    define :prolog foo(x, y, continuation);
+        ...
+    enddefine;
+
+does the same as:
+
+    define foo(x, y, continuation);
+        ...
+    enddefine;
+    foo -> prolog_valof("foo", pdnargs(foo)-1);
+
+define :define_form prolog;
+    lvars pred_name = nextitem();
+    ;;; compile the procedure
+    nonsyntax define();
+    ;;; do the assignment
+    sysPUSH(pred_name);
+    sysPUSHQ(pred_name);
+    sysPUSH(pred_name);
+    sysCALLQ(pdnargs);
+    sysPUSHQ(1);
+    sysCALLQ(nonop -);
+    sysUCALL("prolog_valof")
+enddefine;
+
+
+-- Exercise: Defining procedures to operate on patterns ---------------
+
+This application (suggested by Roger Evans) is left as an exercise.
+
+Define a "pattern" define_form such that
+
+    define :pattern foo([arc ?s ?f ??y ?x]) -> [?a ??b];
+        ...
+    enddefine;
+
+does:
+
+    define foo();
+        vars s f x y a b;
+        --> [arc ?s ?f ??y ?x];
+        ...
+        [^a ^^b];
+    enddefine;
+
+-- define_inline: inline macro expressions ----------------------------
+
+See HELP *INLINE for an example of how to use define forms to build
+Pop-11 "inline" macros similar to those produces by the C
+pre-processor's #define directive. For example:
+
+    define :inline calc(a,b);
+        (a * 10 - b)
+    enddefine;
+
+is equivelant to the C macro:
+
+    #define calc(a,b) (a * 10 - b)
+
+It is simle to use, and looks much like a procedure call:
+
+    calc(1,2) =>
+
+
+-- See also -----------------------------------------------------------
+
+HELP * DEFINE
+HELP * INLINE
+REF  * POPCOMPILE
+REF  * POPCOMPILE/pop11_define_declare
+REF  * POPCOMPILE/pop11_define_props
+REF  * POPSYNTAX
+REF  * VMCODE
+
+Acknowledgement:
+The original idea for this feature was improved as a result of suggestions
+by Steve Knight, Roger Evans and John Gibson.
+
+--- C.all/help/define_form ---------------------------------------------
+--- Copyright University of Sussex 1988. All rights reserved. ----------

@@ -1,0 +1,112 @@
+HELP UPDATER                                   Updated. A. Sloman, April 1985
+
+    updater(<procedure>) -> <procedure>;
+    <procedure> -> updater(<procedure>);
+
+A procedure for accessing a data structure has two independent tasks to
+perform.  One is to extract the contents of the appropriate component;  the
+other is to change the contents of the components. Thus:
+
+    hd(x) -> v;    ;;; get HD of x and assign it to v
+    v -> hd(x);    ;;; set the value of v to be the HD of x
+
+Two separate procedures are therefore needed; one called the SELECTOR
+procedure (in this case HD) and the other its updater (i.e. updater(hd)).
+The updating procedure is stored as one component of the selector procedure,
+as is the *PDPROPS.
+
+When a procedure call follows an assignment arrow (i.e. ->) the updater part
+of the procedure is called, so that instead of executing:
+
+    v -> f(x);
+
+we could execute:
+
+    updater(f)(v,x);
+
+Updaters take their arguments off the stack (see *HELP STACK) in the same way
+as other procedures. Moreover, items occuring before the assignment arrow are
+merely additional arguments for the updater. So
+
+    x,y -> f(p,q,r)
+
+is equivalent to
+
+    -> f(x,y,p,q,r)
+
+and to:
+
+    x,y,p,q,r -> f();
+
+If we call the updater of f, g,
+
+    updater(f) -> g;
+
+then the above are also equivalent to:
+
+    g(x,y,p,q,r)
+
+Most procedures, of course, have no updater.  If we define a new data
+structure accessing procedure it is sensible to give it an updater, for
+example:
+
+    define second(list);
+        hd(tl(list))
+    enddefine;
+
+    define setsecond(value,list);
+        value -> hd(tl(list))
+    enddefine;
+
+    setsecond -> updater(second);
+
+    vars l; [a b c d] -> l;
+    second(l) =>
+    ** b
+
+    "e" -> second(l);
+    l =>
+    ** [a e c d]
+
+A more convenient syntax for declaring updaters uses 'define updaterof':
+
+    define updaterof second(value, list);
+        value -> hd(tl(list))
+    enddefine;
+
+Just as DEFINE sets the PDPROPS of a procedure to be its name, so DEFINE
+UPDATEROF sets the PDPROPS of the UPDATER to be the name of the procedure.
+
+Every POP-11 procedure has a 'slot' available for an updater - not only
+procedures associated with fields of data-structures. However, for most
+procedures the default updater is merely a procedure which produces an error.
+
+    define test(x);
+        x * x
+    enddefine;
+
+    test(3) =>
+    ** 9
+
+    9 -> test(3);
+
+    ;;; MISHAP - EXECUTING NON-EXISTENT UPDATER
+    ;;; INVOLVING:  <procedure test>
+    ;;; DOING    :  compile nextitem popval compile
+
+Thus if a procedure has not been given an updater, and your program attempts to
+run its updater, an error message will result.
+
+Since every procedure can have an updater, the use of updaters is not
+restricted to procedures which access fields of data-structures. Updaters
+can be used to associate two procedures which do related computations. For
+instance if procedure F does some elaborate computation to solve a problem,
+the updater of F could then be used to store a solution to be found by F by
+direct lookup.
+
+See also HELP
+    *DEFINE     - for form and content of procedure definitions
+    *PDPROPS    - stores information about a procedure (its name etc.)
+    *EFFICIENCY - has a comment on using updater loops
+    *CLOSURES   - are procedures and therefore can have updaters.
+    *PARTAPPLY  - for further information on creating closures.

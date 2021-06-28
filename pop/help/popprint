@@ -1,0 +1,74 @@
+HELP POPPRINT                                         JLCunningham, July 1982
+
+The library file LIB POPPRINT provides a pretty-printer for lists which
+consist of POP program, i.e. the sort of list that can be successfully
+*POPVALed (see the example at the end of this help file). The list is printed
+in a form which can be re-read or compiled, e.g. strings are printed with
+string quotes.
+
+The simplest use, using all the defaults, is to make successive calls to the
+procedure POPPRINT with lists to be pretty-printed. The last item in the list
+of the last call should be *TERMIN. The output is written to a VED buffer
+called 'program.p', e.g.
+
+    lib popprint;
+    popprint([define foo(x,y); x*y enddefine;]);
+    popprint(['Finished'=>]);
+    popprint([^termin]);
+    ved program.p;
+
+-- CHANGING DEFAULTS --------------------------------------------------------
+
+The algorithm used is heuristic; in particular it is table-driven (using the
+variables SPACETABLE, BREAKLINEBEFORE, and BREAKLINEAFTER) and does not do any
+parsing. Procedures and variables provided by the library are:
+
+PRSTRING          print a string with string quotes
+
+SPACETABLE        a boolean table providing heuristic information for the
+                  pretty-printer, to decide when not to omit spaces between
+                  items.
+
+BREAKLINEBEFORE   a list of POP items which should start a new line of output
+
+BREAKLINEAFTER    a list of POP items which come at the end of a line of output
+
+POPPRINTOUT       a variable containing the character consumer to be used by
+                  POPPRINT. It will normally be initialised by a call of
+                  STARTPOPPRINT when POPPRINT is first used. The default writes
+                  to a ved buffer called 'program.p': see STARTPOPPRINT. If
+                  a character consumer produced by DISCOUT is assigned to
+                  POPPRINTOUT, then the output file will not be justified, i.e.
+                  there will be no indentation.
+
+STARTPOPPRINT     takes a filename as argument (if the filename is a
+                  word '.p' will be added), and uses lib vedout to produce a
+                  character consumer to be assigned to POPPRINTOUT. So if you
+                  want to send output to a differently named ved buffer, call
+                  STARTPOPPRINT before the first call of POPPRINT.
+
+POPPRINT          takes a list as argument, and pretty-prints it as POP code to
+                  the character consumer POPPRINTOUT. If POPPRINTOUT is false,
+                  then STARTPOPPRINT is called prior to any printing with
+                  'program.p' as argument.
+
+-- EXAMPLE TO ILLUSTRATE COMPLETELY RE-WRITING A FILE -----------------------
+
+The current heuristics tend to result in lines which are longer than 80
+columns; this could possibly look nicer when printed on 132-column paper.
+The following would re-write a file (with a different name):
+
+    lib popprint;
+    startpopprint('name2.p');
+    popprint(pdtolist(incharitem(discin('name1.p'))));
+    popprint([^termin]);
+
+When the above code has been executed, there will exist a VED buffer called
+NAME2.P containing the re-written file; it will not however have been written
+to disc. The buffer can, however, be edited, written etc. as required
+(although this is probably not worth doing, since comments and blank lines
+will get lost).
+
+See also
+HELP *PRINT - for other printing procedures
+REF  *SYSIO - for more information on I/O procedures

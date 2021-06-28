@@ -1,0 +1,593 @@
+HELP NEWPOP                                     Robert Duncan, July 1991
+                                       Revised Robert Duncan, April 1993
+
+Building a new Poplog system.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+  2   WARNING
+  3   Notation
+  4   The NEWPOP Environment
+  5   Functions of NEWPOP
+  6   Options to NEWPOP
+  7   Linking "newpop11"
+  8   Linking "newpop11" for X
+  9   Installing the "basepop11" Command
+ 10   Building Supporting Libraries
+ 11   Making the Standard Saved Images
+ 12   Defining Other Poplog Commands
+ 13   Making Documentation Indexes
+ 14   Removing Ved Special Characters from Documentation
+ 15   Running Local NEWPOP
+
+
+------------------------------------------------------------------------
+1  Introduction
+------------------------------------------------------------------------
+
+The command script NEWPOP located in the Poplog source directory
+($popsrc) is used to build a new Poplog system.
+
+The command synopsis is:
+
+    For the Unix C shell:
+
+        % setenv usepop <poplog-root-directory>
+        % $popsrc/newpop [options] [config-file]
+
+    For the Unix Bourne shell:
+
+        $ usepop=<poplog-root-directory>; export usepop
+        $ $popsrc/newpop [options] [config-file]
+
+    For VMS:
+
+        $ assign <poplog-root-directory> usepop
+        $ @popsrc:newpop [options] [config-file]
+
+The command installs a new Poplog system in the directory denoted by the
+path <poplog-root-directory>.
+
+If you have deleted the source directory to save space, you must recover
+it from your distribution tape before trying to run NEWPOP.
+
+
+------------------------------------------------------------------------
+2  WARNING
+------------------------------------------------------------------------
+
+NEWPOP installs a completely new Poplog system in the directory
+identified by the environment variable (or logical name) "usepop". If
+you have an existing Poplog system at that location, it will be
+overwritten. You must ensure that "usepop" has been set to the correct
+directory name before you run NEWPOP.
+
+
+------------------------------------------------------------------------
+3  Notation
+------------------------------------------------------------------------
+
+In order to avoid tedious repetition of examples using different
+syntaxes and notations, the following conventions are adopted throughout
+the remainder of this file.
+
+    1)  Environment variables (logical names) are written in the Unix
+        style, prefixed with a '$' sign, e.g.
+
+            $popsys         (for the Poplog executable directory)
+            $popsrc         (for the Poplog source directory)
+
+        VMS users should simply ignore the leading '$'.
+
+    2)  Filenames are written in the Unix style, e.g.
+
+            $poplocal/local/com/    (for the local command directory)
+
+        which corresponds to the VMS pathname
+
+            poplocal:[local.com]
+
+        The procedure * sysfileok on VMS systems will perform this
+        conversion automatically, e.g. try
+
+            sysfileok('$poplocal/local/com/')=>
+
+    3)  Examples of operating system commands are written to assume the
+        Unix shell. The arguments to commands are the same for all
+        systems, only the syntax for denoting the command script varies.
+        Thus the example:
+
+            $popsrc/newpop -link
+
+        corresponds to the VMS DCL command:
+
+            @popsrc:newpop -link
+
+    4)  The word NEWPOP is used in the text to stand for the command:
+
+            $popsrc/newpop
+
+
+------------------------------------------------------------------------
+4  The NEWPOP Environment
+------------------------------------------------------------------------
+
+NEWPOP runs in an environment initialised by reading the standard Poplog
+login script
+
+    $popcom/poplog
+
+(see HELP * INITIAL). This depends on an initial setting of the
+environment variable $usepop; other environment variables are then
+defined relative to that. The principal environment variables used by
+NEWPOP are
+
+    $popsrc         (the Poplog source directory)
+    $popsys         (the Poplog executable directory)
+    $popsavelib     (the Poplog saved image directory)
+    $popcom         (the Poplog command directory)
+    $poplocal       (the Poplog local directory)
+
+If you are unfamiliar with the Poplog environment, you should read
+DOC * SYSSPEC.
+
+
+------------------------------------------------------------------------
+5  Functions of NEWPOP
+------------------------------------------------------------------------
+
+NEWPOP performs the following functions:
+
+    1)  Linking the newpop11 executable image in $popsrc.
+
+    2)  Installing the newpop11 image as the base Poplog executable in
+        $popsys.
+
+    3)  Building supporting executables and libraries.
+
+    4)  Making the standard saved images in $popsavelib.
+
+    5)  Creating definitions for other Poplog commands: prolog,
+        clisp etc.
+
+    6)  Making documentation indexes (and optionally removing Ved
+        special characters from documentation files).
+
+    7)  Running the local version of NEWPOP for site-specific tailoring.
+
+Any of these functions can be omitted or controlled by means of
+appropriate options.
+
+
+------------------------------------------------------------------------
+6  Options to NEWPOP
+------------------------------------------------------------------------
+
+The behaviour of NEWPOP is completely option-driven: only those actions
+explicitly selected by options are performed. The available options are
+summarised in Table 1; their meanings are discussed in more detail in
+the sections which follow.
+
+  --------------------------------------------------------------------
+  |              Table 1 : Summary of Options to NEWPOP              |
+  |------------------------------------------------------------------|
+  |                                                                  |
+  | link            Link $popsrc/newpop11, including:                |
+  | x               ... X System support                             |
+  | rsv             ... RSV (delivery system) support                |
+  |                                                                  |
+  | install         Install the basepop11 executable in $popsys      |
+  |                                                                  |
+  | xpw             Build the Poplog Widget Set archive library      |
+  |                 (requires option x)                              |
+  |                                                                  |
+  | startup         Make the startup saved image                     |
+  | images          Make other saved images, selected from:          |
+  | eliza           ... the eliza demo image                         |
+  | prolog          ... the Prolog language image                    |
+  | logic           ... the Prolog logic tutor image (requires       |
+  |                     option prolog)                               |
+  | clisp           ... the Common Lisp language saved image         |
+  | pml             ... the Standard ML language saved image         |
+  | xved            ... the XVed saved image (requires option x)     |
+  |                                                                  |
+  | commands        Define shell/DCL commands for the standard       |
+  |                 languages, and for Ved functions selected from:  |
+  | ved             ... the Ved command                              |
+  | ve*d            ... the Ved command with abbreviation (VMS only) |
+  | help            ... the HELP command                             |
+  | hlp             ... the HELP command                             |
+  | ref             ... the REF command                              |
+  | teach           ... the TEACH command                            |
+  | doc             ... the DOC command                              |
+  | im              ... the IM command                               |
+  | vt100           ... the VT100 command                            |
+  |                                                                  |
+  | indexes         Build documentation indexes                      |
+  | stripdoc        Strip Ved special characters from all            |
+  |                 documentation files (implies option indexes)     |
+  |                                                                  |
+  | local           Run the local NEWPOP command,                    |
+  |                 $poplocal/local/com/newpop                       |
+  |                                                                  |
+  --------------------------------------------------------------------
+
+Table 1 lists only the "enabling" options: specifying any of these
+implies the inclusion of some particular step in the NEWPOP process. For
+each one there is a corresponding "disabling" option which suppresses
+that same feature, obtained by prefixing the option name with no: e.g.
+nolink, noprolog etc.
+
+Also, certain options (described below) allow for an extra "qualifier"
+argument separated from the option name by an "=" sign:
+
+    option = qualifier
+
+option and qualifier together make up a single item.
+
+The case of options is not significant, as all options are converted
+internally to lower case.
+
+NEWPOP obtains its options from two sources:
+
+    1)  a configuration file
+
+    2)  the command line
+
+The configuration file provides the primary control; command-line
+options are used to refine its behaviour. The default configuration file
+is
+
+    $popsrc/newpop_options
+
+This contains all the options necessary to build a standard
+configuration Poplog system (with slight variations between Unix and
+VMS). So running the NEWPOP command with no options will regenerate this
+standard configuration. You can provide an alternative configuration
+file as the last argument to the NEWPOP command, e.g:
+
+    $popsrc/newpop $poplocal/local/newpop_options
+
+In this case, the default file is not consulted at all: only the options
+specified in your own file will be acted upon. If you want to write your
+own configuration file, a good idea is to copy the default version and
+delete or modify lines as appropriate. Within a configuration file, each
+option (together with any associated qualifier) must appear on a line by
+itself. End-of-line comments can be indicated with the usual Poplog
+';;;' convention, and blank lines are ignored.
+
+Regardless of which configuration file is to be used, you can also
+specify options on the command line to override those in the file.
+Command-line options are the same as those from Table 1 above, but
+prefixed with a '-' sign, e.g.
+
+    $popsrc/newpop -link
+
+Disabling options are particularly useful on the command-line, where
+they can be used to suppress features requested in the configuration
+file, e.g. the command:
+
+    $popsrc/newpop -nolink -nolocal
+
+runs the default NEWPOP, but omitting the link and local steps.
+
+If you add a qualifier to a command-line option, remember that the two
+must be passed as a single item, so will probably need quoting. Any
+special characters in the qualifier will need quoting too. This is not a
+problem with options in a file.
+
+If the number or complexity of command-line options becomes too unwieldy
+(particularly on VMS systems, where a limit is imposed on the number of
+arguments) you can place the options into a file and use the options
+flag to get that file consulted, e.g:
+
+    $popsrc/newpop -options tempfile
+
+This file is read in addition to the configuration file.
+
+Finally, if you want to ignore configuration files altogether and supply
+all the options on the command line, you can use the special word only
+in place of the configuration file name; e.g. the command:
+
+    $popsrc/newpop -link only
+
+will perform only the link step.
+
+
+------------------------------------------------------------------------
+7  Linking "newpop11"
+------------------------------------------------------------------------
+
+Step 1 of the NEWPOP process is to link a new version of the Poplog
+executable -- newpop11 -- in $popsrc. This step is enabled with the link
+option.
+
+Within the link step, there are two further parameters of variation:
+whether to include X support within Poplog and whether to build an RSV
+image for delivery systems.
+
+X support is included by default. In order to make use of it, your
+system must have an implementation of the X Toolkit and Xlib libraries
+(X11 Release 4 or later) available to the system linker. NEWPOP will
+look for these in standard places -- exactly where depends on your
+system. If this fails to work, or if you want to do something different,
+then read the next section.
+
+If your system doesn't have X, or if you're sure you're not going to use
+it and want to reduce the size of the Poplog images, then you can
+exclude it from Poplog by specifying the option nox.
+
+RSV support is not included by default: it must be enabled with the rsv
+option. This causes a special copy of the newpop11 image to be made as
+$popsrc/rsvpop11. This image is required for delivery systems.
+
+Linking newpop11 requires the Poplog "external" library
+
+    $popexternlib/libpop.olb
+
+If this does not exist, NEWPOP will rebuild it.
+
+As well as the executable image itself, NEWPOP may also create in
+$popsrc a symbol table file for external loads ($popsrc/newpop11.stb)
+and a map file for debugging ($popsrc/newpop11.map).
+
+
+------------------------------------------------------------------------
+8  Linking "newpop11" for X
+------------------------------------------------------------------------
+
+The newpop11 image created by the NEWPOP link step will include support
+for X unless you override it with the nox option.
+
+As described in the section Poplog Image X Link Specification in
+REF * X, X linking is controlled by the values of Unix environment
+variables/VMS logical names, whose names have the form
+
+    POP_XPREFIX_EXLIBS
+
+where XPREFIX is a short prefix corresponding to the X link type. The
+format of the NEWPOP x option is thus
+
+    x = -xprefix
+
+where (lowercase) xprefix selects the corresponding (uppercase) variable
+name. Standard values for -xprefix include
+
+    -xm         (selects POP_XM_EXLIBS,   for Motif)
+    -xol        (   "    POP_XOL_EXLIBS,   "  OpenLook)
+    -xt         (   "    POP_XT_EXLIBS,    "  MIT)
+
+If the '= -xprefix' qualifier is omitted, it default to -xlink, which
+selects POP_XLINK_EXLIBS. This variable is set to give the appropriate
+host-specific default.
+
+For example, to link a system with MIT only, use
+
+    $popsrc/newpop -link -x=-xt
+
+See REF * X for further details.
+
+
+------------------------------------------------------------------------
+9  Installing the "basepop11" Command
+------------------------------------------------------------------------
+
+Step 2 of the NEWPOP process is the installation of the newpop11 image
+as the base Poplog executable:
+
+    $popsys/basepop11
+
+This step is enabled with the install option.
+
+The first stage of the installation is to clear out any existing
+executables and saved images from the $popsys and $popsavelib
+directories: it's primarily for this reason that you must be sure that
+you have set $usepop correctly before you run NEWPOP, to avoid your
+existing Poplog system from being deleted in this way. However, if there
+is an existing basepop11 executable in $popsys, it is renamed as
+"oldpop11" rather than being deleted, so you can recover it if something
+goes wrong.
+
+The newpop11 executable, symbol table and map files are then moved from
+$popsrc to $popsys and renamed as basepop11. There must be a newpop11
+executable in the $popsrc directory. In the normal progress of events,
+it will have been created by a preceding link step. If you have chosen
+to omit this step, you should ensure that the newpop11 executable has
+been created by some other means: either by manual linking, or by
+copying an existing executable from $popsys.
+
+NEWPOP also creates a new "popenv" file in $popsys for definitions of
+command symbols for Poplog shell/DCL commands such as "pop11", "ved",
+"prolog", etc. This file is consulted by the standard Poplog login
+script, $popcom/poplog. It wil always contain at least the definition of
+the command "pop11".
+
+
+------------------------------------------------------------------------
+10  Building Supporting Libraries
+------------------------------------------------------------------------
+
+Step 3 of the NEWPOP process involves building executables and libraries
+needed for Poplog run-time support. Currently there is just one such
+object: the archive library for the Poplog Widget Set (Xpw).
+
+The Poplog Widget Set is enabled with the xpw option. This causes NEWPOP
+to run the command $popcom/mkXpw which will rebuild and install the
+Poplog Widget Set archive library in $popexternlib. This option is
+ignored if you have selected nox.
+
+
+------------------------------------------------------------------------
+11  Making the Standard Saved Images
+------------------------------------------------------------------------
+
+Step 4 of the NEWPOP process is to build the standard saved images in
+$popsavelib. The full set of standard images consists of:
+
+    startup.psv         # Default start-up code
+    prolog.psv          # Prolog language subsystem
+    clisp.psv           # Common Lisp language subsystem
+    pml.psv             # Standard ML language subsystem
+    xved.psv            # XVed (X based version of Ved)
+    eliza.psv           # Eliza demo (not built by default)
+    logic.psv           # Logic demo (uses Prolog; not built by default)
+
+For each image there is a corresponding option -- startup, prolog,
+clisp, etc. -- such that selecting the option causes NEWPOP to build the
+image. The default configuration file includes options for all the
+images except eliza and logic; if you want these two built as well, use
+the command:
+
+    $popsrc/newpop -eliza -logic
+
+The status of the startup image is special in that (if it exists) it is
+loaded by default with all Poplog commands. In particular, all
+subsequent saved images are layered on top of the startup image. The
+image contains code which is viewed as part of the base Poplog system,
+but which is not part of the Poplog executable itself. It may well be
+customised on a per-site basis, depending on how Poplog is used at each
+site.
+
+Other dependencies exist between images: you can't build the logic image
+without prolog, and you can't have xved without x. Also, none of the
+images (except startup) will be built if you specify noimages.
+
+Images are normally built using command scripts from $popcom. You can
+specify your own commands instead, by qualifying the image-name argument
+with the command to use: the qualifier is simply executed as a Shell or
+DCL command without interpretation. For example, the option
+
+    prolog = $poplocal/local/com/mkprolog       # Unix
+
+    prolog = @poplocal:[local.com]mkprolog      # VMS
+
+would use a local version of the "mkprolog" command in place of the
+system-supplied one. If such an option is to be given on the command
+line, make sure that you add the required amount of quoting to allow the
+option to be read as a single item, e.g:
+
+    $popsrc/newpop -"prolog = $poplocal/local/com/mkprolog"
+
+
+------------------------------------------------------------------------
+12  Defining Other Poplog Commands
+------------------------------------------------------------------------
+
+Step 5 of the NEWPOP process consists of writing to the $popsys/popenv
+file definitions of any additional Poplog shell/DCL commands which are
+to be made available to users on login. This step is associated with the
+commands option and is always performed unless you disable it by
+specifying nocommands.
+
+If this step is enabled, NEWPOP will create command definitions for any
+of the following standard saved images you have chosen to build:
+
+    prolog      # Run Prolog
+    clisp       # Run Common Lisp
+    pml         # Run Standard ML
+    xved        # Run XVed
+
+Beyond that, there are several other commands which you can request to
+have defined:
+
+    ved
+    help
+    ref
+    teach
+    doc
+    vt100
+
+which provide various entry points to the Ved editor. Note that on VMS
+systems, the commands ved and help are normally replaced with the
+commands
+
+    ve*d
+    hlp
+
+The first allows for command abbreviation; the second is to avoid
+conflict with the DCL help command.
+
+Having each command specified individually allows you to avoid any which
+conflict with existing command names. For example, some Unix sites may
+also prefer not to have the help command enabled, so the command-line
+option:
+
+    $popsrc/newpop -nohelp
+
+would suppress that.
+
+
+------------------------------------------------------------------------
+13  Making Documentation Indexes
+------------------------------------------------------------------------
+
+Step 6 of the NEWPOP process is making the documentation indexes. This
+means creating an index file in each HELP, TEACH and REF directory, and
+also creating the DOC_INDEX database for the <ENTER> ?? command. This
+step is enabled with the indexes option.
+
+The standard Poplog system is distributed with indexes already built, so
+if you are rebuilding a system, using the same documentation directories
+as before, it is unlikely that you will need to rebuild the index files.
+The command-line option
+
+    $popsrc/newpop -noindexes
+
+will suppress the index-building stage and save a little time.
+
+Indexes are built with the command $popcom/makeindexes.
+
+
+------------------------------------------------------------------------
+14  Removing Ved Special Characters from Documentation
+------------------------------------------------------------------------
+
+An additional function performed by $popcom/makeindexes is to strip all
+documentation files of Ved special character encodings.
+
+Files written by Ved use extra control characters to represent
+attributes like bold and italic, as well as a special graphics character
+set. Since they are not recognised by editors other than Ved, the extra
+control characters will show up explicitly when a file is viewed with
+another editor.
+
+One way round this problem is to use the command 'pop11 stripvedfile' to
+filter individual files (see LIB * STRIPVEDFILE). This removes Ved
+encodings from a file and writes the result either to standard output or
+to another file, from whence another editor can access it.
+
+On the other hand, if you will mainly be using other editors to examine
+Poplog documentation, you have the option of employing
+
+    $popsrc/newpop -stripdoc
+
+to (permanently) remove special encodings from all documentation files
+(this implies the indexes option).
+
+                           NOTE
+    Even if you prefer not to use Ved for your normal editing, in an
+    X environment you always have the option of using XVed to view
+    Poplog documentation. This will in no way interfere with the
+    operation of another editor.
+
+
+------------------------------------------------------------------------
+15  Running Local NEWPOP
+------------------------------------------------------------------------
+
+The final stage in the NEWPOP process is to run the local NEWPOP command
+script:
+
+    $poplocal/local/com/newpop
+
+This step is enabled with the local option.
+
+This file need not exist; if it does, it may contain any commands for
+tailoring the newly-installed Poplog system, e.g. adding local command
+definitions, building local saved images in $poplocalbin etc.
+
+
+--- C.all/help/newpop
+--- Copyright University of Sussex 1997. All rights reserved.

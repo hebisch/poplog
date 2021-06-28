@@ -1,0 +1,202 @@
+HELP INCHARITEM                                Updated A.Sloman Dec 1986
+
+    incharitem(<character repeater>) -> <item_repeater>;
+    incharitem(discin(<filename>)) -> <item_repeater>;
+
+INCHARITEM takes a character repeater and creates an item repeater that
+produces items derived from the stream of characters produced.
+
+CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Character repeaters
+ -- Item repeaters
+ -- Using incharitem
+ -- End of file indicator: TERMIN
+ -- Using incharitem with discin
+ -- Using incharitem with the compiler and proglist
+ -- Making an item repeater from a string
+ -- Making item repeaters from the VED buffer
+ -- Altering the itemisation rules using item_chartype
+ -- Related Documentation
+
+
+-- Character repeaters ------------------------------------------------
+
+A character repeater is a procedure that takes no arguments and returns
+a character every time it is called, or returns the special object
+TERMIN if there are no more characters to be read.
+
+Examples of system character repeaters are * CHARIN, * RAWCHARIN,
+* VEDINASCII, and VEDREPEATER, described below.
+
+-- Item repeaters -----------------------------------------------------
+
+An item repeater is a procedure that takes no arguments, but returns a
+POPLOG data object each time it is called. Usually item repeaters are
+created from character repeaters, using INCHARITEM, though they need not
+be.
+
+An item repeater produced by INCHARITEM will, each time it is called,
+get characters from the character repeater, and analyse them into text
+items, according to POP-11's 'lexical analysis' rules described in
+REF * ITEMISE.
+
+There are different classes of item that can be represented in a
+character stream, and which such an item repeater can return: words,
+strings, integers, bigintegers, decimals, ddecimals, rationals, complex
+numbers. For full details see REF * ITEMISE. These are not all the kinds
+of data that can be created by a POP-11 program. (See REF * DATA).
+
+
+-- Using incharitem ---------------------------------------------------
+
+When applied to *CHARIN, INCHARITEM produces an item repeater which
+reads items from the terminal. For example:
+
+    repeat 3 times charin()=> endrepeat;  ;;; prompts terminal and waits
+    : abc                                 ;;; type in three characters
+    ** 97
+    ** 98
+    ** 99
+
+    vars itemrep;
+    incharitem(charin) -> itemrep;      ;;; ITEMREP is an item repeater
+
+    itemrep() =>     ;;; prompts and waits for an item to be typed in.
+    : the
+    ** the           ;;; prints it out
+
+    itemrep() =>
+    cat
+    ** cat
+
+
+-- End of file indicator: TERMIN --------------------------------------
+
+If the user types the "end-of-file" character (usually CTRL-D on Unix
+machines; CTRL-Z on VMS), then the character repeater CHARIN returns the
+unique object TERMIN. In that case the item repeater does the same,
+indicating that there are no more items to be returned.
+
+POP-11 repeaters typically produce the unique object * TERMIN to
+indicate the end of the stream. When the character repeater given to
+INCHARITEM returns TERMIN then so does the item repeater created by
+INCHARITEM. If it is used to create PROGLIST, then at that point
+
+    null(proglist)
+
+will be true.
+
+
+-- Using incharitem with discin ---------------------------------------
+
+When applied to the result of * DISCIN(<FILENAME>), INCHARITEM produces
+an item repeater which reads items from a file. E.g. if 'numbers' is a
+file containing numbers separated by spaces and newlines, then to
+create a repeater which reads in a new number every time it is called,
+do:
+    vars numrep;
+    incharitem(discin('numbers')) -> numrep;
+
+Then if invoked repeatedly NUMREP returns numbers from the file, and
+finally returns TERMIN, when the file is exhausted. If called again
+after that, it will produce an error.
+
+
+-- Using incharitem with the compiler and proglist --------------------
+
+The POP-11 compiler reads items from * PROGLIST, usually a dynamic list
+created by taking a character repeater R, creating an item repeater,
+then using *PDTOLIST to make a dynamic list, e.g.
+
+    pdtolist(incharitem(R)) -> proglist;
+
+R might, for example, be CHARIN, or the result of discin(<file name>)
+
+* ITEMREAD and * READITEM are examples of item repeaters built in to
+POP-11. They are used to read in items from * PROGLIST, the current
+stream of items to be compiled. While a file is being compiled, the
+current input stream underlying PROGLIST comes from the file, so that if
+these procedures are run during the compilation process, they will not
+read from the terminal, but from the file.
+
+Having created the dynamic list, PROGLIST, in this way it can be handed
+to the POP-11 compiler by applying POPVAL to it. So a file 'prog.p' can
+be compiled thus:
+
+    popval(pdtolist(incharitem(discin('prog.p'))));
+
+This can be abbreviated to:
+    compile('prog.p');
+
+Further details are described in REF * PROGLIST and REF * POPCOMPILE.
+
+
+-- Making an item repeater from a string  -----------------------------
+
+*STRINGIN can be applied to a string to produce a character repeater for
+the characters in the string. INCHARITEM can then be used to produce an
+item repeater, e.g.
+
+    incharitem(stringin(<string>))
+
+
+-- Making item repeaters from the VED buffer --------------------------
+
+The procedure VEDREPEATER returns the character under the cursor in the
+current VED buffer and moves the cursor one character on.  At the end of
+a line it returns the newline character and moves the cursor to the next
+line. Hence
+    incharitem(vedrepeater)
+
+creates a procedure that when called returns the next POP-11 item
+to the right of the cursor, and moves the cursor on.
+
+The procedure VEDRANGEREPEATER takes two line numbers L1 and L2 and
+creates a character repeater for the portion of the current VED buffer
+from lines L1 to L2 inclusive. In fact it makes a copy of that portion
+of the buffer, so that the characters produced are not affected by
+subsequent changes in that portion of the buffer. So lines 10 to 20
+inclusive of the current VED buffer could be compiled thus:
+
+    popval(pdtolist(incharitem(vedrangerepeater(10,20))))
+
+or, since COMPILE can take a character repeater:
+
+    compile(vedrangerepeater(10,20))
+
+
+-- Altering the itemisation rules using item_chartype -----------------
+
+It is sometimes convenient, e.g. when using these facilities to define a
+new compiler, to alter the rules for dividing up a stream of characters
+into items. To some extent this is possible by changing the internal
+tables that determine how the itemiser treats incoming characters. The
+characters are divided into different classes for this purpose, and the
+procedure * ITEM_CHARTYPE makes it possible to find out which class a
+character is in, or to change the class, either globally or for a
+particular character repeater.
+
+
+-- Related Documentation ----------------------------------------------
+
+HELP *ASCII         - on character codes
+HELP *CHARIN        - reads in a character from the terminal
+HELP *CHAROUT       - outputs a character to the terminal
+HELP *DISCIN        - creates a character repeater for a file or device
+HELP *ITEMREAD      - reads in items, expands macros and attempts autoloading
+HELP *ITEM_CHARTYPE - on finding the class number associated with a character
+HELP *NEXTCHAR      - on altering the internal buffers of repeaters
+HELP *OUTCHARITEM   - converts character consumer into item consumer
+HELP *PROGLIST      - more on proglist and macros
+HELP *READITEM      - similar to ITEMREAD, but no macro expansion or autoload
+HELP *STRINGIN      - creates a character repeater for a string
+HELP *STRINGS       - on character strings
+
+REF *PROGLIST       - the use of PROGLIST
+REF *ITEMISE        - details on itemisation, and related procedures
+REF *SYSIO          - details of I/O procedures
+
+
+--- C.all/help/incharitem ----------------------------------------------
+--- Copyright University of Sussex 1992. All rights reserved. ----------

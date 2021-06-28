@@ -1,0 +1,248 @@
+HELP MACRO                                     Steven Hardy, January 78
+                                         Updated Aaron Sloman, Sept 1990
+
+
+The word "macro" is used to define macros, i.e. pieces of text that are
+rearranged by the compiler. It can be used in two ways:
+    1) in macro definitions and
+    2) in variable declarations.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Macro definitions
+ -- Variable declarations
+ -- Non-procedure values for macro identifiers
+ -- A macro with a list as value
+ -- Formal parameters in macro definitions
+ -- Tracing macros
+ -- Defining syntax words
+ -- WARNING: macros can be confusing
+ -- Related documentation
+
+-- Macro definitions --------------------------------------------------
+
+A macro definition looks just like a normal procedure definition, except
+that the word MACRO occurs after the *DEFINE. For example:
+
+    define macro swap;
+        vars x y;
+        itemread() -> x;
+        itemread() -> y;
+        x, ",", y, "->", x, "->", y;
+    enddefine;
+
+The name of the macro (in this case SWAP) is specially marked (see HELP
+*IDENTPROPS) as a macro rather than an ordinary procedure.  When the
+compiler reads the name of a macro it immediately calls the procedure.
+This procedure may read things from the input stream (perhaps using
+*ITEMREAD) and the results of the macro call are inserted into the input
+stream in place of the macro name and items read.
+Thus:
+
+    swap a b;
+
+is equivalent to
+
+    a, b -> a -> b;
+
+Any POP-11 word may be used as a macro name provided it has not already
+been declared as an ordinary variable or procedure name.  Once used as a
+macro a word cannot later be used as an ordinary variable without being
+explicitly reintroduced by a vars statement or being cancelled (see HELP
+*VARIABLES, *CANCEL).
+
+
+-- Variable declarations ----------------------------------------------------
+
+A word can be declared as a macro name without a value being immediately
+assigned to it. This is achieved by using the word MACRO in the *VARS
+statement. So the piece of program:
+
+    define macro x;
+    .........
+    enddefine;
+
+is roughly equivalent to:
+
+    vars macro x;
+    procedure <.....> endprocedure -> nonmac x;
+
+Note the use here of a procedure introduced without a name (see HELP
+*PROCEDURE) and the use of *NONMAC to indicate that in the second line
+the word X is not to trigger off the operation of a macro.
+
+
+-- Non-procedure values for macro identifiers -------------------------
+
+If a word declared as a macro name turns out not to have a procedure as
+its associated value, it is treated just like a procedure that always
+produces that value as its result. That is, when the compiler hits the
+word, it just adds the value to the front of the input stream. For
+instance, supposing that "pi" were not already a built in Pop-11
+identifier, you could do:
+
+    vars macro pi = 3.141593;
+
+is a slightly more concise way of getting the effect of:
+
+    define macro pi;
+        3.1416
+    enddefine;
+
+This is different from:
+
+    vars pi; 3.1416 -> pi;
+
+The difference is that if you have a program with *PI defined as this macro,
+the compiler will effectively substitute the number 3.1416 for every
+occurrence of the word PI in the program. So the procedure:
+
+    define circle_area(radius);
+        pi * radius * radius
+    enddefine;
+
+would be saying "to find the area of a circle, multiply 3.1416 with the
+square of the radius". If PI was an ordinary variable, it would say
+instead "to find ..., multiply the value of the variable PI with the
+square of the radius" (and there would be nothing to stop the value of
+PI changing between calls of CIRCLE_AREA). So the difference is that in
+the macro case the looking-up of the value is done while the program is
+being loaded, and not while the program is being run.
+
+I.e. macros are substituted at "compile time" not at "run time".
+
+
+-- A macro with a list as value ---------------------------------------
+
+If the value associated with a macro is a list, the compiler puts all
+the elements of the list individually on the front of the input stream,
+rather than just considering the list as a single item. For instance,
+each time the macro
+
+    vars macro debug;
+    [if debugging then database ==> endif;] -> nonmac debug;
+
+is used, a conditional statement will be inserted into the program. This
+statement has the effect that, when the program is running, if the
+variable DEBUGGING has a non-FALSE value then the *DATABASE will be
+printed out at this point.
+
+
+-- Formal parameters in macro definitions -----------------------------
+Macros created with DEFINE can have formal parameters. These are set by
+calling *ITEMREAD the appropriate number of times before invoking the
+macro. Thus
+
+    define macro swap x y;
+    .............
+    enddefine;
+
+is equivalent to:
+
+    define macro swap;
+        vars x y;
+        itemread() -> x;
+        itemread() -> y;
+        .............
+    enddefine;
+
+So the parameter mechanism  should not be used for macros which may
+themselves read in macros, but don't want to 'expand' them. Instead, use
+*READITEM, which just reads text items off PROGLIST without expanding
+macro items. (See HELP *PROGLIST, *ITEMREAD and *READITEM).
+
+
+-- Tracing macros -----------------------------------------------------
+
+POP11 MACROS can be traced. If the macro foo is traced, it will change
+foo so that when it runs it shows the text is is creating.
+    (See HELP *TRACE)
+
+
+-- Defining syntax words ----------------------------------------------
+
+In POP11, the format DEFINE SYNTAX can be used more effectively for some
+purposes than defining a macro. (See HELP *SYNTAX, *DEFINE)
+
+For examples of the use of SYNTAX and MACRO to extend the POP11
+language, look at the following library files, using SHOWLIB:
+
+        SHOWLIB *SYNONYM
+        SHOWLIB *FOREACH
+        SHOWLIB *FOREVERY
+        SHOWLIB *SWITCHON
+
+
+-- WARNING: macros can be confusing ------------------------------------
+
+Macros can be defined to create new constructs that are misleading
+because they look like procedure calls but are not really. For example
+a macro "foo" could be defined that used syntax like
+
+    foo(x)
+
+to produce some instructions that depend on x. For example it might
+translate into something like
+
+    x + 1 -> x;
+
+This would make it look as if -foo- is a procedure. However using it as
+a procedure could cause problems, for example if you tried to give it as
+an argument to -applist-.
+
+For this reason, it is important to take care when defining new macros
+(or syntax words) that the resulting constructs do not lead to confusion
+and programs that are hard to maintain, especially when programs are
+written as part of a large project that where code may have to be
+maintained and debugged by someone other than the author.
+
+There are several ways of doing this. One is to make it clear that a
+special syntactic construct is involved by having separate opening and
+closing brackets, as in
+
+    foo <exprssion> endfoo
+
+Another is to define the macro (or syntax word) to use a form that would
+not normally be legal Pop-11, as in
+
+    foo x
+
+(which would normally produce a "MISSING SEPARATOR" error, unless "foo"
+was defined as an infix operator.)
+
+Another is to use upper case to indicate that something special is going
+on, as in
+
+    FOO(x)
+
+Use of upper case to draw attention to macros is common among C
+programmers, for this reason.
+
+
+-- Related documentation ----------------------------------------------
+
+HELP *IDENTIFIERS - introduction to identifiers
+HELP *IO          - overview of I/O related documentation
+HELP *WORDS       - an overview of how words are formed in POP-11
+REF  *IDENT       - details of POP-11 identifiers
+REF  *POPSYNTAX   - details of the syntax of POP-11
+REF  *PROGLIST    - details of proglist
+REF  *WORDS       - details of word construction and related items
+
+REF  *GENSYM      - generating words, e.g. for variable names
+REF  *sysNEW_LVAR - generate temporary working local variables.
+REF  *VMCODE      - facilities available for syntax procedures
+                    (For experts only!)
+
+HELP * INLINE     - define form for creating macros that perform textual
+                    rewrites using parameters - much like the C
+                    pre-processor directive #define.
+
+HELP * FORM       - a library for conveniently defining new syntax
+                    forms
+
+HELP * DEFINE_FORM - Syntax for defining new define ... enddefine syntax
+                    constructs.
+
+--- C.all/help/macro -----------------------------------------------------
+--- Copyright University of Sussex 1991. All rights reserved. ----------

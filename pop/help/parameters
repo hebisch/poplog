@@ -1,0 +1,332 @@
+HELP PARAMETERS                                   Aaron Sloman, Dec 1989
+                                         Updated Simon Nichols, Dec 1990
+
+Running POP11 with parameters.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Introduction
+ -- 1. Invoking a saved image from the SHELL
+ -- 1.1. Search path for saved images: popsavepath
+ -- 1.2. Additional arguments to saved images
+ -- 1.3. Actions performed when a saved image starts up
+ -- 1.4. Invoking layered saved images
+ -- 1.5. Changing $popsavepath
+ -- 2. Special arguments
+ -- 3. Executing an expression specified on the command line
+ -- 4. Invoking a program file from the command line
+ -- 4.1. Changing $popcomppath
+ -- Related Documentation
+
+
+-- Introduction -------------------------------------------------------
+
+POP11, like other UNIX programs, can be invoked from the SHELL with
+command line arguments. These arguments fall into four categories,
+distinguished by the flag character which is the first character of the
+argument:
+
+    1) An argument beginning with `+` or `-` causes a saved image to be
+       restored.
+
+    2) An argument beginning with `%` modifies POP11 startup behaviour.
+
+    3) A string beginning with `:` causes the remainder of the string
+       (after the colon) to be interpreted as a string of source text to
+       be executed.
+
+    4) Any other argument is treated as the name of a program file to be
+       compiled.
+
+These four kinds of arguments are described in detail below.
+
+Notes:
+
+1) It is possible to have a single argument list containing arguments
+   of kinds 1, 2 and 3 or of kinds 1, 2 and 4, but kinds 3 and 4 are
+   mutually exclusive.
+
+2) The initialisation files ('init.p', 'init.pl', 'init.lsp', 'init.ml',
+   'vedinit.p', etc.) are not compiled automatically if arguments of
+   kinds 1, 3 or 4 are supplied. Therefore, user programs (including
+   saved images) can decide whether to compile them or not; see section
+   1 for details. The %noinit flag can be used to suppress the
+   compilation of initialisation files when no argument is supplied; see
+   section 2 for details.
+
+
+-- 1. Invoking a saved image from the SHELL ---------------------------
+
+If POP11 is run with a command line argument starting with `-` or `+`
+then it will try to restore a saved image. For example,
+
+    pop11 -myimage
+
+or
+
+    pop11 +myimage
+
+will do this. The latter form is preferred, as it is now compatible
+with the syntax for invoking a POPLOG saved image in VMS.
+
+Either command will make POP11 search for a saved image called
+'myimage.psv', in directories that are specified in an environment
+variable called $popsavepath.
+
+If the saved image name contains a full path name then $popsavepath is
+not used. If the name ends in '.psv' then the suffix is not added.
+
+Thus the following uses a full path name, so
+
+    pop11 +$HOME/lib/myimage.psv
+
+it will try only to restore 'myimage.psv' located in the user's
+directory $HOME/lib (the subdirectory lib of their home directory), and
+will ignore $popsavepath.
+
+
+-- 1.1. Search path for saved images: popsavepath ---------------------
+
+$popsavepath is a list of directory pathnames, separated by colons An
+empty component (":" at the beginning or end, or "::" in the middle)
+means the current working directory.  The default value for $popsavepath
+(set up by '$popcom/popenv') is
+
+    ":$poplib:$poplocalbin:$popsavelib"
+
+This starts with an empty string before the first ":" so the first place
+to look is the current directory. E.g.
+
+    pop11 -myimage
+or
+    pop11 +myimage
+
+will try to restore the image 'myimage.psv' in the current directory,
+and if it isn't there it will look in the user's library directory
+($poplib), and if there isn't one it will look in the local library
+directory $poplocalbin which defaults to
+
+    $poplocal/local/bin
+
+(to be created by local system manager). If it cannot be found there, it
+is sought in the POP11 library directory ($popsavelib) which is normally
+
+    $usepop/pop/lib/psv
+
+
+-- 1.2. Additional arguments to saved images --------------------------
+
+When a saved image is invoked, additional arguments can be specified,
+separated by spaces. A list of strings containing these arguments will
+be available in *POPARGLIST when the image is restored. For example, the
+command
+
+    pop11 +myimage arg1 arg2 arg3
+
+Will cause -poparglist- to be the list
+
+    ['arg1' 'arg2' 'arg3' ]
+
+
+-- 1.3. Actions performed when a saved image starts up ----------------
+
+When a saved image is restored it does not automatically compile either
+the user's 'init.p', or the SYSTEM version in $popsys. Compilation can
+be forced by invoking the procedure -sysinitcomp-. This can be specified
+in the command that creates the saved image, e.g.
+
+    if syssave('...') then
+        ...
+        sysinitcomp();
+        ...
+    endif;
+
+as the instructions between "then" and "endif" are executed whenever the
+saved image is restored. Alternatively various initialisation files can
+compiled, if they exist, using -trycompile-, which is like -compile-
+except that it returns a boolean indicating whether the file existed or
+not.
+
+Similar start-up procedures can be specified with layered saved images
+created using -sys_lock_system-, described in REF * SYSTEM.
+
+
+-- 1.4. Invoking layered saved images ---------------------------------
+
+Saved images created using -sys_lock_system- can be used as a basis for
+creating new saved images which will not duplicate the contents of the
+original image. (On some versions of UNIX the locked image can even be
+mapped into shared memory when run by different users.) The standard
+POPLOG saved images, such as prolog, clisp and pml, are created as
+locked images.
+
+If 'image1.psv' is a locked image, and 'image2.psv' is another locked
+image created relative to it, and 'image3.psv' is created relative to
+'image2.psv', then the command
+
+    pop11 +image1 +image2 +image3 arg1 arg2 arg3
+
+can be used to restore 'image3.psv' with ['arg1' 'arg2' 'arg3'] assigned
+to -poparglist-.
+
+For example, the command
+
+    pop11 +prolog +logic
+
+runs the Prolog image then restores the saved image contained in the
+file 'logic.psv'. The latter file is created by the SHELL command file
+'$popcom/mklogic'.
+
+In fact this can be abbreviated to
+
+    prolog +logic
+
+because 'pop_prolog' is defined as a suitable environment variable on
+startup in the file '$popcom/popenv'. It uses the abbreviation mechanism
+described for Unix systems in HELP * INITIAL.
+
+
+-- 1.5. Changing $popsavepath -----------------------------------------
+
+You can change the default search path for saved images simply by
+changing the $popsavepath environment variable. In the C shell csh, this
+is done by the setenv command. For example:
+
+    setenv popsavepath ~/aaa\:~/aaa/bbb\:$popsavelib\:\:~/ccc
+
+will make POP11 look for saved images first in a sub-directory 'aaa' in
+your home directory, then in a sub-sub-directory 'aaa/bbb' of your home
+directory, then in the POP11 library directory, then in the current
+working directory and finally in a sub-directory 'ccc' of your home
+directory.
+
+Note: the colons have to be preceeded by a backslash to stop the C shell
+from interpreting them; the `\` characters are stripped off before
+assigning the string to popsavepath, as you can see if you print the
+value of the variable, thus:
+
+    echo $popsavepath
+
+
+-- 2. Special arguments -----------------------------------------------
+
+POP11 recognises the following special arguments, all of which begin
+with a '%' character, and cause the associated actions to be performed:
+
+    %nobanner   suppresses printing of the banner
+
+    %noinit     prevents compilation of initialisation files
+
+    %nort       prevents execution of "runtime actions"
+
+    %x          tells POP11 to start-up under X
+
+The %x argument may optionally be followed by a bracketed list of X
+arguments, which is assigned to the variable -popunderx-.
+
+For example,
+
+    pop11 %nobanner %x \( -display cx010:0.0 \)
+
+causes POP11 to startup under X without printing the banner. The
+variable -popunderx- will have the value:
+
+    ['-display' 'cx010:0.0']
+
+These X specific arguments may be passed on to the X server.
+
+See REF * SYSTEM for full details.
+
+
+-- 3. Executing an expression specified on the command line -----------
+
+If POP11 is invoked with a string starting with `:`, the string after
+the colon is treated as a POP11 expression and is compiled and executed
+as soon as POP11 starts up. POP11 then exits. The string will normally
+have to be enclosed in double quotes to prevent it being interpreted by
+the SHELL. For example, the following will print the sum of 99 and 55:
+
+    pop11 ":99 + 55 =>"
+
+To prevent POP11 from exiting as soon as it has evaluated the
+expression, the expression can assign -setpop- to -interrupt- (or call a
+procedure which does this). For example, the following will print the
+sum of 99 and 55 and then perform a setpop, leaving you at the POP11
+prompt:
+
+    pop11 ":setpop -> interrupt; 99 + 55 =>"
+
+When VED is invoked from the shell, -setpop- is assigned to -interrupt-.
+However, argument(s) supplied on the command line are not compiled
+before entering ved or after leaving it; instead they is treated as the
+name of a file. Hence,
+
+    ved ":99 + 55 =>" temp
+
+will create a file called ':99 + 55 => temp'. Interrupting VED will
+cause a return to POP11.
+
+When POP11 is run in this mode, i.e. with an executable POP11 command as
+a parameter, it does not compile either the user's 'init.p', or the
+SYSTEM version in $popsys. Compilation can be forced by calling
+-sysinitcomp-. Thus
+
+    pop11 ":sysinitcomp(); ved file"
+
+will start POP11 off with the proper initialisations, and run the editor
+on the file 'file'.
+
+In the C shell an alias can be used to abbreviate this sort of command.
+In other Unix shells it is achieved in a roundabout fashion, described
+in HELP * INITIAL.
+
+
+-- 4. Invoking a program file from the command line --------------------
+
+Invoking POP11 as follows:
+
+    pop11 file arg1 arg2 arg3
+
+will cause POP11 to search in the directories specified by the
+environment variable $popcomppath for a program file whose name is
+'file.p'. The file will be compiled, with the POP11 variable *POPARGLIST
+bound to a list of the form:
+
+    ['arg1' 'arg2' 'arg3']
+
+If the first argument has a full path name then $popcomppath is not
+used, and if the name already ends in '.p' then '.p' is not added.
+
+
+-- 4.1. Changing $popcomppath -----------------------------------------
+
+This search path is set up in the same way as $popsavepath, and in the
+same login initialisation command file. Its default value is set up in
+'$popcom/popenv' thus:
+
+    setenv popcomppath ':$poplib:$poplocalauto:$popautolib:$popliblib'
+
+
+The leading colon ":" indicates an initial null path name, standing for
+the current directory. Thus, this search path specifies that the current
+directory is to be searched first, followed by the user's $poplib, then
+$popautolib, $poplocalauto and finally $popliblib. It can be altered in
+your '.login' file in the same way as $popsavepath (see above).
+
+
+-- Related Documentation ----------------------------------------------
+
+HELP * SYSSAVE      - creating saved images
+HELP * SYSRESTORE   - running them
+REF  * SYSTEM       - general information on running Poplog, saved
+                      images etc.
+REF  * sys_lock_system  - layered saved images
+HELP * INITIAL      - Tailoring POPLOG and its subsystems, via login
+                      command files, init.p vedinit.p etc.
+HELP * INITIAL.EX   - some examples of users' tailoring files
+DOC  * SYSSPEC      - overview of Poplog's directory structure
+DOC  * PUG          - Poplog User Guide
+
+
+--- C.unix/help/parameters ---------------------------------------------
+--- Copyright University of Sussex 1990. All rights reserved. ----------

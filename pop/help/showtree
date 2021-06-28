@@ -1,0 +1,328 @@
+HELP SHOWTREE                                   J L Cunningham, Nov 1982
+                                           Revised John Gibson, Aug 1993
+
+------------------------------ NOTE ------------------------------------
+
+  From Version 14.5, a change has been made to LIB SHOWTREE which makes
+  it incompatible with previous versions: the new version has all the
+  exported (i.e. top-level) identifiers prefixed by "showtree_" (except
+  for showtree itself).
+
+  The old identifier names can be got by loading LIB * OLD_SHOWTREE,
+  which requires LIB * POPOBSOLETELIB first, i.e.
+
+        uses popobsoletelib, old_showtree;
+
+  This file describes the new names; the relationship between old and
+  new is fairly obvious (but see LIB * OLD_SHOWTREE if in any doubt).
+
+------------------------------------------------------------------------
+
+    uses showtree;
+
+    showtree(tree);
+    showtree_mess(tree);
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- SHOWTREE
+ -- SHOWTREE_MESS
+ -- SHOWTREE_PRINTABLE and SHOWTREE_GRAPHICAL
+ -- PROCEDURES AND VARIABLES
+ -- A SIMPLE EXAMPLE
+ -- A MORE COMPLICATED EXAMPLE
+ -- FROM PROLOG
+
+
+-- SHOWTREE ------------------------------------------------------------
+
+This library provides a procedure -showtree- which takes a tree, by
+default represented as lists within lists, (an example of these are the
+parse trees produced by LIB * GRAMMAR), and draws it on the screen using
+VED. It is normally called from outside VED, although it is okay to call
+it inside VED.  You can also call it from Prolog: see the end of this
+file.
+
+Example:
+
+    uses showtree;
+    showtree([alpha [beta gamma] [delta [epsilon]]]);
+
+Tree nodes are either atoms, or heads of sublists.  Atoms are not drawn
+in a box, heads of sub-lists are drawn in a box.  Details of how to
+extend this are given below.
+
+
+-- SHOWTREE_MESS -------------------------------------------------------
+
+The procedure -showtree_mess- does the same as -showtree- but adds a
+message helpful to non-VED users above the displayed tree.
+
+
+-- SHOWTREE_PRINTABLE and SHOWTREE_GRAPHICAL ---------------------------
+
+On most VDUs the tree displayed on the screen uses symbols that cannot
+be printed on a line-printer.  If you call the procedure
+
+    showtree_printable();
+
+then the characters used to draw the tree will be suitable for printing.
+This procedure also alters -showtree_vgap- to have the value 5.
+WARNING: if the tree is too wide to fit on the printer paper, it will
+not be nice.
+
+    showtree_graphical();
+
+will make showtree use the characters used before -showtree_printable-
+was called.  -showtree_vgap- is set to be 4.
+
+
+-- PROCEDURES AND VARIABLES --------------------------------------------
+
+A number of procedures and variables are available to be used, or
+re-defined, by the user to allow easy extensions of the facilities in
+this library.
+
+Also available are a number of variables whose values are vedfileprops
+(see * NEWVEDFILEPROP) containing PROPERTIES; these give information
+about positions of nodes in the layout etc.  For more information look
+at the library file.
+
+
+showtree_box(column1, line1, column2, line2)                 [procedure]
+        Draw a box whose top left  position is line1, column1 and  whose
+        bottom right position is line2, column2.
+
+
+showtree_daughters(subtree)                                  [procedure]
+        Should return a list of the immediate subtrees of this  subtree.
+        The default values is -tl-.
+
+
+showtree_draw_node(node, position)                           [procedure]
+        Used to draw the  node -node- at  position given by  -position-.
+        -position- is node_location(node).
+
+
+showtree_height(node, name)                                  [procedure]
+        Returns the number of lines used to show the given node.
+
+
+showtree_isleaf(node)                                        [procedure]
+        Used to determines whether a node is printed in a box. If a node
+        is a leaf,  it is not  printed in a  box, but is  printed as  PR
+        prints it. The default value of -showtree_isleaf- is * ATOM.
+
+
+showtree_name_&_subtrees(tree) -> name -> subtrees;          [procedure]
+        If a subtree is not a leaf  node, its root node will be  printed
+        in a  box,  in  which case  the  (user  re-definable)  procedure
+        -showtree_name_&_subtrees- is  called. The  procedure takes  one
+        argument and returns  two results:  It should return  a word  or
+        string to be  used as the  node name  of the root  node of  this
+        subtree, and  a  list (which  may  be  the empty  list)  of  the
+        subtrees   immediately   below   this   node.   Note   that   if
+        -showtree_isleaf- is true, then the node is a leaf of the  tree,
+        but if it is  false, then the  node may still be  a leaf of  the
+        tree in  the sense  that  it may  have  no daughter  nodes.  The
+        default    value     for     -showtree_name_&_subtrees-     uses
+        -showtree_root- and -showtree_daughters- (q.v.).
+
+        The default value for -showtree_name_&_subtrees- assumes that if
+        the  -showtree_root-   of   a   subtree   is   a   leaf   (using
+        -showtree_isleaf- q.v.) then that is the name of its root  node,
+        otherwise that the node is anonymous, and that the *DATALIST  of
+        the subtree is the required list of DAUGHTERs.
+
+
+showtree_node_daughters()(node)                            [vedfileprop]
+        Returns a list of daughters of node.
+
+
+showtree_node_draw_data()(node)                            [vedfileprop]
+        Returns a list of the form [label startrow] where -label- is the
+        name produced by -showtree_name_&_subtrees-  or the node  itself
+        if the  node is  a leaf.  The label  can be  used by  draw_node.
+        startrow is the first row on which the node is displayed.
+
+
+showtree_node_location()(node)                             [vedfileprop]
+        Returns a  list  of  the form  [startrow  finishrow  startcolumn
+        finishcol] for the given node.
+
+
+showtree_quit()                                              [procedure]
+        Removes the tree file from the list of file being edited.
+
+
+showtree_root(tree)                                          [procedure]
+        Should return the  item to be  printed as the  name of the  root
+        node. This will be converted  to a string if necessary.  Default
+        value is -hd-.
+
+
+showtree_defaults()                                          [procedure]
+        Procedure used  when  calling  vededitor to  display  the  tree.
+        Default is -vedhelpdefaults-.
+
+
+showtree_init()                                              [procedure]
+        Procedure called before the tree is planned (and may be used  to
+        set  the  values  of  -showtree_isleaf-,  -showtree_root-  etc).
+        Default value is -identfn-.
+
+
+showtree_name                                                 [variable]
+        The name of the file used to display the tree. The initial value
+        is 'tree.t'.
+
+
+showtree_subtree_rootnode_name()(subtree)                  [vedfileprop]
+        Returns node name for given subtree. A property to give  inverse
+        mapping from tree fragments to  node names. N.B. this will  only
+        work on sub-trees, not on leafs.
+
+
+showtree_graphical()                                         [procedure]
+        Makes -showtree- use the  best graphic characters available  for
+        the current vdu. See above.
+
+
+showtree_printable()                                         [procedure]
+        Makes -showtree- use characters  that can be  printed on a  line
+        printer. See above.
+
+
+showtree_vgap                                                 [variable]
+        The minimum  number  of lines  beteen  nodes vertically.  It  is
+        initially 1.
+
+
+showtree_width(node, name)                                   [procedure]
+        Returns the width that will be used to display node. By default,
+        if the node  has daughters  then this will  be 2  more than  the
+        length of name  (to allow for  a box) otherwise  it will be  the
+        length of name.
+
+
+$-showtree$-connectup()                                      [procedure]
+        Draws the  connections between  the  nodes. Uses  the  procedure
+        -drawline-    and    the    data     held    in    the     table
+        -showtree_node_location-.
+
+
+$-showtree$-shapetree(node)                                  [procedure]
+        Updates the data held  in the table -showtree_node_location-  to
+        reflect the correct layout of the tree.
+
+
+$-showtree$-transformtree(tree, depth) -> topnode            [procedure]
+        Involved in calculating the layout of the tree on the screen.
+
+
+
+-- A SIMPLE EXAMPLE ----------------------------------------------------
+
+Normally it will be unnecessary to redefine -showtree_name_&_subtrees-,
+as it will be sufficient to redefine -showtree_isleaf-, -showtree_root-
+and -showtree_daughters-. As an example:
+
+    defclass bintree {value, left, right};
+
+    vars tree;
+    consbintree("top",consbintree("alpha",1,2),3) -> tree;
+
+    isbintree <> not -> showtree_isleaf;
+    value -> showtree_root;
+    define showtree_daughters(tree);
+        [% left(tree), right(tree) %]
+    enddefine;
+
+    showtree(tree);
+
+
+-- A MORE COMPLICATED EXAMPLE ------------------------------------------
+
+    define showtree_width(tree, name) -> w;
+        lvars tree name i w = 0;
+        if isvector(name) then
+            for i from 1 to length(name) do
+                max(length(name(i)), w) -> w
+            endfor;
+            w + 2 -> w
+        else
+            length(name) -> w
+        endif;
+    enddefine;
+
+    define showtree_height(tree, name);
+        lvars tree name;
+        if isvector(name) then
+            length(name) + 2
+        else
+            3
+        endif
+    enddefine;
+
+    define showtree_draw_node(node,val);
+        lvars node val i name;
+        vars r1 r2 c1 c2;
+        val --> [?r1 ?r2 ?c1 ?c2];
+        hd(showtree_node_draw_data()(node)) -> name;
+        if isvector(name) then
+            showtree_box(c1, r1, c2-2, r2);
+            c1 + 1 -> c1;
+            r1 + 1 -> r1;
+            for i from 1 to length(name) do
+                vedjumpto(r1, c1);
+                vedinsertstring(name(i));
+                r1 + 1 -> r1;
+            endfor
+        else
+            vedjumpto(r1+1, c1);
+            vedinsertstring(name);
+        endif;
+    enddefine;
+
+    define showtree_name_&_subtrees() -> name -> subtrees;
+        lvars name,subtrees;
+        destpair() -> subtrees -> name;
+    enddefine;
+
+    showtree([{top} [above [{a fairly big node}
+        {with a very tall sub node}]] and
+        [{a} [deep [{sub tree} {which} {is} fairly {wide}]]]
+        [also [{a smaller node} with {some 'sub-' nodes}]]]);
+
+
+-- FROM PROLOG ---------------------------------------------------------
+                                   Added 8 July 1983, Jonathan Laventhol
+
+Almost everything written above applies when calling SHOWTREE from
+Prolog, although of course you have to use prolog syntax (and the
+prolog predicates use the old names without the showtree_ prefix).
+This is just a list of the predicates that are available.
+
+    ?- library(showtree).
+
+    ?- showtree(Tree).
+
+    ?- showtreemess(Tree).
+
+    ?- vgap(X).         /* find value of vspacing */
+    ?- vgap(6).         /* set value of vspacing */
+
+    ?- tree_printable.
+    ?- tree_graphical.
+
+    Example:
+
+    Make a printable tree, with helpful message:
+
+    ?- tree_printable.
+    ?- showtreemess([alpha, [beta, gamma], [delta, [epsilon]]]).
+
+
+--- C.all/help/showtree ------------------------------------------------
+--- Copyright University of Sussex 1987. All rights reserved. ----------

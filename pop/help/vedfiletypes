@@ -1,0 +1,268 @@
+HELP VEDFILETYPES                                      A.Sloman July 1986
+
+
+VEDFILETYPES
+    [ [<condition> <action> <action> ...]
+      [<condition> <action> <action> ...]
+      [<condition> <action> <action> ...]
+        ...... ]
+
+This is a user-definable list of information telling VED how to assign
+values to VED variables when a new file is created or a file is read in
+from disk, or the name of a file already in the buffer is changed using
+<ENTER> name. It has a default value that may be altered in the user's
+vedinit.p file. (See HELP * INITIAL).
+
+CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- FORMAT OF VEDFILETYPES
+ -- CONDITIONS
+ -- ACTIONS
+ -- DEFAULT VEDFILETYPES
+ -- EXAMPLE
+ -- ENSURING DEFAULTS ARE CORRECT
+ -- HANDLING TABS: VEDNOTABS and VEDREADINTABS
+ -- INVOCATION OF VEDFILETYPES USING VEDSETFILETYPES
+ -- VEDVEDDEFAULTS vs VEDFILETYPES
+ -- FURTHER INFORMATION
+
+
+-- FORMAT OF VEDFILETYPES ---------------------------------------------
+
+Each element of VEDFILETYPES is a list whose first element is a
+condition and the remaining elements specify instructions to be
+performed if the condition is satisfied by the file, or more precisely
+by the path name of the file. For example, if initfoobaz is a procedure
+then the list
+
+    [['.foo' '.baz'] {vednotabs false} initfoobaz]
+
+will tell VED that if a file name ends in '.foo' or '.baz' then
+VEDNOTABS should be set false and the procedure initfoobaz run when the
+file is created.
+
+
+-- CONDITIONS ---------------------------------------------------------
+
+A condition may take one of the following forms
+1. a string:-
+    the condition is satisfied if the string is a final substring of
+    vedcurrent. If the string is empty (i.e. '') then ALL files will
+    satisfy the condition (useful for defaults)
+
+2. a procedure:-
+    the condition is satisfied if the procedure returns a non-false
+    result on being applied to vedpathname - the full name of the
+    current file. (Of course, the procedure can ignore the name and
+    decide on some other grounds what to do.)
+
+3. a list of conditions:-
+    the condition is satisfied if at least one of its elements is
+    satisfied (they are tried from left to right)
+
+4. a word whose recursive_valof is a condition of type 1 to 3:-
+    the condition is satisfied if the value is satisfied according
+    to 1, 2, or 3.
+
+
+-- ACTIONS ------------------------------------------------------------
+
+The tail of each element of VEDFILETYPES is a list of actions, where an
+action may be one of the following:
+
+1. A procedure:-
+    The action is to execute the procedure
+
+2. A two or three element vector, whose first element is a word:-
+    {<variable> <value>} or {<variable> " <word>}
+    In the first case, the <value> is assigned to the valof the
+    first element, unless the <value> is itself a word, in which case
+    its valof is assigned instead.
+    If the vector has three elements and the second element is """ then
+    the third element is assigned without being dereferenced.
+
+3. A word whose valof is an action or list of actions:-
+    The actions are treated as in 1 2 or 3.
+
+NOTE:
+If a word is used as a condition or an action, then if its valof is
+also a word, then that is treated the same way, using the procedure
+recursive_valof. This terminates when an appropriate valof is reached,
+e.g. a string, a list, or a procedure.
+
+However when a word is used as the second element of an action of type
+2, i.e. a vector, then its valof is taken only ONCE to find the value
+to be assigned. This is suppressed by preceding the word with '"'
+
+
+-- DEFAULT VEDFILETYPES -----------------------------------------------
+
+The default value of vedfiletypes will be something like this:
+
+vars    vedfiletypes    =
+    [
+        ;;; First the default case: the empty string will match any
+        ;;; file name
+        ['' {vednotabs ^true} {vedbreak ^true} {vedindentstep 4}]
+        ['.p'           {subsystem "pop11}]
+        [lispfiletypes  {subsystem "lisp}]
+        ['.pl'          {subsystem "prolog}]
+        [['.ml' '.sig'] {subsystem "ml}]
+        [['.p' '.pl' lispfiletypes '.ml' '.sig'] {vedcompileable ^true}]
+        [vednonbreakfiles {vedbreak ^false}]
+        [is_ved_output_file {vedcompileable ^false}]
+       ];
+
+-vednonbreakfiles- is a user-assignable variable having the following
+list as its default:
+
+    vars vednonbreakfiles =
+        ['.p' '.com' lispfiletypes '.pl' '.ml' '.sig'];
+
+and -lispfiletypes- is defined by default as:
+
+    vars lispfiletypes =
+        ['.lsp' '.l' '.lisp' '.cl'];
+
+Files whose names end with any of these suffixes will have VEDBREAK set
+false, so VED will not automatically break a line if you type beyond the
+edge of the screen. See HELP * VEDNONBREAKFILES.
+
+The procedure -is_ved_output_file- tests whether the current file is an
+"output" file, i.e. a file created by -ved_lmr- in which to display
+program output. Such files have -vedcompileable- set false, so that they
+don't get compiled by the <ENTER> C, <ENTER> L, or <ENTER> X commands.
+
+
+-- EXAMPLE ------------------------------------------------------------
+
+If you wished a procedure called "myinitialise" to be run whenever VED
+creates a new file whose pathname includes 'test', you could define a
+procedure
+
+    define hastest(name);
+        lvars name;
+        issubstring('test',1,name)
+    enddefine;
+
+Then add "hastest" as a condition for triggering the action
+"myinitialise":
+
+    [^^vedfiletypes [hastest myinitialise] ]  -> vedfiletypes;
+
+The procedure myinitialise will also be run when a file is renamed
+to include 'test' in its path name.
+
+Alternatively, use HASSUBSTRING partially applied to 'test',
+e.g.
+
+    [^^vedfiletypes
+        [^(hassubstring(%'test'%)) myinitialise] ]  -> vedfiletypes;
+
+The procedures HASSTARTSTRING and HASENDSTRING are available also.
+See REF * STRINGS.
+
+
+-- ENSURING DEFAULTS ARE CORRECT --------------------------------------
+
+If a VED variable is not set by either vedveddefaults or vedfiletypes,
+then when a new file is created it will simply inherit whatever value
+previously existed. To ensure that certain values are always set as
+defaults, start vedfiletypes with a rule whose condition is the empty
+string and whose action sets the defaults. They may then be over-ridden
+by later actions.
+
+E.g. to make the default value of vednotabs TRUE, while setting it FALSE
+for program files, put the following into vedfiletypes, in your
+vedinit.p file:
+
+ [
+    ['' {vednotabs true} ]   ;;; default case
+    [['.p' '.pl' '.lsp'] {vednotabs false}]
+
+    ......
+ ] -> vedfiletypes;
+
+To ensure that backup files in UNIX are treated the same way, the second
+line could be
+
+    [['.p' '.pl' '.lsp' '.p-' '.pl-' '.lsp-' ] {vednotabs false}]
+
+since in UNIX VED creates backup files by appending "-" to the name.
+(See HELP * VEDVERSIONS, * POP_FILE_VERSIONS)
+
+
+-- HANDLING TABS: VEDNOTABS and VEDREADINTABS -------------------------
+
+(Ignore this section if you are not familiar with the operation of
+VEDNOTABS, or if you always make it FALSE.)
+
+The global variable VEDNOTABS (which defaults to TRUE, since that has
+been found most convenient for beginners), does not provide sufficiently
+flexible control over the handling of tabs. (See HELP * VEDNOTABS).
+Normally it is most convenient to have it FALSE for program files and
+TRUE for other files. However, there are some non-program files for
+which tabs should be preserved, and which are not easily recognised from
+their file types, e.g. TROFF input, or SHELL command files. The problem
+is that it is too late to make VEDNOTABS false AFTER a file has been
+read in to VED, since the reading process may have converted tabs to
+spaces. The variable VEDREADINTABS provides the extra flexibility
+required. If you do (e.g. in your VED initialisation file):
+
+    true -> vedreadintabs;
+
+then no tabs will be converted to spaces when files are read in from the
+disk, even if they are of a type for which you normally set VEDNOTABS
+true. Moreover, if such a file is found to have any tabs, then VEDNOTABS
+will automatically be set FALSE as soon as it is read in. This means
+
+ (a) that any tabs you type will go into the file without conversion
+ (b) when the file is written to disk, tabs will be preserved.
+
+
+-- INVOCATION OF VEDFILETYPES USING VEDSETFILETYPES -------------------
+
+Whenever a VED file is first created or read in or given a new name,
+
+    vedsetfiletypes(vedfiletypes)
+
+is run, and then
+
+    vedveddefaults()
+
+The procedure VEDSETFILETYPES is available to the user and can be
+applied to any other lists in the appropriate format. E.g. the user
+might wish various actions to be performed after a file is read in,
+in which case the procedure VEDINITIALISE could be defined thus:
+
+    define vedinitialise(where_called);
+        lvars where_called;
+        vedsetfiletypes(vedinitfiletypes)
+    enddefine;
+
+where VEDINITFILETYPES is a list in the same general form as
+VEDFILETYPES, created by the user.
+
+
+-- VEDVEDDEFAULTS vs VEDFILETYPES -------------------------------------
+
+The procedure VEDVEDDEFAULTS can be used to achieve everything that can
+be achieved by VEDFILETYPES. The main difference is that since the
+latter is a data-structure it can relatively easily be partly altered
+temporarily. E.g. VEDFILETYPES can be made local to a procedure and an
+extra condition-action rule appended in that procedure to ensure that
+whenever that procedure is running VED will behave slightly differently.
+
+
+-- FURTHER INFORMATION ------------------------------------------------
+
+See the following HELP files:
+
+ * VEDVARS       - list of global VED variables
+ * INITIAL       - general guidance on setting up POPLOG environment
+ * VEDVEDDEFAULTS (see above)
+ * VEDINITIALISE - a procedure run after a VED file is read in
+
+
+--- C.all/help/vedfiletypes
+--- Copyright University of Sussex 1990. All rights reserved. ----------

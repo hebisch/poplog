@@ -1,0 +1,255 @@
+HELP STRINGS                                      A.Sloman April 1988
+
+Strings in POP11 are vectors whose elements occupy one byte (i.e. they
+must be positive integers less than 256). They can be constructed by
+programs using * INITS, or * CONSSTRING, or at compile time using the
+string quote symbol "'", to form a string expression.
+
+
+CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- STRING EXPRESSIONS
+ -- TYPING IN LONG STRINGS
+ -- ACCESSING COMPONENTS
+ -- CONCATENATING STRINGS
+ -- EQUALITY OF STRINGS
+ -- SEARCHING FOR A CHARACTER IN A STRING
+ -- SEARCHING A STRING (OR WORD) FOR A SUBSTRING (OR WORD)
+ -- THE "HAS" VERSIONS
+ -- RELATED DOCUMENTATION
+
+-- STRING EXPRESSIONS ----------------------------------------------
+
+E.g. here is a string expression:
+
+    'a string of arbitrary 0248751293485;lkasdf characters &%$ '
+
+If the string is to contain the string quote character, then it should
+be preceded by the back-slash character, "\", as in
+
+    'don\'t think this isn\'t one string' =>
+    ** don't think this isn't one string
+
+The string does not contain the "\" characters - they are used only at
+the time the string is read in.
+
+To include the back-slash character in a string, repeat it: E.g.
+    'A big V: \\/' =>
+    ** A big V: \/
+
+HELP *ASCII shows how to insert arbitrary control characters into
+strings. E.g. CTRL-G is the fourth character in 'abc\^G' or
+'abc\^g'.
+
+
+-- TYPING IN LONG STRINGS -------------------------------------------
+
+To guard against unterminated strings, POP11 complains if the closing
+"'" is not on the same line as the opening one. However, if you wish a
+string to go over several lines, then at the end of each line put a
+backslash "\", e.g.
+
+    'a string with\
+    more than\
+    one line in it'
+
+It will contain the newline character at each line break. Alternatively,
+    true -> pop_longstrings;
+
+will alter the itemiser so that while reading in programs it accepts
+string expressions going over several lines, without "\" at the end of
+each line.
+
+A common error is to forget that "'" is the opening string quote, and to
+use it as an apostrophe in lists. See HELP * APOSTROPHE.
+
+Strings are not normally printed out with quote marks. This can be
+changed by assigning true to *POP_PR_QUOTES
+
+    'a string' =>
+    ** a string
+
+    true -> pop_pr_quotes;
+    'a string' =>
+    ** 'a string'
+
+
+-- ACCESSING COMPONENTS -------------------------------------------
+
+A string's elements may be accessed or updated using numerical
+subscripts:
+
+    vars string;
+    'cat' -> string;
+    string(2) =>
+    ** 97       ;;; i.e. the character `a`
+
+    `o` -> string(2);
+    string =>
+    ** cot
+
+*EXPLODE puts all the elements on the stack:
+
+    explode(string) =>
+    ** 99 111 116
+
+For more efficient access see *SUBSCRS.
+
+To create a new string containing a substring of a string use
+* SUBSTRING. E.g.
+    substring(4,4,'on his mettle') =>
+    ** his
+
+
+-- CONCATENATING STRINGS -------------------------------------------
+
+Strings can be concatenated using the infix operation ><. This can take
+any two printable objects, e.g. strings, words, numbers, lists, etc. It
+always returns a string containing the characters which would be printed
+if both objects were printed. One of the arguments can be an empty
+string, e.g.
+
+        123 >< ''
+
+creates a string with the character codes for 1, 2 and 3.
+
+Similarly, if W is a word, then
+
+        '' >< W
+
+creates a string with the same characters as the word.
+
+Note that the operation >< is dependent on the printing procedure PR.
+You can change the way PR prints things, and these changes will be
+reflected in any use of ><.  If you want to make strings using the
+standard printing conventions, ignoring the current state of PR, you can
+use SYS_><. See HELP *PR *SYSPR *SYS_SYSPR
+
+The operation <> can also be used to concatenate two strings. But it
+will produce an error if it is not given two arguments of the same type.
+
+There is a special operator for joining two strings which are file
+names, namely DIR_><. For example, in unix
+
+    '/dir1/dir2' dir_>< 'dir3/file' =>
+    ** /dir1/dir2/dir3/file
+
+    '/dir1/dir2/' dir_>< 'dir3/file' =>
+    ** /dir1/dir2/dir3/file
+
+For further details of how this works in UNIX or VMS see
+    REF * SYSUTIL/dir_><
+
+
+Note that using <> and >< to concatenate strings can have different
+effects.  This is because <> does not produce a copy when one of its
+arguments is empty.  For example, consider the following behaviour:
+
+    vars test = 'a string';
+    vars test1 = test <> '';
+    vars test2 = test >< '';
+
+    test1 =>
+    test2 =>
+    test = test1 =>
+    test == test1 =>
+    test = test2 =>
+    test == test2 =>
+
+
+-- EQUALITY OF STRINGS ------------------------------------------------
+
+If two strings are created with the same characters, then they will be
+different objects in the computer. However, the equality test "=" will
+recognise that they have the same components, and will return TRUE. The
+STRICT equality test "==" will return FALSE, since they are different
+entities, located in different places in the machine's memory:
+    'cat' = 'cat'=>
+    ** <true>
+
+    'cat' == 'cat' =>
+    ** <false>
+
+In the case of words, formed with the word quote symbol, e.g. "cat", the
+two expressions will refer to the same word, in the POP11 dictionary,
+and so the strict equality test will also come out true:
+    "cat" == "cat" =>
+    ** <true>
+
+-- SEARCHING FOR A CHARACTER IN A STRING ------------------------------
+
+Several procedures are provided. Procedures for searching a string for a
+given character are described in the following help files:
+  * LOCCHAR
+  * LOCCHAR_BACK
+  * SKIPCHAR
+  * SKIPCHAR_BACK
+  * STRMEMBER
+
+
+-- SEARCHING A STRING (OR WORD) FOR A SUBSTRING (OR WORD) -------------
+
+Searching or testing for a substring (or embedded word) is provided by
+the following procedures described in more detail in REF * STRINGS.
+  * ISENDSTRING         check if one string terminates another
+  * ISMIDSTRING         check if one string is embedded in another
+  * ISSTARTSTRING       check if one string starts another
+  * ISSUBSTRING         check if one string is in another
+  * ISSUBSTRING_LIM     limited search for one string in another
+
+-- THE "HAS" VERSIONS -------------------------------------------------
+The following perform a similar function with the string arguments
+reversed.
+
+  hasendstring(S1,S2)
+  hasmidstring(S1,S2)
+  hasstartstring(S1,S2)
+  hassubstring(S1,S2)
+
+Each is equivalent to the corresponding 'is' procedure, but with
+the string arguments reversed. This is useful when you wish to
+"partially apply" the procedure to a particular sub-string, e.g.
+
+   maplist(['abcd123' 'efg89' '123abc456'], hassubstring(%'abc'%)) =>
+    ** [1 <false> 4]
+
+The numbers give the location in the longer string at which the
+substring was found to start. See HELP * PARTAPPLY
+
+issubitem(S1,N,S2) is like issubstring(S1,N,S2), but false if
+S1 is not a separate item in S2 according to POP-11 itemiser rules.
+
+
+-- RELATED DOCUMENTATION ----------------------------------------------
+
+See also the following documentation files.
+  * ALLBUTFIRST - getting the end of a structure
+  * ALLBUTLAST  - getting the start of a structure
+  * APOSTROPHE  - the use of the string quote character
+  * ASCII       - character codes
+  * CLASSES     - meta-information about data types
+  * CONSSTRING  - creates a string of given characters
+  * CONSWORD    - converts a string to a word
+  * EXPLODE     - putting contents of a structure on the stack
+  * INITS       - creates a string of nulls of a given length
+  * ISSTRING    - string recogniser
+  * ISSUBSTRING - recognising a substring
+  * ISSUBSTRING_LIM - ditto with bounds
+  * KEYS        - on data-types
+  * PRINTF      - formatted printing
+  * POP_LONGSTRINGS - controls reading in of strings with line breaks
+  * POP_PR_QUOTES - controls printing of string quotes
+  * STRINGIN    - given a string returns a character repeater
+  * STRNUMBER   - convert string to number if possible
+  * SUBSCRS     - string subscriptor
+  * SUBSTRING   - extract a substring from a string
+  * SYSPARSE_STRING - convert string to list of strings and numbers
+
+REF * STRINGS   - full details of strings in POP-11
+REF * DATA      - generic data procedures in POP-11
+REF * FASTPROCS - for more efficient accessing
+
+
+
+--- C.all/help/strings -------------------------------------------------
+--- Copyright University of Sussex 1990. All rights reserved. ----------

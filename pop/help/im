@@ -1,0 +1,315 @@
+HELP IM                                             Andrew Law, May 1987
+                                          Revised Tom Khabaza, June 1990
+
+    <ENTER> im
+    <ENTER> im filename
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+  1   Introduction
+  2   Invoking Immediate Mode
+  3   Leaving Immediate Mode
+      3.1   Leaving the file
+      3.2   Aborting Immediate Mode
+  4   Ved Behaviour
+  5   Control (Ctrl) & <ESC> Characters
+  6   vedcrinteractive
+  7   Subsystems
+      7.1   The Pop Subsystem
+      7.2   The Lisp Subsystem
+      7.3   The Prolog Subsystem
+  8   Miscellaneous
+  9   Associated Documentation
+
+
+-----------------------------------------------------------------------
+1  Introduction
+-----------------------------------------------------------------------
+
+Immediate mode provides a convenient mode of interaction with a Poplog
+language in the Ved buffer, as an alternative to "Load Marked Range"
+(see HELP * LMR).
+
+E.g. in "immediate mode", Pop-11, Prolog or Lisp commands or procedure
+definitions may be typed in and will be evaluated "immediately", with
+program output appended to the Ved buffer.
+
+Ved edit commands may be given as usual (marking ranges, moving text,
+cursor movements, moving between files, etc.), apart from minor changes.
+
+The most important change is that every time <RETURN> is pressed, the
+current line is copied to the end of the buffer (unless it is already
+the last line) and handed to the current compiler (which will depend on
+the file type.) So the <RETURN> key can not be used to break a line of
+text. This "immediate mode" behaviour can be switched on or off (whether
+in immediate mode or not) by the procedure * ved_switchmode_im which is
+normally mapped to the key sequence:
+
+    <ESC> Ctrl-D
+
+In an immediate mode file, whenever the compiler is ready for input, it
+will display, at the end of the Ved buffer, the prompt associated with
+the compiler in question, e.g.:
+
+    ': '  - for Pop-11,
+    '?- ' - for Prolog
+    '== ' - for Lisp.
+
+However, input may be taken from any line, not just the line with the
+prompt.
+
+The normal load marked range (* LMR) facility is still available,
+except that it now copies the marked range to the end of the buffer
+before it is handed to the compiler. This enables the buffer to serve
+as a "log" of interaction with the compiler.
+
+MISHAPS occur as they would outside the editor.
+
+This facility is available for Pop-11, Lisp and Prolog.
+
+There is also a version for "immediate mode" interaction through Ved with
+the SHELL in Unix or DCL in VMS.
+
+(See (on Unix) HELP * IMCSH, * IMSH, (on VMS) HELP * IMDCL)
+
+
+-----------------------------------------------------------------------
+2  Invoking Immediate Mode
+-----------------------------------------------------------------------
+
+Immediate mode can be invoked from inside or outside Ved when in the
+Pop-11, Lisp or Prolog subsystem.
+
+If the call to immediate mode is given no arguments e.g.: in Lisp
+
+    == @im <RETURN>
+
+or in Pop-11
+
+    :  im <RETURN>
+
+or in Prolog
+
+    ?-  im <RETURN>
+
+or in Ved
+
+    <ENTER> im
+
+immediate mode will be invoked with a Pop-11 compiler in a file called
+"output.p". It can be given arguments so that it can be invoked in a
+named file, e.g.:
+
+    <ENTER> im filename
+
+This will invoke immediate mode with a Pop-11 compiler in a file called
+filename. The type of compiler invoked is determined by the file
+extension (see below).
+
+You can recognise immediate mode by an "I" inserted in the command line
+e.g.:
+
+  here
+    |
+    V
+
+   -I--| 33|- im temp (EDITING: im) ------------------------------
+
+
+-----------------------------------------------------------------------
+3  Leaving Immediate Mode
+-----------------------------------------------------------------------
+
+3.1  Leaving the file
+---------------------
+The file can be quit or left temporarily in the standard way, e.g:
+
+    <ENTER> q
+    <ENTER> wq
+    <ENTER> x
+    <ESC> x
+    <ESC> q
+
+(The last two may not work for some Ved terminal mappings).
+
+
+3.2  Aborting Immediate Mode
+----------------------------
+You may choose to stay in the file but stop the immediate compilation,
+this can be done by doing a "bye" to the Pop-11 prompt, e.g.:
+
+    : bye
+
+or a more general command, which works for all uses of immediate mode,
+with any language:
+
+    <ENTER> end_im
+
+This invokes the procedure * ved_end_im, which terminates immediate mode
+compilation by passing * termin to the compiler. Ved returns to its
+normal editing mode after <ENTER> end_im has been called.
+
+
+-----------------------------------------------------------------------
+4  Ved Behaviour
+-----------------------------------------------------------------------
+
+Most of Ved's facilities work in immediate mode. You can mark, move
+copy and delete text, you can swap between files, suspend Ved, move the
+cursor etc. However, the <RETURN> key is changed in the manner described
+above.
+
+One advantage of this is that if programs run in immediate mode request
+input, then it is possible to move to another file, do some calculation,
+examine a help file, etc. and then return to the interactive file and
+type in the input. NB: this facility also works with programs run using
+ved_lmr.
+
+The presence of immediate mode prompts in a file can cause undesirable
+side-effects in editing or printing.  These problems can be overcome
+using the command
+
+    <ENTER> noprompts
+
+which effectively turns immediate mode prompts into ordinary text.
+See HELP * ved_noprompts.
+
+
+-----------------------------------------------------------------------
+5  Control (Ctrl) & <ESC> Characters
+-----------------------------------------------------------------------
+
+The following are set up in the default Ved key mapping, but may be
+altered for some terminal configurations:
+
+<ESC> Ctrl-Z
+    invokes the procedure ved_end_im to send termin to the compiler
+    (rather like typing the EOF character at top level).
+
+    WARNING:
+        If you are running Poplog on a standard Unix platform, this key
+        sequence will cause Poplog to be suspended.
+        Please use <ENTER> end_im instead.
+
+<ESC> Ctrl-D
+    invokes the procedure ved_switchmode_im, which alters value of
+    the variable vedcrinteractive, described in the next section.
+
+
+-----------------------------------------------------------------------
+6  vedcrinteractive
+-----------------------------------------------------------------------
+
+This boolean variable is used to control the effect of pressing the
+<RETURN> key in an immediate mode file. If the value is:
+
+    false
+        then <RETURN> will not send current line for compilation:
+        Ved has returned to compiling text only via ved_lmr (or
+        equivalent) to load whole marked range.
+
+    true
+        then <RETURN> will send current line for compilation.
+
+It is most conveniently altered by using the ved_switchmode_im
+described above.
+
+
+-----------------------------------------------------------------------
+7  Subsystems
+-----------------------------------------------------------------------
+
+It is possible to invoke a Lisp, Prolog,  Pop-11 or ML compiler in
+immediate mode. The compiler invoked is determined by what subsystem you
+are in and what file extensions you use. The following indicates what
+compiler will normally be invoked with each subsystem/file extension
+combination.
+
+7.1  The Pop Subsystem
+----------------------
+If only Pop-11 is available in the current process you can normally only
+invoke the Pop-11 compiler from Pop-11.
+
+
+7.2  The Lisp Subsystem
+-----------------------
+You can invoke the Lisp compiler by doing
+
+    == @im filename.lsp
+
+or  in Ved
+
+    <ENTER> im filename.lsp
+
+You can invoke the Pop-11 compiler by any call to immediate mode without
+a ".lsp" file extension. You can not invoke the Prolog compiler.
+
+
+7.3  The Prolog Subsystem
+-------------------------
+You can invoke the Prolog compiler by doing
+
+    ?- im filename.pl
+
+or
+
+    <ENTER> im filename.pl
+
+You can invoke the Pop-11 compiler by any other call to immediate mode
+without a ".pl" extension. You can not invoke the Lisp compiler.
+
+
+-----------------------------------------------------------------------
+8  Miscellaneous
+-----------------------------------------------------------------------
+
+A call of
+
+    vedsetpop();
+
+will invoke immediate mode at the end of the current file.
+
+The prompts produced by immediate mode contain a special character at
+the end (* vvedpromptchar, which displays as a space), and can cause
+problems. You may get (Ved) error messages saying "INSIDE PROMPT" if you
+try to insert or delete characters inside the prompt.
+
+
+-----------------------------------------------------------------------
+9  Associated Documentation
+-----------------------------------------------------------------------
+
+TEACH * MARK
+    General introduction to use of marked ranges
+
+HELP * LMR
+    Information on loading marked range
+
+HELP * IMCSH
+    CSHELL immediate mode (Unix only)
+
+HELP * IMSH
+    SHELL  immediate mode (Unix only)
+
+HELP * IMDCL
+    DCL    immediate mode (VMS only)
+
+HELP * IO
+    Overview of Poplog Input/Output behaviour
+
+HELP * VED
+    Overview of Ved facilities
+
+HELP * ved_noprompts
+    Command to remove prompt character from file
+
+
+For more details on immediate mode (and the Ved-buffer devices on which
+it is based), see Ved-Buffer Devices and Immediate Mode in
+REF * VEDPROCS.
+
+
+
+
+--- C.all/help/im
+--- Copyright University of Sussex 1992. All rights reserved.

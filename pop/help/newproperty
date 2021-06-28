@@ -1,0 +1,178 @@
+HELP NEWPROPERTY                                       A.Sloman Oct 1990
+                                         Revised: Adrian Howard Mar 1992
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Overview
+ -- Summary Of Arguments
+ -- Example Use Of A Property
+ -- Related Documentation
+
+
+-- Overview -----------------------------------------------------------
+
+    newproperty(LIST, INT, ITEM, GC_TYPE) -> PROP
+
+A property is essentially a table in which keys (or "arguments") are
+associated with values. The procedure -newproperty- can be used to
+create a property PROP of a given size with an initial set of key/value
+associations.
+
+The property appears to the user as a procedure which, when given an
+item (the "key") returns the "value" associated with that item. The
+procedure has an updater to set values.
+
+
+-- Summary Of Arguments -----------------------------------------------
+
+The procedure -newproperty- takes four arguments:
+
+LIST    A list of initial key/value associations. If it is not an empty
+        list it must be a list of two element lists, for example:
+
+            newproperty([[cat chat] [dog chien] [green vert]], ...)
+
+        Keys and values used with -newproperty- can be arbitrary POP-11
+        objects.
+
+INT     The size of the "hash" table used for the property. The size
+        does not affect the number of item/value pairs that can be
+        stored. Large tables take more memory than small tables but can
+        be searched more quickly.
+
+ITEM    A default item. This will be the default value returned when the
+        specified key is not mentioned in the property.
+
+        If you reassign the default value to an entry in the property
+        table it is removed.
+
+GC_TYPE This controls whether an association is removed from the table
+        if either the key or the value or both would be garbage
+        collected but for the fact that they are in the table. Possible
+        values for GC_TYPE are explained in REF *PROPS.
+
+        The two most commonly used values are "perm" meaning the items
+        remain there permanently unless explicitly removed from the
+        table, and "tmparg", which means the association is removed from
+        the table if ever the key (or argument) would have been garbage
+        collected but for being in the table. In the first case it is a
+        "permanent" property, in the second case a "temporary" property.
+
+        If a property is "permanent", then an item/value pair in it will
+        remain forever even if the user has lost all pointers to the
+        item. If this occurs the only way the user can get at the
+        item/value pair is by using -appproperty-.
+
+
+-- Example Use Of A Property ------------------------------------------
+
+The following property is used to associate peoples names with their
+nationalities.
+
+    vars nationality=newproperty([[joe FRENCH]], 10, "BRITISH", "perm");
+    nationality("joe") =>
+    ** FRENCH
+    nationality("sue") =>   ;;; Default value returned
+    ** BRITISH
+    "AMERICAN" -> nationality("sue");
+    nationality("sue") =>
+    ** AMERICAN
+
+Properties created by -newproperty- can be recognised by -isproperty-
+
+    isproperty(nationality) =>
+    ** <true>
+
+But they are also procedures:
+
+    isprocedure(nationality) =>
+    ** <true>
+
+The procedure -appproperty- takes a property, and a two-argument
+procedure, which it applies to all item/value pairs in the table. The
+following:
+
+    appproperty(
+        nationality,
+        procedure(item,val);
+            lvars item, val;
+            [^val is associated with ^item]=>
+        endprocedure
+    );
+
+will print out all the item-value pairs of the property nationality
+(they may however not be in this order):
+
+    ** [FRENCH is associated with joe]
+    ** [AMERICAN is associated with sue]
+
+In order to remove something from the property assign the default value
+(in this case "BRITISH") as the value of an item
+
+    "BRITISH" -> nationality("joe")
+
+The procedure -appproperty- will now not find the association. However,
+"joe" will still appear to have a nationality, the default one:
+
+    nationality("joe") =>
+    ** BRITISH
+
+IMPORTANT NOTE: In the properties returned by -newproperty- the keys are
+compared with "==", not "=". This gives the following behaviour:
+
+    "CANADIAN" -> nationality('chris');
+    nationality('chris')=>
+    ** BRITISH
+
+because the two 'chris' strings are double equals different, ie:
+
+    'chris' == 'chris' =>
+    ** <false>
+
+The following would have worked:
+
+    vars name = 'chris';
+    "CANADIAN" -> nationality(name);
+    nationality(name)=>
+    ** CANADIAN
+
+since:
+
+    name == name =>
+    ** <true>
+
+
+-- Related Documentation ----------------------------------------------
+
+HELP *NEWANYPROPERTY    --- A generalisation of -newproperty- giving the
+                            user more control over the hashing algorithm
+                            and the equality test used.
+
+HELP *NEWMAPPING        --- The same as -newproperty- but allows items
+                            which are "=" to be mapped to the same
+                            value.
+
+REF *PROPS              --- Full information on properties
+REF *APPPROPERTY        --- Full information on -appproperty-
+REF *CLEARPROPERTY      --- Clearing a property
+
+REF *ASSOC, *APPASSOC   --- Association tables based on lists
+
+HELP *ARRAYS            --- Creating multi-dimensional arrays of objects
+HELP *NEWANYSPARSE      --- Uses properties to create "sparse" arrays
+
+HELP *DATASTRUCTURES    --- Information on POP-11 data structures
+
+HELP *DATALIST          --- Return a list of the components of a data
+                            structure
+
+HELP *DATALENGTH        --- Returns the length of a structure
+
+HELP *APPDATA           --- Apply a procedure to the components of a
+                            data structure
+
+HELP *COPY              --- Copy a data structure.
+
+
+--- C.all/help/newproperty
+--- Copyright University of Sussex 1990. All rights reserved. ----------
