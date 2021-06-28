@@ -1,0 +1,421 @@
+TEACH DECIMALS                                        A.Sloman July 1988
+
+
+                        Decimal Numbers
+                        ---------------
+
+TEACH * ARITH should be read before this file.
+
+This file describes  so-called 'decimal numbers',  that is numbers  with
+decimal points in them.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Decimals and integers
+ -- Using -dataword- to recognise decimals
+ -- Single and double decimals
+ -- Using popdprecision
+ -- Don't use = or == on decimals
+ -- An example: computing the mean of a list of numbers
+ -- More on coercions
+ -- Exercises
+ -- Floating point numbers
+ -- Sensible calculations
+ -- Reading in decimals
+ -- Arithmetic operations available
+ -- More Exercises
+ -- Further reading
+
+
+-- Decimals and integers -----------------------------------------------
+
+Numbers  without  decimal  points   are  integers.  The  following   are
+'integers':
+
+    3, 1, 0, -126
+
+whereas the following are all decimal numbers:
+
+    3.42, 1.07, 0.003, -126.237, 3.2e-3
+
+The last is equivalent to 3.2 times 10 to the power -3, i.e. 0.0032.
+
+    3.2e-3 =>
+    ** 0.0032
+
+    3.2 * (10 ** -3) =>
+    ** 0.0032
+
+Warning: POP-11  doesn't  accept 3.2E-3,  or  .6 as  decimals,  as  some
+languages do. You must have something before the decimal point, even  if
+it is '0', and use lower-case "e" for the exponent, e.g.: 3.2e-3 or 0.6.
+
+Sometimes decimals are called 'reals'.
+
+
+-- Using -dataword- to recognise decimals ------------------------------
+
+Try:
+    dataword(1) =>
+    ** integer
+
+    vars x = 5.3 + 2.6, y = 33;
+    dataword(x) =>
+    ** decimal
+
+    dataword(y) =>
+    ** integer
+
+I.e. if you add or multiply or divide two decimal numbers you will get a
+decimal number.
+
+
+-- Single and double decimals ------------------------------------------
+
+POP-11 also  has  'double  decimal' numbers.  These  are  more  accurate
+numbers and have the  dataword "ddecimal". These take  up more space  in
+the  computer,  but  can  be   used  for  more  accurate  (and   slower)
+calculations.  A  decimal  number   expression  typed  in  directly   is
+interpreted as a ddecimal, not a decimal. E.g.
+
+    dataword(3.4) =>
+    ** ddecimal
+
+Whereas  if  it  is  the  result  of  an  operation  like  addition   or
+multiplication it will normally be a single decimal:
+
+    dataword(3.4 + 0.0) =>
+    ** decimal
+
+
+-- Using popdprecision -------------------------------------------------
+
+You can  change the  Pop-11  operators so  that instead  of  producing a
+single precision decimal result, they produce a double precision result.
+
+    true -> popdprecision;
+    dataword(3.4 * 999) =>
+    ** ddecimal
+
+    false -> popdprecision;
+    dataword(3.4 + 999) =>
+    ** decimal
+
+
+As the  above  examples show,  operations  combining a  decimal  and  an
+integer, will produce a decimal  result. (This is called "coercion"  the
+integer is co-erced into the form  of a decimal before the operation  is
+performed.)
+
+
+-- Don't use = or == on decimals ---------------------------------------
+
+The most important thing to remember about decimal numbers is that  they
+are inherently imprecise. E.g. 10.0 divided by 3.0 should be an infinite
+decimal, whereas the computer does not  have enough memory for that,  so
+it stores an approximation.
+
+    10.0 / 3.0 =>
+    ** 3.333333
+
+This is  partly because  the computer  cannot really  cope with  decimal
+numbers and tends  to get its  sums slightly  wrong, so that  1.0 +  1.0
+might work out as 1.99999 (or perhaps 2.00001). So if you write:
+
+    if num == 678.325 then ...
+
+You might not get the behaviour  you had expected. Instead test  whether
+two numbers  are  within  some  "tolerance",  i.e.  test  whether  their
+difference is less than some specified amount.
+
+    if abs(num - 678.325) < 0.00001 then ...
+
+N.B.
+ABS (short for absolute 'value') always returns a positive number  (more
+precisely a non-negative number).
+
+Of course, it is  up to you  to decide what  the "tolerance" should  be.
+E.g. for some problems you might type:
+
+    if abs(num - 678.325) < 0.1 then ...
+
+
+-- An example: computing the mean of a list of numbers -----------------
+
+The following procedures compute the 'mean',  (or average) of a list  of
+numbers. First a procedure to add up the numbers in a list. Notice  that
+the number 0.0 is used  to start the addition,  in order to ensure  that
+the result is a decimal number.
+
+    define sum(list) -> result;
+      if  list == [] then
+        0.0 -> result
+      else
+        hd(list) + sum(tl(list)) -> result
+      endif
+    enddefine;
+
+    define mean(list);
+      sum(list) / length(list)
+    enddefine;
+
+    mean([1 2 3 4]) =>
+    ** 2.5
+
+    mean([1 2 3]) =>
+    ** 2.0
+
+
+-- More on coercions ---------------------------------------------------
+
+The arithmetic operations + - and * will return an integer only if  both
+their arguments are integers.
+
+If given two integers the division  operator / returns a RATIO if  there
+would be a remainder, that is:
+    8 / 4 =>
+    ** 2            (an integer)
+    9 / 4 =>
+    ** 9_/4         (a ratio)
+
+If one  of the  numbers is  a decimal  then the  result will  also  be a
+decimal:
+
+    9 / 4.0 =>
+    ** 2.25
+
+    9.0 / 4 =>
+    ** 2.25
+
+You can make POP-11 print ratios as if they were decimals by doing:
+
+    false -> pop_pr_ratios;
+
+Then:
+
+    9 / 4 =>
+    ** 2.25         (a ratio printed as a decimal)
+
+
+-- Exercises ----------------------------------------------------------
+
+Write a  procedure called  SQUARE, which  takes as  argument a  list  of
+numbers, for example:
+
+    square([1 2 3 4]) =>
+
+and returns a list of the squares of the number, that is
+
+    ** [1 4 9 16]
+
+Use this procedure to write MEANSQ,  a procedure to compute the  average
+of the squares of a set of numbers, that is
+
+    meansq([1 2 3 4]) =>
+    ** 7.5
+
+Notice, this is not the same as:
+
+    mean([1 2 3 4]) * mean([1 2 3 4]) =>
+
+which is:
+
+    ** 6.25
+
+
+-- Floating point numbers ----------------------------------------------
+
+Decimal numbers are sometimes called  'floating point numbers', or  just
+'floats'. This is because their accuracy is measured in terms of 'number
+of significant digits' rather than absolute value.
+
+Normally POP11 will not print out a decimal showing all the  significant
+digits, because  it is  limited  by the  value of  pop_pr_places,  which
+defaults to 6.
+
+    0.1234567890123456789 =>
+    ** 0.123457
+
+However, you  can make  it print  out more  significant digits  (if  the
+number has any) by doing something like:
+
+    20 -> pop_pr_places;
+
+You can then  see how  many significant  figures are  stored in  various
+situations:
+
+    0.1234567890123456789 =>
+    ** 0.1234567890123457
+
+    10 / 3.0 =>
+    ** 3.33333
+
+    true -> popdprecision;
+    10 / 3.0 =>
+    ** 3.333333333333333
+
+In POP11, the first  six digits of a  decimal number (excluding  leading
+zeroes) are usually significant  no matter where  the decimal point  is.
+However, this will generally depend on the kind of machine that is used.
+
+
+-- Sensible calculations -----------------------------------------------
+
+Because the decimal point can 'float', multiplying a decimal number  by,
+say, ten doesn't affect its accuracy.
+
+    20 -> pop_pr_places;
+    false -> popdprecision;
+    vars x = 10 / 3.0;
+    x =>
+    ** 3.33333
+
+    x * 10 =>
+    ** 33.3333
+
+    x * 100 =>
+    ** 333.333
+
+    x * 10000000 =>
+    ** 33333300.0
+
+
+An implication of  this is that  some operations make  sense and  others
+don't. E.g.:
+
+    123456.0 + 654321.0 =>
+    ** 777777.0
+
+is reasonable, as is:
+
+    1.23456 + 6.54321 =>
+    ** 7.77777
+
+but the following has a second argument whose precision is spurious:
+
+    123456.0 + 6.54321 =>
+    ** 123463.0
+
+The result is  accurate to  only, six significant  figures. (The  result
+may, as here, be 'rounded up'.)
+
+-- Reading in decimals -------------------------------------------------
+
+In general numbers  are read  as 'double decimal'  numbers (accurate  to
+more significant figures), but results  of computations will be  'single
+decimal numbers. e.g. try :
+
+    dataword(9/4) =>
+    ** ratio
+    dataword(2.25) =>
+    ** ddecimal
+
+The accuracy of decimals resulting from compilations can be increased by
+assigning TRUE to POPDPRECISION. (See REF * POPDPRECISION.)
+
+
+-- Arithmetic operations available -------------------------------------
+
+The following procedures are available for manipulating decimal numbers.
+
+
+SQRT(X)
+square root.
+
+    sqrt(100) =>
+    ** 10.0
+
+If applied to a  negative number, this will  produce a "complex"  number
+with a zero "real" part and a non-zero "imaginary" part.
+
+    sqrt(-100) =>
+    ** 0.0_+:10.0
+
+The symbol "_+:" joins two integers or decimal numbers to form a complex
+number.
+
+
+INTOF(X)
+Given a  decimal number  this procedure  returns the  integer part,  for
+example:
+
+    intof(3.6) =>
+    **  3
+
+N.B., if X is negative then
+    intof(x) = -intof(-x)
+so
+    intof(-3.6) =>
+    ** -3
+
+
+ROUND(X)
+Given a decimal number this  procedure returns the closest integer,  for
+example:
+
+    round(3.5) =>
+    ** 4
+    round( -3.5) =>
+    ** -4
+
+
+REALOF(X)
+Given an  integer  this  procedure  returns  the  corresponding  decimal
+number, for example:
+
+    realof(3) =>
+    ** 3.0
+
+If X is an integer then:
+
+    x = intof(realof(x))
+
+The above is not a complete list. See below.
+
+
+-- More Exercises ------------------------------------------------------
+
+Suppose you know  that a  group of workers  earn the  following sums  of
+money a week:
+
+    [112.34 96.40 87.05 103.56 99.39]
+
+(rather a small sample!). Extrapolating from this sample how probable do
+you consider it that:
+
+    the average worker earns, say, 92.07 a week?
+
+Write a procedure which compares this probability.
+
+Suppose, further, that the same group of workers is paid (as opposed  to
+earns):
+
+    [37.24 83.00 130.45 65.75 82.00]
+
+(People don't  always get  paid what  they've earned.  E.g. tax  may  be
+deducted!)
+
+Write a procedure to  guess what someone is  paid given what they  earn,
+also compute a measure of 'confidence' in this value.
+
+Hint: Think of the problem  in terms of fitting  a curve to points  on a
+graph. As  a first  approximation try  fitting a  straight line  to  the
+points. The  above  figures aren't  too  good for  this,  try  instead a
+height/weight table or something similar.
+
+
+-- Further reading -----------------------------------------------------
+
+TEACH * ARITH
+TEACH * STATS
+
+For a summary of available arithmetical facilities, try
+
+    HELP * MATH
+
+For fuller information on numbers in POP-11 see HELP * NUMBERS
+
+For complete information see REF * DATA, REF* NUMBERS
+
+--- C.all/teach/decimals -----------------------------------------------
+--- Copyright University of Sussex 1987. All rights reserved. ----------

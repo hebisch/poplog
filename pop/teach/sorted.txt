@@ -1,0 +1,383 @@
+TEACH MATCH_SORTED
+Aaron Sloman
+3 Dec 2011
+
+
+CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Introduction
+ -- Defining 'sorted'
+ -- An alternative approach using 'matches'
+ -- Defining match_sorted
+ -- -- Subsidiary procedure 'descends'
+ -- Improving efficiency using 'doesmatch'
+ -- Using 'doesmatch' to check ordering
+ -- Defining doesmatch_sorted
+ -- Generalising doesmatch_sorted
+ -- Procedure doesmatch_sorted_any
+
+-- Introduction
+
+This teach file shows how using a pattern matcher to check whether a
+list of numbers is sorted in increasing area compares with the more
+conventional way of defining a procedure to check whether a list is
+sorted.
+
+The demonstration uses the Pop11 pattern matcher described in
+    TEACH MATCHES
+    http://www.cs.bham.ac.uk/research/projects/poplog/teach/matches
+
+and summarised in
+    HELP MATCHES
+    http://www.cs.bham.ac.uk/research/projects/poplog/doc/pophelp/matches
+
+It also shows how for some problems solutions will not be found using
+the standard Pop-11 operator MATCHES, but can be found using a more
+powerful version called DOESMATCH.
+
+For many purposes the former is adequate and in those situations is much
+faster than doesmatch. But there are cases where doesmatch is more
+efficient, as will be shown, below, and some cases where doesmatch
+allows a problem to be solved that cannot be solved using matches.
+
+-- Defining 'sorted' --------------------------------------------------
+
+We'll present a fairly standard definition for the 'sorted' procedure.
+
+*/
+
+
+/*
+PROCEDURE: sorted (list) -> result
+INPUTS   : list is a list of numbers
+OUTPUTS  : result is a boolean
+USED IN  : programs requiring sorted lists of numbers
+CREATED  : 3 Dec 2011
+PURPOSE  : test for increasing order
+
+TESTS:
+
+sorted([]) =>
+** <true>
+
+sorted([3 5]) =>
+** <true>
+
+sorted([5 5]) =>
+** <true>
+
+sorted([5 4]) =>
+** <false>
+
+sorted([ 1 3 6 9 10 14]) =>
+** <true>
+
+sorted([ 1 3 6 9 14 10]) =>
+** <false>
+
+sorted([9 8 7 6 5 4 3 2 1 ]) =>
+** <false>
+
+
+*/
+
+define sorted (list) -> result;
+
+    if length(list) < 2 then true
+
+    else
+
+        hd(list) <= (hd(tl(list)))
+
+        and sorted(tl(list))
+
+    endif -> result
+
+enddefine;
+
+/*
+
+-- An alternative approach using 'matches' ----------------------------
+
+
+*/
+
+
+/*
+PROCEDURE: descends (list) -> result
+INPUTS   : list is a list of numbers
+OUTPUTS  : result is a boolean
+USED IN  : match_sorted (defined below)
+CREATED  : 3 Dec 2011
+PURPOSE  : checking for unordered pairs of items in a list
+
+TESTS:
+
+descends([1 2])=>
+** <false>
+
+descends([2 1])=>
+** <true>
+
+descends([])=>
+** <false>
+
+descends([3 4 5 2])=>
+** <false>
+
+descends([2 99])=>
+** <false>
+
+descends([200 99])=>
+** <true>
+
+-- Defining match_sorted ----------------------------------------------
+
+We'll now show how to define a procedure match_sorted that uses the
+pattern matcher, and then go on to discuss some of its problems. First
+we need a subsidiary procedure that is given a list of numbers and
+checks whether it is a list of two items where the second is smaller
+than the first: i.e. it's no good when we are looking for lists sorted
+in increasing order.
+
+-- -- Subsidiary procedure 'descends'
+
+*/
+
+define descends(list) -> result;
+    ;;; result is true if list is of length 2 and items
+    ;;; are not in increasing order
+
+    lvars x, y;
+    list matches ! [?x ?y] and y < x -> result;
+
+enddefine;
+
+
+
+/*
+PROCEDURE: match_sorted (list) -> result
+INPUTS   : list is a list of numbers
+OUTPUTS  : result is a boolean
+USED IN  : programs requiring sorted lists of numbers
+CREATED  : 3 Dec 2011
+PURPOSE  : test for increasing order
+
+TESTS:
+
+match_sorted([]) =>
+
+match_sorted([3 5]) =>
+
+match_sorted([5 5]) =>
+
+match_sorted([5 4]) =>
+
+match_sorted([ 1 3 6 9 10 14]) =>
+
+match_sorted([ 1 3 6 9 14 10]) =>
+
+match_sorted([9 8 7 6 5 4 3 2 1 ]) =>
+
+match_sorted([ 1 3 6 9 14 10 19 30 2000]) =>
+
+match_sorted([ 1 3 6 9 14 18 19 30 2000]) =>
+
+match_sorted([5 1 3 6 9 14 18 19 30 2000]) =>
+
+try with descends traced:
+
+trace descends
+
+untrace descends
+
+*/
+
+define match_sorted(list) -> result;
+
+    lvars items;
+
+    not(list matches ![== ??items:descends ==]) -> result
+
+enddefine;
+
+
+/*
+-- Improving efficiency using 'doesmatch'
+
+The match_sorted procedure works and can be seen to work in a manner
+that probably fits more closely the intuitions of non-programmers (and
+beginner programmers) as to what it means for a list of numbers to be
+sorted in increasing order.
+
+But the pattern it uses cannot prevent the program from trying all sorts
+of connected subsequences to see if they fail on the descends test.
+
+For example if we give it this problem
+
+    match_sorted([1 2 3]) =>
+
+It produces the right answer, but only after applying the descends
+procedure to many irrelevant sublists, including all the empty lists
+found between successive pairs of items in the input list.
+
+We can demonstrate this inefficiency by telling the descends
+procedure to trace its behaviour, i.e. print out records of what it does
+and what results it produces.
+
+    trace descends ;
+
+    match_sorted([1 2 3]) =>
+
+    match_sorted([1 2 3 4]) =>
+
+It finds a mis-ordering quickly if it is near the beginning of the list
+
+    match_sorted([2 1 3 4]) =>
+
+but wastes more time if the first bad pair is near the end of the list
+
+    match_sorted([1 2 4 3]) =>
+
+    untrace descends ;
+
+The difference in time taken between the original procedure
+
+    PROCEDURE: sorted (list) -> result
+
+and the later one that is easier for many people to understand
+
+    PROCEDURE: match_sorted (list) -> result
+
+may not matter for many simple programs, but for programs that create
+very long lists it can make a significant difference.
+
+There is an alternative mechanism that keeps the intuitive 'pictorial'
+format of the solution but is much more efficient on long lists.
+
+-- Using 'doesmatch' to check ordering --------------------------------
+
+There is a library called LIB DOESMATCH, described in
+
+    HELP DOESMATCH
+
+that can be used to find the same wrongly sorted lists as match_sorted
+finds, but is much more efficient because it does not waste time on
+irrelevant sub-cases.
+
+The 'doesmatch' operator can be used in the same way as 'matches',
+though with greater generality, and less speed. But it can also be used
+to perform searches inside a list structure that 'matches' cannot do.
+For that purpose we'll use the format:
+
+    <list> doesmatch <pattern> where <condition>
+
+This expression is a boolean expression, i.e. it produces a true or
+false result. But we'll see that it can be controlled a lot more
+precisely than matches, because after doesmatch has found a match
+involving more than one variable, the results found can be tested in the
+
+    <condition>
+
+expression.
+
+-- Defining doesmatch_sorted ------------------------------------------
+
+*/
+
+;;; load the doesmatch library
+uses doesmatch;
+
+
+/*
+PROCEDURE: doesmatch_sorted (list) -> result
+INPUTS   : list is a list of numbers
+OUTPUTS  : result is a boolean
+USED IN  : programs requiring sorted lists of numbers
+CREATED  : 3 Dec 2011
+PURPOSE  : test for increasing order
+
+TESTS:
+
+doesmatch_sorted([]) =>
+
+doesmatch_sorted([3 5]) =>
+
+doesmatch_sorted([5 5]) =>
+
+doesmatch_sorted([5 4]) =>
+
+doesmatch_sorted([ 1 3 6 9 10 14]) =>
+
+doesmatch_sorted([ 1 3 6 9 14 10]) =>
+
+doesmatch_sorted([ 1 3 6 9 14 10 11 12 13 16]) =>
+
+doesmatch_sorted([9 8 7 6 5 4 3 2 1 ]) =>
+
+doesmatch_sorted([ 1 3 6 9 14 10 19 30 2000]) =>
+
+doesmatch_sorted([ 1 3 6 9 14 18 19 30 2000]) =>
+
+doesmatch_sorted([ 1 3 6 9 14 18 19 30 2000 1]) =>
+
+doesmatch_sorted([5 1 3 6 9 14 18 19 30 2000]) =>
+
+
+*/
+
+define doesmatch_sorted(list) -> result;
+
+    lvars item1, item2;
+
+    not(list doesmatch ![== ?item1 ?item2 ==] where item2 < item1) -> result
+
+enddefine;
+
+
+/*
+
+-- Generalising doesmatch_sorted --------------------------------------
+
+-- Procedure doesmatch_sorted_any -------------------------------------
+
+*/
+
+
+/*
+PROCEDURE: doesmatch_sorted_any (list, wrong_order) -> result
+INPUTS   : list, wrong_order
+  Where  :
+
+    list - is a list of any items
+
+    wrong_order - is a relation, or two-place predicate used to
+          identify items that are in the wrong order in a larger list.
+
+OUTPUTS  : result is a boolean
+USED IN  : Below
+CREATED  : 3 Dec 2011
+PURPOSE  : see above
+
+TESTS:
+
+See below.
+
+*/
+
+define doesmatch_sorted_any(list, wrong_order ) -> result;
+
+    lvars item1, item2;
+
+    not(list doesmatch ![== ?item1 ?item2 ==]
+            where wrong_order(item2, item1) ) -> result
+
+enddefine;
+
+
+/*
+
+We can define a number of different subsidiary predicates to be given as
+the second input to doesmatch_sorted_any
+
+-- -- subsdiary predicate

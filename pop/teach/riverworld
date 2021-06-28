@@ -1,0 +1,840 @@
+/*
+TEACH RIVERWORLD
+Aaron Sloman
+Based on a program originally by Max Clowes,
+University of Sussex, around 1978
+Updated: 11 Dec 2011
+
+Available as part of Poplog and here:
+    http://www.cs.bham.ac.uk/research/projects/poplog/teach/riverworld
+
+A Youtube video tutorial based on this is available here:
+
+    http://youtu.be/JKCZyBIzKMk
+
+This is a compilable file. The explanatory text is all inside pop11 comment
+brackets, so compiling this file (using ENTER l1) ignores the text. After the
+file is compiled, the sample commands, included in the comments below, can be
+run.
+
+
+CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Introduction: Setting up a microworld for teaching
+ -- Procedure setup_world used to initialise everything.
+ -- Procedure display_world() is used to show the current state in pictorial form
+ -- -- Test setup_world
+ -- An error-reporting procedure: river_mishap
+ -- -- Test river_mishap
+ -- Action procedures which check preconditions then change the world
+ -- -- putin(item)
+ -- -- Procedure takeout(item)
+ -- -- Test takeout(item)
+ -- -- Procedure getin()
+ -- -- Test getin
+ -- -- Procedure getout()
+ -- -- Test getout
+ -- -- Procedure checkeat() (if edible things not protected, they get eaten)
+ -- -- Test checkeat();
+ -- -- Procedure crossriver()
+ -- -- Test crossriver
+ -- Tests for use in checking conditions after performing actions
+ -- -- Procedure check_goals checks whether goals are already achieved
+ -- -- Test check_goals
+ -- -- Possibly useful utility procedure opposite(side)
+ -- -- Test opposite
+ -- -- Possibly useful procedure sameplace(item1, item2)
+ -- -- Test sameplace
+ -- -- Utility procedure: eat(item1, item2);
+ -- Further Reading
+
+-- Introduction: Setting up a microworld for teaching -------------
+
+This tutorial (with video on Youtube) explains how to use the Pop11 language
+including its pattern matcher and simple database mechanism to create a
+micro-world for teaching some aspect of general programming, or AI (artificial
+intelligence) programming.
+
+An earlier tutorial TEACH RIVER
+    http://www.cs.bham.ac.uk/research/projects/poplog/teach/river
+with Youtube video showing how it works:
+    http://youtu.be/xfGv9xfqDxU
+
+made use of a microworld of the sort described here. The original program
+providing the microworld (available as LIB RIVER in Pop11) is several decades
+old. The version presented below makes less use of general programming
+constructs (e.g. using global variables) and more use of a database in which
+knowledge about the world, including both its general features and its current
+state, can be stored.
+
+It is useful to distinguish:
+o Internal semantics of the program.
+    Which entities and operations of the computer, or the virtual machine
+    running on the computer are referred to by structures and commands in the
+    program code.
+    E.g. the program can refer to lists, strings, number representations,
+    variables, their values, procedures, and operations on those items.
+
+o External semantics of the program.
+    Which entities, states, events and processes in the world being modelled
+    (e.g. a boat, a man, a river, and processes of getting in and out of the
+    boat, or moving the boat from one side of the river to the other) are
+    referred to by structures and commands in the program code. The external
+    semantics can also include causal relationships (what causes what, and what
+    constraints what) in the world represented.
+
+The external semantics may or may not include some portion of the actual world.
+In this tutorial it is a mythical rather simple world, which is an abstraction
+from things that can exist in our actual world, containing real rivers, boats,
+animals, eatings, river crossings, and so on.
+
+The external causal relationships will be represented by constraints on what the
+program allows, or what side effects running portions of the program can have.
+
+In this tutorial, intended for teachers learning to set up a microworld for
+students to use, we employ the pop11 database and associated mechanisms, in
+addition to conventional programming constructs, e.g. procedures,
+variables, conditionals, loops, etc.
+
+The pop11 database is one of a number of related libraries of varying
+sophistication available in pop11 based in the Pop11 pattern matcher, introduced
+in
+
+    TEACH MATCHES
+and summarised in
+    HELP MATCHES
+
+with an enhanced version described in
+    HELP DOESMATCH
+
+The database is explained in these files
+
+    TEACH DATABASE
+    HELP DATABASE
+    TEACH FOREACH
+    HELP FOREVERY
+    HELP WHICH
+
+and other files referenced in those.
+    TEACH
+
+Previous video tutorials in this collection introduced the use of the matcher.
+This one shows how to use the matcher with Pop11's most elementary database
+mechanisms to design a microworld.
+
+The microworld is the puzzle world of man, fox, chicken, grain, boat and river,
+illustrated in TEACH RIVER.
+
+*/
+
+;;; We use the pop11 database package, described in TEACH DATABASE
+uses database;
+
+/*
+-- Procedure setup_world used to initialise everything.
+
+*/
+
+define setup_world();
+    ;;; A procedure to initialize the world
+    ;;; empty the database
+    [] -> database;
+    ;;; add the initial facts
+    add( [boat isat left] );
+    add( [chicken isat left] );
+    add( [fox isat left] );
+    add( [grain isat left] );
+    add( [man isat left] );
+    add( [transportable fox] );
+    add( [transportable chicken] );
+    add( [transportable grain] );
+    add( [can_eat fox chicken] );
+    add( [can_eat chicken grain] );
+    add( [opposite right left] );
+    add( [opposite left right] );
+enddefine;
+
+/*
+
+-- Procedure display_world() is used to show the current state in pictorial form
+
+We want it to show the contents of the database in one-dimensional diagrams like
+these:
+
+    ** [man grain chicken fox ---\ \_ _/ _________________ /---]
+
+    ** [man grain chicken fox ---\ _________________ \_ _/ /---]
+
+    ** [man grain chicken fox ---\ \_ _/ _________________ /---]
+
+    ** [man grain chicken ---\ \_ fox _/ _________________ /---]
+
+    ** [grain chicken ---\ \_ man fox _/ _________________ /---]
+
+    ** [grain chicken ---\ _________________ \_ man fox _/ /---]
+
+    ** [grain chicken ---\ _________________ \_ fox _/ /--- man]
+    
+    ** [grain chicken ---\ _________________ \_ _/ /--- fox man]
+
+    ** [chicken ---\ _________________ \_ _/ /--- fox man]
+
+
+NB: the laws of our microworld should not allow some of these states to exist!
+
+*/
+
+define display_world();
+    ;;; Procedure used to print "picture" of current scene, as
+    ;;; illustrated above.
+
+    lvars item;
+    [%
+        ;;; If man on left bank, show man first
+        if present([man isat left]) then
+            "man"
+        endif;
+
+        ;;; show transportable items that are on left side
+        ;;; 'forevery' finds all possible ways of satisfying the list of
+        ;;; conditions represented by a list of patterns. See HELP FOREVERY
+
+        forevery ![[transportable ?item] [?item isat left]] do
+            item
+        endforevery,
+
+        ;;; show left bank
+        "---\",
+
+        ;;; If boat is at the left bank, show left side of boat, and the boat's
+        ;;; contents, and the right side of boat
+
+        if present([boat isat left]) then
+            "\_",
+            forevery ![[?item isin boat]] do
+                item
+            endforevery,
+            "_/"
+        endif,
+
+        ;;; show empty stretch of 'water'
+        "_________________",
+
+
+        ;;; If boat is at the right bank, show left side of boat, and the boat's
+        ;;; contents, and the right side of boat
+
+        if present([boat isat right]) then
+            "\_",
+            forevery ![[?item isin boat]] do
+                item
+            endforevery,
+            "_/"
+        endif,
+
+        ;;; show right bank
+        "/---",
+
+
+        ;;; show transportable items that are on right side, using forevery
+        ;;; as before to find them all.
+
+        forevery ![[transportable ?item] [?item isat right]] do
+            item
+        endforevery,
+
+        ;;; if the man is on the right bank, show him last
+        if present([man isat right]) then
+            "man"
+        endif;
+    %] =>
+
+    ;;; the print arrow '=>' above, prints out the list in the form of a
+    ;;; picture, as shown above
+
+    ;;; end with a blank line.
+    pr(newline);
+
+enddefine;
+
+/*
+
+-- -- Test setup_world
+
+setup_world();
+
+database ==>
+
+;;; That should print out
+
+    ** [[opposite left right]
+        [opposite right left]
+        [can_eat chicken grain]
+        [can_eat fox chicken]
+        [transportable grain]
+        [transportable chicken]
+        [transportable fox]
+        [man isat left]
+        [grain isat left]
+        [fox isat left]
+        [chicken isat left]
+        [boat isat left]]
+
+
+display_world();
+
+;;; That should print out:
+
+    ** [man grain chicken fox ---\ \_ _/ _________________ /---]
+
+remove([boat isat left]);
+add([boat isat right]);
+
+;;; the database has now changed -- boat now at right:
+database ==>
+
+    ** [[boat isat right]
+        [opposite left right]
+        [opposite right left]
+        [can_eat chicken grain]
+        [can_eat fox chicken]
+        [transportable grain]
+        [transportable chicken]
+        [transportable fox]
+        [man isat left]
+        [grain isat left]
+        [fox isat left]
+        [chicken isat left]]
+
+display_world();
+
+    ;;; the boat is now shown at the right (moved by magic):
+
+    ** [man grain chicken fox ---\ _________________ \_ _/ /---]
+
+;;; More examples of tests are included in later tests.
+*/
+
+/*
+
+
+-- An error-reporting procedure: river_mishap --------------------------
+
+*/
+
+define river_mishap(list);
+    [MISHAP:]=>
+    list ==>
+    [The World:]=>
+    display_world();
+enddefine;
+
+
+/*
+
+-- -- Test river_mishap
+
+setup_world();
+
+river_mishap([elephant missing]);
+
+
+*/
+
+
+/*
+-- Action procedures which check preconditions then change the world
+
+-- -- putin(item)
+*/
+
+
+define putin(item);
+    lvars place, thing;
+
+    if item = "man" then
+
+        river_mishap([man cannot put man in boat -- use 'getin()']);
+
+    elseif not(present([transportable ^item]))
+    then
+
+        river_mishap([CANNOT Put 'non-transportable' ^item in boat]);
+
+    elseif present([man isin boat]) then
+
+        river_mishap([man in boat cannot put in ^item]);
+
+    elseif present(![?thing isat boat]) then
+
+        river_mishap([^thing already in boat -- cannot put in ^item]);
+
+    elseif allpresent( ![[man isat ?place] [^item isat ?place]] )
+    then
+
+        if present([boat isat ^place]) then
+
+            remove([^item isat ^place]);
+            add([^item isin boat]);
+            [^item loaded] =>
+            display_world();
+
+        else
+            lvars newplace;
+            lookup(![boat isat ?newplace]);
+            river_mishap([CANNOT PUTIN: man at ^place but boat at ^newplace]) =>
+        endif
+
+    else
+        river_mishap([Unexpected unknown failure])
+    endif;
+
+enddefine;
+
+/*
+;;; test putin
+
+setup_world();
+
+display_world();
+
+putin("elephant");
+
+putin("man");
+
+putin("fox");
+
+database ==>
+
+*/
+
+/*
+-- -- Procedure takeout(item)
+
+*/
+
+define takeout(item);
+    lvars item, place, otherplace;
+
+    if item = "man" then
+
+        river_mishap([man cannot take man out of boat -- use 'getout()']);
+
+    elseif present([man isin boat]) then
+
+        river_mishap([man in boat cannot take out ^item]);
+
+    elseif not (allpresent(![[man isat ?place] [boat isat ?place]])) then
+
+        ;;; This situation should never occur. Can you prove it cannot?
+
+        lookup(! [man isat ?place]);
+        lookup(! [boat isat ?otherplace]);
+
+        river_mishap([cannot takeout: man at ^place, boat at ^otherplace]);
+
+    elseif not(present([^item isin boat])) then
+
+        river_mishap([^item not in boat -- cannot take it out]);
+
+    else
+        ;;; Where is the man? set the variable place, to be used below
+        lookup(! [man isat ?place]);
+
+        remove([^item isin boat]);
+        add([^item isat ^place]);
+
+        ;;; report the action, and show the world state
+        [^item unloaded] =>
+        display_world();
+    endif
+enddefine;
+
+/*
+
+-- -- Test takeout(item)
+;;; some of these should report errors
+
+setup_world();
+
+display_world();
+
+takeout("chicken");
+takeout("boat");
+takeout("fox");
+takeout("man");
+
+putin("fox");
+takeout("fox");
+
+*/
+/*
+
+-- -- Procedure getin()
+
+*/
+
+vars procedure checkeat;    ;;; defined below, could be invoked in getin()
+
+define getin();
+    ;;; put the man in the boat, then check whether anything gets
+    ;;; eaten
+    lvars place, otherplace;
+
+    ;;; Make sure the presuppositions of the action are satisfied
+    if  present([man isin boat]) then
+
+        river_mishap('Man already in boat');
+
+    else
+
+        ;;; find where the man is, and check boat is there
+
+        lookup( ! [man isat ?place] );
+
+        if present([boat isat ^place]) then
+
+            ;;; conditions satisfied, so move man from bank to boat
+
+            remove([man isat ^place]);
+            add([man isin boat]);
+
+            display_world();
+
+            ;;; now check if something can be eaten
+            ;;; Try inserting a call of checkeat, defined below
+            ;;; checkeat()
+
+        else
+
+            ;;; A running program should never get here, if  bug free!
+
+            lookup( ![boat isat ?otherplace] );
+            river_mishap([Cannot getin -- man at ^place, boat at ^otherplace]);
+
+        endif
+
+    endif;
+
+enddefine;
+
+/*
+-- -- Test getin
+
+setup_world();
+
+display_world();
+
+getin();
+
+display_world();
+
+
+*/
+
+/*
+
+-- -- Procedure getout()
+
+*/
+
+define getout();
+    lvars place;
+
+    ;;; Check conditions first, then perform actions
+
+    if  not(present([man isin boat])) then
+        river_mishap('man already out of boat')
+    else
+
+        ;;; ensure first effect -- man not in boat
+        remove([man isin boat]);
+
+        ;;; find which side the boat is at, and put the man there
+        lookup(![boat isat ?place]);
+        add([man isat ^place]);
+
+        display_world();
+    endif;
+enddefine;
+
+/*
+-- -- Test getout
+
+getin();
+
+getout();
+
+*/
+
+
+/*
+
+-- -- Procedure checkeat() (if edible things not protected, they get eaten)
+
+The procedure getin() above could be altered to invoke this, immediately after
+the man's location has been transferred to inside the boat.
+
+Try that change.
+
+*/
+
+
+define checkeat() -> items_eaten;
+    ;;; check if last move was safe
+    ;;; If unsafe, make eating happen
+
+    ;;; return list of things eaten, empty if nothing eaten
+    [] -> items_eaten;
+
+    lvars eater, eaten, place;
+
+    forevery ![[can_eat ?eater ?eaten][?eater isat ?place][?eaten isat ?place]] do
+
+        if not(present([man isat ^place])) then
+            remove([^eaten isat =]);
+
+            river_mishap([DISASTER -- ^eater has consumed ^eaten]);
+
+            [^^items_eaten ^eaten] -> items_eaten;
+        endif;
+
+    endforevery;
+
+enddefine;
+
+/*
+
+-- -- Test checkeat();
+
+setup_world();
+display_world();
+checkeat() =>
+
+getin();
+display_world();
+checkeat() =>
+
+add([chicken isat right]);
+add([grain isat right]);
+display_world();
+checkeat() =>
+
+*/
+
+
+/*
+
+-- -- Procedure crossriver()
+
+*/
+
+define crossriver();
+    lvars place, newplace;
+
+    ;;; check man is in boat, find location of boat, and find
+    ;;; opposite location
+    if  allpresent(
+        ![
+            [man isin boat]
+            [boat isat ?place]
+            [opposite ?place ?newplace]
+        ])
+    then
+
+        ;;; move boat to opposite location
+
+        remove([boat isat ^place]);
+        add([boat isat ^newplace]);
+
+        display_world()
+    else
+        ;;; if test failed, report mishap
+
+        river_mishap('BOAT NOT SELF PROPELLING: MAN NOT IN BOAT')
+    endif
+enddefine;
+
+
+/*
+-- -- Test crossriver
+
+setup_world();
+display_world();
+crossriver();
+getin();
+display_world();
+crossriver();
+getout();
+checkeat();
+
+*/
+
+
+
+/*
+
+-- Tests for use in checking conditions after performing actions
+
+*/
+
+/*
+-- -- Procedure check_goals(goals) checks whether goals are already achieved
+
+This is not used in the demos in the online video tutorial, but show how an
+agent trying to achieve some goals could check whether its goals have been
+achieved, after various actions.
+
+*/
+
+define check_goals(goals) -> result;
+    ;;; goals is a list of conditions, to be checked
+    ;;; Test the assumption that the goals are already achieved:
+
+    ;;; assume goals achieved,
+    true -> result;
+
+    ;;; Check goals one by one, and if one is not true make result false
+
+    lvars goal;
+
+    for goal in goals do
+
+        if not(present(goal)) then
+
+            false -> result;
+            [^goal not achieved] =>
+
+            ;;; could use quitloop() to exit here
+
+        endif
+    endfor;
+
+enddefine;
+
+
+/*
+
+-- -- Test check_goals
+
+setup_world();
+
+database ==>
+
+display_world();
+
+check_goals([[man isat left][fox isat left]])=>
+check_goals([[man isat right][fox isat right]])=>
+check_goals([[man isat left][foc isat left]])=>
+
+
+EXERCISE: alter check_goals to make it return either true or a list of
+fulfilled goals.
+
+*/
+
+
+/*
+-- -- Possibly useful utility procedure opposite(side)
+
+*/
+
+define opposite(side) -> other;
+    ;;; given side, a word, find its opposite, another word
+
+    if present( ![opposite ^side ?other] ) then
+
+        ;;; do nothing. other will be the result
+
+    elseif present( ![opposite ?other ^side] ) then
+
+        ;;; do nothing. other will be the result
+
+    else
+        ;;; this should never happen!
+        river_mishap([^side has no opposite]);
+        false -> other
+    endif;
+
+enddefine;
+
+/*
+
+-- -- Test opposite
+setup_world();
+
+opposite("left") =>
+opposite("right") =>
+opposite("boat") =>
+
+*/
+
+
+
+/*
+-- -- Possibly useful procedure sameplace(item1, item2)
+*/
+
+define sameplace(item1, item2) -> boolean;
+    ;;; item1 and item2 are words, e.g. "man" "fox" "boat"
+    lvars place;
+    allpresent(![[^item1 isat ?place][^item2 isat ?place]]) -> boolean
+enddefine;
+
+/*
+-- -- Test sameplace
+
+setup_world();
+display_world();
+
+sameplace("grain", "fox") =>
+sameplace("man", "fox") =>
+sameplace("man", "dog") =>
+putin("chicken");
+
+sameplace("man", "chicken") =>
+sameplace("fox", "chicken") =>
+sameplace("chicken", "chicken") =>
+takeout("chicken");
+sameplace("man", "chicken") =>
+
+*/
+
+
+/*
+-- -- Utility procedure: eat(item1, item2);
+;;; not yet used, but might be
+
+*/
+
+define eat(item1, item2);
+;;; dispose of edible, unattended item
+    lvars place;
+    remove(![^item2 isat ?place]);
+    river_mishap([DISASTER: ^item1 has eaten ^item2 TOO BAD])
+enddefine;
+
+
+
+/*
+
+-- Further Reading ----------------------------------------------------
+
+Pop11 Primer: TEACH PRIMER, especially the section on internal semantics and
+external semantics for a programming language.
+
+TEACH RIVER
+TEACH RIVERCHAT
+
+Available after
+
+    uses newkit
+
+    TEACH PRBRIVER
+    Shows how a program using poprulebase can search for a plan to cross
+    the river, using either depth first or breadth first searching.
+
+--- $usepop/pop/teach/riverworld
+--- Copyright University of Birmingham 2011. All rights reserved.
+
+*/

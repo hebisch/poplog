@@ -1,0 +1,335 @@
+TEACH VARS_AND_LVARS                                         David Young
+                                                           November 1995
+                               (With some modifications by Aaron Sloman)
+
+
+CONTENTS
+
+ -- Introduction
+ -- -- vars declares variables with "permanent" scope
+ -- -- lvars declares variables with "lexical" scope
+ -- lvars variables will usually be more efficient
+ -- Examples illustrating the difference
+ -- Example showing interactions between procedures
+ -- Nested procedures can access lvars with enclosing scope
+ -- File-local lvars
+ -- -- Example of a file-local lexical
+ -- Summary
+ -- -- An exception: pattern variables
+ -- Commonly used "permanent" variables
+ -- dlocal can be used with both vars and lvars variables
+ -- `Lexical closures'
+
+-- Introduction -------------------------------------------------------
+
+This teach file explains the basic differences between permanent
+variables (vars) and lexical variables (lvars) in Pop-11. See also
+Chapter 2 of Aaron Sloman's Pop-11 primer, available as TEACH * PRIMER,
+HELP * LVARS and HELP * LEXICAL.
+
+(You will need to understand these differences in order to understand
+some of the changes made to Pop-11 in Poplog Version 15.
+    See HELP V15.NEWS, for a summary of the main changes.)
+
+-- -- vars declares variables with "permanent" scope
+
+Basically, vars declares a permanent variable - that is, a variable that
+lasts for the rest of your Pop-11 session. This is made more complicated
+by the fact that if vars occurs inside a procedure, it still declares a
+permanent variable, but the value of the variable is saved when the
+procedure is entered and restored when the procedure returns.
+
+-- -- lvars declares variables with "lexical" scope
+
+lvars inside a procedure declares a variable that comes into existence
+when the procedure is called and vanishes when it exits. This kind of
+variable can only be accessed from code that is within the same "lexical
+block" - in this case between the same define and enddefine.
+
+-- lvars variables will usually be more efficient ---------------------
+
+It so happens that lvars are more efficient than vars (i.e. faster
+access) and also that their semantics are cleaner. (More precisely, if
+you have lots of lvars in one procedure, then the first few of them will
+be accessible more quickly because they are in fast registers -- the
+exact number of which varies from one type of computer to another.
+Accessing the remaining lvars not held in registers will normally be no
+faster than accessing a global variable. However, when a procedure exits
+it has to restore the previous value of all of its vars variables,
+whereas it does not have to anything about its lvars. The extra cost of
+saving and restoring values of vars variables also makes them slower,
+even where the access times while the procedure is running are the
+same.)
+
+-- Examples illustrating the difference -------------------------------
+
+Let me illustrate the basic differences first. Assume you've not
+declared the variables vfoo and lfoo so far. Then, first the fact that
+vars declares a permanent variable even when it's used inside a
+procedure:
+
+    define p;
+        vars vfoo;
+        3 -> vfoo;
+        vfoo =>
+    enddefine;
+
+If you are using Poplog version 15.0 , a warning message will be printed
+when you compile the procedure, to make sure you realise that the
+variable is really permanent. In earlier versions, there is no message.
+In Poplog version 15.01 and later versions, as used in Birmingham, the
+warning has been removed.
+
+After compiling the procedure, you can check the behaviour of the
+variable with
+
+    vfoo =>
+    ** <undef vfoo>
+
+    p();
+    ** 3
+
+    vfoo =>
+    ** <undef vfoo>
+
+This shows that vfoo has been declared permanently - it's available when
+the procedure p is not executing. Its value at top-level is <undef>
+because that's what permanent variables get initialised to; this value
+was saved when the call to p started, and was restored afterwards.
+
+Contrast this with a lexical variable:
+
+    define q;
+        lvars lfoo;
+        3 -> lfoo;
+        lfoo =>
+    enddefine;
+
+No warning message now, as "lvars" is used properly to declare a
+completely local variable. Now try to access lfoo from outside the
+procedure:
+
+    lfoo =>
+    ;;; DECLARING VARIABLE lfoo
+    ** <undef lfoo>
+
+which shows that the declaration inside q had NOT declared a permanent
+variable. (The message shows the system, annoyingly, does a "vars lfoo"
+for me because it thinks my attempt to access lfoo at top-level means I
+want such a variable.)
+
+-- Example showing interactions between procedures --------------------
+
+An important difference between lvars and vars affects is what happens
+when procedures call other procedures. Look at these examples.
+
+    define a;
+        vfoo =>
+    enddefine;
+
+    define b;
+        vars vfoo;
+        3 -> vfoo;
+        a()
+    enddefine;
+
+    b();
+    ** 3
+
+and
+
+    define c;
+        lfoo =>
+    enddefine;
+
+    define d;
+        lvars lfoo;
+        3 -> lfoo;
+        c()
+    enddefine;
+
+    d();
+    ** <undef lfoo>
+
+In the first, procedure a accesses the permanent variable vfoo.
+Procedure b has set its value to 3, so a prints out 3. (When b returns,
+vfoo gets set back to <undef>).
+
+In the second, procedure c cannot access the lexical variable lfoo even
+though it is called from d, because c is outside the lexical block
+("define d ... enddefine") in which lexical lfoo was declared. In fact,
+c prints out the value of the permanent lfoo variable which the system
+declared for me when it thought I wanted one - this is a different
+variable from the lexical lfoo declared in d.
+
+
+-- Nested procedures can access lvars with enclosing scope ------------
+
+Note the difference between the last example and the following:
+
+    define f;
+        lvars lfoo;
+
+        define e;
+            lfoo =>
+        enddefine;
+
+        [inside e] -> lfoo;
+        e()
+    enddefine;
+
+    f();
+    ** [inside e]
+
+In this case, procedure e is inside the lexical scope in which the
+variable lfoo was declared, so it can and does access the lexical lfoo.
+If a reference could be either to a permanent or to a lexical variable,
+it's always the lexical one that is actually accessed.
+
+That about covers the central differences, but I advise you to try more
+experiments like the ones above if you are in doubt about the behaviour
+in particular cases.
+
+-- File-local lvars ---------------------------------------------------
+
+You can also declare an lvars variable outside any procedure. In this
+case, everything in the file if it is loaded all at once, or in the
+marked range if you are used ved to compile, is treated as one lexical
+scope. The variable is global during the compilation stream (which
+terminates at the end of the file, or the end of the marked range). But
+it is not "permanent", as it cannot be accessed after the stream has
+ended.
+
+Any code in the same file (or marked range) can access such a variable,
+provided it occurs after the lvars declaration.
+
+Moreover, the value given to such a variable is not lost between calls.
+This can be useful if you want variables that are global to all the
+procedures in a given file but are not known about outside that file.
+(This provides partly similar functionality to a Pop-11 section. See
+HELP * SECTIONS.)
+
+These 'file-local' lexical variables are also useful if a procedure
+needs to retain a value between calls, since lvars variables inside a
+procedure get set to 0 when they are created, whenever the procedure is
+called.
+
+-- -- Example of a file-local lexical
+
+Many library programs use file-local lexical variables.
+
+For instance, try loading the following code all at once, and then one
+line at a time:
+
+    lvars lfoo;   [lexical lfoo] -> lfoo;
+    lfoo =>
+
+If done all at once, you get ** [lexical lfoo]. If one line at a time,
+you get ** <undef lfoo>, because the second reference to lfoo is outside
+the lexical scope of the first line when they are compiled apart. This
+is why the variables appearing in teach files are vars.
+
+-- Summary ------------------------------------------------------------
+
+Here's the recommended way of using vars and lvars
+
+All variables declared inside procedures should be lvars.
+
+If you actually want to have the value of a permanent variable saved
+when a procedure is entered and restored when it is exited, then use
+dlocal. Thus the first example above should be written:
+
+    vars vfoo;
+
+    define p;
+        dlocal vfoo;
+        3 -> vfoo;
+        vfoo =>
+    enddefine;
+
+The reason this is better than a single local declaration is that this
+makes explicit what is really happening. The fact that vars inside a
+procedure makes a hidden top-level declaration is a potential source
+of confusion. Having separate declarations makes clear what is
+happening. (See HELP * DLOCAL for more details - but you probably don't
+need any at this stage - knowing that it causes the value to be saved
+and restored is all there is to it - but see the example below.)
+
+-- -- An exception: pattern variables
+
+There is one exception. Variables used in the pattern for the matcher
+and matcher arrow HAVE to be permanent (given its present
+implementation), unless the pattern prefix "!" is used.
+See TEACH * MATCHES for further information.
+
+Use of a pattern matcher (instead of multiple calls of "hd" and "tl")
+makes learning AI techniques very much easier and is therefore used a
+lot in introductory teaching material.
+
+Variables declared at top-level should be vars if you want them to be
+accessible outside the scope of the compilation - i.e. you want to write
+new procedures that refer to them, or to use them in interactive code.
+
+-- Commonly used "permanent" variables --------------------------------
+Commonly used examples are: cucharout, interrupt, pop_debugging, and
+current_section. All of these can be temporarily given a new value
+inside a procedure if declared as "dlocal" within that procedure.
+
+Variables that are declared at top-level in a file containing a number
+of procedures, so that all the procedures in that file, but no
+procedures in other files, can access them, should be lvars. For
+instance, look at LIB * RCI_SHOW (load LIB * POPVISION first if you
+cannot access it).  It starts off with a number of vars and lvars
+declarations - the vars are things which are documented in
+HELP * RCI_SHOW, and need to be permanent so that users can change them,
+whilst the lvars are global to the procedures in the file and shared by
+them but are private to those procedures.
+
+-- dlocal can be used with both vars and lvars variables --------------
+
+Note that you can use dlocal with vars or lvars. For example, mark the
+whole of the following example and run it:
+
+    lvars lfoo;
+
+    [initial value] -> lfoo;
+
+    define g;
+        lfoo =>
+    enddefine;
+
+    define h;
+        dlocal lfoo;
+        [inside h] -> lfoo;
+        g();
+    enddefine;
+
+    h();        ;;; makes g print ** [inside h]
+    g();        ;;; g called directly prints ** [initial value]
+
+That is, lfoo gets back its original value when h exits, as the
+top-level call to g shows. Try it without the dlocal. The behaviour will
+be the same if lfoo is declared as vars rather then lvars, but then of
+course it will be permanent - i.e. the list [initial value] would still
+be stored if I referred to it again.
+
+All of the above also applies to the variables that hold procedures as
+their values (note that "define foo ... enddefine" is like
+    "vars foo; procedure ... endprocedure -> foo").
+
+-- `Lexical closures' -------------------------------------------------
+
+There is a further difference between lvars and vars which is relevant
+to programs that return programs as results. In these cases, the use of
+lvars supports sophisticated techniques in which programs create
+programs which remember some of the environment that existed when they
+were created. It is also possible for a procedure to create a family of
+new procedures which share some data which not other procedures can
+possibly access. Such examples are explained in HELP * LVARS/closures
+
+
+--- $poplocal/local/teach/vars_and_lvars
+--- Copyright University of Sussex 1995. All rights reserved.
+
+--- $poplocal/local/teach/vars_and_lvars
+--- The University of Birmingham 1995.  --------------------------------

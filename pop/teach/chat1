@@ -1,0 +1,419 @@
+TEACH CHAT1                                            A.Sloman Oct 2011
+
+
+CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Introduction
+ -- What this is about
+ -- Selecting an architecture for the chatbot
+ -- First draft interface
+ -- Using readline
+ -- Using readline to put user input into a variable
+ -- First make this your own file instead of a 'protected' teach file
+ -- Your first eliza interface
+ -- Now test the procedure
+ -- NOTES:
+ -- Copy and rename your procedure
+ -- Further reading
+
+-- Introduction -------------------------------------------------------
+
+This is the second of a series of short tutorial files concerned with
+making a small, but expandable chatbot, using Pop11. This follows on from
+    TEACH * CHAT0
+
+This file assumes you know how to create, edit and save files using the Poplog
+editor Ved or XVed, and that you have learnt how to give commands, and started
+correcting Pop11 program commands that produce error messages, as explained in
+    TEACH * MISHAPS
+
+This file is based on the much longer TEACH RESPOND file.
+
+
+-- What this is about -------------------------------------------------
+
+With the help of this TEACH file you will build a simplified ELIZA
+program, that can hold a 'conversation' in English. The original Eliza
+was a half-serious exercise in natural language processing developed
+by Joseph Weizenbaum at MIT in the USA. It loosely simulated a
+non-directive Rogerian psychotherapist. Many text books on AI include an
+account of Eliza, and a criticism of the techniques used, because they
+are so limited.
+
+For now the criticisms are irrelevant: you are learning some basic techniques,
+not producing a realistic human-like program. (That would be like hoping to
+become a concert pianist the day you start learning to play the piano.)
+
+-- Selecting an architecture for the chatbot --------------------------
+
+In order to create a chatbot you need to design a system that has an
+"architecture". In other words, like a house, or a car, it has several
+parts that do different things. If you think very clearly about what you
+want the parts to do and how you need to put them together you are more
+likely to create a successful program than if you just start writing
+program code.
+
+Some programs just operate on their own, doing calculations or looking
+after a file store. Your chatbot will be part of a larger system
+containing a user, namely a person (or possibly another computer in the
+future) who types in sentences and reads responses.
+
+We can represent the user as having an output connection (for
+transmitting sentences) and an input connection, for reading the
+responses:
+
+
+  *------*  --- > --- (output from user)
+  | USER |
+  *------*  --- < --- (responses from chatbot)
+
+Deep inside the computer there may be an intelligent subsystem that
+works out what would be an appropriate response to what the user has
+last typed in. We can call that subsystem the "Inference engine" and
+represent it, with its input connection and its output connection, like
+this:
+
+  (requests from user)    --- > ---  *----------------*
+                                     |INFERENCE ENGINE|
+  (responses from engine) --- < ---  *----------------*
+
+We could think of the user as directly connected to the inference
+engine, by joining the output channel of each to the input channel of
+the other, producing this architecture:
+
+  *------*  --- > --- (requests) --- > ---  *----------------*
+  | USER |                                  |INFERENCE ENGINE|
+  *------*  --- < --- (responses)--- < ---  *----------------*
+
+But sometimes there are tasks that involve only dealing directly with
+the user: e.g. starting off the conversation, deciding to ask the user
+to type something if the last sentence typed was empty, or perhaps
+transforming the user's sentences into commands and questions that the
+inference engine understands, or noticing that the user wants to stop,
+and then gracefully terminating the conversation.
+
+And perhaps the inference engine produces output that a human would not
+easily understand, which needs to be reformulated.
+
+All of that can be achieved by designing a user interface subsystem that
+has two lots of input connections and two lots of output connections and
+can be connected both to the user, and to the inference engine.
+
+That will give the following architecture for the whole chatbot:
+
+  *------*  --- > ---  *---------*  --- > ---  *----------------*
+  | USER |             |INTERFACE|             |INFERENCE ENGINE|
+  *------*  --- < ---  *---------*  --- < ---  *----------------*
+
+We don't need to design the user: that's you. But we'll design and test
+a very simple interface and a very simple inference engine, and test
+them, then later expand their functionality.
+
+-- First draft interface ----------------------------------------------
+
+Our first interface can be so simple that it does not need the inference
+engine, because it always says the same thing. But it starts by printing
+a greeting, asking the user's name, then three times requests input, and
+prints the same answer each time.
+
+-- Using readline -----------------------------------------------------
+
+For getting the user's input the interface will use the pop11 procedure
+readline. Try running it, and printing out what it produces.
+
+It may be a good idea to start with a clean output.p file if you have
+been doing other unrelated things in Pop11. You can find out how to
+start a new output.p file with or without saving the old one on the hard
+drive by renaming it, in this teach file: TEACH * RENAME_OUTPUT
+
+You now need to learn how to use the Pop11 readline command to get input
+from the user for your chatbot
+
+Use ESC d on this command.
+
+    readline() ==>
+
+It will move the editor cursor to the output.p file and print '?'.
+You can then type some words and end with the RETURN key (often labelled
+ENTER, just below the Backspace key).
+
+If you want to type a long sentence, just go on typing: don't try to
+break the line, as readline will take that to be the end of your input.
+
+Do that a couple of times to get the feel of how it works. E.g. if you
+do ESC d on the readline command then in response to the '?' prompt type
+
+    hello eliza
+
+then do the ESC-d again and type this:
+
+    you are very clever
+
+the output file will look like this:
+
+    ? hello eliza
+    ** [hello eliza]
+    ? you are very clever
+    ** [you are very clever]
+
+Notice that each sentence read in is turned into a list of words.
+
+Try it (esc d) a few times, and type something ending with RETURN each
+time:
+
+    readline() =>
+
+-- Using readline to put user input into a variable -------------------
+
+Usually we shall want to do more than just print out the sentence.
+So we can
+    declare a variable to hold the list of words produced by readline,
+
+    then perform an operation on the list (e.g. add something to it),
+
+and finally
+    print out the result.
+
+Mark the next four lines (F1 and F2), then compile and run them
+(CTRL-d not ESC-d)
+
+    vars input;
+    [Hi] ==>
+    readline() -> input;
+    [you said: ^^input] ==>
+
+The portion
+    ^^input
+
+allows the contents of the list input, to be spliced into the list that
+starts [you said:...] So the whole lot is printed out.
+The output file may then contain something like this, as a result:
+
+** [Hi]
+? this is not real chat
+** [you said : this is not real chat]
+
+OK now for the first draft interface procedure.
+
+-- First make this your own file instead of a 'protected' teach file --
+
+You may wish to save your existing output.p file, which has records of
+previous interactions, and then start a new one. If so, you can find out
+how by reading this:
+
+    TEACH * RENAME_OUTPUT
+
+If you don't want to save your existing output.p just read it in now
+
+    ENTER ved ./output.p
+
+(the './' makes sure the editor does not find the wrong output.p if you
+have more than one)
+
+It is now probably a good idea to start your own file, so that work you
+do will not be lost. The easiest way to do that for now, is to rename
+the teach file you are reading, called chat1.
+
+You can call it 'mychat1.p', where the .p bit tells pop11 it is a file
+with pop11 code. Do this, using the 'ENTER name' editor command:
+
+    ENTER name mychat1.p RETURN
+
+then save it on the hard drive:
+
+    ENTER w1 RETURN
+
+If there are earlier bits you don't want included in your file, you can
+mark them using F1 (or ESC m) for the start, F2 (or ESC M) for the end,
+then do this to delete those bits:
+
+    ENTER d RETURN
+
+Perhaps delete from the beginning of this file to just before the
+section:
+
+    -- First draft interface
+
+You can always get back the original text by invoking TEACH chat1
+
+Make sure you don't delete more than you want to.
+
+After deletion, you can update the index in this file by doing
+
+    ENTER indexify RETURN
+
+To look at the new index do:
+
+    ENTER g RETURN
+
+
+-- Your first eliza interface -----------------------------------------
+
+Instead of always repeating the above commands we can put the commands
+inside a procedure called interface1 (the first of several). Then in
+order to obey the commands all we shall have to do is run the procedure
+interface1.
+
+Let's make it print a greeting, ask the user's name, print another
+greeting, then repeatedly ask the user to type something in and print it
+out. If the user types 'bye' or 'Bye' it should print a farewell
+message, and stop.
+
+Feel free to edit some of the text in the interactions. Don't use any
+apostrophes as they will interfere with pop11's lists, because, in Pop11
+an apostrophe is the beginning of a string, and the string will need to
+be finished. (There are ways round this which you can learn much later.)
+
+define interface1();
+
+    ;;; declare a variable sentence to hold the input,
+    ;;; and a variable name to hold the user's name.
+    ;;; Use 'lvars' because the variable is 'local' to a procedure
+
+    lvars sentence, name;
+
+    ;;; Print greeting
+    [Hello -- I am Eliza] ==>
+
+    ;;; get user name
+    [Please type your name, and end with RETURN] ==>
+
+    readline() -> name;
+
+    ;;; print a response (edit to suit your tastes)
+    [Hello ^^name -- I am very pleased to meet you] ==>
+
+    [What can I do for you? ] ==>
+
+    ;;; now make the program repeatedly request and process input
+    repeat
+
+        ;;; get the next user input and store it in sentence
+        readline() -> sentence;
+
+        ;;; Play it back with a preamble. Edit to taste
+        [I am sorry to hear you say ^^sentence] ==>
+
+        ;;; if the sentence had only the word bye or Bye, finish
+
+        if sentence matches [bye] or sentence matches [Bye] then
+            ;;; go to the end of the loop -- after endrepeat
+            quitloop()
+        endif;
+
+        ;;; otherwise repeat the loop by asking for more input
+        ;;; edit to taste
+        [Is there anything else?] ==>
+
+        ;;; Everything up to here is repeated, unless the command
+        ;;; quitloop() is obeyed. It jumps to the end of the loop.
+    endrepeat;
+
+    ;;; Now close the conversation, using the name. Edit to taste.
+    [Good day ^^ name]==>
+    [I hope you are feeling better]==>
+
+enddefine;
+
+You can now compile and run your procedure:
+
+Put the editor cursor inside the procedure (using Up or Down arrow
+keys). Then invoke 'mark current procedure' (mcp):
+
+    ENTER mcp RETURN
+
+You should see a range mark on the left, from 'define' to 'enddefine'.
+If you can't see all of the procedure at once, you can enlarge the
+window using ESC w.
+
+While the procedure is marked, you can compile it, using CTRL d.
+After that '(done)' will appear on the status line. If you get a mishap
+message, because you made a mistake while editing the procedure, study
+the message carefully and try to correct the code, then repeat
+    ENTER mcp
+    CTRL d
+
+Until you get no error.
+
+-- Now test the procedure ---------------------------------------------
+
+Run this line (ESC d):
+
+    interface1();
+
+Here's a sample of the program at work (don't worry now about
+punctuation marks, e.g. "," and "?" being printed on their own):
+
+** [Hello -- I am Eliza]
+** [Please type your name , and end with RETURN]
+? Freddy Blogs
+** [Hello Freddy Blogs -- I am very pleased to meet you]
+** [What can I do for you ?]
+? Fix my brain
+** [I am sorry to hear you say Fix my brain]
+** [Is there anything else ?]
+? Help me write programs
+** [I am sorry to hear you say Help me write programs]
+** [Is there anything else ?]
+? Bye
+** [I am sorry to hear you say Bye]
+** [Good day Freddy Blogs]
+** [I hope you are feeling better]
+
+Try changing some of the words in the interactive part of your procedure
+and then compile the program and then run it again
+
+    interface1();
+
+Later we can make it more varied and interesting.
+
+-- NOTES: -------------------------------------------------------------
+
+ 1  When you have marked your procedure, e.g. using ENTER mcp
+    there are various things you can do besides compiling it.
+
+    One of the useful things is adjusting the format, using
+    the command
+        ENTER tidy
+    That will cause lines that are parts of commands to be
+    indented, helping to show the program's structure.
+
+    Also, if you have made a mistake, such as leaving out a
+    'closer' like 'endrepeat', the format will show you that
+    something is wrong.
+
+ 2  Instead of marking the procedure (mcp) then compiling (CTRL-d)
+    you can do both in one command (ESC c), provided that the
+    Ved cursor is somewhere between 'define' and 'enddefine'.
+    Try that.
+
+Later you will find there is much more that you can do with
+marked ranges.
+
+-- Copy and rename your procedure -------------------------------------
+
+If you have marked your procedure and you would like to make a copy of
+it to try making changes while keeping the original, you can use the
+ENTER t (transcribe command), then change the name of the new copy. Try
+that now. Go back to your procedure definition. Mark the procedure with
+the command ENTER mcp Then come back here and go down to the line that
+starts 'NEW COPY' and make your copy:
+    ENTER t
+
+You will have a new copy of the procedure. So you can change its name to
+interface2, for use when you read TEACH chat2.
+
+NEW COPY (to be inserted after here). After that save the file: ENTER w1
+
+-- Further reading ----------------------------------------------------
+
+    TEACH * CHAT2
+        adding more sophistication to your chatbot
+
+    TEACH * MARK
+        If you have time -- more on marked ranges.
+
+/*
+--- $usepop/pop/teach/chat1
+--- Copyright University of Birmingham 2011. All rights reserved. ------
+*/

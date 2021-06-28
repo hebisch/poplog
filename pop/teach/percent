@@ -1,0 +1,503 @@
+TEACH PERCENT                                         A. Sloman Jan 1991
+
+                         THE PERCENT SYMBOL "%"
+                         ----------------------
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Overview
+ -- Using the percent symbol in list expressions [ % ... % ]
+ -- Defining a procedure that creates lists using %
+ -- Using "^" instead of "%...%"
+ -- Using ^^ or % %to merge lists
+ -- Loops inside list expressions
+ -- Using percent symbols to form closures (partial application)
+ -- Other uses of the percent symbol
+ -- Further reading
+
+-- Overview -----------------------------------------------------------
+The percent symbol has several distinct uses in POP-11, of which the two
+most common are
+
+o Its use in building lists
+
+o Its use in partial application, i.e. partially applying a general
+    procedure to create a new more specialised procedure.
+
+The other uses are relevant to more advanced programming:
+
+o Building vectors (this is similar to the use of "%" in buildling
+    lists)
+
+o Use with "cons_with" in structure expressions
+
+o Setting entry and exit actions for procedures, using "dlocal".
+
+
+-- Using the percent symbol in list expressions [ % ... % ] -----------
+
+If text items are inserted between list brackets, as in
+
+    [ the sum of 3 and 3  is 8]
+
+then the list created contains the words as if they had been quoted,
+i.e. the words "the", "sum", "of", "and" and "is". So it prints thus:
+
+    [ the sum of 3 and 3  is 8] =>
+    ** [the sum of 3 and 3 is 8]
+
+No attempt is made to treat the words as variables with values. In fact
+the list can contain illegal POP-11 instructions:
+
+    [ 3 + 3 4 => ]  =>
+    ** [3 + 3 4 =>]
+
+There is no error message, as there would be if the square brackets
+were omitted.
+
+However it is sometimes desirable to have some or all of the text in a
+list expression evaluated, i.e. treated as program to be executed, with
+the results included in the list. This can be done by enclosing the
+relevant bit of program between two percent symbols. Thus:
+
+    [The sum of 3 and 8 is % 3 + 8 %] =>
+    ** [The sum of 3 and 8 is 11]
+
+So a very common use of percent symbols in POP-11 programs is to change
+the contents of a list from being quoted, to being evaluated (or
+executed, or run). E.g. try the following examples. You can use the load
+marked range facility to see what the instructions produce, as explained
+in TEACH * LMR:
+
+    vars lista listb;
+    [ 3 + 4 ] -> lista;
+    [% 3 + 4 %] -> listb;
+    lista =>                    ;;; should produce ** [3 + 4]
+    listb =>                    ;;; should produce ** [7]
+
+See how the following print out:
+
+    hd(lista) =>
+    ** 3
+
+    [ hd(lista), "number" ]   =>
+    ** [hd ( lista ) , " number "]
+
+Notice how the text items are separated out when the list is printed.
+Now compare the effect with percents, to "unquote" the contents of the
+list expression and turn it into program instructions to be obeyed.
+
+    [ % hd(lista), "number" %]   =>
+    ** [3 number]
+
+The first list, produced without the "%" symbols contains all EIGHT of
+the items that were typed between the brackets, whereas everything
+between the percents in the second list has been treated as program to
+be executed, and the TWO results put in the list.
+
+
+POP-11 (unlike earlier versions of POP2) allows 'floating' percents, so
+that part of a list is quoted and part evaluated. Can you tell what the
+following will do:
+
+    [ 9 + 5 = % 9+5 % ] =>
+
+try it, and similar examples.
+
+How can you use the percents to make a list which records some larger
+sum, e.g. to demonstrate the effect of
+
+    (55 + 23) * 11
+
+You could use:
+
+    [ (55 + 23) * 11 = % (55 + 23) * 11 % ] =>
+
+compare
+    [ (29 + 4) * 99 = % (29 + 4) * 99 % ] =>
+
+-- Defining a procedure that creates lists using % --------------------
+
+You can generalise this sort of thing by creating a procedure which
+makes lists, e.g. (be sure to put the percents in the right places).
+
+    define showsum(x,y) -> result;
+        [the sum of %x% and %y% is %x + y%] -> result;
+    enddefine;
+
+    showsum(5,11) =>
+    ** [the sum of 5 and 11 is 16]
+    showsum(99,166) =>
+    ** [the sum of 99 and 166 is 265]
+
+Before reading on try defining a similar procedure SHOWPROD which makes
+a list stating what the product of three numbers is.
+
+
+
+A possible answer follows. Look at it after you have tried your own.
+
+
+
+Your procedure might have been something like
+
+    define showprod(x,y,z) -> prod;
+        [the product of %x% , %y% and %z% is %x * y * z%] -> prod;
+    enddefine;
+
+test it
+
+    prod(3,4,5) =>
+    prod(11,12,13) =>
+
+-- Using "^" instead of "%...%" ---------------------------------------
+
+It is so tedious typing %x% %y% etc, that POP-11 allows you to use just
+the symbol "^" in front of a variable, to get it evaluated inside a
+list,  as in the following:
+
+    3 -> x; 4 -> y; 7 -> z;
+    [the sum of ^x and ^y is ^z] =>
+
+
+If you don't want to have the third variable, you can do
+
+    [the sum of ^x and ^y is ^(x + y)] =>
+
+Notice that ^( <expression> ) is equivalent to % <expression> %
+
+Which you prefer is a matter of taste. More examples of "^" can be found
+in TEACH * ARROW.
+
+If you use "^" before something more complex than a single variable,
+then you MUST have the parentheses: ^( ).
+
+    define showsum(x,y) -> sum;
+        [the sum of ^x and ^y is ^(x + y) ] -> sum;
+    enddefine;
+
+
+Some people find it more convenient to use two percents %  %, rather
+than ^(  ), especially when the text between the brackets contains
+complex POP-11 including brackets. E.g. which of these equivalent
+forms do you find more readable?
+
+    [^(hd(tl([a b c])))] =>
+
+    [%hd(tl([a b c]))%] =>
+
+You may already have come across the "^" symbol in connection with
+MATCHES and DATABASE. %X% is exactly equivalent to ^X inside a list.
+
+It is important that you don't need to use the symbol "^" or the percent
+symbols to get the value of a variable outside a list, e.g. the
+following will produce a 'MISPLACED SYNTAX WORD' error:
+
+    % x % =>
+
+The following produces a 'MISSING SEPARATOR' error because it treats "^"
+as the name of an unknown variable outside list brackets:
+
+    ^x =>
+
+
+-- Using ^^ or % %to merge lists --------------------------------------
+
+If you want to put the elements of an existing list into another
+list as separate elements of the new list you can use %..% and the
+POP-11 procedure -dl- (a mnemonic for "destruct list"). -dl- just
+puts all the elements of the list onto the stack:
+
+    vars list;
+    [d e f g] -> list;
+    list =>
+    ** [d e f g]
+
+    dl(list) =>
+    ** d e f g
+
+We can create a new list containing the elements of -list- thus:
+
+    [% dl(list) %] =>
+    ** [d e f g]
+
+The double up arrow is available as an abbreviation for this. So the
+form
+
+    [ ^^(   )  ]
+
+is a shorthand equivalent to
+
+    [ % dl(   )% ]
+
+So we can type
+
+    [ ^^(list) ] =>
+    ** [d e f g]
+
+as with "^", if the item within the parenthesis is just a single
+identifier, then the parenthesis can be omitted:
+
+    [^^list] =>
+    ** [d e f g]
+
+Compare the single up arrow:
+    [ ^list ] =>
+    ** [[d e f g]]
+
+This makes a new list containing only one element, the whole original
+list.
+
+Using ^^ we can join two or more lists together.
+
+    vars list1;
+    [a b c] -> list1;
+
+    [^^list1 ^^list] =>
+    ** [a b c d e f g]
+
+This is equivalent to
+    list1 <> list2 =>
+
+Here are some more examples. Try them and variations, using <ENTER> lmr.
+
+    vars x,y,z;
+    [a b c] -> x;
+    [d e] -> y;
+    [f] -> z;
+
+    [^x ^y ^z] =>
+    ** [[a b c] [d e] [f]]
+
+    [^^x ^^y ^^z] =>
+    ** [a b c d e f]
+
+    [^x ^^y] =>
+    ** [[a b c] d e]
+
+    [p ^^x y] =>
+    ** [p a b c y]
+
+
+You can put the same thing into a list more than once:
+
+    [^^x ^^y ^^x] =>
+    ** [a b c d e a b c]
+
+If you want to use not just the value of a variable, but some more
+complex expression (which MUST produce a list) after "^^", then, as with
+"^", you need parentheses:   ^^(     ). Try the following
+
+    [^x ^^(tl(x)) ]  =>
+    [^^x ^^(rev(x)) ] =>
+
+-- Loops inside list expressions --------------------------------------
+
+Using percent signs enables us to put a 'loop' command inside list
+brackets, to create a list that would be tedious to type in. For
+instance, the following loop puts the numbers from 1 to 20 on the stack.
+
+    vars num;
+    for num from 1 by 1 to 20 do num endfor;
+
+now print them out
+    =>
+
+'BY 1' says 'increment the variable by 1 each time.' When the increment
+is 1 you can leave it out. e.g. 'FOR X FROM 1 TO 20 DO....ENDFOR.
+E.g.
+
+    vars x;
+    for x from 3 to 8 do x endfor =>
+    ** 3 4 5 6 7 8
+
+    for x from 0 by 5 to 30 do x endfor =>
+    ** 0 5 10 15 20 25 30
+
+Type in a loop to put all the even numbers up to 30 on the stack, and
+then print them out:
+
+    for num from 2  .... endfor =>
+
+what should go in place of the dots?
+
+
+We can now put such a loop inside list brackets and make a list of all
+the results. For instance here is a procedure which will make a list of
+all the numbers up to N:
+
+    define listto(n) -> list;
+        vars num;
+        [% for num from 1 to n do num endfor%] -> list;
+    enddefine;
+
+test it
+
+    listto(5) =>
+    ** [1 2 3 4 5]
+
+    listto(10) =>
+    ** [1 2 3 4 5 6 7 8 9 10]
+
+    listto(50) =>
+
+Now try defining a procedure LISTALL which takes three inputs
+    a starting number   START
+    an increment        INC
+    an upper limit      LIM
+and makes a list of all the numbers between START and LIM, incremented
+by INC, e.g.
+
+    listall(3,5,20) =>
+
+should produce
+
+    [ 3 8 13 18]
+
+
+A hint follows if you have difficulty.
+
+
+If you did not succeed, try filling the gaps in the following:
+
+    define listall(start,inc,lim)-> list;
+        vars num;
+        [%for num from start .....endfor%] -> list
+    enddefine;
+
+Test your procedure.
+
+Other loops besides FOR loops can be used inside [  % ..... %  ] E.g. it
+is often convenient to use UNTIL or WHILE loops. The crucial thing to
+remember is that everything left on the stack during execution of the
+loop will become part of the list created by '[   ]'.
+
+TEACH * ARROW; will give you a little more practice with ^ and ^^.
+
+The remainder of this teach file is concerned with other uses of the
+percent symbol.
+
+
+-- Using percent symbols to form closures (partial application) -------
+
+Percent symbols can be used to 'partially apply' a procedure to some
+arguments which are "frozen in" to create a new procedure which, when
+later executed behaves as like the original procedure run with the
+frozen argument.
+
+E.g. SQRT is a procedure which produces the square root of a number.
+
+    sqrt(3) =>      ;;; prints the square root of 3
+    ** 1.73205
+
+You can partially apply it to 3 to produce a a procedure which always
+returns the square root of 3.
+
+    vars sq3;
+    sqrt(%3%) -> sq3;       ;;; partially apply SQRT to 3, to create a new
+                            ;;; procedure, which is assigned to SQ3
+    sq3 =>                  ;;; SQ3 now has a procedure as its value
+    ** <procedure sqrt>     ;;; Its name is derived from SQRT
+
+    sq3() =>                ;;; CAll the new procedure. It needs no
+    ** 1.73205              ;;; argument, as it already has one 'frozen'
+                            ;;; in.
+
+A procedure produced by partial application is called a CLOSURE.
+Additional kinds of closures are described in the files HELP * CLOSURES
+and HELP * LVARS (Not for beginners).
+
+A POP-11 closure can be used like an ordinary procedure. Its components
+can be accessed using PDPART and FROZVAL, explained in
+    HELP * PDPART
+    HELP * FROZVAL
+    HELP * CLOSURES
+
+The example SQ3 was rather silly. A more sensible example would use a
+procedure partially applied to another procedure, or to some
+datastructure. For example, MAPLIST takes two arguments, a list and a
+procedure, applies the procedure to all elements of the list, and makes
+a new list of all the results:
+
+    maplist([1 2 3 4 5], sqrt)=>
+    ** [1.0 1.41421 1.73205 2.0 2.23607]
+
+We can partially apply MAPLIST to SQRT to create a new procedure of one
+argument which takes a list and returns a list of square roots, e.g.
+
+    vars sqrt_of_list;
+    maplist(%sqrt%) -> sqrt_of_list;    ;;; partially apply maplist
+                                        ;;; to form a closure
+    sqrt_of_list([4 9 16 25])=>
+    ** [2.0 3.0 4.0 5.0]
+
+    sqrt_of_list([10 100 1000 10000])=>
+    ** [3.16228 10.0 31.6228 100.0]
+
+For more information on this see HELP * CLOSURES, * PARTAPPLY, *PERCENT
+
+
+-- Other uses of the percent symbol -----------------------------------
+
+Just as the percent symbol (and "^" and "^^") can he used in list
+expressions, so they can also be used in constructing vectors. E.g.
+
+    {a vector with five words} =>
+    ** {a vector with five words}
+    {a new vector with % 3 + 3 % items } =>
+    ** {a new vector with 6 items}
+
+REF * VECTORS explains what vectors are in more detail.
+
+The syntax word "cons_with" that can be used with curly braces to
+construct a variety of structures. It is followed by the name of the
+constructor procedure, then an expression in braces indicating the
+contents of the structure.
+
+So, instead of
+    [a b c d] =>
+    ** [a b c d]
+
+We could have
+
+    cons_with conslist {a b c d} =>
+    ** [a b c d]
+
+Similarly, instead of
+    {a vector} =>
+    ** {a vector}
+
+we can use
+    cons_with consvector {a vector} =>
+** {a vector}
+
+The percent symbol can be used within the braces to case POP-11 code to
+be evaluated:
+
+    cons_with consvector {% 1,2,3, 99 * 9 %} =>
+    ** {1 2 3 891}
+
+A totally different use of the percent symbol occurs with the syntax
+word "dlocal" can be used in advanced programs to define "dynamic local"
+expressions, specifying actions to be executed when a procedure is
+entered or exited, either normally or abnormally. Advanced programmers
+wishing to know more should consult HELP * DLOCAL
+
+
+-- Further reading ----------------------------------------------------
+
+Some of the information presented here is elaborated in:
+    R.Barrett, A.Ramsay and A.Sloman
+    POP-11: A practical language for artificial intelligence
+
+    - Use of % in list expressions: sections 5.3, 6.2
+    - In partial application: section 11.3
+    - In vector expressions: section 10.1
+
+TEACH * ARROW
+HELP  * CLOSURES (more on partial application)
+HELP  * DLOCAL
+HELP  * CONS_WITH
+
+--- C.all/teach/percent ------------------------------------------------
+--- Copyright University of Sussex 1991. All rights reserved. ----------

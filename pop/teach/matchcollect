@@ -1,0 +1,280 @@
+MATCHCOLLECT                                         A. Sloman June 1983
+                                            Updated to use "!", Oct 1996
+
+Some exercises using the pattern matcher and database facilities
+
+
+ -- Introduction
+ -- Defining findmid
+ -- Looking for individual items in a list which match a pattern
+ -- Defining findall
+ -- findalljobs
+ -- Using a global list of data: pfindall
+ -- Exercise: findvals
+ -- The database
+
+-- Introduction -------------------------------------------------------
+
+We have so far used predicates to find things in lists. We can also use the
+matcher. I.e. we look for things which match a pattern. (See TEACH MATCHES,
+and TEACH RESPOND).
+
+We can also use the matcher to look for related items in a list. First an
+example of the latter.
+
+-- Defining findmid
+
+Given a list of numbers and words, find every word, which has a number on
+its left, and a number on its right.
+
+define findmid(list) -> result;
+    lvars wd litem ritem rest;
+    [] -> result;
+    repeat
+        if list matches
+                    ![== ?litem:isinteger ?wd:isword ?ritem:isinteger ??rest]
+        then
+            [found ^litem ^wd ^ritem] =>        ;;; needed only for tracing
+            [^^result ^wd] -> result;
+            [^ritem  ^^rest] -> list;
+        else return()
+        endif;
+    endrepeat;
+enddefine;
+
+
+findmid([1 2 a b 3 c 4 d 5 6 e f 7 g 8 h i])=>
+** [found 3 c 4]
+** [found 4 d 5]
+** [found 7 g 8]
+** [c d g]
+
+;;; Now show the workings by tracing the matcher
+trace matches;
+findmid([1 2 a b 3 c 4 d 5 6 e f 7 g 8 h i])=>
+> matches [1 2 a b 3 c 4 d 5 6 e f 7 g 8 h i] [== ? <ID litem <undef>> : isinteger ? <ID
+     wd <undef>> : isword ? <ID ritem <undef>> : isinteger ?? <ID rest <undef>>]
+< matches <true>
+** [found 3 c 4]
+> matches [4 d 5 6 e f 7 g 8 h i] [== ? <ID litem 3> : isinteger ? <ID wd c> : isword ?
+     <ID ritem 4> : isinteger ?? <ID rest [d 5 6 e f 7 g 8 h i]>]
+< matches <true>
+** [found 4 d 5]
+> matches [5 6 e f 7 g 8 h i] [== ? <ID litem 4> : isinteger ? <ID wd d> : isword ? <ID
+     ritem 5> : isinteger ?? <ID rest [6 e f 7 g 8 h i]>]
+< matches <true>
+** [found 7 g 8]
+> matches [8 h i] [== ? <ID litem 7> : isinteger ? <ID wd g> : isword ? <ID ritem 8> : isintege
+    r ?? <ID rest [h i]>]
+< matches <false>
+** [c d g]
+
+untrace matches;
+
+Here's a neater version using while:
+
+define findmid(list) -> result;
+    lvars wd litem ritem rest;
+    [] -> result;
+    while list matches
+        ![== ?litem:isinteger ?wd:isword ?ritem:isinteger ??rest]
+    do
+        [found ^litem ^wd ^ritem] =>        ;;; needed only for tracing
+        [^^result ^wd] -> result;
+        [^ritem  ^^rest] -> list;
+    endwhile;
+enddefine;
+
+;;; test it
+findmid([1 2 a b 3 c 4 d 5 6 e f 7 g 8 h i])=>
+** [found 3 c 4]
+** [found 4 d 5]
+** [found 7 g 8]
+** [c d g]
+
+-- Looking for individual items in a list which match a pattern -------------
+
+Suppose we have a list of lists, and we want to find all the lists which
+have a certain form. We could define a predicate to recognise lists of that
+form, and use the ideas in teach collect. But often we can use the matcher
+to do the recognising.
+
+vars people;
+[
+    [name fred age 95 sex male job [vice chancellor]]
+    [ age 62 name joe sex female job dustperson]
+    [sex female name mary age 22 job [prime minister] ]
+    [name suzy age 95 sex female job [vice chancellor]]
+    [name hugh age  2 sex male job professor]
+    [name ermintrude age 44 sex neuter ]
+] -> people;
+
+-- Defining findall ---------------------------------------------------
+
+Define a procedure which can be given an attribute and a value for that
+attribute, produce a list of all the people for whome the attribute has
+that value.
+
+define findall(data, att, val) -> list;
+    lvars record;
+    [] -> list;
+    for record in data do
+        if record matches [== ^att ^val ==  ] then
+            [^record ^^list] -> list;
+        endif
+    endfor;
+enddefine;
+
+findall(people,"age", 95) ==>
+** [[name suzy age 95 sex female job [vice chancellor]]
+    [name fred age 95 sex male job [vice chancellor]]]
+
+;;; Try that again after tracing matches.
+
+;;; Then
+untrace matches;
+
+-- findalljobs --------------------------------------------------------
+
+Finding all the jobs of such people could use the following:
+
+define findalljobs(data, att, val) -> list;
+    lvars record job;
+    [] -> list;
+    for record in data do
+        if record matches [== ^att ^val ==  ] then
+            record --> ! [== job ?job ==];
+            [^job ^^list] -> list;
+        endif
+    endfor;
+enddefine;
+
+findalljobs(people,"age", 95) ==>
+** [[vice chancellor] [vice chancellor]]
+
+We can use foreach to do this sort of thing. foreach uses "it" the way we
+used record, namely to refer to each thing which matched.
+
+If you want to write something like
+
+    lvars item;
+    for item in list do
+        if item matches <pattern> then
+            <actions>
+        endif
+    endfor
+
+This can be abbreviated to:
+    vars it;
+    foreach <pattern> in list do
+            <actions>                   ;;; use IT instead of ITEM
+    endforeach
+
+Because the variable IT will be changed in this procedure, we should define it
+as local, so as not to interfere with other procedures using this one and the
+variable IT. Outside a procedure we use "vars". Inside the procedure use
+"dlocal".
+
+define findalljobs(data, att, val) -> list;
+    dlocal it;
+    lvars job;
+    [] -> list;
+    foreach [== ^att ^val ==] in data do
+        it --> ! [== job ?job ==];
+        [^job ^^list] -> list;
+    endforeach;
+enddefine;
+
+The line:
+            it --> ! [== job ?job ==];
+means roughly
+        unless it matches ! [== job ?job ==] then
+            mishap(.....)
+        endunless;
+
+findalljobs(people, "age", 95) =>
+** [[vice chancellor] [vice chancellor]]
+
+Now re-write FINDALL using FOREACH!
+
+-- Using a global list of data: pfindall ------------------------------
+
+If we are always going to use the same list of records, we can define a
+version of findall which doesn't have an argument specifying which list
+of records. E.g. if the list is always the one called PEOPLE then we can
+define the procedure thus:
+
+define pfindall(att,val) -> results;
+    dlocal it;
+    [] -> results;
+    foreach [== ^att ^val == ] in people do
+        [^it ^^results ] -> results;
+    endforeach
+enddefine;
+
+
+pfindall("sex", "female")==>
+
+** [ [name suzy age 95 sex female job [vice chancellor]]
+    [sex female name mary age 22 job [prime minister]]
+    [age 62 name joe sex female job dustperson]]
+
+
+-- Exercise: findvals -------------------------------------------------
+
+Exercise: write a procedure call findvals, which looks in the list called
+PEOPLE for the values associated with a given attribute.
+E.g.
+    findvals("age") =>
+
+should produce a list of all the ages
+
+    ** [ 95 62 22 95 2 44]
+
+The procedure could start something like:
+
+    define findvals(att) -> results;
+        dlocal it;
+        ....
+        foreach [ .....<you do this>......] in .... do
+
+Complete the definition. Test it. Produce a little report showing it at work,
+and explaining what is going on.
+
+
+-- The database -------------------------------------------------------------
+
+The POP-11 database makes use of these mechanisms. E.g. the variable DATABASE
+is used by ADD, REMOVE, PRESENT etc. the way the variable PEOPLE has been used
+in the last few examples. That is DATABASE is a global variable, whose value
+is assumed to be a list of lists (just like PEOPLE was), and PRESENT searches
+the list, for an item matching a given pattern.
+
+So PRESENT could be defined roughly as follows
+
+    define present(pattern) -> bool;
+        for it in database do
+            if it matches pattern then
+                true -> bool; return()
+            endif
+        endfor;
+        false -> bool;
+    enddefine;
+
+people -> database;
+
+vars name;
+present([ == name ?name == age 95 ==]) =>
+** <true>
+it =>
+** [name fred age 95 sex male job [vice chancellor]]
+name =>
+** fred
+
+SEE ALSO:
+
+TEACH * MATCHES
+TEACH * DATABASE
+
+--- $poplocal/local/teach/matchcollect
+--- Copyright University of Birmingham 1996. All rights reserved. ------

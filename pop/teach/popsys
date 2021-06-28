@@ -1,0 +1,192 @@
+TEACH POPSYS                                        Steve Hardy Dec 1982
+
+INCOMPLETE
+
+
+                       HOW THE POP11 SYSTEM WORKS
+                       ==========================
+
+                                Keywords
+                                --------
+
+Compiler, interpreter, LISP,  machine  code,  syntax  analysis,  lexical
+analysis, list cell, garbage collection.
+
+This handout points out those areas of computer science necessary for an
+understanding (even slight) of how the POP11 system works. More detailed
+discussion of some of the topics presented here can be found in TEACH VM
+and TEACH GC.
+
+We can divide an understanding of how the POP11 system  works  into  two
+parts.  Firstly,  how  is  the  translation from POP11 to a language the
+machine can  understand  done,  and  secondly,  how  are  the  important
+features of POP11. (In particular list structures,) implemented?
+
+An important phase in the translation process is  the  formation  of  an
+intermediate  representation  of  the  program  that  is called a 'parse
+tree'. This parse tree is in many ways analagous to a LISP  program  and
+so  an  understanding  of  LISP itself is useful. There is then a second
+phase of translation from LISP to machine code. To completely understand
+the second phase of translation, the reader must understand something of
+machine code itself.
+
+The two principal data structures of POP11 (and LISP) are "the word" and
+"the  list". We need to know how these can be represented on the VAX's
+memory - this, of course,  requires  an  understanding  of  the  VAX's
+memory.
+
+A third important aspect of understanding POP11 is the operating system,
+for it is via the operating system that POP11 programs communicate with the
+'world'.
+
+                         Translation Into LISP
+                         ----------------------
+
+Translation of a  high  level  language  like  POP11  into  a  LISP-like
+language  is  usually called syntax analysis. This topic is described in
+most books on compiling  techniques  and  is  usually  dependent  on  an
+understanding of "transformational grammars".
+
+A related topic  is  'lexical  analysis',  that  is  the  conversion  of
+characters (e.g. 'C','A','T') into symbols, (e.g. "CAT").
+
+                                  LISP
+                                  ----
+
+No actual compiler would produce LISP as an intermediate  representation
+of  a  program.  However,  the parse trees produced will usually be very
+like LISP and as LISP is well documented I will use it as a analogy  for
+a parse tree. There are many manuals on LISP itself.
+
+Here is an example of a POP11 program:
+
+       define sum(list);
+             if      list = []
+             then    0
+             else    hd(list) + sum(tl(list))
+             endif
+       enddefine;
+
+Here is the same program in LISP
+
+       (define (sum list)
+             (cond ((null list) 0)
+                     (t (plus (hd list)
+                             (sum (tl list))))))
+
+Notice that in LISP, expressions are represented by lists.   The  HD  of
+such  a  list  is  the  name of a procedure to be applied and the TL its
+arguments.  Notice, also, that the arguments of COND  are  'condition  -
+consequent' pairs.
+
+An important feature of LISP is that it can be "interpreted" by  a  LISP
+interpreter.   Therefore, it is useful if a reader understands something
+of the way LISP is interpreted in a LISP system.
+
+                            Code Generation
+                            ---------------
+
+One of the disadvantages  of  interpreting  code  is  that  one  usually
+requires  a  complicated  program, written in a simple language (usually
+machine code) to  do  the  interpreting.  Furthermore,  interpreting  is
+inevitably  slower  than  direct  execution  by  the  machine  itself. A
+tremendous increase in efficiency can be achieved  by  translating  LISP
+into  machine  code.  When  carried  out  by a compiler, this process is
+called "code generation".
+
+Here is an example of a LISP expression;
+
+       (plus (hd list)
+             (sum (tl list)))
+
+and here is its translation into a simple machine code:
+
+       push list
+       call hd
+       push list
+       call tl
+       call sum
+       call plus
+
+                              Machine Code
+                              ------------
+
+Machine code is a language, specific  to  each  machine,  which  can  be
+understood  by  the  hardware  of  the  machine  itself.  That  is,  the
+interpreter for machine code IS the machine. Perhaps surprisingly,  most
+modern  computers  have a very similar sort of language as their machine
+code. Each instruction in a machine code program  will  usually  perform
+some very simple operation, for example:-
+
+    (1)  Putting the value of a variable on to a stack.
+    (2)  Putting a literal (e.g. a number) on to a stack.
+    (3)  Taking the top item from the stack and putting it into a variable.
+    (4)  Calling a sub-routine.
+    (5)  Returning from a sub-routine.
+    (6)  A jump instruction which  breaks  the  normal  sequential  flow  of
+     control.
+    (7)  All programming languages  require  the  ability  to  conditionally
+     execute  code. One way of doing this is to have a "conditional jump
+     instruction". Unlike the jump instruction, this label will only  be
+     "gone  to"  if some 'condition' is met (e.g. the top element of the
+     stack being TRUE).
+
+                             Machine Memory
+                             --------------
+
+Most computers have a very simple memory structure. A  large  number  of
+numbered "words" - each word of the computer's memory can hold a number.
+This contained number can be interpreted in any way we wish, for example
+as  an  instruction  to  the hardware, as a character (e.g. A = 1, B = 2
+etc.), as the address of  another  word  in  the  machine's  memory,  "a
+pointer" or, of course, as a number.
+
+For a more detailed explanation of how we can  represent  POP11  objects
+such as words and lists in this sort of memory, see the * WAL demo.
+
+                           Garbage Collection
+                           ------------------
+
+The computer only has a finite memory (in our case about 1 million words)
+As  the  POP11 program is running it is creating various data structures
+(e.g. lists,  words,  procedures,  etc.).   These  data  structures  are
+represented  using some of the machine's memory. A problem arises - what
+happens when the POP11 system has used all of the memory allocated to it
+by  the operating system?  Now, many data structures are only temporary,
+they are created, used for a while  and  then  no  longer  wanted.  (For
+example, a procedure is re-defined, the data structure used to represent
+the old definition  is  no  longer  wanted.  POP11  contains  a  set  of
+procedures collectively called the "garbage collector" which attempts to
+guess which of the data structures  currently  existing  are  no  longer
+wanted.  These  unwanted data structures are then made available for re-
+use.
+
+                          The Operating System
+                          --------------------
+
+There is a set of programs collectively called  'the  operating  system'
+which exist to help programs make the best use possible of the computer.
+They have two important rules:-
+
+     (1)  The computer would be under-used if only one person could  use
+     it  at  a  time. When that one person was sat thinking, the machine
+     would be idle. To prevent  this  happening,  the  operating  system
+     allows  many  people  to use the machine on a "time sharing" basis.
+     First one user has her program running  and  then,  whilst  she  is
+     thinking,  another user's program can run. If more than one program
+     is runnable at any given moment, the operating  system  gives  them
+     equal  shares  of  the  computer's  time. The operating system also
+     protects users from one another (and indeed, protects  itself  from
+     them)  if  one  user has an area that should not affect others. For
+     this reason, the operating system  clearly  defines  what  sort  of
+     access  each user can have to the machine (for example, how much of
+     the computer's memory they are allowed to use).
+     (2)  Almost all programs want to communicate with the world in some
+     way,  for  example  by  reading  input from the teletype or sending
+     output to the teletype or accessing the discs. These tasks are very
+     fiddly  and  moreover,  it  is essentially the same task, no matter
+     what program the user wants to run. For this  reason,  instructions
+     on  how  to  work  the  individual  devices  are  made  part of the
+     operating system (thus preventing unnecessary duplication of code).
+
+-----<Copyright University of Sussex 1987.  All rights reserved.>-------

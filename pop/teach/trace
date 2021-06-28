@@ -1,0 +1,239 @@
+TEACH TRACE                                       Aaron Sloman, Nov 1982
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- TRACING POP-11 PROCEDURES
+ -- TRACING DATABASE PROCEDURES
+ -- REVISION QUESTIONS
+ -- TRACING A RECURSIVE PROCEDURE
+
+
+-- TRACING POP-11 PROCEDURES -------------------------------------------
+
+It is often useful when running a program to have information printed
+out about which procedures are run and what their inputs and outputs
+are.
+
+The TRACE command can be used to POP11 tell you each time that a
+selected procedure starts or finishes.
+
+For example suppose you define a pair of (rather silly) procedures as
+follows:
+
+    define double(x) -> z;
+        x + x -> z;
+    enddefine;
+
+    define doublesum(x, y) -> z;
+        double(x) + double(y) -> z;
+    enddefine;
+
+The second calls the first, and can be used thus:
+
+    doublesum(2, 3) =>
+    ** 10
+
+In order to get POP11 to show us more clearly what is going on we can
+TRACE the two procedures, thus:
+
+    trace double doublesum;
+    doublesum(4, 5) =>
+    > doublesum 4 5                 ;;; entering DOUBLESUM with 4 and 5
+    !> double 4                     ;;; entering DOUBLE with argument 4
+    !< double 8                     ;;; leaving DOUBLE with result 8
+    !> double 5                     ;;; entering DOUBLE with argument 5
+    !< double 10                    ;;; leaving DOUBLE with result 10
+    < doublesum 18                  ;;; leaving DOUBLESUM with result 18
+    ** 18
+
+The '>' symbol indicates the beginning of a procedure, and '<' indicates
+the end. The indentation, by means of exclamation marks, lets you see
+that the procedure DOUBLE is being used inside another traced procedure,
+namely DOUBLESUM.  In fact, within the single run of DOUBLESUM, the
+procedure DOUBLE starts and finishes twice, with different inputs and
+outputs. The line with the two asterisks is produced by the print-arrow
+'=>' printing out the result of DOUBLESUM.
+
+Here's another example:
+
+    doublesum(3, 20) =>
+    > doublesum 3 20
+    !> double 3
+    !< double 6
+    !> double 20
+    !< double 40
+    < doublesum 46
+    ** 46
+
+To stop trace printing of one or more procedures, use UNTRACE e.g.
+
+    untrace double doublesum;
+    doublesum(3, 20) =>
+    ** 46
+
+
+N.B. The TRACE command does not of itself produce any printing.
+
+    trace double doublesum;
+
+This merely alters the two procedures DOUBLE and DOUBLESUM so that IF
+they are ever run in future they will cause the trace printing to occur.
+You can think of TRACE as if it adds an extra instruction and the
+beginning and end of each procedure, namely instructions to print
+information about starting and finishing of the procedures.
+
+
+-- TRACING DATABASE PROCEDURES -----------------------------------------
+
+If you are using the database procedures ADD and REMOVE, in your
+programs it is often useful to know when the database is being changed
+as your procedures run. For example, suppose you record the ages of
+people in the POP-11 database in a format like the following:
+
+    [the age of john is 22]
+    [the age of mary is 26]
+
+You could then have a procedure to record a birthday, thus:
+
+    define birthday(person);
+        vars age;
+        remove([the age of ^^person is ?age]);
+        age + 1 -> age;
+        add([the age of ^^person is ^age]);
+    enddefine;
+
+When you run this procedure it will alter the database:
+
+    database =>
+    ** [[the age of mary is 27] [the age of john is 22]]
+    birthday([john]);
+    ** [[the age of mary is 27] [the age of john is 23]]
+
+You can make the program show you how the database is being altered,
+thus:
+
+    trace add remove birthday;
+
+The TRACE command does not itself cause anything to be printed out.
+Rather it alters the procedures ADD and REMOVE so that later, when they
+run, they tell you that they are doing so. They indicate when they start
+and when they finish, thus:
+
+    birthday([john]);
+    > birthday [john]
+    !> remove [the age of john is ? age]
+    !< remove
+    !> add [the age of john is 24]
+    !< add
+    < birthday
+
+
+    birthday([mary]);
+    > birthday [mary]
+    !> remove [the age of mary is ? age]
+    !< remove
+    !> add [the age of mary is 28]
+    !< add
+    < birthday
+    database =>
+    ** [[the age of mary is 28] [the age of john is 24]]
+
+
+-- REVISION QUESTIONS --------------------------------------------------
+
+Does a TRACE command make any printing occur immediately?
+
+What does TRACE BIRTHDAY; do to the procedure BIRTHDAY?
+
+What symbol is used to indicate that a traced procedure is starting to
+run? What symbol is used to indicate that it is finishing?
+
+What do the exclamation marks signify?
+
+Besides the name of the procedure starting or finishing, and the symbols
+">" or "<" and exclamation marks, what else may be printed out by a
+traced procedure?
+
+The rest of this file is for more advanced students. If you have only
+done a few weeks of programming, you should stop here. Pressing the
+'ESC' key then a lowercase Q will quit this TEACH file.
+
+
+-- TRACING A RECURSIVE PROCEDURE ---------------------------------------
+
+For a more spectacular example of the effect of TRACE try the following.
+We define a procedure which will take an object and a list and produce
+the result TRUE if the object is in the list, otherwise FALSE. The
+strategy is to see if the list is empty, in which case the result must
+be FALSE. Otherwise see if the object is the first element of the list
+in which case the result must be TRUE. Otherwise use the same procedure
+to check if the object is in the TAIL of the list, i.e. the list
+consisting of all but the first element. In POP-11 the procedure TL can
+be used to get at the tail of a list.
+
+    define iselement(item, list) -> answer;
+        if list = [] then
+            false -> answer;
+        elseif item = list(1) then
+            true -> answer;
+        else
+            iselement(item, tl(list)) -> answer;
+        endif
+    enddefine;
+
+    iselement("cat", [dog cat mouse]) =>
+    ** <true>
+
+We can now see how ISELEMENT arrives at its result, by tracing it:
+
+    trace iselement;
+
+This produces no printing, but the same command as before does:
+
+    iselement("cat", [dog cat mouse]) =>
+    > iselement cat [dog cat mouse]
+    !> iselement cat [cat mouse]
+    !< iselement <true>
+    < iselement <true>
+    ** <true>
+    iselement("pig", [dog cat mouse]) =>
+    > iselement pig [dog cat mouse]
+    !> iselement pig [cat mouse]
+    !!> iselement pig [mouse]
+    !!!> iselement pig []
+    !!!< iselement <false>
+    !!< iselement <false>
+    !< iselement <false>
+    < iselement <false>
+    ** <false>
+
+We can switch off the tracing of ISELEMENT:
+
+    untrace iselement;
+    iselement("pig", [dog cat mouse]) =>
+    ** <false>
+
+You can switch off ALL trace printing by doing
+
+    false -> tracing;
+
+or, equivalently
+
+    untrace;
+
+You can restart tracing of previously traced procedures with
+
+    true -> tracing;
+
+or, equivalently:
+
+    trace;
+
+All other uses of TRACE and UNTRACE (i.e. with named procedures), will
+set TRACING to be TRUE. This may cause some odd behaviour if you have
+declared a variable of your own called "tracing".
+
+For more advanced tracing facilities see HELP * TRACE
+
+--- C.all/teach/trace --------------------------------------------------
+--- Copyright University of Sussex 1988. All rights reserved. ----------

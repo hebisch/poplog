@@ -1,0 +1,1726 @@
+TEACH RECURSION                                        A.Sloman Jan 1997
+
+Based on
+TEACH RECURSE1                                  Steven Hardy August 1978
+                                               Updated A.Sloman Nov 1989
+                                           Updated to use lvars Oct 1996
+                                                  Minor updates Jan 2001
+
+
+                     RECURSIVE PROCEDURE DEFINITIONS
+                    (Illustrated with POP11 examples)
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Introduction
+ -- Example: Arithmetic expressions
+ -- Prerequisites for the rest of this file
+ -- The example of factorial
+ -- Why are circular definitions permitted?
+ -- Example: adding the numbers in a list
+ -- Expressing sum in Pop-11
+ -- Using the Pop-11 tracer on a recursive procedure
+ -- Using the functional style
+ -- Finding the largest number in a list
+ -- A Pop-11 definition of largest(list)
+ -- Does largest really need to test whether the length exceeds 1?
+ -- An inefficient definition of "largest"
+ -- A more efficient version of largest
+ -- Searching procedures and accumulating procedures
+ -- The importance of recursion
+ -- Recursion vs iteration (loops)
+ -- How recursion works: the "little man" metaphor
+ -- How elves run a procedure from a script
+ -- -- What happens when other elves are active on sub-tasks
+ -- -- Why Elf1 needs a separate script with space for local variables
+ -- -- Elf2 runs the recursive call
+ -- Demonstrating how elves start and stop procedures
+ -- -- Elves need instruction pointers
+ -- Designing a recursive procedure
+ -- Exercise: listsize
+ -- Exercise: countwords
+ -- Exercise: nonwords
+ -- Searching a tree
+ -- -- Counting the elements of a tree
+ -- Exercise: addup_items
+ -- Exercise: find_items
+ -- Exercise: findbetween
+ -- Evaluating arithmetic expressions
+ -- Further work
+ -- Some things to do:
+
+-- Introduction -------------------------------------------------------
+
+This teach file discusses 'recursive' definitions, that is defining some
+concept in terms of itself (or some group of concepts in terms of each
+other).
+
+For example you cannot say what a noun phrase is without including the
+possibility of a noun phrase that contains a prepositional phrase, e.g.
+
+    the man on the moon
+
+However, you cannot specify what a prepositional phrase is without
+saying that it can contain a preposition and a noun phrase, e.g.
+
+    on the moon
+
+TEACH GRAMMAR introduces recursive definitions of grammatical
+constructs.
+
+It is also often useful to use recursion in defining a procedure. An
+example is the procedure for evaluating an arithmetic expression, whose
+components may also be arithmetic expressions.
+
+
+-- Example: Arithmetic expressions ------------------------------------
+
+Consider arithmetical expressions, which we can represent a lists, where
+each expression starts with an operator, e.g. + or * or / and one or
+more arguments, which may themselves be arithmetical expressions. Thus
+the following are lists representing arithmetical expressions:
+
+    [+ [- 3 2] [* 4 5]]           which evaluates to 21
+
+    [/ [* [+ 3 2] [- 4 8]] 2]     which evaluates to -10
+
+Notice that I defined an arithmetical expression as something that could
+include arithmetical expressions. However I implicitly assumed that the
+numbers on their own, 2, 3, 4, 5, 8 etc. were all arithmetic
+expressions.
+
+Also the definition of the procedure to evaluate an arithmetical
+expression says that if it is a number then the value is just that
+number otherwise evaluate the arguments and then apply the operator to
+the results.
+
+That's recursive, as it defines evaluation in terms of evaluation.
+
+Some people object to circular definitions. But these circular, or
+recursive definitions, or types of structures and of procedures are not
+viciously circular, because they always "bottom-out" on something that
+is handled without further recursion.
+
+-- Prerequisites for the rest of this file ----------------------------
+
+The examples below assume that you are familiar with procedure
+definitions in POP-11 (see TEACH * DEFINE), including the definition of
+procedures with inputs and outputs.
+
+You should also be familiar with the basic arithmetical operations
+
+    +   (plus)
+    -   (minus)
+    *   (multiplied by)
+
+and the elements of list processing, as introduced in TEACH * LISTS.
+In particular, you need to know that
+
+    (a) [] is an empty list
+    (b) HD is a built-in operation to find the first element of a list
+    (c) TL is a built-in operation to find the tail of a list, where
+        the tail of L is a list containing all the elements of L except
+        the first.
+
+
+-- The example of factorial -------------------------------------------
+
+An example which may be familiar to you is the definition of a
+factorial, a concept often used in mathematics. The factorial of a
+number is got by multiplying together all the numbers from 1 up to that
+number.
+
+So (using "*" for multiplication) we have the following examples:
+
+Factorial of 5 is
+
+    5 * 4 * 3 * 2 * 1
+
+which is 120. Factorial of 9 is
+
+    9 * 8 * 7 * 6 * 5 * 4 * 3 * 2 * 1
+
+which is 362880 !
+
+It is easy to give examples of this concept, but how can we define it
+in general for any number? Here is one way:
+
+
+    (a) factorial 1 is 1.
+    (b) factorial of a number n greater than 1 is n multiplied by the
+        factorial of n-1,
+
+We represent the factorial of n as "factorial(n)", though mathematicians
+often represent it as "n!" and read it as "n factorial".
+
+From (a) and (b) you can work out the factorial of any number. For
+example, because 3 is greater than 1, definition (b) implies that
+factorial of 3 is :
+
+    3 * factorial(2)
+
+Because 2 is also greater than 1, factorial(2) is 2 * factorial(2 - 1),
+so we can replace "factorial(2)" above giving:
+
+    3 * 2 * factorial(1)
+
+and, because factorial 1 is 1 (using definition (a)),  that is
+
+    3 * 2 * 1
+
+
+Algebraically the definition reads:
+
+    (a) factorial(1) = 1
+    (b) if n > 1 then  factorial(n) = n * factorial(n-1)
+
+We can express that in Pop-11 thus:
+
+
+define factorial(num) -> result;
+    ;;; compute the factorial of a number
+
+    if num == 1 then 1 -> result
+    else
+        num * factorial(num - 1) -> result
+    endif
+
+enddefine;
+
+Now compile that and try it out on these examples:
+
+factorial(1) =>
+** 1
+factorial(5) =>
+** 120
+factorial(50) =>
+** 30414093201713378043612608166064768844377641568960512000000000000
+
+
+-- Why are circular definitions permitted? ----------------------------
+
+That second clause, (b) defines 'factorial' in terms of factorial - how
+is that possible without endless circularity?
+
+The key idea, which is often hard to remember, is that once a procedure
+P has been defined and the definition has been compiled, any procedure
+can use P. I.e. any procedure can "call" P, provided that it gives P the
+appropriate inputs. The caller will simply wait till P's instructions
+have been obeyed, and then continue.
+
+If ANY procedure can use P, then P can also use P. I.e. it can use
+itself to solve some sub-problems. While writing the instructions for P
+you may find it hard to believe that P can be used in the middle,
+because the definition has not yet been completed. However, once the
+procedure has been compiled, all the instructions for doing P are in the
+computer.
+
+So when P calls P, the computer will do exactly the same as if anything
+else calls P: i.e. it will run the instructions for doing P.
+
+Those instructions may also call P. But if the procedure is well
+designed it will not go on forever calling itself. Eventually it will
+reach a point where the answer is given in some other way. For example
+in the case where the number is 1 the factorial is defined directly as
+1, so that's where the recursion stops. For instance in the case of
+factorial(50) the procedure had to deal with 49, 48, 47, ... etc. until
+it got down to 1, when the recursion stopped (though the procedure
+continued using the result).
+
+However if you try to compute the factorial of -30, the recursion will
+never stop, for the sequence of numbers is then
+
+    -30, -31, -32, -33 ....
+
+which never reaches 1.
+
+
+-- Example: adding the numbers in a list ------------------------------
+
+We'll now use a slightly different example, as some readers will be
+unfamiliar with factorial and may find the concept unmotivated.
+
+You often have to add up a set of numbers. Suppose we represent a set
+of numbers by a list, e.g.
+
+    [3 5 13 6 22 4]
+
+You probably know how to add up the numbers presented in such a list,
+but can you tell a computer how to do it?
+
+Consider the following definition of the 'the sum of a set of numbers':
+
+    (a) The sum of a set of numbers is zero if the set is empty
+    (b) otherwise it is the first element of the set plus the
+        sum of the rest of the set.
+
+(b) Implies that the sum of the numbers in [3 5 13 6 22 4], which we
+can represent as sum([3 5 13 6 22 4]) is
+
+    3 + sum([5 13 6 22 4])
+
+since [5 13 6 22 4] is the tail of the list. Once again we can use
+the definition (b) to "expand this" giving
+
+    3 + 5 + sum([13 6 22 4])
+
+using (b) repeatedly we eventually get to
+
+    3 + 5 + 13 + 6 + 22 + sum([4])
+
+and then, (since [] is the tail of [4]):
+
+    3 + 5 + 13 + 6 + 22 + 4 + sum([])
+
+To finish this off, we have to use definition (a), giving
+
+    3 + 5 + 13 + 6 + 22 + 4 + 0
+
+We can define "sum" more formally thus:
+
+    (a) sum([]) = 0
+
+    (b) if L is not empty then
+        sum(L) = hd(L) + sum(tl(L))
+
+where "hd" is the Pop-11 procedure that gives the first element of the
+list, and "tl" is the procedure that gives the tail, i.e. a list
+containing all elements apart from the first.
+
+Notice that hd and tl are not defined for empty list: these Pop-11
+procedures give an error if applied to []. But this is not a problem,
+since case (b) excludes the possibility of L being the empty list.
+
+
+-- Expressing sum in Pop-11 -------------------------------------------
+
+When translated into POP11 the above definition becomes:
+
+    define sum(set) -> total;
+      if set == [] then
+          0 -> total
+      else
+          hd(set) + sum(tl(set)) -> total
+      endif
+    enddefine;
+
+You should be able to test that procedure on a number of examples.
+
+    sum([]) =>
+    ** 0
+
+    sum([15]) =>
+    ** 15
+
+    sum([1 3 5 7]) =>
+    ** 16
+
+    ;;; find the sum of a list containing number 1, 2, ... 1000
+    vars x;
+    sum([% for x from 1 to 1000 do x endfor %]) =>
+    ** 500500
+
+-- Using the Pop-11 tracer on a recursive procedure -------------------
+
+One advantage of recursive procedures is that if you trace them then
+the trace information shows exactly what they are doing.
+
+Use the Pop-11 tracer to help you see what is going on when sum runs.
+Trace "sum" and "tl" and "+".
+
+    trace sum tl +;
+
+(Because "tl" and "+" are "system" procedures you will have to
+recompile "sum" to make the tracing work for them.
+
+    sum([1 3 5]) =>
+    > sum [1 3 5]        ;;; Going into sum with [1 3 5]
+    !> tl [1 3 5]        ;;; Calling tl to get the tail
+    !< tl [3 5]          ;;; tl returns [3 5], for the recursive call
+    !> sum [3 5]         ;;; Calling sum recursively with the tail
+    !!> tl [3 5]         ;;; The new call of sum needs the tail of [3 5]
+    !!< tl [5]           ;;; tl returns [5]
+    !!> sum [5]          ;;; Call sum recursively with the new tail [5]
+    !!!> tl [5]          ;;; The new call of sum needs tail of [5]
+    !!!< tl []           ;;; which is the empty list
+    !!!> sum []          ;;; Call sum recursively with the empty list
+    !!!< sum 0           ;;; At last sum knows what to return - 0
+    !!!> + 5 0           ;;; Call + with the previous head and 0
+    !!!< + 5             ;;; Plus returns the result 5
+    !!< sum 5            ;;; which is then used as the result of sum
+    !!> + 3 5            ;;; Call plus with previous head and previous
+    !!< + 8              ;;; result: Plus returns 8
+    !< sum 8             ;;; which is then returned by sum
+    !> + 1 8             ;;; At last the initial call of sum can
+    !< + 9               ;;; call + with 1 and 8, getting back 9
+    < sum 9              ;;; which is the final result of sum
+    ** 9                 ;;; And "=>" prints it out
+
+
+Notice how NO addition is done until after the recursion has got to the
+end of the list, and produced the first result, the number 0.
+
+We can see the same thing without the tracing of "+" and "tl".
+
+    untrace + tl;
+    sum([1 3 5]) =>
+    > sum [1 3 5]
+    !> sum [3 5]
+    !!> sum [5]
+    !!!> sum []
+    !!!< sum 0
+    !!< sum 5
+    !< sum 8
+    < sum 9
+    ** 9
+
+-- Using the functional style -----------------------------------------
+
+Some people find that the output local variables clutter up the
+procedure definitions given above, and prefer to use the following form
+of definition, sometimes referred to as "the functional style":
+
+    define sum(set);
+      if set == [] then
+          0
+      else
+          hd(set) + sum(tl(set))
+      endif
+    enddefine;
+
+As far as Pop-11 is concerned this is equivalent to the previous
+version. However, in more complex cases it is convenient for the header
+to make it clear that the procedure returns one result. So having an
+output local is helpful. You can compromise by using the following
+format, which is also equivalent to the above, but is slightly less
+cluttered.
+
+    define sum(set) -> total;
+      if set == [] then
+          0
+      else
+          hd(set) + sum(tl(set))
+      endif  -> total
+    enddefine;
+
+In this format you don't have to do an explicit assignment in each
+branch of the conditional expression. You simply assign the result of
+evaluating the conditional expression to the output local variable, in
+this case total. This has the advantage that if you omit the "else"
+clause, a common problem in such cases, you'll get an error message when
+the explicit conditions are all false, instead of an obscure result
+being returned which causes an error to occur later.
+
+If you forget to assign to the output local you'll get the following
+obscure result, or worse in some implementations of Pop-11.
+
+    define sum(set) -> total;
+      ;;; buggy version, where total is not given a value
+      if set == [] then
+          0
+      else
+          hd(set) + sum(tl(set))
+      endif
+    enddefine;
+
+    ;;; test it
+    sum([3 5]) =>
+    ** 3 5 0 0
+
+    sum([1 2 3]) =>
+    ** 1 2 3 0 0
+
+All the recursive calls produce spurious extra results, one for the
+value of the conditional and one for the value of total, which on a Sun
+computer defaults to 0. On some implementations an uninitialised lexical
+variable might default to garbage.
+
+Exercise: define an iterative version of sum, using the format
+
+    for item in list do .... endfor
+
+Compare your iterative version with the above recursive versions, and
+try to decide which you prefer. Can you trace the iterative version to
+see how it behaves?
+
+For more on the "functional style" of programming, see
+    TEACH * FUNCTIONAL.STYLE
+
+
+-- Finding the largest number in a list -------------------------------
+
+Consider finding the largest number in a list of numbers.
+
+We can specify what largest means along the same lines as before, except
+that now we say that if the list is empty there is no largest number. We
+can represent that by producing an error in that case.
+
+If there's only one element then that is the largest. Otherwise, find
+the largest element in the tail of the list, and compare that with the
+head of the list. The larger of the two is the largest in the original
+list.
+
+We can use the procedure "max" to specify this more precisely. max(x,y),
+where x and y are numbers, is always one of x and y, the larger one if
+one is larger, or x if they are the same number E.g.
+
+    max(3, 55) =>
+    ** 55
+    max(55, 3) =>
+    ** 55
+    max(55, 55) =>
+    ** 55
+    max(-3, -2) =>
+    ** -2
+
+
+We therefore have three cases to consider:
+
+    (a) If L = [] then largest(L) is undefined, and produces an error
+
+    (b) If L has only one element, then largest(L) is that element
+
+    (c) If L has more than one element then
+
+            largest(L) = max( hd(L) , largest( tl(L) ) )
+
+Notice that because "max" takes two numbers as input, this definition
+assumes that hd(L) is always a number and that largest(tl(L)) is always
+a number, which it must be if "largest" is defined properly!
+
+-- A Pop-11 definition of largest(list) -------------------------------
+
+One way of saying this in POP11 is:
+
+    define largest(list) -> result;
+      if tl(list) = [] then
+          hd(list)
+      elseif length(list) > 1 then
+          max( hd(list), largest(tl(list)) )
+      endif  -> result
+    enddefine;
+
+Test that definition:
+
+    largest([33]) =>
+    ** 33
+    largest([2 66 4 8]) =>
+    ** 66
+
+    vars ages = [23 42 17 9 16 32 15 12 7];
+
+    largest(ages) =>
+    ** 42
+
+Try some of your own examples.
+
+What happens if you give it the empty list?
+
+    largest([]) =>
+
+If the list given is empty, then the call of "tl" in the first condition
+will produce an mishap, with the error message
+
+    ;;; MISHAP - NON-EMPTY LIST NEEDED
+    ;;; INVOLVING:  []
+    ;;; DOING    :  tl largest ...
+
+
+Exercise:
+compile that procedure and testing it on some examples of lists of
+numbers, including the empty list. If you trace it, and trace max, then
+you can see how it works.
+
+To turn off tracing use
+    untrace largest;
+
+
+-- Does largest really need to test whether the length exceeds 1? -----
+
+If you think hard about it, you should be able to work out that
+the test for the length being more than 1 is redundant. The length
+cannot be 0 at that stage because an empty list would not have got
+past the call of "tl" in the first test: it would have produced an
+error. The length cannot be 1 because that would involve having a tail
+that is empty, so the first condition
+
+    tl(list) = []
+
+would be true, and the first action would be done, giving the result
+hd(list).
+
+So if the length is not 0 and not 1, then it must be greater than 1,
+by the time it gets to the "elseif" instruction. Hence the test is
+redundant.
+
+We can therefore have a more economical definition without the second
+condition, thus:
+
+    define largest(list) -> result;
+      if tl(list) == [] then
+          hd(list)
+      else
+          max( hd(list), largest(tl(list)) )
+      endif  -> result
+    enddefine;
+
+
+-- An inefficient definition of "largest" -----------------------------
+
+We can also define largest differently, without using "max". Instead
+we can use the arithmetic operator ">", i.e. "greater than", thus:
+
+    define largest(list) -> result;
+      if tl(list) = [] then
+          hd(list)
+      elseif hd(list) > largest(tl(list)) then
+          hd(list)
+      else
+          largest(tl(list))
+      endif -> result
+    enddefine;
+
+Try compiling and testing that one, to make sure it works (using trace
+if necessary).
+
+Notice that if the "elseif" condition is FALSE, then it will call
+largest on the tail TWICE. So you may find, if you trace this, that it
+has more recursive calls than you expect. This means that it is a
+wasteful definition. Look back at the previous definition to see why it
+did not need to call largest(tl(list)) twice.
+
+-- A more efficient version of largest --------------------------------
+
+We can avoid calling it twice by calling it once and storing the result
+temporarily in a local variable "temp", and use that to
+compare with the head of the list, without having to find the largest
+again if the head of the list is smaller than temp. So
+
+    define largest(list) -> result;
+
+      if tl(list) == [] then
+          hd(list)
+      else
+
+        ;;; Get the largest from the tail
+        lvars temp = largest(tl(list));
+
+        ;;; Now check whether to use this as the final result or not
+        if hd(list) > temp then
+            ;;; The head is bigger, so use it
+            hd(list)
+        else
+            ;;; use temp, as it is bigger or the same
+            temp
+        endif
+      endif  -> result
+    enddefine;
+
+
+Compile and test that. Make sure you choose a "good" set of test
+examples. What is a good set?
+
+Here is a slightly different version, which avoids the extra local
+variable temp, by using the output local variable result as the
+temporary variable. Here we have to assign to result on each conditional
+branch. (Why?)
+
+    define largest(list) -> result;
+
+      if tl(list) == [] then
+          hd(list) -> result;
+      else
+        ;;; get the largest element in the tail
+        largest(tl(list)) -> result;
+
+        ;;; now check whether to use this as the final result or not
+        if hd(list) > result then
+            ;;; The head is bigger, so use it
+            hd(list) -> result
+            ;;; no need for an else clause: just use result as it is
+        endif
+      endif
+    enddefine;
+
+
+Exercise:
+Use recursion to define a procedure smallest, that can be given a list
+of numbers and returns the smallest one. Test your procedure with
+different lists of numbers, including a list containing only negative
+numbers.
+
+Try also writing an iterative definition of smallest, using
+    for num in list do ... endfor
+
+
+-- Searching procedures and accumulating procedures -------------------
+
+Notice that unlike the procedure sum, defined above, the procedure
+largest sometimes DISCARDS the result of the recursive call on the tail
+of list, after using the result to compare with the head of the list.
+
+It discards the result when the head of the list is bigger.
+That is because largest is a searching procedure, not an accumulating
+procedure.
+
+An accumulating procedure builds up its result using everything it finds
+in the list.
+
+A searching procedure uses only one element of the list to create its
+result.
+
+An intermediate procedure could use a subset of its elements, e.g. a
+procedure that takes a list and returns a list of all the numbers in it
+that are between 3 and 30, for instance, or adds up all the numbers in
+the list between 3 and 30.
+
+The procedure sum is an accumulating procedure, as it uses every
+element in the list to build up the total. So we added the result from
+the recursive call to the head of the list.
+
+
+-- The importance of recursion ----------------------------------------
+
+In each of these procedure definitions - SUM and LARGEST - we see a
+mention of the procedure being defined. It is this feature that makes
+the definition recursive.
+
+Definitions of procedures, like definitions of almost anything else
+typically involve mentioning something that isn't part of the
+definition. Dictionary definitions always use words that aren't defined
+in that definition - how could they avoid it?
+
+Recursive definitions are just a very special case of this more general
+phenomenon - a phenomenon bound up with our capacity to NAME things -
+objects, procedures, events and so on. Once you can name a procedure,
+you can invoke it inside another procedure. If you can do that, you
+can invoke it inside itself.
+
+This circularity may appear to produce an infinite regress. Why does the
+recursion stop?
+
+If our recursive procedure is well defined, there are always special
+cases e.g. factorial(1), sum([]), or largest([3]) that don't involve
+recursion.
+
+Moreover, we define the procedure so that it always eventually gets to
+such "terminating" case when it recurses. That is how the recursion
+avoids going on forever. All recursive procedures must have one or more
+"stopping conditions".
+
+What the stopping condition is depends on the problem. Often it is the
+empty list, but we saw with "largest" that it was a list of length 1.
+
+Often the stopping condition in numerical recursive procedures is an
+input of 0, but with factorial, as we defined it, the stopping
+condition was an input value of 1.
+
+The significance of recursion lies in its ability to deal
+straightforwardly with variable structures. For example in sum, and
+largest, we used the same definition to cope with lists of very
+different lengths, from one element up to as many as can fit in the
+machine.
+
+-- Recursion vs iteration (loops) -------------------------------------
+
+In both of those cases, it would have been possible to use a loop
+instead of recursion, because the structures were all linear. Executing
+a loop is generally referred to as "iteration".
+
+Here is how we could define the above two procedures iteratively:
+
+define sum(set) -> total;
+    0 -> total;
+    lvars item;
+    for item in set do total + item -> total endfor
+enddefine;
+
+sum([3 4 5]) =>
+** 12
+
+define largest(list) -> result;
+
+    lvars item;
+    hd(list) -> result;
+
+    for item in tl(list) do
+        max(item, result) -> result
+    endfor
+
+enddefine;
+
+largest([3 4 5]) =>
+** 5
+largest([-3 -4 -5]) =>
+** -3
+
+Many people find iterative procedures much easier to design and
+certainly easier to create. That's because iterative constructs are very
+familiar from everyday life:
+
+    Keep walking till you see the station on your left.
+    Keep hitting the nail until its head is flat.
+    Examine every pocket in all your clothes until you find
+        the lost key.
+    Collect all the children who are over four feet tall.
+
+
+When dealing with a range of numbers it is very convenient to use a
+"for" loop, and similarly when searching down the elements of a list,
+using "for" or "foreach" is very easy, whether your procedure is an
+accumulating one or a searching one. (See HELP FOR, HELP FOREACH)
+
+However for investigating  or manipulating objects with more complex
+non-linear structures, recursion may be more appropriate.
+
+For example, one approach to a definition of complex sentences uses
+recursion in such a way as to 'embed' simple sentences inside another.
+Such an approach to language structures makes it possible to encompass a
+knowledge of potentially infinitely many sentences in a brain of only
+finite capacity.
+
+(See TEACH *ISASENT, and John Lyons, CHOMSKY, Fontana Modern Masters
+paperback).
+
+The example of evaluating arithmetic expressions, introduced above, is a
+natural case for the use of recursion, as we'll see below. The same is
+true of programs that search tree structures or network structures.
+
+
+-- How recursion works: the "little man" metaphor ---------------------
+
+A metaphor can be used to explain how the computer is able to understand
+these recursive definitions. (The metaphor is originally due to Seymour
+Papert, though it has been modified slightly here.)
+
+Imagine that inside the computer there is a library of procedure
+definitions each in the form of a set of instructions for running the
+procedure. For example it might include the following recursive
+definition of sum, introduced above
+
+    define sum(set) -> total;
+      if set == [] then
+          0
+      else
+          hd(set) + sum(tl(set))
+      endif  -> total
+    enddefine;
+
+The library also contains a data-structure section, were information
+is stored about the contents of various data-structures, such as lists,
+or strings.
+
+So for example if I do
+
+    vars ages = [23 42 17 9 16 32 15 12 7];
+
+Then the library has the information that the variable called "ages" has
+as its value the list of numbers
+
+    [23 42 17 9 16 32 15 12 7]
+
+Next to the library is a waiting room full of little men and little
+women (lets call them elves) sitting around doing nothing.
+
+There is also a table called "the stack" on which things can be placed
+by elves when then do their work. So if one elf asks another to compute
+something it gives that elf its inputs by putting them on the stack. The
+second elf takes what it needs from the stack, and when it is finished,
+if it produces some results it puts them on the stack.
+
+A "boss" elf, interacts with users and tells the other elves what to do.
+In particular each elf can be given a copy of the instructions for
+running a procedure and will know how to follow them.
+
+
+-- How elves run a procedure from a script ----------------------------
+
+So when you type in a request to run a procedure, for example, asking
+for the procedure sum to be used to add up a list of ages of people:
+
+    sum(ages) =>
+
+one of the elves in the waiting room is instructed by the boss to work
+this out for you. Suppose that is Elf1.
+
+The description that follows is quite complex. You may find it easier to
+understand if you create a diagram which keeps changing, depending on
+
+    o what items are on the stack,
+    o which elf is active,
+    o which elves are sleeping while they wait for another one to
+      finish.
+    o which set of procedure instructions each active or sleeping
+      elf has
+    o which instruction is the *current* one for each elf (whether
+      active or sleeping).
+
+This is what happens when the instruction sum(ages) is obeyed.
+
+The boss gives Elf1 a photocopy of the instructions defining the
+procedure SUM, and then finds on the stack information about where the
+list AGES is stored in the library (i.e. a pointer to the list), i.e.
+the list
+
+    [23 42 17 9 16 32 15 12 7]
+
+(NOTE:
+    Elf1 will not work on a copy of the list, but the list itself.
+    Sometimes programs have instructions to change the contents of a
+    list, and that may or may not cause problems. If the contents of the
+    original list are not to be changed, then the elves carrying out a
+    procedure could use a copy of the contents of the list, so that
+    changes made to the copy will not affect the original.
+    However, the instructions in the procedure SUM do not change
+    the contents of the list, so in this case no copy needs to be
+    made, and none is made.)
+
+Elf1 looks at the procedure header
+
+    define sum(set) -> total;
+
+From this, Elf1 learns
+
+(a) The procedure SUM has two local variables "set" and "total".
+    The first is an input local, the second an output local.
+    The first will be given a value at the beginning of the process,
+    as explained in point (b), and "total" will get a value later,
+    as described in point (c) below.
+    So Elf1 draws two boxes on the sheet of paper, one labelled "set"
+    (for the procedure's input) and one labelled "total" (for the
+    procedure's result, still to be worked out).
+
+    Similar boxes would be created for any other variables declared as
+    local in the procedure. (In the case of SUM, there are no more.)
+
+(b) Next Elf1 has to take one item from the stack, and temporarily
+    (i.e. while following the instructions for sum) call it "set".
+    This can be done by writing in the box labelled "set" whatever
+    was found on the stack (in this case a pointer to a list of numbers
+    in the library).
+
+(c) Nothing is written in the box labelled "total". But Elf1 notes that
+    just before the job is finished, i.e. when all the instructions
+    in the definition of SUM have been carried out, whatever has been
+    stored in the "total" box has to be put on the stack.
+    (That's where it could be found by another procedure that invoked
+    SUM.)
+
+Since Elf1 is going to go through different steps in the following the
+definition of SUM he could attach a label corresponding
+to each instruction in the definition (e.g. "I1", "I2", "I3", ...).
+Then he could create a box on his scriped labelled "Current
+instruction", and write "I1" in it, and then keep changing what is in
+the box as he steps through the instructions. (This requires an eraser.)
+Alternatively he could keep a finger on the current instruction and move
+it to the next instruction after each instruction is completed.
+
+To a first approximation, this produces the following labelled
+instructions:
+
+    I1: -> set
+        if
+    I2:     set == []
+        then
+    I3:     0
+        else
+    I4:     hd(set) + sum(tl(set))
+        endif
+    I5: -> total
+
+    I6: Put value of "total" on stack
+
+    I7: Tell boss elf I am finished.
+
+
+Where I1 is the instruction to get the input value from the stack and
+give it to "set", and I6 is the instruction to take whatever the value
+of "total" is and put it on the stack.
+
+The words "if" "then" "else" are "control" instructions. They
+help the elf decide what to do next. "if" says that the next
+instruction must produce a value that will be used to decide what to do
+after that.
+
+"next" says that if the test instruction produces the result true
+then instruction I3 should be obeyed (put the number 0 on the stack).
+
+"else" says that if the test instruction I2 produces the result false,
+then the next instruction is I4.
+
+There is also implicit information that whichever of I3 or I4 is obeyed
+the next instruction is that coming after "endif", namely I5.
+
+Working  through the definition of SUM Elf1 first does I1, i.e. gets
+whatever was at the top of the stack and writes it in the box labelled
+"set". (This will be information about the list in the the library).
+
+Then El1 turns to the next instruction (labelled "I2").
+
+    I2: set == []
+
+This is an instruction to run the equality procedure "==" with the value
+of "set" and the empty list.
+
+But the instructions given to Elf1 do not say how to do equality tests,
+So Elf1 puts the value of set on the stack, followed by the empty list
+[], and asks the boss to arrange for the procedure called "==" to be
+run.
+
+Then Elf1 goes to sleep, waiting to be woken up when that procedure is
+finished.
+
+The Boss gets another elf, e.g. Elf2, who then gets a copy of the
+instructions for doing a strict equality test (which is what "==")
+means.
+
+Elf2 finds that the script for "==" tells him to get the two things on
+the top of the stack and compare them.
+
+    []
+    [23 42 17 9 16 32 15 12 7]
+
+He decides that the result is false. So he puts the object FALSE on the
+stack, and tells the boss he has finished then goes back to the waiting
+room.
+
+The boss wakes up Elf1, who is waiting for the result of I2, and still
+has his finger on the "then".
+
+Elf1 looks at the stack, finds FALSE there, and concludes that the
+condition has failed.
+
+So he removes FALSE from the stack, jumps to after the word "else"
+where the instruction found is
+
+    I4:     hd(set) + sum(tl(set))
+
+This has to be broken down into several smaller instructions
+    invoke hd on set and put the result on the stack
+    invoke tl on set and put the result on the stack
+    invoke sum on what tl left on the stack, and then put
+        the result of sum (a number) on the stack
+    invoke + on the results of hd and sum, and put the
+        result, another number, on the stack.
+
+Most of that is done by other elves, obeying instructions for hd, for
+tl, for sum and for +.
+
+For example, when the first bit of I4 is done, the value of set is put
+on the stack, Elf1 tells the boss that the result of hd is wanted and
+then goes to sleep.
+
+Elf2 is called in, handed a copy of the instructions for hd, and
+finds on the stack a pointer to our list called "set" in the library.
+
+Elf2 follows the instructions for hd, i.e. looks in the list to get the
+first element, in this case the number 23, and then leaves the number 23
+on the stack as the result of the procedure hd. Elf2 informs the boss
+that running the procedure hd is finished, and the boss then wakes up
+Elf1, who does the next bit, i.e. tl(set), by putting the value of "set"
+on the stack and asking the boss to get an elf to do tl.
+
+
+When all the component in structions of I4 are done, Elf1 is woken up by
+the boss, and moves to instruction I5
+
+    I5: -> total
+
+This means removing the top item of the stack and writing it in the box
+labelled "total".
+
+Instructions I6 and I7 cause Elf1 to put the value of "total" on the
+stack and inform the boss that the job is complete.
+
+-- -- What happens when other elves are active on sub-tasks
+
+When the "==" test was required, Elf2 was given that task. Later
+Elf1 might be given other tasks, e.g. running the instructions for
+"hd", the instructions for "tl", the instructions for the recursive call
+of "sum", or the instructions for "+".
+
+The same Elf as before can be used because there is no need for the elf
+to remember anything about what it did previously: e.g. time it starts
+with a clean sheet, i.e. as set of instructions for a procedure.
+
+However if those instructions are complex, then that elf may have to
+wait for another elf to finish. So when Elf2 is running SUM on the
+shorter list it may need Elf3 to do various taks while Elf2 is sleeping.
+Elf1 is also sleeping but can't be used because Elf1 is in the middle
+of the original task and has to remember what to do on being woken up.
+
+-- -- Why Elf1 needs a separate script with space for local variables
+
+After another elf has run tl, Elf1 then wakes up, ignores the what has
+just been added to the stack and instead tells the boss that sum now
+needs to be run, in order to complete this bit of I4:
+
+    sum(tl(set))
+
+After the "nested" bit, i.e. tl(set) has been complete the following
+list, the tail of set, will have been left on the stack, (more precisely
+a pointer to it will be on the stack):
+
+    [42 17 9 16 32 15 12 7]
+
+Elf1 wakes up finds that step 5 requires the script for sum to be run.
+
+Now he is already running the script for sum, so you might think he
+could do it. But he has to remember where he is on that script (near the
+end of the else condition) and also what his value is for the local
+variable "set".
+
+If Elf1 tried to remember two (or more) locations and two (or more)
+values for the same variable, that could lead to confusion and error. So
+Elf1 sticks with the task of computing the sum of the original list, and
+asks the boss to get another elf to do the job of finding the sum of the
+tail of the list.
+
+So while Elf1 sits with its copy of the instructions for sum, another
+elf, possibly Elf2 again, is given a new copy of the instructions and
+is told to obey those instructions. Elf1 can then go back to sleep,
+while Elf2 gets the subsidiary task done.
+
+Elf2 will have different values for "set", and for "total" and while
+Elf1 sleeps waiting for Elf2 to do sum, Elf1 will have one *next*
+instruction to do and Elf2 will have a sequence of next instructions.
+
+So each of the elves needs its private workspace recording the values of
+the local variables and also which instruction is the current one.
+
+One way to achieve that is to think of each elf with a sheet of paper
+containing a script, with spaces in which it can write down its private
+information.
+
+You could try to invent a different model, e.g. one where there is only
+one elf which uses different bits of paper at different times, and keeps
+them in the right order so that as each one is finished with the
+preceding script is found with its "private" information safe and sound.
+
+
+-- -- Elf2 runs the recursive call
+
+Elf2 has to go through the same rigmarole as Elf1 has just been through,
+getting help with ==, hd, tl, and sum. So Elf2 will need yet another elf
+to do these tasks, while Elf2 waits patiently, i.e. sleeps.
+
+Elf3 could do all of them.
+
+However, when Elf3 is asked to do sum the list at the top of the stack
+is this:
+
+    [17 9 16 32 15 12 7]
+
+Then Elf4 will have to be used for various subtasks while Elf3 sleeps,
+and so on and so on, until eventually an elf, call it Elf11, turns up to
+find the empty list [] on the stack when it is asked to do the script
+for sum.
+
+Its task is then very easy, as it asks the next elf to do the equality
+test (==), and at last gets back the result TRUE on the stack. So at
+last, after these instructions
+
+        if
+    I2:     set == []
+        then
+
+it is possible to do instruction I3 (done for the first time):
+
+    I3:     0
+
+Then Elf11 can ignore I4 and jump to I5
+
+    I5: -> total
+
+which puts 0 in the box for total.
+
+So Elf11 does that, then does the next two instructions I6 and I7.
+
+So the previous instruction is woken up  in the middle of instruction I4
+
+    I4:     hd(set) + sum(tl(set))
+
+except that by now the instruction "sum(tl(set))" has been finished,
+leaving the number 0 on the stack.
+
+Then "+" can run to add the 0 to what was previously on the stack
+(i.e. the number 7) in our example and eventually this elf finishes and
+the previous one continues finishing its version of I4.
+
+
+-- Demonstrating how elves start and stop procedures ------------------
+
+To see what's going on we can trace sum and get it to compute the total
+of a list of numbers.
+
+Each line with a ">" represents a new elf starting his job with a
+certain value of SET -- a list of numbers. Each line with a "<"
+represents an elf finishing his task of carrying out the SUM
+instructions, and it shows the result achieved, which will then
+be used by the elf who asked him to do it. The vertical lines help you
+relate the start and the finish of the job done by each elf.
+
+    trace sum;    ;;; make pop11 show all the "activations" of sum
+
+    vars list = [3 77 5 9];
+
+    sum(list) =>
+    > sum [3 77 5 9]    ;;; Elf1 starts doing sum
+    !> sum [77 5 9]     ;;; Elf2 starts doing sum with the tl of list
+    !!> sum [5 9]       ;;; Elf3 starts doing sum with a shorter list
+    !!!> sum [9]        ;;; Elf4 starts, with a 1 element list
+    !!!!> sum []        ;;; Elf5 does sum, with empty list on stack
+    !!!!< sum 0         ;;; Elf5 leaves 0 on the stack
+    !!!< sum 9          ;;; Elf4 leaves 9  + 0  = 9 on the stack
+    !!< sum 14          ;;; Elf3 leaves 5  + 9  = 14
+    !< sum 91           ;;; Elf2 leaves 77 + 14 = 91
+    < sum 94            ;;; Elf1 leaves 91 + 3  = 94
+    ** 94               ;;; The number is printed out by "=>"
+
+
+Each elf has to WAIT while the other elves do their task, one at a time.
+Some of them may have to call other elves to do further sub-tasks. All
+the "nested" waiting is shown by the trace printout if you run a traced
+recursive procedure.
+
+Elf1 has to wait longest. Eventually its recursive call of SUM, handled
+by Elf2 is finished, and the result 91 is found on the stack by Elf1.
+Elf1 does not know or care how it is done, as long as the instructions
+have been followed properly.
+
+Notice that Elf1 does not get involved with evaluating the recursive
+call. A second elf comes from the waiting room, with his own photocopy
+of the SUM instructions and his own idea of the value associated with
+the name SET. This second elf will in turn ask a third elf to perform a
+SUM operation. At one stage, there will be several elves using the very
+same definition of SUM, to work on slightly different versions of a SUM
+process, though most of them will be sleeping or waiting patiently for
+the next one along the chain to finish its task, as they cannot get on
+until that is done.
+
+The last elf to be invoked will associate the name SET with the empty
+list [], and as explained above, will be able to 'return' the result 0
+without 'invoking' yet another SUM operation.
+
+This is where the recursion "bottoms out".
+
+Once this last elf has finished, the previous one continues (by getting
+a friend to do the actual addition) and then returns his result to the
+second last elf and so on until the whole process is complete.
+
+The advantage of this way of thinking about recursive procedures is that
+each of the elves involved has a straightforward task - merely to
+remember what its own 'local variables' are and to remember how far
+through the procedure definition (the script) it has gone after each
+step.
+
+That elf does not have to understand the process as a whole - just its
+own part in it (which is simple, and completely specified by ITS copy of
+the instructions).
+
+Remembering local variables includes both coping with input and output
+variables and also any variables declared locally within the procedure
+using "lvars" or "vars". (In Pop-11 these are handled differently in the
+machine, but that need not concern us now. See TEACH VARS_AND_LVARS)
+
+As explained above, the easiest way to think about local variables is to
+assume that when each elf gets its script to follow, there are some
+named boxes on the sheet, and the local variables have their values
+written in those boxes by the elf using the script. Different elves
+running the same script may put different values in the boxes.
+
+Note that in the case of something like a list or other datastructure,
+the whole list is not copied into the local variable's box. Rather the
+box contains information about where that structure is stored in the
+library.
+
+For simple objects, e.g. small integers or decimal numbers that can fit
+within one box (within a machine word) a symbol for the entity itself is
+written in the box, not a pointer to a complex structure containing it.
+
+-- -- Elves need instruction pointers
+
+Each elf who waits for others will have to remember where he had got to.
+So he keeps his finger on the instruction he has to obey as soon as the
+next elf has finished. At any one time different elves may have their
+fingers waiting on different instructions.
+
+If the procedure involves a loop, the finger may have to go back to the
+top of the loop several times, until a stopping condition is reached.
+
+Everything said here is applicable not only to recursive procedures but
+also the non-recursive case, where procedure A calls B, and B calls C,
+and C calls D, etc. Each procedure is run as if by a little elf with a
+copy of the instructions for the current procedure, while the preceding
+elves sleep holding on to the insructions for their procedures.
+
+
+-- Designing a recursive procedure ------------------------------------
+
+When you design a recursive procedure, you have to think of yourself as
+being like Elf1. Namely assume
+
+    1. that the "base level" case that does not require recursion is
+       handled properly.
+
+    2. that the recursive call handles all of the problem except a small
+       part (e.g. the first element of a list, or the first number in a
+       sequence of numbers).
+
+Then write your procedure to complete the task as if those assumptions
+were both true. If you have the courage to make assumption 2 (and are
+very clear in specifying the inputs to and the outputs from the
+recursive call), then it is often easy to do the rest, as in the case of
+the procedures sum and largest, defined above.
+
+
+-- Exercise: listsize -------------------------------------------------
+
+Look at the definition of sum and see if you can modify it to produce a
+recursive procedure that takes a list and computes its length. You can
+not call it "length" as there is already a procedure called length in
+Pop-11, and its name is a "protected" identifier.
+
+So call it listsize:
+
+    define listsize(list) -> size;
+        if list == [] then
+            ...
+        else
+            ... + listsize(tl(list))
+        endif -> size
+    enddefine;
+
+-- Exercise: countwords -----------------------------------------------
+
+Define a recursive procedure called countwords that takes a list which
+may contain a mixture of items, some of which are words and some are
+not, and returns a number as a result, which is the total number of
+words in the list.
+
+Use the procedure isword to recognise the words:
+
+    isword("cat") =>
+    ** <true>
+    isword('cat') =>
+    ** <false>
+    isword(99) =>
+    ** <false>
+    isword(hd([the big cat])) =>
+    ** <true>
+
+    define countwords(list) -> words;
+        if list == [] then
+            ...
+        elseif isword(hd(list)) then
+            ... + countwords(tl(list))
+        else
+            ...
+        endif -> size
+    enddefine;
+
+    ;;; use these tests to check your procedure
+    countwords([]) =>
+    ** 0
+    countwords([the 3 cats]) =>
+    ** 2
+    countwords([1 2 3 4]) =>
+    ** 0
+
+    countwords([a b c d]) =>
+    ** 4
+
+-- Exercise: nonwords -------------------------------------------------
+
+Define a procedure called nonwords that takes a list and counts the
+things that are in it that are not words. It should behave like this:
+
+    nonwords([]) =>
+    ** 0
+    nonwords([the 3 cats]) =>
+    ** 1
+    nonwords([1 2 3 4]) =>
+    ** 4
+    nonwords([the silly old cats]) =>
+    ** 0
+
+-- Searching a tree ---------------------------------------------------
+
+For all the recursive procedures defined so far, there are fairly
+obvious ways of translating them into iterative, looping, procedures,
+and the iterative version will often be found clearer by someone who is
+not used to the "functional style" of programming, which makes heavy use
+of recursion.
+
+But there are some tasks that are very hard to do entirely using
+iteration.
+
+Consider a row of houses, each containing a family, and suppose that for
+each family you have a list of the ages of the individuals. Then if
+there are four families, each with between two and five members, their
+ages might be in a list of lists, like this.
+
+    vars family_ages = [[3 6 27 28] [39 39] [ 13 35 37]];
+
+Suppose that in a village there are several streets and for each
+street you make a list of the families and for each family a list of
+the ages. Then you could have a list of lists of lists of ages.
+
+Suppose however, that in some streets there are houses that are shared
+between different families. So you may want to group the occupants of a
+house together in a list, but subdivide the list into two sublists, one
+for each family. Then you may have some individuals who are of no fixed
+abode, but move around and sleep in different places at different times.
+You could add them as extra numbers, not in any list.
+
+The upshot is that you have a list of lists of lists of lists... where
+eventually you get down to numbers in the lists, but at varying depths
+in the list structure.
+
+
+    vars village_ages =
+        [
+          16 19                                     ;;; homeless
+          [[3 6 27 28] [39 39] [ 13 35 37]]         ;;; street1
+          24 33                                     ;;; homeless
+          [[5 9 28 32] [ 55 58]]                    ;;; street 2
+          [[22 25] [[33 33] [1 26 28]] [2 6 33]]    ;;; street 3
+          52 21 23                                  ;;; homeless
+            ;;; ... etc.
+        ];
+
+I've put the ages for homeless people in different places, to indicate
+that they are currently in different parts of the village.
+
+This is a bit like a tree, which starts with a trunk, and then branches
+at various points, eventually ending in leaves. But some leaves are
+reached after a few branches from the trunk and some after many.
+
+Now suppose you want to compute the average age of the members of the
+village. To do that you have to find the total number of occupants of
+the village, and the total of all their ages, and divide the latter by
+the former.
+
+-- -- Counting the elements of a tree
+
+It is not easy to use an iterative construct to explore a tree-structure
+of the sort described, where you don't know how many branches there are
+at each level, and how many different levels of branching you go through
+if you follow different branches to the leaves at their extremities.
+
+But if we think very clearly we can define a recursive procedure to
+count the number of items (leaves) in a structure like the list assigned
+to village_ages above.
+
+Consider what happens if you look at the head of the list village_ages.
+You may find their either a number, if it's a homeless person, or a
+list, giving information about a street. If its a list, it may be an
+empty list, or its head may be a number or another list, and so on.
+Using that subdivision of cases we can define a recursive procedure to
+count the number of items in a tree structure like village_ages. We'll
+assume that eventually the counting procedure will get down to the
+leaves of the tree, i.e. the numbers and in that case it will produce
+the result 1 for the object. If by following tails, it gets to a list
+that's empty, the result should be 0, as there are no members in the
+empty list. If the list is not empty, it should count the head, count
+the tail and add the two. So:
+
+    define count_items(tree) -> total;
+        ;;; return a number specifying how many numbers are in
+        ;;; the tree, at any depth
+        if isnumber(tree) then
+            1 -> total;
+        elseif tree == [] then
+            0 -> total
+        else
+            count_items(hd(tree)) + count_items(tl(tree)) -> total
+        endif
+    enddefine;
+
+Compile that then try it out on village_ages:
+
+    count_items(village_ages) =>
+    ** 32
+
+Check that it has got the number right, by counting the number of
+numbers yourself!
+
+Try tracing it and do it again
+
+    trace count_items;
+    count_items(village_ages) =>
+
+That will produce a LOT of trace printing. See if you understand it.
+Then
+    untrace count_items;
+
+Defining a non-recursive procedure to do what count_items does would
+be very much harder. In fact it would be so messy that no attempt will
+be made here to explain how to do it. The key idea is that you'd have to
+build a stack of things waiting to be examined.
+
+-- Exercise: addup_items ----------------------------------------------
+
+Now you know how to find out how many people there are in the village.
+But you don't yet have the total age which you need before you can
+compute the average age.
+
+So try to define a recursive procedure called addup_items, which can use
+a structure similar to count_items, but instead of adding 1 to the total
+for each number found adds the number. Try completing this.
+
+    define addup_items(tree) -> total;
+        ;;; Add up all the numbers found in tree
+        ...
+    enddefine;
+
+Then test it on the collection of village ages.
+
+    addup_items(village_ages) =>
+    ** 811
+
+-- Exercise: find_items -----------------------------------------------
+
+Here is a tree containing mixture of words and numbers at its
+extremities:
+
+vars mixed_items =
+    [ ant 1 [[bat] cat 2] [dog 3 4 [elephant flea 5] goose] 6 ];
+
+Try to define a procedure find_items that takes such a tree, and a
+recogniser procedure such as isword or isinteger and returns a list of
+all the items in the tree that satisfy the recogniser.
+
+In Pop-11 the best way to do this is to define a sub-procedure that
+searches the tree and leaves all the things it finds on the stack.
+Then you can call that procedure inside list brackets [% ... %] to make
+a list of all the things found.
+
+So to define this
+
+    define find_items(tree, pred) -> list;
+        ....
+    enddefine;
+
+we first do this:
+
+    define sub_find(tree, pred);
+        if tree == [] then
+            ;;; got to end of list, do nothing
+        elseif atom(tree) then
+            if pred(tree) then
+                ;;; leave the item on the stack
+                tree
+            endif;
+        else
+            ;;; It must be a list, so
+            ;;; get all the items in the head of the list
+            sub_find(hd(tree), pred);
+            ;;; get all the items in the tail of the list
+            sub_find(tl(tree), pred);
+        endif
+    enddefine;
+
+
+Try that out on the list, mixed_items created above, and on simpler
+lists, looking for words, and looking for integers.
+
+    sub_find([a 1 [b 2] [c [d 3 4]] 5 e], isword) =>
+    ** a b c d e
+    sub_find([a 1 [b 2] [c [d 3 4]] 5 e], isinteger) =>
+    ** 1 2 3 4 5
+
+Now complete the definition of find_items, so that it uses sub_find and
+makes a list of all the results.
+
+NOTE: in Pop-11 a procedure can be nested inside another. So having
+debugged sub_find, you could move the definition inside find_items, and
+indent it. Thus:
+
+    define find_items(tree, pred) -> list;
+
+        define sub_find(tree, pred);
+            .....
+        enddefine;
+
+        .... -> list
+
+    enddefine;
+
+sub_find is then accessible only from find_items.
+
+You might like to try replacing that definition of find_items with
+one that creates lists as it goes along, and then joins up the sublists.
+For that to work, every call of find_item must return a list, possibly
+an empty list.
+
+It might start something like this.
+
+    define find_item(tree, pred) -> list;
+        if tree == [] then
+            ;;; got to end of list, nothing more to find
+            [] -> list
+        elseif atom(tree) then
+            if pred(tree) then
+                [^tree] -> list
+            else
+                [] -> list
+            endif;
+        else
+            ... complete the recursive calls and their use...
+        endif
+    enddefine;
+
+Try finishing this and try it out on the test cases, given above.
+
+This sort of procedure, which makes lots of temporary lists then joins
+them into bigger lists. can sometimes be a lot more inefficient than one
+which puts all the objects found on the stack, and then, at the end,
+makes a list of all the items on the stack.
+
+
+-- Exercise: findbetween ----------------------------------------------
+
+Here is a tree containing only numbers at its leaves:
+
+vars num_tree = [ 1 [2 [3] [4 5 6]] [7 [8 9] 10] 11] ;
+
+Define a procedure called find_between which takes two numbers, lower
+and upper, and a tree, and searches the tree for numbers that are
+between the lower and the upper number and makes a list of all of them.
+
+You can use < and > for testing whether a number is in the required
+range.
+
+Complete this:
+
+    define find_between(lower, upper, tree) -> found;
+        ;;; return a list of all the numbers between lower and upper
+        ;;; in the tree
+
+        ....
+
+    enddefine;
+
+    ;;; test it on the above list
+    find_between(3, 8, num_tree) =>
+    find_between(4, 9, num_tree) =>
+    find_between(-5, 0, num_tree) =>
+
+
+
+-- Evaluating arithmetic expressions ----------------------------------
+
+Now for something rather different. Earlier we introduced expressions
+like these:
+
+    [+ [- 3 2] [* 4 5]]           which evaluates to 21
+
+    [/ [* [+ 3 2] [- 4 8]] 2]     which evaluates to -10
+
+We can define a grammar for these expressions by saying that they are
+trees satisfying the following rules:
+
+    Operators are: + - * /
+    Trees are: numbers
+    Trees are: [OP T1 T2], where
+        OP is an operator, T1 is a tree and T2 is a tree.
+
+How can you evaluate an arbitrary tree?
+
+    1. If it is a number it evaluates to itself.
+
+    2. If it is of the form [OP T1 T2] then, evaluate T1 and
+       T2 and apply the operator OP to the two values.
+
+Try to define a recursive procedure eval_tree that can evaluate such a
+tree:
+
+    define eval_tree(tree) -> result;
+        ;;; Evaluate a possibly tree structured arithmetic expression
+        ....
+    enddefine;
+
+Complete that definition, then try it out on these tests, and others:
+
+    eval_tree([+ [- 3 2] [* 4 5]]) =>
+    ** 21
+
+    eval_tree([/ [* [+ 3 2] [- 4 8]] 2]) =>
+    ** -10
+
+HINT:
+Each of the sub-trees which is a list will have a word as its first
+item, namely one of the words "+", "-", "/", "-". If you apply the
+procedure valof to a word, you'll get its value. In these cases the
+value is always a procedure, the procedure associated with the operator.
+Thus if the word is held in the variable op_name, and the two values of
+the sub-expressions are v1 and v2, you can evaluate the whole thing
+thus:
+
+    valof(op_name)(v1, v2)
+
+Or, if you find it clearer thus:
+
+    (valof(op_name))(v1, v2)
+
+The second form makes it clearer that something is being applied to v1
+and v2.
+
+It is possible to define eval_tree in about six lines of Pop-11.
+
+
+-- Further work -------------------------------------------------------
+
+This teach file by no means exhausts what can be accomplished using
+recursive definitions. For example 'mutually recursive' definitions -
+where two or more operations are defined in terms of each other - can be
+handled by the POP11 system as easily as the more straightforward
+'simple recursion' shown above.
+
+Many of the examples given given above relied on your understanding of
+numbers. POP11 has many structure building and structure modifying
+facilities. Recursive definitions are often the ONLY sensible way of
+manipulating the complex and varied objects one can create using these
+facilities.
+
+-- Some things to do: -------------------------------------------------
+
+    (a) Write out English versions of SUM and LARGEST, and
+        get some friends to help you enact their behaviour, pretending
+        to be elves.
+
+    (b) Write a POP11 definition of your own to find the
+        SMALLEST number in some set, and test it out.
+
+    (c) What does the following procedure do, when applied to
+        a list:
+
+        define sillyprint(set);
+          if set == [] then
+              "finished" =>
+          else
+              hd(set) =>
+              sillyprint(tl(set));
+              hd(set) =>
+          endif
+        enddefine;
+
+        sillyprint([a b c d]);
+
+        Write an explanation of what it does and how it works.
+
+    (d) Try TEACH * SETS, TEACH * SETS2
+
+The file TEACH * RECURSE2 discusses some recursive procedures for
+drawing pictures. If you try it out, you can change the examples to
+use the RC_GRAPHIC facilities described in TEACH RC_GRAPHIC
+
+TEACH * RECURSE3 analyses some of the problems of dealing with the
+"terminating" condition, e.g. recursing down a list till you reach
+the empty list.
+
+
+--- $poplocal/local/teach/recursion
+--- Copyright University of Birmingham 2001. All rights reserved. ------

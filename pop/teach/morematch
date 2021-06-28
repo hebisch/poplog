@@ -1,0 +1,477 @@
+TEACH MOREMATCH                                 Aaron Sloman 1981
+
+This assumes that you have read TEACH * MATCHES
+
+-- CHAINING DOWN A LIST -------------------------------------------------
+
+Suppose you wish to do something with every element of a list, for instance
+checking if it is a number bigger than 5, and if so printing it out. One way
+to do this is to first do it with the  first element, then start again using
+the rest of the list.
+
+First we need a procedure to do the test on a list item:
+
+    define test(item);
+        if isnumber(item) and item > 5
+        then    item =>
+        endif;
+    enddefine;
+
+Define that procedure, then try it out:
+
+    test(7);
+    test(4);
+    test(5);
+    test(-10);
+    test("seven");
+
+The procedure TEST takes one argument (i.e. one input), and does something
+with it.
+
+
+compare the following:
+    vars seven;
+    test(seven);
+    7 -> seven;
+    test(seven);
+
+
+-- TESTING ALL THE ELEMENTS OF A LIST ---------------------------------------
+The procedure TEST can now be used to define another procedure to test all
+the elements of a list of numbers and print out those which exceed 5.
+We use the operation MATCHES. Remember that if the match succeeds it produces
+the result TRUE, and if it fails it produces the result FALSE. So it can be
+used in a CONDITION, e.g. between IF and THEN, or between WHILE and DO.
+
+Here MATCHES is used to recognise when we are able to continue, because there
+is another element to dig out of the list.
+
+    define testall(list);
+        vars x,rest;
+        while   list matches [?x ??rest] do
+            test(x);
+            rest -> list;
+        endwhile
+    enddefine;
+
+Type that into a file and load it. Then test it:
+
+    testall([ 1 3 5 7 9 11]);
+
+    trace test;
+    testall([ 1 7 2 8 3 9]);
+
+
+Go back and look at the definition of TESTALL, and see if you understand
+how it works. The construction
+    WHILE <condition> DO <action> ENDWHILE
+is often useful for a repetitive task. Why do we need the <condition>?
+
+-- A DIFFERENT EXAMPLE ------------------------------------------------------
+Can you define a procedure which will take a list of numbers and print
+out all those which are less than 8. Try it, and test your definition.
+
+
+Notice that the line
+
+        while list matches [?x ??rest] do
+
+actually uses the matcher to do three different things:
+    1. It tests when the LIST is empty, i.e. when the loop should
+       stop. This is because the following is false (Try it):
+            [] MATCHES [?X ??LIST]  =>
+    2. It sets X to be the first element in LIST (if LIST is not [])
+    3. It sets REST to be the tail of LIST
+
+You can get a better understanding of how the three different tasks are
+performed if you try the following procedure:
+    define silly(list);
+        vars x rest;
+        while   list matches [?x ??rest]
+        do  x => rest=>
+            rest -> list;
+        endwhile;
+        list =>
+    enddefine;
+
+then
+    trace matches;
+    silly([a b c]) =>
+    silly([1 2 3 4]) =>
+
+-- MATCHES AND --> ----------------------------------------------------------
+
+The operation --> was explained in TEACH MATCHES2
+What is the difference between MATCHES and '-->' ?
+Write down your answer.
+
+
+-- THE ANSWER ---------------------------------------------------------------
+MATCHES
+        produces TRUE as its result if the items match,
+        otherwise it produces FALSE.
+-->
+        produces no result. If the items match it doesn't do anything
+        (except possibly set variables).
+        If they don't match, then a MISHAP results.
+e.g. try:
+    [a b] matches [b a] =>
+    [a b] --> [b a];
+
+-- ADDING NUMBERS -----------------------------------------------------------
+Now for a procedure which will add up all the numbers in a list.
+Before you start, set the total to 0, then repeatedly add each element
+of the list to the total.
+
+    define addall(list) -> total;
+        vars x rest;
+        0 -> total;
+        while   list matches [?x ??rest]
+        do  x + total -> total;
+            rest -> list
+        endwhile
+    enddefine;
+
+Because the heading includes ' -> TOTAL', the value that TOTAL
+has at the end is left on the stack, as the result of the procedure.
+Try typing in that definition, then test it as
+follows:
+
+    addall([1 2 3]) =>
+    addall([2 4 99 88]) =>
+    addall([]) =>
+
+
+Notice that there is no print instruction inside the procedure ADDALL.
+That is why we use the print arrow "=>" to print out the result, when we run
+the procedure.
+See what happens if you try to use ADDALL on a list containing
+something other than numbers:
+    addall([one two three]) =>
+    addall([ 1 2 3 cat dog mouse]) =>
+
+POP11 cannot read English: [one two three] is a list of words, not a list
+of numbers.
+
+You can see what is happening inside ADDALL if you trace MATCHES.
+    trace matches;
+    addall([ 3 4 5 6]) =>
+
+    addall([ 3 4 five]) =>
+
+    untrace matches;
+
+-- A RECURSIVE ADDALL -------------------------------------------------------
+It is possible to define a 'recursive' version of ADDALL, which uses
+itself to work on the tail of the list, thus
+
+    define addup(list) -> total;
+        vars x,rest;
+        if  list matches [?x ??rest]
+        then    x + addup(rest)-> total
+        else    0 -> total
+        endif
+    enddefine;
+
+Type that in and test it.
+
+-- TRACING A RECURSIVE PROCEDURE --------------------------------------------
+The advantage of recursively defined procedures is that you can trace
+them to see what is happening:
+    trace addup;
+    addup([5 4 9]) =>
+
+The trace printing shows how the results start being produced
+only when ADDUP gets to the end of the list. In the printing
+'>' means going into the function, '<' means coming out.
+
+Now try defining a procedure called "count" which instead of adding up
+the numbers in a list simply  counts how many things are in the list.
+The basic idea is very similar to ADDALL. If the list is empty then the
+number of elements is 0, otherwise keep adding 1 to total each time round
+the loop.
+Try to complete the defintion of COUNT:
+
+    define count(list) -> total;
+        vars rest;
+        0 -> total;
+        while list matches [= ??rest] do
+            ... you fill in this bit ...
+        endwhile
+    enddefine;
+
+
+If you manage, test your procedure. DONT READ ON BEFORE TRYING.
+
+
+
+
+
+The following would work. would have worked.
+
+    define count (list) -> total;
+        vars rest;
+        0 -> total;
+        while   list matches [= ??rest] do
+            1 + total -> total;
+            rest -> list
+        endwhile
+    enddefine;
+
+You could also have used recursion.
+Note that we don't need a variable to represent the first element of
+LIST each time round the loop. Line 3 is now doing only two things
+    (a) checking that LIST is not empty
+    (b) making REST refer to the tail, for next time.
+
+If you couldn't define COUNT successfully, type in the above version:
+Try the following:
+    trace matches;
+    count([]) =>
+    count([1 2 3 4]) =>
+
+    count([4 4 4 4 4]) =>
+
+    count([cat dog mouse]) =>
+
+Notice that the last example does not cause an error because you are not
+trying to add elements of the list to the total, as you did in procedure
+ADDALL.
+Instead, for each element of the list, only 1 gets added to the total.
+
+
+
+-- LENGTH -------------------------------------------------------------------
+Did you notice that COUNT does exactly what the procedure LENGTH
+does? LENGTH is illustrated in TEACH LISTS. Compare:
+    untrace matches;
+    count([1 2 3 4]) =>
+    length([ 1 2 3 4]) =>
+
+
+
+Can you define a recursive version of COUNT, analogous to the recursive
+ADDUP defined previously?
+
+
+This might be a good point to stop, and write notes on what you've learnt.
+You can come back later.
+
+-- AVERAGE ------------------------------------------------------------------
+
+Can you now define a procedure which will find the average of a list of
+numbers. e.g. the average of [ 1 2 3 ] is 2, and the average of [ -3 4 5]
+is also 2 while the average of [2 3 4 5] is 3.5 To find the average of a
+list, you can add up all the numbers in the list, and then divide by the
+length of the list. e.g try the following:
+    addall([1 2 3 4]) / 4 =>
+    addall([2 4 6 8 10]) / 5 =>
+
+
+The symbol "/" means "divide by" (try "TEACH ARITH" later if you
+haven't already done so). Try the following:
+    addall([4 5 6]) / length([4 5 6])  =>
+
+
+    addall([ 2 3]) / length([ 2 3])  =>
+
+
+now try
+    vars list;
+    [1 2 3 4 5] -> list;
+    list =>
+    addall(list) / length(list) =>
+    [ 4.25 3.75] -> list;
+
+    addall(list) / length(list) =>
+
+
+-- ANOTHER EXAMPLE ----------------------------------------------------------
+On the basis of what you've just been doing, try completing the
+following, using LENGTH and ADDALL:
+    define average(list) -> result;
+        ????  / ????  -> result;
+    enddefine;
+
+then test your procedure thus:
+
+    trace average;
+    average([ 1 2 3 4]) =>
+    average([ 99 33]) =>
+    average [ -3 -2 -1 1 2 3]) =>
+
+
+
+    untrace average;
+    average([101 202 303 404 505]) =>
+
+
+If you were not able to define AVERAGE, try the following:
+
+    define average(list) -> result;
+        addall(list) / length(list) -> result
+    enddefine;
+
+i.e. to find the average of a list, add up all the  elements, then divide
+the total by the length of the list. This will only work if you have
+already defined a procedure called ADDALL. If you did not do so earlier in
+this session, you will have to define it again before average will
+work. Try out the procedure average with some examples.
+Before doing so, type
+    trace average addall;
+
+
+
+
+----------       PROCEDURES WHICH CREATE LISTS
+It is often important to write programs which take some sort of list
+as input and create a new list which depends on the input. The simplest
+example is creating a replica of the input.
+How can we make a copy of a list? Here is one way. We want to go down
+a list, putting each element on the stack, and make a list of all the
+things left on the stack. Here is one way:
+    define newlist(list) -> result;
+        vars x rest;
+        [%      ;;; start building a list
+           while list matches [?x ??rest]
+           do   x;  ;;; i.e. just put X on the stack
+            rest -> list;
+           endwhile
+        %]      ;;; make up the list of things on stack
+            -> result
+    enddefine;
+
+Try that, then test your procedure;
+    newlist([a b c]) =>
+    newlist([cat dog [a list] mouse]) =>
+
+
+
+Could you modify that procedure so that it makes a copy of the elements
+in reverse order? You need to alter the line containing WHILE. Try
+it and test it.
+
+
+
+
+-- A SOLUTION ---------------------------------------------------------------
+You might have tried something like
+    define reverse(list)->result;
+        vars x rest;
+       [%
+        while list matches [??rest ?x] DO
+            x;
+            rest -> list
+        endwhile
+        %] -> result
+    enddefine;
+
+Try that and test it.
+
+Suppose that instead of copying the whole list exactly, we want to
+replace any occurrence of the word "silly" with "clever". We need to
+replace the line
+         X;
+
+The new procedure should test whether X is "silly". We get the
+following definition:
+    define subs(list) -> result;
+        vars x,rest;
+        [%
+           while list matches [?x ??rest]
+           do
+            if x = "silly" then "clever" else x endif;
+            rest -> list
+           endwhile
+        %]
+            -> result
+    enddefine;
+
+Notice that what is left on the stack (after DO) depends on what X is.
+
+
+Test SUBS
+    subs([you are a silly boy]) =>
+    subs([silly silly boy you silly]) =>
+
+
+It is usually wise to make sure that your program works on the empty list:
+    subs([]) =>
+
+Try modifying SILLY so that it puts 'VERY CLEVER' rather than 'CLEVER'
+into the list. Then test it again.
+
+-- ANOTHER EXERCISE ---------------------------------------------------------
+
+Can you define a procedure called REDUCE which takes a list of numbers,
+and produces as its result a new list in which all the numbers over 100
+have been divided by 2, and all the other numbers are left unchanged.
+Assuming you use X as in previous procedures, you'll need the test
+
+    if  x > 100
+
+also, to leave X divided by 2 on the stack do
+
+         x / 2
+
+Test your procedure. You'll need lots and lots of practice to develop
+fluency at defining this sort of procedure.
+
+
+
+-- LISTS CAN CONTAIN LISTS --------------------------------------------------
+
+Very often we want to build a list which is made of lists which contain
+elements of another list. Before doing this you'll
+need to be familiar with the use of "^" and "^^" in lists. Try
+    TEACH ARROW;
+
+Here's an example of a procedure which builds lists of lists.
+Suppose you want a procedure which will transform
+
+    [a b c d]   into    [[a a a] [b b b] [c c c] [d d d]]
+
+i.e. given the first as input it should produce the second as output.
+Notice that the output is a list of lists.
+
+    define triples(list) -> result;
+        vars x rest;
+        [] -> result;
+        while list matches [?x ??rest]
+        do  [^^result [^x ^x ^x]] -> result;
+            rest -> list;
+        endwhile
+    enddefine;
+
+Type that in and test it
+
+    triples([a b c]) =>
+    triples([]) =>
+    triples( [ [1] [2] [3] ]) =>
+
+
+
+Can you define a procedure called LISTON, which, when given
+two lists as input produces a new list of lists as output, thus.
+Input:  [a b c d] [p q]
+Output: [[a p q] [b p q] [c p q ] [d p q]]
+
+First try to describe in English what this procedure should do.
+    'It takes two lists as input, and produces a list of lists as output.
+    Every element of the outputlist consists of....
+    etc.'
+It is very important to be able to describe your procedures clearly and
+accurately.
+
+What should go in place of the dots in the following definition?
+    define liston(lista,listb) -> result;
+        vars x resta;
+        [] -> result;
+        while   lista matches [?x ??resta]
+        do
+            [^^result [ ..... ] ] -> result;
+            .....
+        endwhile
+    enddefine;
+
+complete that, then test it

@@ -1,0 +1,757 @@
+TEACH NETSTART                                     Aaron Sloman Oct 1996
+
+
+An introduction to the use of the Pop-11 database package: how to use it
+to create simple networks, and then write procedures that operate on
+those networks.
+
+Note: this exercise could more easily be done in Prolog. However it
+introduces mechanisms in Pop-11 that are in some ways more flexible.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- The Pop-11 database package
+ -- The main procedures provided in the package
+ -- The example problem
+ -- Information about weights of objects
+ -- Computing unknown weights
+ -- Objective for the program
+ -- How should the information be stored?
+ -- Alternative representations
+ -- -- The compound fact technique.
+ -- -- The atomic fact technique
+ -- Using the "atomic fact" technique
+ -- A list of atomic facts
+ -- Interrogating the database
+ -- Checking whether an object is compound or atomic
+ -- Replacing an undef value using remove and add
+ -- Using foreach to print out only information about weights
+ -- Computing the weight of an object from its parts
+ -- -- A procedure to find the parts
+ -- -- Adding up the weights of the parts
+ -- -- Adding up the weights of the parts
+ -- Further exercises
+ -- A procedure to build the display from the database
+
+-- The Pop-11 database package ----------------------------------------
+
+The Pop-11 database provides a simple mechanism for storing information
+in the form of a list of lists. Each list is an item of information.
+There are facilities for adding, removing, or searching for stored
+items. The items can contain any information whatsoever, but it is
+usually convenient to treat each item (a list) as expressing a fact
+about some object, or a relationship between two or more objects, in
+much the same way as items in a Prolog database do.
+
+Because information items are stored in the form of lists, the Pop-11
+pattern matcher can be used to facilitate searching for them, and
+retrieving their components. The matcher is described in
+    HELP * MATCHES, TEACH * MATCHES, TEACH * MATCHARROW
+
+-- The main procedures provided in the package ------------------------
+
+The following database facilities which are all summarised in TEACH
+POPCORE, and described more fully in other teach files listed below.
+
+add(<item>);
+    Puts <item> into database
+
+remove(<pattern>);
+    Removes the first item matching pattern from database. If there
+    isn't one it triggers a mishap message.
+
+flush(<pattern>);
+    Removes ALL items matching <pattern> from database, if they
+    exist
+
+present(<pattern>) -> boole
+    Searches the database for an item matching pattern. Returns TRUE
+    or FALSE, and in the first case sets variables in the pattern.
+
+lookup(<pattern>);
+    Like present, but causes a mishap if the item not found
+
+foreach <pattern> do <actions> endforeach
+foreach <pattern> in <list> do <actions> endforeach
+    Iterates over database, or list
+
+forevery <patternlist> do <actions> endforevery
+forevery <patternlist> in <list> do <actions> endforevery
+    Iterates over combinations of database items. The body is
+    executed once for every possible way of consistently binding
+    all the variables in the <patternlist>
+
+it
+    A variable whose value is set whenever something is found in the
+    database. The value is the item found.
+
+alladd(<list_of_items>);
+    Adds all the patterns to database
+
+allremove(<list_of_patterns>);
+    Applies remove to each pattern in the list. A mishap results if
+    any of them fails to match any database item.
+
+allpresent(<list_of_patterns>) -> boole
+    Checks that a combination of patterns can be consistently
+    instantiated in the database
+
+which(<variables>,<list_of_patterns>) -> <list_of_values>;
+    Finds items satisfying all the patterns and returns a list of the
+    values of the corresponding pattern <variables>. forevery is a
+    generalisation of this.
+
+
+There are several Pop-11 library packages that are built on top of the
+database, including a number of "expert system" shells, of which the
+most complex is LIB NEWPSYS (described in HELP NEWPSYS). Simpler shells
+are available in LIB PSYS, LIB PRODSYS, LIB EMYCIN, LIB EPROSPECT
+and LIB ESHELL. The last three are described in TEACH EXPERTS.
+
+What follows illustrates a subset of the database techniques that are
+used in building those systems and others.
+
+WARNING: because the database uses the Pop-11 pattern matcher, and the
+matcher does not work on lexically scoped variables or section
+variables, all the pattern variables must be declared locally or
+globally using "vars". NOT "lvars". (Later we'll show how to use the
+pattern prefix "!" to make it unnecessary to declare local pattern
+variables using "vars". This extension is available from the Pop-11
+library at Birmingham.)
+
+-- The example problem ------------------------------------------------
+
+An example will be given showing how to store information about a
+hierarchically structured object, and how to use the information in the
+database to make inferences about parts of the object. For simplicity
+we'll assume that the information provided is of two kinds.
+
+    1. For each object either it is "atomic" or it has parts.
+    2. Every object has a label, its name.
+    3. Every object has a weight.
+    4. Every non-atomic object has a weight that is simply the sum of
+       the weights of the parts of that object.
+
+Thus if object A has parts B and C and no others, and the weights of the
+parts are 2 and 3 (we'll ignore units, such as grams, or ounces, for
+now), then the weight of A is 5. In this case, if we know the weights of
+any two of the objects we can infer the weights of the third, using the
+equation
+
+    weight(A) = weight(B) + weight(C)
+
+To illustrate the problem suppose we are dealing with an object called
+A, made of parts B, C and D, where B is composed of E and F, C is
+atomic, D has parts G and H, E is atomic and F has parts I and J.
+
+The object then has a structre that can be displayed using the
+"showtree" library.
+
+;;; first load the library
+    uses showtree
+
+;;; Then give it a list showing the structure
+    showtree([ A [B [E] [F [I] [J]]] [C] [D [G] [H]]]);
+
+-- Information about weights of objects -------------------------------
+
+Suppose that in addition to that topological information we were also
+given weights of all the atomic components, then we could derive the
+weights of all others using simple addition. E.g. suppose the weights
+of the atomic components were:
+
+    [E 2] [C 3] [I 4] [J 5] [G 6] [H 7]
+
+The information giving known weights could be displayed using showtree,
+as follows:
+
+showtree([A [B [E_2] [F [I_4] [J_5]]] [C_3] [D [G_6] [H_7]]]);
+
+(You will now have two VED files showing tree diagrams. You can quit
+them as normal by moving the VED cursor into them and using the quit
+command.)
+
+In this example we have joined the label and the number using the
+underscore character `_` in order to make the diagram produced by
+showtree neater. It would be possible to use [E 2] instead
+of [E_2], for example, but the diagram would then sprawl out more.
+
+showtree([A [B [E 2] [F [I 4] [J 5]]] [C 3] [D [G 6] [H 7]]]);
+
+-- Computing unknown weights ------------------------------------------
+
+Given the above information about the weights of the atomic components
+it would be possible to propagate weights up the tree and assign weights
+to all the compount components. E.g. the weight of A would be 27, the
+weight of D would be 13.
+
+
+It is also possible in principle to propagate weights down the tree.
+
+Suppose that the weights of C and H were omitted, but the weights of A
+and D were given. I.e. the complete assignment given would then be:
+
+    [A 27] [E 2] [D 13] [I 4] [J 5] [G 6]
+
+It would again be possible to work out the weights of everything else.
+
+However, if too much information is provided, it will be redundant, or
+possibly even inconsistent, such as the following assignments:
+
+    [I 4] [J 5] [F 13]
+
+
+-- Objective for the program ------------------------------------------
+
+We wish to develop a program that can propagate weights either up or
+down the tree, and detect inconsistent assignments.
+
+Given information about
+
+    o The structure of a hierarchically structured object
+    o The weights of a subset of the parts
+
+Then:
+    o Compute the weight of the whole system and of any parts.
+    o If it turns out that the information is inconsistent, report that
+    fact.
+
+-- How should the information be stored? ------------------------------
+
+In almost every problem there are alternative ways of storing the same
+information. Some ways support more efficient processing. Some make the
+program easier to understand and debug, or easier to extend or interface
+with other programs. Some ways make it easier to input information for
+the program to operate on, though it is usually not difficult to create
+a program that transforms information that is easy to "input" into a
+format that is easy to compute.
+
+In this example we shall ignore all issues concerning efficiency of
+processing and simply go for a clear and simple representation that
+illustrates the capabilities of the database.
+
+
+-- Alternative representations ----------------------------------------
+
+To illustrate some of the choices, we could either put all the
+information about each object into one list to be added to the database
+(i.e. one list per object), or we could separate the information into
+individual facts and store those facts as separate list items.
+
+Call the first the compound fact technique the second the atomic
+fact technique.
+
+Suppose we consider an object composed of the parts A to J, with the
+topology specified above, and weights corresponding to the assignment:
+
+    [A 27] [E 2] [D 13] [I 4] [J 5] [G 6]
+     ---          ---
+
+Where the non-atomic items are underlined.
+
+
+-- -- The compound fact technique.
+
+We could collect together all the information known about each object in
+turn and create an information molecule. An example would be the
+information about A, namely that its label is A, its total weight 27 and
+its parts are B, C and D. All that could be stored as one fact added
+to the database, i.e.
+
+    add([name A weight 27 parts [B C D]]);
+
+For an object whose weight was unknown we can use the word "undef"
+instead of a number, as in:
+
+    add([name F weight undef parts [I J]]);
+
+This method has the advantage that as soon as you have ANY information
+about an object you already have ALL the information about the object
+quickly accessible.
+
+A disadvantage is that if you have to change part of the information
+about an item you may have to reconstruct the whole thing. Also, in
+order to retrieve any item of information you have to build a pattern
+that will match the whole compound fact structure.
+
+
+-- -- The atomic fact technique
+
+This stores a lot of separate information about each object. For example
+the information about A might be broken down into
+
+    [object A ]
+    [weight A 27 ]
+    [parts A [B C D]]
+
+The last could be broken down further into
+    [part A B]
+    [part A C]
+    [part A D]
+
+So that instead of the pattern [part A ?parts] retrieving all the
+information about the parts of A in one go, we would need to instantiate
+the pattern [part A ?part] three times.
+
+Besides having advantages and disadvantages opposite to those of the
+compound fact strategy, the atomic strategy also has the disadvantage
+that the list of items in the database will be very long, which could
+slow down access because of the time taken to traverse larger list. In
+some cases this may be compensated for by the simpler pattern matching
+required.
+
+
+-- Using the "atomic fact" technique ----------------------------------
+
+In what follows we'll use the atomic fact technique, except that the
+parts list will not be broken down. The reader may wish to experiment
+with an alternative method later.
+
+We'll also start with the simpler problem of propagating weights up the
+tree starting from known weights for the "leaf" nodes, i.e. the
+simplest components C, E, I, J, G and H.
+
+Let's assume we have the same topology as above, with the weights
+assignment:
+
+    [C 3] [E 2] [I 4] [J 5] [G 6] [H 7]
+
+We could represent that in a diagram with the following command, using
+"?" to represent weights still unknown.
+
+showtree([A_? [B_? [E_2] [F_? [I_4] [J_5]]] [C_3] [D_? [G_6] [H_7]]]);
+
+
+-- A list of atomic facts ---------------------------------------------
+
+We need a list of atomic facts representing all the above information
+about the object A and its tree of parts. Having created such
+a list we can assign that list to the variable database, and then
+interrogate and update it. Create a procedure called setup_parts
+to do that. It takes no inputs, returns no results, but as a side
+effect initialises or re-initialises the database. We represent unknown
+weights using the word "undef".
+
+define setup_parts();
+
+  [
+    [object A]
+    [weight A undef]
+    [parts A [B C D]]
+
+    [object B]
+    [weight B undef]
+    [parts B [E F]]
+
+    [object C]
+    [weight C 3]
+    [parts C []]
+
+    [object D]
+    [weight D undef]
+    [parts D [G H]]
+
+/*    ... and so on ... please complete this list... */
+    [object G]
+    [weight G 6]
+    [parts G []]
+
+    [object H]
+    [weight H 7]
+    [parts H []]
+
+/*    ... and so on ... please complete this list... */
+
+  ] -> database;
+enddefine;
+
+/*
+You can test that procedure by calling it and then printing out the
+database using the pretty-print arrow "==>"
+
+    setup_parts();
+    database ==>
+*/
+
+Try that when you have completed the procedure setup_parts.
+
+
+Note that we have represented atomic objects by giving them an empty
+parts list. It would have been possible instead of have assertions like
+    [atomic C]
+    [atomic H]
+
+However, it is often much simpler to have a uniform representation for
+all objects. Then the fact that something is atomic could be derived, as
+shown below.
+
+-- Interrogating the database -----------------------------------------
+
+The following are examples of uses of the database procedures.
+
+Here is how you could find the weight associated with C
+
+    vars weight;    ;;; declare a pattern variable
+    present([weight C ?weight]) =>
+    ** <true>
+
+    ;;; Find the value of the variable weight
+    weight =>
+    ** 3
+
+Compare finding the weight of A
+    present([weight A ?weight]) =>
+    ** <true>
+    weight =>
+    ** undef
+
+Note that a side-effect of using present is that the pattern variable
+gets set. We can also use "it" to access the last database item matched,
+e.g.:
+
+    it =>
+    ** [weight A undef]
+
+Find and print out the weights associated with parts E, F and G.
+
+
+-- Checking whether an object is compound or atomic -------------------
+
+We can use the database procedure present (pronounced like the adjective
+in "John was present", not like the verb in "present arms").
+
+define atomic(object) -> boole;
+
+    vars parts;     ;;; a pattern variable
+
+    if present([parts ^object ?parts]) then
+        if parts == [] then true else false endif -> boole
+    else
+        mishap('No information about parts', [^object])
+    endif
+enddefine;
+
+/*
+    setup_parts();
+;;;Some tests for atomic
+    atomic("A") =>
+    atomic("C") =>
+    atomic("bomb") =>
+*/
+
+Try those tests with the database you have created.
+
+NOTE:
+The requirement to use "vars" for pattern variables is unfortunate.
+If a local "vars" declaration for a particular is omitted, obscure
+errors can result, and there are other problems. At Birmingham we
+have an autoloadable library which defines a pattern prefix "!" which
+can be used immediately to the left of a list expression defining a
+pattern containing "?" and "??" variables, which allows those variables
+to be declared as "lvars", i.e. lexically scoped within the procedure.
+So the above procedure could, instead be defined thus:
+
+
+define atomic(object) -> boole;
+
+    ;;; declare pattern variable parts as lvars
+    lvars parts;
+
+    if present( ! [parts ^object ?parts]) then
+        if parts == [] then true else false endif -> boole
+    else
+        mishap('No information about parts', [^object])
+    endif
+enddefine;
+
+This procedure takes an object, represented by its label, and then
+searches the database to see if there is information about the object's
+parts. If so it checks whether the list of parts is empty.
+
+Compile that and check that the above tests still work.
+
+It would have been possible to define atomic slightly differently, using
+the procedure lookup, which is like present, but whereas present returns
+a boolean result, lookup returns no result, and when it does not find
+a matching item it causes an error:
+
+define atomic(object) -> boole;
+
+    lvars parts;
+
+    lookup(! [parts ^object ?parts]);
+    parts == [] -> boole
+
+enddefine;
+
+Try compiling that version and compare its behaviour on the tests.
+
+Yet another version would be
+
+define atomic(object) -> boole;
+
+    present([parts ^object []]) -> boole
+
+enddefine;
+
+This one does not give an error if there is no matching item in the
+database. Instead it merely returns false.
+
+Also for non-atomic objects this one will be less efficient, because
+if given the argument "A" then, having failed to match the pattern
+    [parts A []]
+against
+    [parts A [B C D]]
+it will continue till the end of the database, searching for the
+nonexistent pattern. So this version is not recommended.
+
+Exercise:
+Define a procedure called weight_of, which uses lookup to find the
+weight of an object. Its behaviour should be like this:
+
+    weight_of("A") =>
+    ** undef
+    weight_of("C") =>
+    ** 3
+
+Hint: the pattern given to lookup can contain a pattern variable
+(remember to declare it with "vars", not "lvars"). The value assigned to
+the variable by lookup can be returned as the result of the procedure.
+
+define weight_of(object) -> w;
+    ... fill in the missing portion ...
+enddefine;
+
+
+-- Replacing an undef value using remove and add ----------------------
+
+The weight associated with F is undef. We can see from the information
+provided that it should be 9. So we can remove the old value and add a
+new one.
+
+
+Just to make sure, start by re-initialising the database.
+
+    setup_parts();
+
+We can remove whatever information is stored about the weight of F,
+using the fact that "=" in a pattern will match any item. (See
+HELP * MATCHES).
+
+    remove([weight F =]);
+That complains if nothing matches the pattern. So you can use the
+following if you don't want an error message in such cases:
+
+    flush([weight F =]);
+
+Then we can add the new weight
+
+    add([weight F 9]);
+
+now print out the contents of the database:
+
+    database ==>
+
+Notice that the last thing added is always at the front of the database.
+So the order of items can keep changing, and a program should not assume
+that they are there in any particular order.
+
+
+-- Using foreach to print out only information about weights ----------
+
+If you don't want to print out the whole database, but wish to show
+all the information about weights, you can do this:
+
+    foreach [weight = =] do it => endforeach;
+
+which will print out
+
+    ** [weight F 9]
+    ** [weight A undef]
+    ** [weight B undef]
+    ** [weight C 3]
+    etc.
+
+
+Exercise:
+1. Try modifying the foreach command to print out information about all
+   the objects whose weight is undef. You will need to use a pattern
+   containing a variable.
+
+2. Try printing out the parts information about all objects
+
+
+-- Computing the weight of an object from its parts -------------------
+
+So far we have seen how to change the weight of an object "manually"
+using remove and add. Now consider how a program could compute the
+weight of an object. Let's start with the case where we assume that the
+object has parts whose weights are already known.
+
+In order to work out the weight of a compound object, we have to
+
+    1. obtain a list of its parts
+
+    2. find the weights of the individual parts
+
+    3. add up the weights.
+
+Steps 2 and 3 could be combined into a single loop which computes a
+running total as it finds the weights.
+
+Before reading on you could try defining a procedure called parts_of
+that takes an object label as input and returns a list of the parts.
+
+-- -- A procedure to find the parts
+
+This is almost completely trivial (especially with the use of "!",
+which allows the output lvars variable list to be used as a pattern
+variable, so that it is set by the matcher.)
+
+define parts_of(object) -> list;
+    lookup(! [parts ^object ?list])
+enddefine;
+
+/*
+    ;;; tests for parts_of
+    parts_of("A") =>
+    parts_of("C") =>
+    parts_of("speech")=>
+
+*/
+
+-- -- Adding up the weights of the parts
+
+In case you had not managed to define the procedure weight_of this is
+how it could go
+
+define weight_of(object) -> w;
+    lookup(![weight ^object ?w]);
+enddefine;
+
+
+-- -- Adding up the weights of the parts
+
+
+Try completing this procedure by replacing all occurrences of "..."
+
+define add_weights_parts(object) -> total;
+
+    lvars parts, weight, item, total = 0;
+
+    ... -> parts;
+
+    for item in parts do
+        ... -> weight;
+        ... -> total
+    endfor
+enddefine;
+
+When you have completed this procedure try it out on the following tests
+
+/*
+;;; some tests for add_weights_parts
+
+    ;;; set up the database
+    setup_parts();
+    add_weights_parts("D") =>
+    add_weights_parts("A") =>
+*/
+
+The last example may produce an error, showing that you need to check
+whether a part really has a weight.
+
+Here is a possible definition of the procedure
+
+define add_weights_parts(object) -> total;
+
+    lvars parts, weight, item, total = 0;
+
+    parts_of(object) -> parts;
+
+    for item in parts do
+        weight_of(item) -> weight;
+        if isnumber(weight) then
+            weight + total -> total
+        else
+            mishap('Object has no weight', [^item ^weight])
+        endif;
+    endfor
+enddefine;
+
+
+-- Further exercises --------------------------------------------------
+
+Define a procedure update weight, which takes an object, and if it has
+an undef weight, computes its weight, then removes the undef weight
+information and adds the computed weight.
+
+Define a procedure that updates the weights of all undef objects as far
+as it can using the known weights of objects.
+
+Generalise that procedure so that it can compute the weight of an object
+from the weight of its parent and the weights of its siblings.
+
+Write a procedure that propagates all known weights up and down the
+network checking for consistency as it goes.
+
+... to be continued ....
+
+-- A procedure to build the display from the database -----------------
+
+Define a procedure that takes the weight information in the network and
+builds up a list to give to showtree
+
+It could work something like this, assuming you give it a start node.
+
+First a utility procedure
+
+define new_label(object) -> label;
+    ;;; given an object create a string consisting of the object
+    ;;; an underscore and the weight or `?`
+    lvars weight;
+
+    weight_of(object) -> weight;
+
+    if isnumber(weight) then object >< '_' >< weight
+    else object >< '_?'
+    endif -> label;
+enddefine;
+
+/*
+;;; test cases
+    new_label("A") =>
+    new_label("C") =>
+
+*/
+
+define build_display_tree(object) -> tree;
+
+    lvars parts, part,  label;
+
+    parts_of(object) -> parts;
+    new_label(object) -> label;
+    if parts == [] then
+        [^label] -> tree
+    else
+        ;;; get trees for all the parts and combine them
+        [%
+            label,
+            for part in parts do build_display_tree(part) endfor
+        %] -> tree
+    endif;
+enddefine;
+
+/*
+;;; Test for build_display_tree
+    setup_parts();
+    build_display_tree("A") ==>
+    showtree( build_display_tree("A") );
+*/
+
+
+... to be continued ... suggestions welcome ....
+
+--- $poplocal/local/teach/netstart
+--- Copyright University of Birmingham 1996. All rights reserved. ------

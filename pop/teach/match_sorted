@@ -1,0 +1,983 @@
+/*
+TEACH MATCH_SORTED
+Aaron Sloman
+http://www.cs.bham.ac.uk/~axs
+University of Birmingham
+Revised version 8 Dec 2011
+
+
+Also available at
+    http://www.cs.bham.ac.uk/research/projects/poplog/teach/match_sorted
+
+A video tutorial based on an earlier version of this file (about 49 minutes) is
+on Youtube:
+
+    http://www.youtube.com/watch?v=fpomSHwuE9c
+
+
+CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Introduction
+ -- Defining 'sorted'
+ -- A standard recursive definition of 'sorted'
+ -- An alternative approach using 'matches'
+ -- Defining match_sorted
+ -- -- Subsidiary procedure 'descends'
+ -- Improving efficiency using 'doesmatch'
+ -- Using 'doesmatch' to check ordering
+ -- Defining doesmatch_sorted
+ -- Generalising doesmatch_sorted
+ -- Procedure doesmatch_sorted_any
+ -- -- Checking whether a list is sorted in increasing order:
+ -- -- Checking whether a list is sorted in decreasing order:
+ -- -- subsidiary predicate alpha_ascends
+ -- -- A more abstract kind of ordering
+ -- -- subsidiary predicate vowel_odd
+ -- Partially applying doesmatch_sorted_any
+ -- -- define predicates increasing and decreasing
+ -- Further reading
+
+-- Introduction -------------------------------------------------------
+
+This teach file shows how using a pattern matcher to check whether a list of
+numbers is sorted in increasing order compares with the more conventional way of
+defining a procedure to check whether a list is sorted.
+
+The demonstration uses the Pop11 pattern matcher described in
+    TEACH MATCHES
+    http://www.cs.bham.ac.uk/research/projects/poplog/teach/matches
+
+and summarised in
+    HELP MATCHES
+    http://www.cs.bham.ac.uk/research/projects/poplog/doc/pophelp/matches
+
+It also shows how for some problems solutions will not be found using the
+standard Pop-11 operator MATCHES, but can be found using a more powerful version
+called DOESMATCH.
+
+For many purposes the former is adequate and in those situations is much faster
+than doesmatch. But there are cases where doesmatch is more efficient, as will
+be shown, below, and some cases where doesmatch allows a problem to be solved
+that cannot be solved using matches.
+
+-- Defining 'sorted' --------------------------------------------------
+
+We'll present a fairly standard definition for the 'sorted' procedure.
+
+*/
+
+
+/*
+PROCEDURE: sorted (list) -> result
+INPUTS   : list is a list of numbers
+OUTPUTS  : result is a boolean
+USED IN  : programs requiring sorted lists of numbers
+CREATED  : 3 Dec 2011
+PURPOSE  : test whether a list of numbers is in increasing order
+
+TESTS:
+
+sorted([]) =>
+** <true>
+
+sorted([3 5]) =>
+** <true>
+
+sorted([5 5]) =>
+** <true>
+
+sorted([5 4]) =>
+** <false>
+
+sorted([ 1 3 6 6 9 10 14]) =>
+** <true>
+
+sorted([ 1 3 6 9 14 10]) =>
+** <false>
+
+sorted([9 8 7 6 5 4 3 2 1 ]) =>
+** <false>
+
+;;; turn tracing on and off
+trace sorted;
+
+untrace sorted;
+
+*/
+
+/*
+
+-- A standard recursive definition of 'sorted'
+
+We assume that every non-empty list L has
+
+    a first element, its head:  hd(L)
+        in Lisp that would be (car L)
+
+    a sublist containing all the other elements, its tail: tl(L)
+        in Lisp that would be (cdr L)
+
+So the first element of a list L is hd(L)
+
+The second element is the head of the tail, i.e. hd(tl(L))
+
+        in Lisp that would be (car (cdr L)), or (cadr L)
+
+So if L is the list [cat dog mouse elephant horse]
+
+The first item, i.e. hd(L) is the word "cat".
+
+The tail, i.e. tl(L) is the list: [dog mouse elephant horse]
+
+*/
+
+define sorted (list) -> result;
+
+    ;;; the result of the conditional is assigned to 'result'
+
+    if length(list) < 2 then
+
+        true
+
+    else
+
+        ;;; check that first two items are in ascending order
+        hd(list) <= (hd(tl(list)))
+
+        ;;; and that the tail of the list is in ascending order
+        and sorted(tl(list))
+
+    endif -> result
+
+enddefine;
+
+/*
+
+-- An alternative approach using 'matches' ----------------------------
+
+For variety we define a procedure for checking whether a list is in
+descending order.
+
+*/
+
+
+/*
+PROCEDURE: descends (list) -> result
+INPUTS   : list is a list of numbers
+OUTPUTS  : result is a boolean
+            true if the list contains two items in descending order
+USED IN  : match_sorted (defined below)
+CREATED  : 3 Dec 2011
+PURPOSE  : checking whether a larger list is sorted in ascending order,
+    by looking for exceptions in the list, i.e. two successive numbers
+    in descending order
+
+TESTS:
+
+descends([1 2])=>
+** <false>
+
+descends([2 1])=>
+** <true>
+
+descends([])=>
+** <false>
+
+descends([3 4 5 2])=>
+** <false>
+
+descends([2 99])=>
+** <false>
+
+descends([200 99])=>
+** <true>
+
+-- Defining match_sorted ----------------------------------------------
+
+We'll now show how to define a procedure match_sorted that uses the Pop11
+pattern matcher, and then go on to discuss some of its problems. First we need a
+subsidiary procedure that is given a list of numbers and checks whether it is a
+list of two items where the second is smaller than the first: i.e. it's no good
+when we are looking for lists sorted in increasing order.
+
+-- -- Subsidiary procedure 'descends'
+
+*/
+
+define descends(list) -> result;
+    ;;; result is true if list is of length 2 and items
+    ;;; are in decreasing order
+
+    lvars x, y;
+    list matches ! [?x ?y] and x > y -> result;
+
+enddefine;
+
+
+/*
+PROCEDURE: match_sorted (list) -> result
+INPUTS   : list is a list of numbers
+OUTPUTS  : result is a boolean
+USED IN  : programs requiring sorted lists of numbers
+CREATED  : 3 Dec 2011
+PURPOSE  : test list for increasing numerical order, by checking that
+           list does not contain two successive numbers where the
+           the first is bigger than the second.
+
+NOTE     : This procedure depends on the fact that the pop11 matcher allows
+pattern variables to have 'restrictions' attached, as described in
+HELP * MATCHES. So if '??items is a pattern variable, then it will match any
+sequence of elements of the datum list allowed by other constraints in the
+pattern. E.g. '= = = ??items =' will only allow items to match a list that is
+preceded by at least three members of the list with at least one member
+following. There may be many sublists that satisfy this condition. If you want
+the list items to have exactly three elements then you can add the restriction ':3'
+as in
+        = = = ??items:3 =
+which requires the matcher to find at least 7 sequential items in the datum, and
+make a list containing the fourth fifth and sixth to assign to the variable
+items.
+
+If you have a predicate, such as descends, defined above which returns true ONLY
+for a two element list whose first element is bigger than the second, then you
+can use ':descends' to restrict the possible values of items, as in
+
+    ??items:descends
+
+That what is used in the definition of match_sorted below, to make it return
+false, if it finds any sublist of two items satisfying descends. If no such
+sublist is found then the match_sorted(list) returns true.
+
+TESTS:
+
+match_sorted([]) =>
+
+match_sorted([3 5]) =>
+
+match_sorted([5 5]) =>
+
+match_sorted([5 4]) =>
+
+;;; should be true
+match_sorted([ 1 3 6 9 10 14]) =>
+
+;;; should be false
+match_sorted([ 1 3 6 9 14 10]) =>
+
+;;; should be false
+match_sorted([9 8 7 6 5 4 3 2 1 ]) =>
+
+;;; should be false
+match_sorted([ 1 3 6 9 14 10 19 30 2000]) =>
+
+;;; should be true
+match_sorted([ 1 3 6 9 14 18 19 30 2000]) =>
+
+;;; should be false
+match_sorted([5 1 3 6 9 14 18 19 30 2000]) =>
+
+;;; Try with descends traced:
+
+trace descends
+
+untrace descends
+
+*/
+
+define match_sorted(list) -> result;
+
+    lvars items;
+
+    ;;; it's sorted if no sublist of length 2 descends
+
+    not(list matches ![== ??items:descends ==]) -> result
+
+enddefine;
+
+
+/*
+-- Improving efficiency using 'doesmatch'
+
+The match_sorted procedure works and, for people who are not used to recursion,
+and for non-programmers or beginner programmes, it can be seen to work in a
+manner that probably fits more closely the intuitions of non-programmers (and
+beginner programmers) as to what it means for a list of numbers to be sorted in
+increasing order. Namely, there must not be a pair of adjacent items in
+descending order.
+
+But the pattern used in the definition of match_sorted cannot prevent the
+program from trying all sorts of sublists of list, to see if they fail on the
+descends test.
+
+For example if we give it this problem
+
+    match_sorted([1 2 3]) =>
+
+It produces the right answer, but only after applying the descends procedure to
+many irrelevant sublists, including all the empty lists found between successive
+pairs of items in the input list. 'match_sorted' produces the result <true>
+because it finds no descending pair in the list.
+
+We can demonstrate this inefficiency by telling the descends procedure to trace
+its behaviour, i.e. print out records of what it does and what results it
+produces.
+
+    trace descends ;
+
+    match_sorted([1 2 3]) =>
+
+That produces
+    > descends []
+    < descends <false>
+    > descends [1]
+    < descends <false>
+    > descends [1 2]
+    < descends <false>
+    > descends [1 2 3]
+    < descends <false>
+    > descends []
+    < descends <false>
+    > descends [2]
+    < descends <false>
+    > descends [2 3]
+    < descends <false>
+    > descends []
+    < descends <false>
+    > descends [3]
+    < descends <false>
+    > descends []
+    < descends <false>
+    ** <true>
+
+The trace printing is very verbose because there are many ways in which
+the list 'items' can be selected from the whole list as required in the
+definition of the procedure match_sorted, above.
+
+    match_sorted([1 2 3 4]) =>
+
+It finds a mis-ordering quickly if it is near the beginning of the list
+
+    match_sorted([2 1 3 4]) =>
+    > descends []
+    < descends <false>
+    > descends [2]
+    < descends <false>
+    > descends [2 1]
+    < descends <true>
+    ** <false>
+
+but wastes more time if the first bad pair is near the end of the list
+
+    match_sorted([1 2 4 3]) =>
+
+Turn off tracing:
+
+    untrace descends ;
+
+The difference in efficiency between the original procedure
+
+    PROCEDURE: sorted (list) -> result
+
+and the later one that is easier for many people to understand because
+it uses the list matcher
+
+    PROCEDURE: match_sorted (list) -> result
+
+may not matter for many simple programs, but for programs that create
+very long lists it can make a significant difference.
+
+The problem is that for examples like this we need a way to tell the
+test procedure to look only at successive pairs of items in the list
+being test, and not to look at all sublists. That is hard to do with the
+notation available when using 'matches'.
+
+There is an alternative mechanism in Pop11 that keeps the intuitive
+'pictorial' format of the solution but is much more efficient on long
+lists.
+
+-- Using 'doesmatch' to check ordering --------------------------------
+
+There is a library called LIB DOESMATCH, described in
+
+    HELP DOESMATCH
+
+and
+
+    http://www.cs.bham.ac.uk/research/projects/poplog/help/doesmatch
+
+that can be used to find the same wrongly sorted lists as match_sorted
+finds, but is much more efficient because it does not waste time on
+irrelevant sub-cases.
+
+The 'doesmatch' operator can be used in the same way as 'matches',
+though with greater generality, and less speed. But it can also be used
+to perform searches inside a list structure that 'matches' cannot do.
+
+For that purpose we'll use the format:
+
+    <list> doesmatch <pattern> where <condition>
+
+This expression is a boolean expression, i.e. it produces a true or
+false result, and in the process it can bind some variables used in the
+<pattern>, provided that the satisfy the tests in <condition>.
+
+We'll see that doesmatch can be controlled a lot more precisely than
+matches, because after doesmatch has found a match involving more than
+one variable, the results found can be tested in the final expression:
+
+    <condition>
+
+-- Defining doesmatch_sorted ------------------------------------------
+
+*/
+
+;;; load the doesmatch library
+uses doesmatch;
+
+
+/*
+PROCEDURE: doesmatch_sorted (list) -> result
+INPUTS   : list is a list of numbers
+OUTPUTS  : result is a boolean
+USED IN  : programs requiring sorted lists of numbers
+CREATED  : 3 Dec 2011
+PURPOSE  : test for increasing order
+
+TESTS:
+
+doesmatch_sorted([]) =>
+
+doesmatch_sorted([3 5]) =>
+
+doesmatch_sorted([5 5]) =>
+
+doesmatch_sorted([5 4]) =>
+
+doesmatch_sorted([ 1 3 6 9 10 14]) =>
+
+doesmatch_sorted([ 1 3 6 9 14 10]) =>
+
+doesmatch_sorted([ 1 3 6 9 14 10 11 12 13 16]) =>
+
+doesmatch_sorted([9 8 7 6 5 4 3 2 1 ]) =>
+
+doesmatch_sorted([ 1 3 6 9 14 10 19 30 2000]) =>
+
+doesmatch_sorted([ 1 3 6 9 14 18 19 30 2000]) =>
+
+doesmatch_sorted([ 1 3 6 9 14 18 19 30 2000 1]) =>
+
+doesmatch_sorted([5 1 3 6 9 14 18 19 30 2000]) =>
+
+
+*/
+
+define doesmatch_sorted(list) -> result;
+
+    lvars item1, item2;
+
+    not(list doesmatch ![== ?item1 ?item2 ==] where item1 > item2) -> result
+
+enddefine;
+
+
+/*
+
+-- Generalising doesmatch_sorted --------------------------------------
+
+Suppose we wanted to recognise lists of numbers that are sorted in
+descending order, instead of ascending order? What would we have to
+change? Just the '>' test in the 'where' expression.
+
+That's easy enough to do, but suppose we wanted to check if a list of
+words is in alphabetical order, or in reverse alphabetical order.
+
+Or suppose we had a mixed list of letters and numbers and wanted to make
+sure that no vowel is followed by an odd number, what would we have to
+change?
+
+We can come back to that below. For now, lets notice that the generality
+of the algorithm can be expressed by taking the '<' test out of the
+procedure definition and instead requiring it to be given as an input to
+a new version of doesmatch_sorted that takes a list of any type and an
+ordering test for two successive elements.
+
+We can then use it to do what doesmatch_any did by giving it the pop11
+procedure '>' (which we have to refer to as 'nonop >' when it is not
+actually being used, only referred to).
+
+That's true of all the 'infix' operators, '+', '-', '*', '>' '<' '>='
+etc. We can use them without 'nonop' when we want them to run, but if we
+simply want to refer to them, e.g. by passing them as inputs to a
+procedure, then we need to use 'nonop', as shown below.
+
+If we have the generic procedure, then making it test for lists of
+numbers in descending order, or lists of words alphabetically ordered,
+or lists of varied types of objects with an ordering restraint, then all
+we have to do is give it an appropriate ordering predicate as its second
+argument.
+
+First we define the generic procedure.
+
+-- Procedure doesmatch_sorted_any -------------------------------------
+
+*/
+
+
+/*
+PROCEDURE: doesmatch_sorted_any (list, wrong_order) -> result
+INPUTS   : list, wrong_order
+  Where  :
+
+    list - is a list of any items
+
+    wrong_order - is a relation, or two-place predicate used to
+          identify items that are in the wrong order in a larger list.
+
+OUTPUTS  : result is a boolean
+USED IN  : Below
+CREATED  : 3 Dec 2011
+PURPOSE  : see above
+
+TESTS:
+
+See below.
+
+*/
+
+define doesmatch_sorted_any(list, wrong_order) -> result;
+
+    lvars item1, item2;
+
+    ;;; true if no two items are in the wrong order
+
+    not(list doesmatch ![== ?item1 ?item2 ==] where wrong_order(item1, item2) )
+
+            -> result
+
+enddefine;
+
+
+/*
+
+We can define a number of different subsidiary predicates to be given as
+the second input to doesmatch_sorted_any
+
+We don't need to define procedures for testing numerical order, as we
+can use these as inputs to the new sorting procedure. Remember the input
+procedure is one that checks for items in the WRONG order
+
+-- -- Checking whether a list is sorted in increasing order:
+
+USE  nonop >  (to specify the '>' test)
+        Use this to check that items are in increasing order, i.e.
+        any pair item1 > item2 means the test is failed.
+
+doesmatch_sorted_any([], nonop >) =>
+
+doesmatch_sorted_any([1 3 5], nonop >) =>
+
+doesmatch_sorted_any([1 3 5 4 6], nonop >) =>
+
+doesmatch_sorted_any([1 99 200 9999 100000], nonop >) =>
+
+doesmatch_sorted_any([1 99 200 9999 100001 100000], nonop >) =>
+
+
+-- -- Checking whether a list is sorted in decreasing order:
+
+USE    nonop <  (to specify the '<' test)
+        Use this to check that items are in decreasing order, i.e.
+        any pair item1 < item2 means false
+
+doesmatch_sorted_any([], nonop <) =>
+
+;;; Remember doesmatch_sorted_any returns true if it finds NO pair
+;;; if numbers satisfying the test predicate.
+;;; decreasing should be false
+doesmatch_sorted_any([1 3 5], nonop <) =>
+
+;;; decreasing should be true
+doesmatch_sorted_any([5 3 2 1], nonop <) =>
+
+;;; decreasing should be true
+doesmatch_sorted_any([6 5 4 3 3 2 1 1], nonop <) =>
+
+;;; decreasing false
+doesmatch_sorted_any([6 5 2 4 3 3 2 1 1], nonop <) =>
+
+;;; decreasing should be true
+doesmatch_sorted_any([100000 9999 200 88 1], nonop <) =>
+
+;;; decreasing false
+doesmatch_sorted_any([100000 100001 9999 200 88 1], nonop <) =>
+
+;;; Make sure you understand all those result by identifying the items in
+;;; increasing order that produce the result false.
+
+
+-- -- subsidiary predicate alpha_ascends
+
+Pop11 already includes a predicate 'alphabefore' that tests whether a
+word (or string) is alphabetically prior to another string, so we can
+also use that in our tests.
+
+;;; The predicate alpha_ascends was called alpha_after in a previous
+;;; version.
+
+define alpha_ascends(word1, word2) -> result;
+    ;;; true if word1 comes alphabetically after word2
+
+    ;;; they are different words
+    word1 /= word2
+    ;;; and word2 comes before word1
+    and
+    alphabefore(word1, word2) -> result;
+
+enddefine;
+
+We can use that as a recognizer for lists that are ordered in reverse
+alphabetic order, i.e. descending alphabetic order. We used alpha_ascends
+to look for violations. The test produces true if no violations are found.
+
+doesmatch_sorted_any([pear fig apple], alpha_ascends) =>
+** <true>
+
+doesmatch_sorted_any([pear fig apple appm], alpha_ascends) =>
+** <false>
+
+doesmatch_sorted_any([pear fig apple banana], alpha_ascends) =>
+** <false>
+
+doesmatch_sorted_any([pear fig elephant apple], alpha_ascends) =>
+** <true>
+
+doesmatch_sorted_any([pear fig elephant apple banana], alpha_ascends) =>
+** <false>
+
+doesmatch_sorted_any([pear tomato fig elephant apple banana], alpha_ascends) =>
+** <false>
+
+
+;;; By tracing alpha_ascends we can see how much testing is done before an
+;;; exception is found, if one is found.
+trace alpha_ascends
+
+;;; turn off tracing
+untrace alpha_ascends
+
+;;; Create some more test examples with words using upper and lower
+;;; case, and see what happens.
+
+
+*/
+
+
+/*
+-- -- A more abstract kind of ordering
+
+Our tests so far have have checked a list by searching for two items that
+violate some ordering requirement, e.g. the first item is alphabetically or
+numerically earlier than or later than the second item. Finding such a pair
+shows that a whole list fails to be ordered, and failing to find such a pair
+shows that the whole list is ordered.
+
+In all those cases the common process is searching along a list for two items
+satisfying a condition, and such a pair is found the search terminates, and the
+searching procedure returns false. If it gets to the end without finding such a
+pair (the search as failed) then the procedure returns true.
+
+The method used can be equally be applied to other kinds of test. Suppose we
+have a list providing information about employees. The list has successive pairs
+of items,
+
+    employee name, employee status, employee name, employee status,
+
+where the status is one of paid, left, sacked, unpaid, and we want
+to check that none of the employees is still unpaid.
+
+If we can define a procedure that checks for that combination, when given a name
+and a status we can use it to search a list:
+
+*/
+
+define employee_unpaid(employee, status) -> result;
+
+    if status = "unpaid" then
+
+        true -> result;
+        ;;; print out the discovery
+        [^employee ^status] =>
+
+    else
+        false -> result
+
+    endif;
+
+enddefine;
+
+
+/*
+
+This can be used with doesmatch_sorted_any to search for unpaid employees.
+
+;;; this finds a problem employee and returns false
+doesmatch_sorted_any([tom paid fred left mary unpaid sue sacked], employee_unpaid) =>
+** [mary unpaid]
+** <false>
+
+;;; this finds all employees OK and returns true
+doesmatch_sorted_any([tom paid fred left mary left sue sacked], employee_unpaid) =>
+** <true>
+
+
+-- -- subsidiary predicate vowel_odd
+
+The procedure can also be used with a list of items of mixed type. Pop11 does
+not require all list items to be of the same type. (See TEACH LISTS).
+
+Suppose we have a list containing single letter words, e.g. "a", "f" "K", "z"
+and numbers. And suppose that for some reason we want only lists where every
+vowel is immediately followed by an even number. We don't care if there are no
+vowels occur, and we don't care if some consonants are followed by an even
+number. But if we find a vowel followed by an odd number we want our search to
+return false. If there's no such case, the list is OK and it should return true.
+
+We shall use the pop11 operator 'rem' to test whether a number is odd or
+even by checking whether its remainder on division by 2 is 1 or 0.
+
+'rem' takes two numbers and returns the remainder:
+
+    77 rem 10 =>
+    ** 7
+
+    77 rem 5 =>
+    ** 2
+
+    6 rem 2 =>
+    ** 0
+
+    9 rem 2 =>
+    ** 1
+
+So 6 is even and 9 is odd.
+
+In order to use the procedure doesmatch_sorted_any to perform the search task
+just described we'll need to give it a predicate taking two items to test, with
+result false only if the first item is a word containing a vowel and the second
+is NOT an even number, i.e. it's an odd number. We can call the procedure
+vowel_odd to indicate that it is being used to indicate the unwanted
+combination.
+
+(This example has been slightly modified since the video tutorial was created.)
+
+*/
+
+define vowel_odd(item1, item2) -> result;
+
+    ;;; item1 is a word and item2 is an integer
+    isword(item1) and isinteger(item2)
+
+        ;;; the word has only one character
+        and length(item1) = 1
+
+        ;;; which is a vowel, not a consonant
+        and member(item1, [a e i o u A E I O U])
+
+        ;;; the number is odd -- remainder on dividing by 2 is 1
+        and ( item2 rem 2 = 1 )
+
+            -> result
+            ;;; so result will be true or false depending on the
+            ;;; outcome of the four tests.
+
+enddefine;
+
+
+/*
+;;; test it
+;;; work out what the result should be in each case, and run the test.
+vowel_odd("a", 4) =>
+vowel_odd("e", 5) =>
+vowel_odd("O", 4) =>
+vowel_odd("A", 5) =>
+vowel_odd("b", 5) =>
+vowel_odd("b", 6) =>
+
+;;; what about
+
+vowel_odd("apple", 4) =>
+vowel_odd("egg", 5) =>
+
+Only two of those cases will indicate that our requirement, has been violated
+because a vowel is followed by an odd number. If that's true any list containing
+those two items in success is no good if our requirement is as stated above.
+
+We can use that procedure to complain about lists where a word of length
+one containing a vowel is followed by an even number, and accept all
+others:
+
+;;; Work out what the result should be for each of the following.
+;;; Remember the result <true> means the list does NOT violate the
+;;; requirement.
+doesmatch_sorted_any([], vowel_odd ) =>
+
+doesmatch_sorted_any([ 15 76 9 ], vowel_odd ) =>
+
+doesmatch_sorted_any([ a b c d e ], vowel_odd ) =>
+
+doesmatch_sorted_any([ a 3 b 4 c 5 d 6 e 7 ], vowel_odd ) =>
+
+;;; turn on tracing for vowel_odd
+trace vowel_odd;
+
+;;; this tries many pairs before the vowel_odd procedure finds the
+;;; exception, and returns true, so the whole thing returns false
+doesmatch_sorted_any([ a 2 b 4 c 5 d 6 e 7 ], vowel_odd ) =>
+
+> vowel_odd a 2
+< vowel_odd <false>
+> vowel_odd 2 b
+< vowel_odd <false>
+> vowel_odd b 4
+< vowel_odd <false>
+> vowel_odd 4 c
+< vowel_odd <false>
+> vowel_odd c 5
+< vowel_odd <false>
+> vowel_odd 5 d
+< vowel_odd <false>
+> vowel_odd d 6
+< vowel_odd <false>
+> vowel_odd 6 e
+< vowel_odd <false>
+> vowel_odd e 7
+< vowel_odd <true>
+** <false>
+
+;;; this one stops much sooner because an exception is found quickly:
+
+doesmatch_sorted_any([ a 5 b 4 c 9 d 6 e 7 ], vowel_odd ) =>
+> vowel_odd a 5
+< vowel_odd <true>
+** <false>
+
+;;; here no exception is found (all tests are false), so the procedure
+;;; returns true
+doesmatch_sorted_any([ a 6 b 4 c 9 d 6 e 2 g 2 i 8 ], vowel_odd ) =>
+> vowel_odd a 6
+< vowel_odd <false>
+> vowel_odd 6 b
+< vowel_odd <false>
+> vowel_odd b 4
+< vowel_odd <false>
+> vowel_odd 4 c
+< vowel_odd <false>
+> vowel_odd c 9
+< vowel_odd <false>
+> vowel_odd 9 d
+< vowel_odd <false>
+> vowel_odd d 6
+< vowel_odd <false>
+> vowel_odd 6 e
+< vowel_odd <false>
+> vowel_odd e 2
+< vowel_odd <false>
+> vowel_odd 2 g
+< vowel_odd <false>
+> vowel_odd g 2
+< vowel_odd <false>
+> vowel_odd 2 i
+< vowel_odd <false>
+> vowel_odd i 8
+< vowel_odd <false>
+** <true>
+
+;;; Now create some more tests of your own, and run them. In each case try
+;;; to work out whether the result is true or false, and if false exactly
+;;; which pair of numbers vowel_odd will return false for.
+
+;;; untrace vowel_odd
+untrace vowel_odd;
+
+-- Partially applying doesmatch_sorted_any ----------------------------
+
+This section is an optional extra. It illustrates a very useful feature of pop11
+using the procedure doesmatch_sorted_any as an example to which the feature can
+be applied.
+
+A generic procedure that performs a task in different ways that depend
+on one or more of its inputs can be used to construct a specific
+procedure by constructing a 'closure' of the generic procedure.
+
+In a closure the procedure is partially applied to the last argument it could be
+given for doing something.
+
+(The last two, or the last three, or four, etc. arguments could be frozen.
+We'll illustrate only the simplest case.)
+
+-- -- define predicates increasing and decreasing
+
+define increasing = doesmatch_sorted_any(% nonop > %);
+enddefine;
+
+define decreasing = doesmatch_sorted_any(% nonop < %);
+enddefine;
+
+increasing([ 1 2 4 6 7 8 ]) =>
+** <true>
+
+increasing([ 1 2 4 6 3 7 8 ]) =>
+** <false>
+
+decreasing([ 1000 555 230 110 3]) =>
+** <true>
+
+decreasing([ 1000 555 600 230 110 3]) =>
+** <false>
+
+
+;;; Now show how doesmatch_sorted_any can be partially applied to two other
+;;; procedures operating on words, to produce a procedure to detect whether
+;;; a list of words is sorted in increasing alphabetic order and another to
+;;; detect whether a list of words is in decreasing alphabetic order.
+
+;;; Hint: for one case you can use the procedure alpha_ascends, defined above.
+
+-- Exercise -----------------------------------------------------------
+
+Can you define a procedure, partly modelled on doesmatch_sorted_any that takes
+a list of numbers and checks both that all the numbers are in ascending order,
+that there are no repetitions, and that no two adjacent numbers differ by more
+than 6.
+
+Can you define a procedure, partly modelled on doesmatch_sorted_any that takes
+a list of numbers and checks both that all the numbers are in ascending order,
+that there are no repetitions, and that no three successive numbers differ by
+more than 6.
+
+
+-- Further reading ----------------------------------------------------
+
+TEACH DEFINE
+
+TEACH STACK
+
+TEACH SORT
+    creates a sorted copy of a list of words or numbers
+
+HELP SYSSORT
+    explains a generic Pop11 sorting library.
+
+
+TEACH * PERCENT
+    contains simple tutorial information on closures
+
+HELP CLOSURES
+    More information on closures
+
+
+--- $usepop/pop/teach/match_sorted
+--- Copyright University of Birmingham 2011. All rights reserved.
+
+*/

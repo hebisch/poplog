@@ -1,0 +1,1210 @@
+TEACH PROGLECT4                                    Aaron Sloman Oct 1998
+Revised 6 Nov 2000
+
+The Pop-11 database and its uses.
+
+See TEACH * PROGLECT1, PROGLECT2, PROGLECT3,
+
+CONTENTS
+
+ -- The Pop-11 matcher
+ -- Some simple examples showing testing the contents of a list
+ -- Examples using variables to remember what was matched
+ -- The matcher can also dig into embedded lists
+ -- The matcher arrow "-->"  for use outside conditionals
+ -- The matcher can also use restrictions on variables
+ -- The Pop-11 database
+ -- Simple database examples
+ -- Some useful database procedures
+ -- Iterating over the database with foreach
+ -- Examples using foreach
+ -- Matching lists of patterns consistently: forevery
+ -- One way to fix two_away
+ -- Another way to fix the problem
+ -- Using the database to do list processing
+ -- Allpresent and which_values
+ -- More on the database
+ -- -- Query procedures
+ -- Database reminders
+ -- Next task: build a more convenient interface. See TEACH RIVERCHAT
+ -- Some examples in the library
+
+-- The Pop-11 matcher -------------------------------------------------
+
+One of the features of Pop-11 which makes it particularly useful for
+teaching is the pattern matcher. This allows you to access the contents
+of complex list structures relatively easily.
+
+Contrast this:
+
+    vars list;
+    [the cat sat on the very old mat] -> list;
+
+    vars third, rest;
+    if list matches ![= = ?third ??rest] then
+        rest =>
+        third =>
+    endif;
+
+With this
+
+    if length(list) >= 3 then
+        hd(tl(tl(list))) -> third;
+        tl(tl(tl(list))) -> rest;
+        rest =>
+        third =>
+    endif;
+
+Code written with the pattern matcher is often much clearer and easier
+to keep bug free than code using the lower level list processing
+procedures like hd and tl. However it may run a bit more slowly.
+(There are always tradeoffs.)
+
+The use of the pattern matcher makes it easy to provide a simple but
+powerful "database" mechanism.
+
+For more on the matcher see
+    TEACH MATCHES, TEACH MATCHES2, HELP MATCHES
+    PRIMER, chapter 7
+
+The matcher is also used in the far more powerful Poprulebase system,
+described in TEACH RULEBASE.
+
+-- Some simple examples showing testing the contents of a list --------
+
+The matcher basically compares two lists of items in the same order:
+
+    [1 2 3] matches [1 2 3] =>
+
+    [1 2 3 4] matches [1 2 3] =>
+
+    [1 2 3] matches [1 2 3 4] =>
+
+    [1 2 3] matches [3 2 1] =>
+
+All those examples would have worked with "=" instead of "matches", e.g.
+
+    [1 2 3]  = [1 2 3] =>
+
+    [1 2 3 4] = [1 2 3] =>
+
+However "matches" is more powerful. It can also compare a list with a
+"template" or "pattern".
+
+These contain special pattern elements which allow the matching process
+to be more flexible.
+
+There are two anonymous pattern elements (jokers) which will match
+anything but will not keep any record of what they have matched, unlike
+pattern elements with variables that remember what they matched:
+
+    "="     matches exactly one element
+    "=="    matches an arbitrary number of elements
+
+(The latex Max Clowes used to say: "Gobble one" vs "Gobble many").
+
+    [1 2 3] matches [= 2 ==] =>
+    [1 2 3] matches [== 2 ==] =>
+    [1 2 3] matches [== 2 =] =>
+    [1 2 3 4 5] matches [== 2 ==] =>
+    [1 2 3 4 5] matches [== 1 2 ==] =>
+
+A "segment" pattern element matches an arbitrary sublist (segment of
+the list), including an EMPTY sublist, as in the last case.
+
+Compare:
+    [steve is a teacher ] matches [ ==  is a == ] =>
+    [steve is a teacher ] matches [ ==  is == a == ] =>
+
+    [fred is not a computer] matches [ == is a == ] =>
+    [fred is not a computer] matches [ == is = a == ] =>
+
+
+-- Examples using variables to remember what was matched --------------
+
+
+Create a list:
+
+    vars list = [the cat sat on the very old mat];
+
+We now look at various ways of accessing its components using the
+pattern matcher:
+
+    vars between;
+
+    list matches [== cat ??between old ==] =>
+
+    between =>
+
+    list matches [== the ??between old ==] =>
+
+    between =>
+
+    list matches [== = the ??between old ==] =>
+
+    between =>
+
+    list matches [== = the cat ??between old ==] =>
+
+    between =>
+
+-- The matcher can also dig into embedded lists -----------------------
+
+    vars list = [[a stich in time] saves [twenty nine]];
+
+    vars xxx, yyy, zzz;
+
+    list matches [[a ??xxx time] ?yyy [??zzz]] =>
+
+    xxx =>
+
+    yyy =>
+
+    zzz =>
+
+What about this
+
+    list matches [[a ??xxx time] ??yyy [??zzz]] =>
+
+    xxx =>
+
+    yyy =>
+
+    zzz =>
+
+and this
+    list matches [[a ??xxx time] ??yyy ?zzz] =>
+
+    xxx =>
+
+    yyy =>
+
+    zzz =>
+
+and this
+
+    list matches [[a ??xxx time] ??yyy ??zzz] =>
+
+    xxx =>
+
+    yyy =>
+
+    zzz =>
+
+Warning: two adjacent segment pattern elements will produce undefined
+results.
+
+-- The matcher arrow "-->"  for use outside conditionals --------------
+
+See TEACH MATCHES2
+
+Note, we can use "-->" if we are not interested in WHETHER the match
+holds, only what is in the list.
+
+    vars x;
+    [a b c] --> [a b ?x];
+
+    x=>
+
+
+But mishaps may occur.
+
+    [a b c] --> [a b c d];
+
+The syntax for pattern elements is the same whether you use "matches"
+or "-->" or the database constructs based on the matcher described
+below (and in Chapter 7 of the Pop-11 primer).
+
+
+-- The matcher can also use restrictions on variables -----------------
+
+    vars
+        item, item2,
+        testlist = ['a string' 4 cat [a list] 3 dog];
+
+
+    testlist --> [== ?item:isnumber ==];
+
+    item =>
+
+    testlist --> [== ?item:isstring ==];
+
+    item =>
+
+    testlist --> [== ?item:isword ==];
+
+    item =>
+
+    testlist --> [== ?item:islist ==];
+
+    item =>
+
+    vars rest;
+
+    testlist --> [??item:3 ??rest];
+
+    item =>
+
+    rest =>
+
+
+For more on pattern elements and restrictions see
+    HELP MATCHES
+
+-- The Pop-11 database ------------------------------------------------
+
+THE DATABASE AS A LIST OF LISTS OF INFORMATION
+
+The database package provides a subset of such facilities. See
+
+    TEACH * DATABASE
+
+Lists are a derived data-type, based on Pop-11 pairs, together with a
+host of procedures and syntax constructs that treat chained sets of
+pairs as if they were one extended object, e.g.
+
+Procedures for lists:
+    hd,
+    tail,
+    length,
+    applist,
+    rev
+    member
+    last
+    <>
+    =
+    matches
+
+Syntactic constructs for use with lists, e.g.
+
+    for <var> in <list> do .... endfor,
+    for <var> on <list> do .... endfor,
+
+See HELP FOR
+
+Similarly Pop-11 databases are a derived data-type, based on Pop-11
+lists, together with a collection of procedures and syntactic constructs
+that treat a list of lists as if it were one object, e.g.
+
+Procedures for the database:
+
+    add,
+    alladd,
+    remove,
+    flush,
+    present,
+    lookup,
+    allpresent,
+    which_values
+
+Syntactic constructs for the database:
+
+    foreach <pattern> do ... endforeach, etc.
+    forevery <list of patterns> do ... endforevery, etc.
+
+The database concept depends essentially on the use of the Pop-11
+pattern matcher.
+
+The matcher compares ONE list of information with a pattern.
+
+The database can be thought of as containing MANY lists that can be
+compared with the same pattern. This is the simplest use of the
+database.
+
+E.g. you may wish to check whether the database contains at least one
+item that matches a given pattern.
+
+Or you may wish to find ALL the items that match a pattern.
+
+In either case, pattern variables may be used to extract information
+from the items in the database, just as a pattern can extract
+information from a single list.
+
+Likewise it is possible to remove from the database an item that matches
+a pattern, or to remove ALL items that match a pattern.
+
+There are database procedures that take a pattern and compare it with
+all the items in the database, or all until something is found that
+matches.
+
+There are more complex database procedures that take a LIST of
+patterns and try to find all the different ways those patterns can
+consistently be matched against database entries.
+
+Thus you can find if someone is the maternal grandfather of
+someone else by using a list containing these two patterns:
+
+    [ [father ?person1 ?person2] [mother ?person2 ?person3] ]
+
+Matching consistently means that the matcher should produce the same
+values for the same variables.
+
+I.e. after the first pattern has matched something it constrains
+what can match the second pattern.
+
+Note: rule-based programming (as explained in TEACH * RULEBASE and
+related files, is a generalisation of database programming.)
+
+So is Prolog, the logic programming language.
+
+-- Simple database examples -------------------------------------------
+
+
+    database ==>
+    add([steve is a teacher]);
+    add([steve likes apple pie]);
+    database ==>
+    add([fred is a teacher]);
+    add([fred likes jam tart]);
+    add([julie is a teacher]);
+    add([julie likes baked haddock]);
+    database ==>
+
+Compare the simple print arrow -- the printing is not so easy to read
+when the list of lists is too long to fit on one line.
+
+    database =>
+
+
+    present([steve is a teacher]) =>
+    present([steve likes baked haddock]) =>
+    present([aaron likes jam tart]) =>
+
+
+    present( ![julie likes ??x] ) =>
+    x =>
+    it =>
+
+    present( ![??x likes apple pie] ) =>
+    x =>
+    it =>
+
+    vars person, what;
+
+    present( ![??person likes ??what] ) =>
+
+
+The procedure present returns a true or false result, so that it can be
+used in conditionals. The procedure lookup does not return a result. It
+is used only for its 'side-effects", i.e. setting variables in a pattern
+to record what was found in the database, just as "-->" is used only for
+its side effects whereas matches producs a true/false result.
+
+    lookup( ![fred likes ??x] );    ;;; use semi-colon, not print arrow
+    x =>
+
+    lookup( ![mary likes ??x] );    ;;; use semi-colon, not print arrow
+
+The procedures remove and flush also produce no result. They take a list
+or a pattern and remove items from the database. Only one item, the
+first one found to match the pattern, is removed by remove. By contrast
+flush removes everything that matches the pattern. The item removed in
+the first case is assigned to the variable it. The items removed by
+flush are put in a list (which may be empty) and the list is assigned to
+the variable them.
+
+    remove([== likes ==]);
+    database ==>
+    it =>
+
+    flush([== likes ==]);
+    database ==>
+    them ==>
+
+If there is nothing to match, then remove produces a mishap:
+    remove([== likes ==]);
+
+    ;;; MISHAP - ATTEMPT TO REMOVE NON-EXISTENT ITEM
+    ;;; INVOLVING:  [== likes ==]
+    ;;; DOING    :  remove runproc ....
+
+Whereas flush does not mishap, but if nothing in the database matches
+its argument, it assigns the empty list to them.
+
+    database ==>
+    flush([== elephant ==]);
+    database ==>
+    them ==>
+
+Don't confuse flush, which removes all items matching one pattern, and
+allremove, which takes a list of patterns, and removes one item matching
+each pattern.
+
+    [[julie is a teacher] [fred is a pilot] [steve is a nurse]]
+        -> database;
+
+    vars list1, list2;
+    allremove(![ [fred ??list1] [steve ??list2]]);
+
+    database ==>
+    them ==>
+    list1 ==>
+    list2 ==>
+
+-- Some useful database procedures ------------------------------------
+
+    add(ITEM)
+        The item should be a list. It is added to the database.
+        It is also assigned to the global variable "it", which is used
+        for the last database item accessed.
+
+    alladd(LIST)
+        Takes a list of database items (all lists) and adds them to
+        the database. It assigns the list to the global variable "them".
+
+    present(PATTERN) -> BOOLEAN
+
+        Tries everything till an item is found that matches
+        I.e. looks for ONE thing.
+
+        returns a true-false result
+
+        If it finds something that matches the pattern it
+
+            (a) sets variables in the pattern
+
+            (b) sets the variable "it" to have the item as its value
+
+            (c) returns immediately with a true result.
+
+        It could be defined thus:
+
+        define present(pattern) -> boolean;
+            lvars item;
+
+            for item in database do
+                if item matches pattern then
+                    item -> it;
+                    true -> boolean;
+                    return();
+                endif;
+            endfor;
+            ;;; failed to find match, so return false
+            false -> boolean;
+
+        enddefine;
+
+
+    foreach PATTERN do ... endforeach;
+
+        Tries EVERY ITEM in the database
+
+        Every time an item is found that matches PATTERN foreach
+
+            (a) sets variables in the pattern
+
+            (b) sets the variable "it" to have the item as its value
+
+            (c) performs the action, using the values of the variables.
+
+
+    lookup(PATTERN)
+        NB This has no result. It is like "-->"
+
+        It looks for at least ONE thing that matches the pattern.
+        Generates an error if it fails
+
+        If it succeeds
+            (a) sets variables in the pattern
+
+            (b) sets the variable "it"
+
+        It could be defined thus
+
+        define lookup(pattern);
+            unless present(pattern) then
+                mishap(pattern, 1, 'LOOKUP FAILURE')
+            endunless
+        enddefine;
+
+
+    Example:
+    alladd([ [a b c d] [d c b a] [a b d c] ]);
+
+    vars x;
+    lookup([= ?x b ==]);
+    x =>
+    it =>
+
+    lookup([= ?x e ==]);
+
+Extract from TEACH PRIMER
+
+    procedure   returns           iterates over       mishap on
+                a boolean         the database        failure
+    ---------------------------------------------------------
+    matches      yes                   no               no
+
+    -->          no                    no               yes
+
+    present      yes                   yes              no
+
+    lookup       no                    yes              yes
+
+
+    remove(PATTERN)
+
+        Searches for one thing in the database and removes it
+
+        If it succeeds
+            (a) sets variables in the pattern
+
+            (b) sets the variable "it"
+
+    flush(PATTERN)
+        removes everything that matches
+
+            sets the variable "them" to be a list of items removed.
+
+    [] -> database;
+    alladd([ [a b c d] [d c b a] [a b d c] [1 b 3 d 5]]);
+    database ==>
+    flush([ == b == d == ]);
+    them =>
+    database ==>
+
+    allremove(LIST)
+        Given a list of patterns (or lists) makes sure that it can
+        remove at least one item for each of them, and does so.
+        If not, generates a mishap.
+
+
+-- Iterating over the database with foreach ---------------------------
+
+Formats:
+    foreach <pattern> do <actions> endforeach
+
+    foreach <pattern> in <list> do <actions> endforeach
+
+or
+    foreach ! <pattern> do <actions> endforeach
+    foreach ! <pattern> in <list> do <actions> endforeach
+
+This tries matching the <pattern> against every item in the database.
+Every time the match is succesful it performs actions.
+
+You can treat
+
+    foreach <pattern> do <actions> endforeach
+
+as approximately equivalent to this:
+
+    lvars item;
+    for item in database do
+
+        if item matches <pattern> then
+            <actions>
+        endif;
+
+    endfor;
+
+Note that this uses the variable database as global.
+
+In fact it is a bit more complicated than that because foreach ensures
+that the original database is used throughout the loop since the
+<actions> can change the database if there are add or remove actions
+included.
+
+-- Examples using foreach ---------------------------------------------
+
+define people();
+    ;;; clear the database and set up a collection of "initial" facts
+    []  -> database;
+    add([joe isa man]);
+    add([jill isa woman]);
+    add([joe lives_in london]);
+    add([jill lives_in brighton]);
+    add([bill isa man]);
+    add([sue isa woman]);
+    add([bill lives_in london]);
+    add([sue lives_in paris]);
+enddefine;
+
+people();
+
+
+We have information about several women in the database, but if you do
+
+    vars x;
+    present([?x isa woman])=>
+    x =>
+
+and then do it again
+    present([?x isa woman])=>
+    x =>
+
+you'll see that it always finds the same thing (provided the database has not
+changed in between).
+
+But foreach finds them all:
+
+    vars x;
+    foreach [?x isa woman] in database do x => endforeach;
+
+We could make a list of all of them
+
+    vars x, list;
+    [% foreach [?x isa woman] in database do x  endforeach %] -> list;
+
+    list =>
+
+It is possible to use nested foreach lists.
+
+    [[connects room1 room2]
+     [connects room1 room3]
+     [connects room2 room4]
+     [connects room3 room5]
+     [connects room3 room4]
+     [connects room4 room6]] -> database;
+
+    vars connections;
+    vars r1, r2, r3;
+    [%
+        foreach ! [connects ?r1 ?r2] do
+
+            foreach ! [connects ^r2 ?r3] do
+                [Two away ^r1 ^r3]
+            endforeach
+
+        endforeach
+    %] -> connections;
+
+    connections ==>
+
+Note that for every match of the FIRST pattern the second one is
+tried against ALL the database items.
+
+This can be abbreviated using forevery, which takes a list of lists
+in one loop.
+
+    vars connections;
+    vars r1, r2, r3;
+    [%
+       forevery ! [[connects ?r1 ?r2][connects ?r2 ?r3]] do
+                [Two away ^r1 ^r3]
+       endforevery
+     %] -> connections;
+
+    connections ==>
+
+Forevery can be used with an arbitrarily long list of patterns. N
+patterns corresponds to N nested loops. (As N increases it gets
+slower and slower...).
+
+If K is the length of the database there are N x K matches to do.
+
+Compare which_values
+
+    which_values( ! [?r1 ?r3], ! [[connects ?r1 ?r2][connects ?r2 ?r3]] )
+        ==>
+
+This is defind in terms of forevery, approximately like this:
+
+
+define which_values(Vars, Patternlist) -> List;
+    ;;; Vars should be a list of variables prefixed by "?" transformed by "!"
+    ;;; Patternlist should be a list of patterns, the whole having been transformed
+    ;;; by "!"
+
+
+    if ispair(Vars) then
+        if ispair(Patternlist) then
+            [%forevery Patternlist do
+                lvars list;
+                [%for list on Vars do
+                    if hd(list) == "?" or hd(list) == "??" then
+                        valof(hd(tl(list)))
+                    endif
+                  endfor%]
+              endforevery%] -> List
+        else mishap('LIST OF PATTERNS NEEDED', [^Patternlist])
+        endif;
+    else
+        mishap('LIST NEEDED FOR "WHICH_VALUES"', [^Vars] )
+    endif;
+enddefine;
+
+-- Matching lists of patterns consistently: forevery ------------------
+
+This example introduces the trade-off between forms of representation
+and choice of algorithms.
+
+Searching in the database for an item or set of items that match a given
+pattern is a relatively trivial task. Far more complex is finding a
+consistent way of matching a collection of patterns against a database.
+For example you could have a database of information about which rooms
+are connected with which.
+
+    [[connects room1 room2]
+     [connects room1 room3]
+     [connects room2 room4]
+     [connects room3 room5]
+     [connects room3 room4]
+     [connects room4 room6]] -> database;
+
+Graphically
+
+        room3 --- room1 --- room2
+          | |                |
+          | +----- room4 ----+
+          |          |
+        room5      room6
+
+Now suppose you wanted to find routes to all the rooms that are two
+links away from a given room, you can use the forevery construct in a
+procedure like this:
+
+define two_away(room) -> list;
+        ;;; return a list of two-step routes from room
+
+        lvars r1, r2;
+        [%
+            forevery ! [[connects ^room ?r1][connects ?r1 ?r2]] do
+
+                [^room ^r1 ^r2]
+
+            endforevery
+        %] -> list;
+
+    enddefine;
+
+test it
+
+    two_away("room1") ==>
+
+But this procedure has a bug. What is it and how can it be fixed?
+
+It does not find all the routes:
+
+    two_away("room3") ==>
+
+Why not?
+
+-- One way to fix two_away --------------------------------------------
+
+In deciding how to fix two_away you have to consider whether to change
+the representation of information in the database. For example the
+information is represented asymetrically, insofar as we have
+represented the fact
+
+     [connects room1 room3]
+
+but not the fact
+
+     [connects room3 room1]
+
+which is in a sense the same fact, expressed differently. You could try
+extending the database to include such "reverse" facts, e.g.
+
+    [[connects room1 room2]
+     [connects room2 room1]
+     [connects room1 room3]
+     [connects room3 room1]
+     [connects room2 room4]
+     ;;; and so on
+     [connects room3 room5]
+     [connects room3 room4]
+     [connects room4 room6]] -> database;
+
+and then try out the procedure two_away with the same example as before
+
+
+    two_away("room3") ==>
+
+This now gives more answers.
+
+It would be desirable to rule out answers like this:
+
+    [room1 room3 room1]
+
+Or would it?
+
+-- Another way to fix the problem -------------------------------------
+
+Another way is to use the original database, but extend the procedure
+two_away to try all the combinations explicitly:
+
+    [[connects room1 room2]
+     [connects room1 room3]
+     [connects room2 room4]
+     [connects room3 room5]
+     [connects room3 room4]
+     [connects room4 room6]] -> database;
+
+    database ==>
+
+define two_away_symmetric(room) -> list;
+        ;;; return a list of two-step routes from room
+
+        lvars r1, r2;
+        [%
+            forevery ! [[connects ^room ?r1][connects ?r1 ?r2]] do
+                [^room ^r1 ^r2]
+            endforevery;
+
+            ;;; keep the same first condition, but change the second
+            forevery ! [[connects ^room ?r1][connects ?r2 ?r1]] do
+                [^room ^r1 ^r2]
+            endforevery;
+
+            ;;; now reverse the first condition, and try both orders
+            ;;; for the second
+            forevery ! [[connects ?r1 ^room][connects ?r1 ?r2]] do
+                [^room ^r1 ^r2]
+            endforevery;
+
+            forevery ! [[connects ?r1 ^room][connects ?r2 ?r1]] do
+                [^room ^r1 ^r2]
+            endforevery;
+
+
+        %] -> list;
+
+    enddefine;
+
+        room3 --- room1 --- room2
+          | |                |
+          | +----- room4 ----+
+          |          |
+        room5      room6
+
+Test that:
+    two_away_symmetric("room1") ==>
+    two_away_symmetric("room3") ==>
+
+That is an example of a trade-off between economy of representation and
+economy of processing.
+
+
+-- Using the database to do list processing ---------------------------
+
+How do you remove repeated elements from a list of lists?
+
+One way to "prune" the list would be to make the redundant list
+temporarily the database, then flush out all repetitions, like this:
+
+define prune_list(list) -> newlist;
+
+    vars database = list;
+
+    lvars item, donelist = [];
+
+    for item in list do
+
+        ;;; If item has been met before, ignore it
+        unless member(item, donelist) then
+            ;;; remove all occurrences of item
+            flush(item);
+            ;;; now add it back
+            add(item);
+            ;;; and remember it
+            [^item ^^donelist] -> donelist;
+        endunless;
+    endfor;
+
+    ;;; then use the database as the result
+
+    database -> newlist;
+
+enddefine;
+
+try it out
+
+    prune_list([[a b][c d][a b][d e][c d]]) ==>
+
+    prune_list([[x y z][ y z x][a b][c d][a b][x y z][d e][c d]]) ==>
+
+
+-- Allpresent and which_values ----------------------------------------
+
+Like forevery, the procedure allpresent, and the procedure which_values
+are based on the idea of taking several patterns, and looking for
+consistent ways of matching them with database items.
+
+But allpresent is more limited in that it finds only ONE such consistent
+set of matches, and then stops. E.g.
+
+    vars w,x,y,z;
+
+    allpresent([[connects ?w ? x] [connects ?x ?y] [connects ?y ?z]]) ==>
+
+    them ==>
+
+which_values is sometimes useful when you just want to get the
+combinations of values of some of the variables. It must be used with
+"!"
+
+    which_values(![?x ?z], ![[connects ?x ?y] [connects ?y ?z]]) ==>
+
+Notice that the same pair of values can occur more than once in the
+output list. Why?
+
+
+-- More on the database -----------------------------------------------
+
+An application of the database facilities to a simple simulated world.
+
+    TEACH RIVER2
+
+    TEACH RIVER2.P
+
+These illustrate the use of the database to store and manipulate a
+representation of the world, and also to answer questions.
+
+Procedures to be written include things like the following:
+
+    riv_setup(left_things, right_things, boat_things);
+
+    riv_whereis(thing) -> place;
+
+    riv_can_eat(thing1, thing2) -> boolean;
+
+    riv_will_eat(thing1, thing2) -> result;
+
+For reasons explained in TEACH RIVER2 every procedure has been defined
+so that it either returns "ok" or a list giving a reason for a negative
+answer or a failure to perform. This makes them suitable for use in an
+interactive conversational program, unlike LIB RIVER, whose facilities
+cause a MISHAP if things go wrong, and a mishap aborts the program.
+You don't want that to happen in a conversational program.
+
+It might also be useful in an automatic planning program to have such
+procedures which give reasons for their failure, rather than simply
+aborting.
+
+
+Some examples of what will be found in TEACH RIVER2
+
+You can run these examples if you do
+    lib river2
+
+riv_setup([man fox grain boat], [chicken], []);
+database ==>
+
+riv_whereis("man") =>
+riv_whereis("chicken") =>
+
+
+riv_can_eat("fox", "grain") =>
+riv_can_eat("chicken", "grain") =>
+riv_will_eat("chicken", "grain") =>
+
+The action routines need to check preconditions, and then change
+the database as needed:
+
+riv_putin("chicken") =>
+
+Try doing some of the commands twice, or in inappropriate conditions, to
+see what happens:
+
+riv_putin("fox") =>
+riv_putin("fox") =>
+database ==>
+riv_getin() =>
+riv_getin() =>
+riv_putin("fox") =>
+riv_takeout("fox") =>
+riv_getout() =>
+riv_getout() =>
+riv_takeout("fox") =>
+database ==>
+
+
+COMPLETE LIST OF RIVER2 PROCEDURES
+
+    riv_start()
+        Set up the initial state of the river.
+
+    riv_putin(thing) -> result
+        Man puts the thing into the boat
+
+    riv_takeout(thing) -> result
+        Man takes the thing out of the boat onto the river bank
+
+    riv_getin() -> result
+        Man gets into the boat
+
+    riv_getout() -> result
+        Man gets out of the boat
+
+    riv_cross() -> result
+        Man rows the boat across the river
+
+    riv_eat(thing1, thing2)
+        Something eats something else. (This produces no result because
+        its preconditions will always be satisfied when it is invoked.)
+
+-- -- Query procedures
+
+    riv_whereis(thing) -> place
+
+    riv_is_at(thing, place) -> boolean      (true or false result)
+
+    riv_is_in(thing1, thing2) -> boolean
+
+    riv_will_eat(thing1, thing2) -> boolean
+
+    riv_which_at(place) -> list of things
+
+    riv_which_in(thing) -> list of things
+
+-- Database reminders -------------------------------------------------
+
+The database package comes with a collection of different facilities:
+
+Look at the uses of
+    add
+    addall
+    remove
+    flush
+    present
+    foreach
+    forevery
+
+Most of those are illustrated in TEACH RIVER2.
+
+Contrast
+    present
+        Takes a pattern and searches for an item in the database, and
+        stops after finding one. It is a procedure.
+
+    foreach
+        Takes a pattern and matches it against each item in the database
+        in turn, and performs an action whenever there's a match.
+        this is a syntax word, with corresponding brackets "do"
+        and "endforeach"
+
+    lvars thing;
+
+    foreach ! [at ?thing left] do [^thing is at left] => endforeach;
+
+
+Contrast
+    foreach
+        takes just one pattern
+
+    forevery
+        takes a list of patterns and tries to find consistent ways
+        of matching them against database items. It is also a
+        syntax word with "do" and "endforeach" brackets.
+
+Forevery is a very powerful addition, allowing different combinations of
+patterns to be matched simultaneously against different items in the
+database. This does a form of inference, or reasoning. It is a step
+towards the power of prolog.
+
+Here's a simple example: work out which things are at the same place:
+
+vars x, y, place;
+
+forevery [[at ?x ?place][at ?y ?place]] do
+
+    if x /= y then
+        [^x ^y  'are together at' ^place] =>
+    endif;
+
+endforevery;
+
+Change the database and try the above again:
+
+riv_getin()=>
+riv_cross() =>
+riv_getout() =>
+
+forevery is a lot more powerful.
+
+-- Next task: build a more convenient interface. See TEACH RIVERCHAT --
+
+Controlling program
+
+    define riverchat();
+        river_start_chat();
+        river_introduction();
+        river_converse();
+        river_farewell();
+    enddefine;
+
+
+    define river_converse();                ;;; no inputs and no results
+        lvars input;
+
+        repeat
+            [What next?] =>
+
+            readline() -> input;
+
+        quitif( input = [bye] );            ;;; stopping condition
+
+            river_interpret(input);         ;;; still to be defined
+
+        endrepeat;
+
+        [good bye] =>
+    enddefine;
+
+
+Note the use of readline to get information from the user. What
+does readline do?
+
+TEACH READLINE
+
+Note that in the editor it suspends the running process till you press
+RETURN in the interactive file.
+
+    vars list;
+    'Please type something' =>
+    readline() -> list;
+    [why did you say ^^list] =>
+
+To define the interpret procedure you need to think very clearly about
+what the Ontology of the domain is, i.e. what kinds of facts can exist,
+including what relationships can be talked about. Here are some
+examples:
+
+    [ the ??obj is ??rel the ??loc ]
+
+        the fox is at the left bank
+
+    [ where is the ??obj ]
+
+    [ what is ??rel the ??loc ]
+
+        what is at the right bank
+
+    [ is the ??obj ??rel the ??loc ]
+
+        is the fox at the right bank
+
+    [ put the ??obj ??rel the ??loc ]
+
+        put the fox in the boat
+
+And many more. If you can produce a grammar, that is a good way to
+generate a very large set of cases in a systematic way, but then you
+have to interpret a parse tree
+
+    [s [vp
+            [vnpinnp put]
+            [np the ... ]
+            [prep in]
+            [np the ... ]]]
+
+-- Some examples in the library ---------------------------------------
+
+In an Xterm window try
+
+    pop11 +gblocks
+
+It's not easy to make such things work!
+
+
+TEACH * SCHEMATA
+
+Introduces the task of matching a story (represented as a set of facts
+in the database) against a set of scripts or frames to find the "best"
+match. This can then be used to predict items of information missing
+from the story.
+
+
+--- $poplocal/local/teach/proglect4
+--- Copyright University of Birmingham 2000. All rights reserved. ------

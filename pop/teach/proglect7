@@ -1,0 +1,627 @@
+TEACH PROGLECT7                                    Aaron Sloman Oct 1998
+
+This is a brief introduction to rule-based programming.
+
+Previous lectures are summarised as teach files, with examples which you
+can run.
+
+    TEACH * PROGLECT1
+    TEACH * PROGLECT2
+    TEACH * PROGLECT3
+    TEACH * PROGLECT4
+    TEACH * PROGLECT5
+    TEACH * PROGLECT6
+
+
+CONTENTS
+
+ -- Introduction
+ -- The need for more general forms of control
+ -- Example: a grammar can be seen as a production system
+ -- Another context: programming a "reactive" system
+ -- Conflict resolution strategies
+ -- How to use Poprulebase
+ -- An example: diagnosing an illness
+ -- Now define a procedure to run the rules
+ -- Some notes
+ -- An important difference from the Pop-11 database
+ -- A possible exercise just to get a taste of rule based programming
+ -- The sim_agent toolkit
+
+-- Introduction -------------------------------------------------------
+
+Rule based programming has proved important in expert system design, in
+some forms of "agent" programming and in building models of human
+cognitive processing (e.g. SOAR).
+
+It is also possible to view rule based systems as just one of many forms
+of programming language, all useful for different purposes.
+
+In particular, by considering ways of generalising forms of control
+presented earlier in the course you could probably invent rule based
+programming for yourself.
+
+POP-11 has a number of rule based libraries, providing different
+facilities. POPRULEBASE is one of the more general and sophisticated.
+
+TEACH EXPERTS introduces some more specialised libraries.
+
+
+-- The need for more general forms of control -------------------------
+
+The development of computing in particular and of AI in particular has
+involved more and more decisions being postponed so that they are
+taken by the computer as late as possible.
+
+Previous lectures (and teach files) introduced ever increasing
+flexibility.
+
+1. Sequence of explicit instructions
+
+2. Add procedure calls
+    Allows redefinition of procedures
+
+3. Add parameters
+    Allows actions to depend in part on inputs
+
+4. Add conditionals
+    Allows selection between different sets of instructions
+    to be postponed till "run time".
+    (However, programmer decides on order of tests in
+    multi-branch conditionals).
+
+5. Add loops
+    Allows amount of repetition, depth of problem-solving, etc.
+    to be decided at run time, e.g.
+
+        until ... do ... enduntil
+
+        for x from <start> by <inc> to <fin> do ... endfor
+
+        for x in <list> do ... endfor
+
+In all of these you have to specify the order in which tests are
+performed. I.e. this is determined at compile time by the programmer.
+
+
+6. Use of foreach and forevery with database
+    Allow the contents of the database to determine which actions
+    to do
+
+    foreach <pattern> do .... endfor
+
+    forevery [<pattern><pattern>....<pattern>] do .... endfor
+
+7. Allow programs which create new programs while running.
+    E.g. popval, pop11_compile, partial application.
+    New procedures can be stored in data structures then chosen
+    by the program as required.
+
+    The Pop-11 Eliza has a list of rules rather than a single
+    multi-branch conditional. It shuffles the list on every cycle,
+    so that the tests are done in a different sequence each time.
+
+    Some of the flexibility to change things at run time can depend
+    on using an interpreter or incremental compiler.
+
+8. Rule based programming
+    Create sets of condition-action rules and allow the contents
+    of a database to determine which rules are runnable.
+
+    The set of rules can also be changed by the machine at run time
+    (like creating or replacing procedures).
+
+    The rules can be interpreted in forward chaining mode (poprulebase)
+    or backward chaining mode (as in prolog) or some combination.
+
+    A set of condition-action rules is often referred to as
+    a "production system", for historical reasons.
+
+
+-- Example: a grammar can be seen as a production system --------------
+
+E.g. here's part of a grammar
+
+    S   ==> NP VP
+    S   ==> NP verb NP that_word S
+    S   ==> S  conjunction S
+
+    NP  ==> name
+    NP  ==> pronoun
+    NP  ==> SNP
+    NP  ==> NP PP
+    NP  ==> NP conjunction NP
+
+    SNP ==> determiner QNOUN
+    SNP ==> QNOUN
+
+    QNOUN   ==> noun
+    QNOUN   ==> noun noun
+    QNOUN   ==> adjective QNOUN
+    QNOUN   ==> possessive QNOUN
+
+    PP  ==> preposition NP
+
+    and so on
+
+
+(The arrows can go the other way to represent recognition rules for
+phrases, clauses and sentences.)
+
+Generating a sentence is then a matter of repeatedly deciding which
+rules to expand until all the grammatical category words (non-terminals)
+have been replaced by words.
+
+Decisions regarding which expansion option to follow can depend on
+extra-grammatical factors, such as what you are trying to say (i.e.
+previously selected semantic and pragmatic goals).
+
+[Note: this is not a serious theory of sentence production.]
+
+Similarly, analysing a sentence is a matter of running the rules
+backwards: repeatedly deciding which sequence of previously recognized
+sentence components can form a known type of group.
+
+
+-- Another context: programming a "reactive" system -------------------
+
+A system with internal and external sensors associated with internal and
+external actions, can use a rule based architecture.
+
+E.g.
+If a system is interacting with some environment that is sensed via a
+number of sensors, or an environment that produces input via one or more
+communication channels (e.g. mouse, keyboard), then it may be possible
+to specify the behaviour of the system by saying how it should react to
+each combination of inputs (plus, perhaps previous history).
+
+Sometimes it is useful for the reaction to depend not only on the
+external sensed state and the inputs, but also the internal state of the
+system, e.g. current goals, current beliefs about effects of actions,
+current plans.
+
+These in turn can be changed by the actions of the system.
+
+Thus we have a general scheme:
+
+    repeat
+
+        Read sensor information into database
+
+        Find rules that can be executed because their conditions
+        are satisfied by database contents (including previously
+        inserted records, and long term fixed memory). Rules may
+        include variables.
+
+        Select one or more of the executable rules and run their
+        actions (which may include variables bound in the conditions).
+
+        If appropriate, transfer some database contents to external
+        interfaces, for communication with others, or external actions.
+
+        Decide whether to continue or not
+
+    endrepeat
+
+
+Notes:
+
+1. This is a SYNCHRONOUS rule based system. The interpreter decides when
+to check the rules to see which are runnable.
+
+An ASYNCHRONOUS system allows rules to react as soon as their
+conditions are satisfied, no matter what else is happening (unless some
+rules are suppressed by filters).
+
+An example could be an event driven windowing system on a computer.
+Likewise a robot with external sensors that need to cause immediate
+reactions in the presence of danger.
+
+2. Rule-based systems are temporally DISCRETE systems.
+
+The interpreter repeatedly selects one or more rules and runs it, unlike
+an amplifier or electronic filter which continuously adjusts its
+behaviour on the basis of continuous sensing (and feedback).
+
+
+-- Conflict resolution strategies -------------------------------------
+
+When more than one rule is runnable, or a rule has several instances,
+a decision has to be taken regarding which rule instances to run. This
+requires a "conflict resolution strategy".
+
+TEACH RULEBASE gives several examples of such strategies
+
+Strategies to select only one rule:
+
+    o rule-order strategy
+        Choose first runnable rule
+
+    o refractoriness strategy
+        Choose first runnable rule that has not previously
+        run with the same bindings for variables
+
+    o recency strategy
+        Choose the rule whose conditions were most recently made
+        true
+
+    o specificity
+        Choose the rule whose conditions are hardest to satisfy, or
+        most specific (e.g. most conditions).
+
+    o use heuristic filter
+        Apply some heuristic tests at run time to decide which of the
+        runnable rules to run.
+
+Parallel strategy
+
+    o Run all the runnable rule instances
+        E.g. SOAR
+
+
+    o Run a filtered subset of runnable rules
+
+and other strategies.
+
+POPRULEBASE allows to you to choose any of these strategies, some
+by setting a global variable, some by defining a "filter" procedure.
+Moreover, the strategy can be changed in different parts of a program.
+
+Controlling rules can be difficult: e.g. adding things to the database
+to indicate which stage in solving a problem has been reached, and using
+those database items to ensure that new rules fire, not the previous
+rules, whose conditions may still be true.
+
+
+-- How to use Poprulebase ---------------------------------------------
+
+
+1. Load the library
+
+    uses poprulebase
+
+That can take some time if the machine is heavily loaded.
+Alternatively start with
+
+    pop11 +prb
+
+to get a version of pop11 with the poprulebase library already compiled.
+You then have to use an explicit "ved" or "teach" or "help" command to
+run Ved.
+
+    If you then want Xved to run, your vedinit.p file can include
+        "x" -> vedusewindows;
+
+2. Define one or more rulesets:
+
+    define :ruleset <name> ;
+
+        RULE  <name>
+        <conditions>
+            ==>
+        <actions>
+
+        RULE <name>
+        <conditions>
+            ==>
+        <actions>
+
+        ...
+
+    enddefine;
+
+Some of the available forms of conditions and actions are illustrated in
+various teach files.
+
+A full (very long) specification is in HELP POPRULEBASE.
+
+Users can define additional condition types and action types.
+
+Both conditions and actions can invoke Pop-11 instructions directly,
+giving the system a great deal of flexibility and power.
+
+    (It is even possible for a condition or action to invoke the rule
+    interpreter recursively.)
+
+
+3. Choose your initial database (possibly empty)
+
+4. Define a procedure that
+
+    o locally specifies global control and tracing variables, e.g.
+
+        prb_allrules (default false)
+
+        prb_chatty (default false)
+
+        prb_walk (default false)
+
+        (... and others ...)
+
+    o calls prb_run with the ruleset and the database
+
+        prb_run(<ruleset>, <database>)
+
+(An optional third argument is a cycle limit).
+
+
+-- An example: diagnosing an illness ----------------------------------
+
+From TEACH RULEBASE (but modified):
+
+vars doctor_database =
+    [
+        [start_message 'Welcome to the rule based doctor.']
+        [diagnosis_fee 5 pounds]
+    ];
+
+
+define :ruleset doctor_rules;
+
+
+  RULE start_diagnose
+
+    [NOT started]
+    [start_message ?message]
+         ==>
+    [SAY ?message]
+    [SAY 'I shall do my best to diagnose your problems']
+    [started]
+
+
+  RULE get_sentence
+    ;;; If there's no sentence in the database, get one, using
+    ;;; the READ action format. If there is a sentence this rule
+    ;;; will not be runnable.
+
+    [NOT sentence ==]
+         ==>
+    [READ 'Please tell me one symptom' [sentence ANSWER]]
+
+
+  RULE stop
+
+    [sentence bye]
+    [diagnosis_fee ??fee ]
+         ==>
+    [SAY 'Thank you for using my services.']
+    [SAY the fee is ??fee. 'Please pay at the door. Bye']
+    [STOP]
+
+
+  RULE stomach
+
+    [sentence == stomach ==]
+         ==>
+    [NOT sentence ==]
+    [SAY 'You have eaten too much. Fast for two days.']
+
+
+  RULE cough
+
+    [sentence == cough ==]
+         ==>
+    [NOT sentence ==]
+    [SAY 'Buy some cough mixture and go to bed.']
+
+
+  RULE headache
+
+    [OR [sentence == headache ==] [sentence == head == aches]]
+         ==>
+    [NOT sentence ==]
+    [SAY 'You probably have flu. Take an aspirin']
+
+
+  RULE default
+    ;;; as this is the last rule, it runs if there's any sentence
+    ;;; that is unrecognized by earlier rules
+
+    [sentence == ]
+         ==>
+    [NOT sentence ==]
+    [SAY 'That is very serious, please see a specialist.']
+
+enddefine;
+
+;;; You can print out a ruleset, as it is just a list of rules
+
+doctor_rules ==>
+
+
+-- Now define a procedure to run the rules ----------------------------
+
+define run_doctor(data);
+
+    dlocal
+        ;;; prevent prb_run continually pausing.
+        prb_walk = false,
+
+        ;;; Prevent more than one active rule firing.
+        prb_allrules = false,
+
+        ;;; Make this true for more tracing
+        prb_chatty = false;
+
+    ;;; now run the interpreter
+    prb_run(doctor_rules, data);
+
+enddefine;
+
+run_doctor(doctor_database);
+
+run_doctor([[start_message 'Hello'] [diagnosis_fee 5000 pounds] ]);
+
+(The control variables, instead of being fixed, could be left to
+the global environment. Or their values could be passed in as extra
+parameters to run_doctor.)
+
+
+-- Some notes ---------------------------------------------------------
+
+1. Some keywords for conditions and actions are defined by the library,
+e.g. [NOT ...] [OR ...] [SAY ...], and many more. These are complex
+conditions and complex actions.
+
+2. If a condition does not start with a known keyword, it is a simple
+condition.
+
+It is then simply matched against items in the database, and any
+variables in the condition that have been bound (i.e. had their values
+set) by a previous condition will restrict the match, e.g.
+
+    [father ?x ?y][mother ?y ?z]
+
+3. If variables in a condition have not already been bound they will be
+bound when a matching database item is found. Only one rule in the above
+ruleset has a variable: ??fee, in the "stop" rule. ??fee is also used in
+one of the actions.
+
+4. If action does not start with a known keyword it is simply
+added to the database. An example of such an action in the rule
+above is the simple action in RULE start_diagnose
+    [started]
+
+5. If an action (simple or complex) includes any variables, those
+variables are replaced by their values (picked up from conditions) i.e.
+the action is instantiated before the action is "run". An example
+is the action in RULE stop:
+
+    [SAY the fee is ??fee. 'Please pay at the door. Bye']
+
+Here, fee gets its value from the condition:
+
+    [diagnosis_fee ??fee ]
+
+
+6. If the same conditions match different database items, e.g. if
+   these conditions match
+    [father ?x ?y][mother ?y ?z]
+
+    [father tom mary][mother mary joe]
+    [father tom mary][mother mary fred]
+    [father fred sue][mother sue alison]
+
+then in principle several instances of the rule can be created, all of
+them runnable. A conflict resolution strategy may then select one.
+
+-- Simulating poprulebase in Pop-11 -----------------------------------
+
+Note that this could be simulated (partly) as follows. This ruleset
+
+    define :ruleset <name> ;
+
+        RULE  <name>
+        <conditions>
+            ==>
+        <actions>
+
+        RULE <name>
+        <conditions>
+            ==>
+        <actions>
+
+        ...
+
+    enddefine;
+
+would correspond to a Pop-11 procedure something like
+this, in the case where prb_allrules is false:
+
+define interpret_rules();
+
+    lvars ....all the variables in conditions... ;
+
+    repeat
+
+        if allpresent( ! <conditions>) then
+            obey(<actions>)
+
+        elseif allpresent( ! <conditions>) then
+            obey(<actions>)
+            ...
+
+        else
+            ;;; no conditions satisfied, so finish
+            return()
+        endif;
+
+    endrepeat;
+
+enddefine;
+
+Where obey(list) is a pop-11 procedure that knows how to interpret
+the various actions expressed as a list of lists.
+
+However Poprulebase allows far more flexibility than this, e.g. since
+it allows actions to be run for all possible ways of satisfying the
+conditions (compare forevery).
+
+
+-- An important difference from the Pop-11 database -------------------
+
+For efficiency, the poprulebase database is not really a simple list
+of lists, allthough you can provide a list of lists as second argument
+to prb_run.
+
+The list provided gets converted into a different sort of structure, a
+Pop-11 "property", indexed by the first item of each list. (For now
+don't worry about what properties are. There's a brief introduction in
+Chapter 4 of the Primer. Also HELP NEWPROPERTY, HELP NEWMAPPING.)
+
+Because the Poprulebase database is not a list of lists, many of the
+normal database procedures and constructs will not work, e.g.
+    present,
+    add,
+    remove,
+    foreach,
+    forevery.
+
+Instead there are specialised versions that work on the poprulebase
+database, and can be used in conditions and actions, e.g. (from the
+HELP POPRULEBASE file):
+
+    prb_print_database( )
+    prb_add(item)
+    prb_present(pattern) -> false or item
+    prb_in_database(pattern) -> false or item
+    prb_flush(pattern)
+    prb_flush1(pattern)
+    prb_remove_all(list_of_patterns) -> found
+    prb_forevery(patternlist, proc)
+
+
+-- A possible exercise just to get a taste of rule based programming --
+
+Define a set of rules that will ask you for a number, which it puts into
+the database as a target, and then adds up all the numbers from 1 up to
+the target number, then prints out the result.
+
+A far more complex example is provided in TEACH PRBRIVER. This shows how
+to make a fairly sophisticated planning program for the river world. It
+can be given any legal initial state of the river world and any legal
+goal state and will find a sequence of actions to achieve the goal
+state. You could compare it with TEACH TOWER and TEACH SEARCHING.
+
+    See TEACH PRBRUNRIVER.P
+
+Other exercises are in
+    TEACH RULEBASE
+    TEACH POPRULEBASE
+
+-- The sim_agent toolkit ----------------------------------------------
+
+Poprulebase is part of the sim_agent toolkit developed at Birmingham for
+creating more or less intelligent agents. Information about it is in
+
+    http://www.cs.bham.ac.uk/~axs/cogaff/simagent.html
+
+An interactive demo is provided if you do the following:
+
+    uses simlib
+
+then
+    TEACH SIM_FEELINGS
+
+--- $poplocal/local/teach/proglect7
+--- Copyright University of Birmingham 2000. All rights reserved. ------

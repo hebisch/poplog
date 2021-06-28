@@ -1,0 +1,1090 @@
+TEACH VEDSEARCH                                  Jonathan Meyer Oct 1992
+
+If you are an experienced Ved user wanting to learn about the new Ved
+search mechanism, skip to the section 'Notes for experienced Ved users'.
+
+If you are an experienced VI or ED user, you might want to read the
+section called 'Notes for VI, ED, GREP and AWK users' first.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Introduction
+ -- Searching forward: <ENTER> /
+ -- Non-embedded forward searching: <ENTER> "
+ -- Backward search <ENTER> \
+ -- Non-embedded backward search <ENTER> `
+ -- Empty search string: re-use last search string
+ -- Repeat forward search: <ESC> /
+ -- Repeat backward search: <ESC> \
+ -- Search pattern elements
+ -- Examples
+ -- Search options
+ -- Searching a region of the text
+ -- XVed users
+ -- The combined "search and substitute" command: <ENTER> s
+ -- Substitute pattern elements
+ -- Notes on string delimiters to be ignored on a first reading
+ -- Substitution options
+ -- Global substitutions: the '-ask' option
+ -- Substitution using regions
+ -- Shortcuts
+ -- Creating your own search or substitute commands
+ -- Notes for experienced Ved users
+ -- Notes for VI, ED, GREP and AWK users
+ -- See Also
+
+
+-- Introduction -------------------------------------------------------
+
+Ved allows you to search forwards or backwards for a specified string.
+
+You can either allow embedded strings to be found (e.g. 'the' in the
+word 'their') or constrain the string to match only complete text items,
+(e.g. prevent 'the' being found in 'their'). (See the section below on
+the definition of "embedded".)
+
+You can use special "pattern elements" in search strings to indicate
+things like the beginning or end of a line, or an arbitrary character,
+or control characters.
+
+There is also a search-and-substitute command, for replacing one or more
+occurrences of one string with another string. This can either be
+interactive or work for the whole file, or just the current line or the
+whole of a marked range (see HELP * MARK).
+
+
+-- Searching forward: <ENTER> / ---------------------------------------
+
+Suppose you want to move the cursor to a line containing the word
+"define". You can do this by first going into command mode (press ENTER)
+then type a "slash" i.e. "/" (not the "backslash" "\" higher up the
+keyboard), then type the "search string" then press RETURN, e.g. the
+command
+
+    <ENTER> /define
+
+will search for "define". If you wish to find an occurrence followed by
+some number of spaces, add the spaces and then another "/", e.g.
+
+    <ENTER> /define  /
+
+will find an occurrence of "define" followed by two spaces.
+
+NOTE - searches "wrap around" to the top of the file. I.e. if the
+required string is not found by searching down from the current
+location, Ved will go to the top of the file and continue searching for
+the first occurrence from there.
+
+
+-- Non-embedded forward searching: <ENTER> " --------------------------
+
+If you do not want to find an occurrence of the word embedded in a
+larger word, use the command
+
+    <ENTER> "define
+
+or, if you want trailing spaces type them followed by another ".
+
+If the double quote character (") is used like this, Ved will not find a
+line containing 'enddefine'. Embedded occurrences are ignored: strings
+must begin and end on text item boundaries, though a string can straddle
+more than one text item.
+
+
+-- Backward search <ENTER> \ ------------------------------------------
+
+    <ENTER> \<string>
+
+Will search backward for the last occurrence of <string> preceding he
+current cursor location. NOTE - If the string is not found between the
+current location and the top of the file it will wrap around and search
+from the bottom.
+
+The search string can be terminated with a second occurrence of "\".
+This is essential for a string that ends with a space.
+
+
+-- Non-embedded backward search <ENTER> ` -----------------------------
+
+    <ENTER> `<string>
+
+This is exactly the same as <ENTER> \, except that it will not find
+embedded occurrences of the string. I.e. it will find occurrences that
+begin and end on text item boundaries, like <ENTER> ". <string> should
+be terminated by "`" if it ends with a space.
+
+
+-- Empty search string: re-use last search string ---------------------
+
+If ever you give an empty string with any of the search or substitute
+commands (described below), Ved will reuse the search string that you
+supplied on the previous search.
+
+
+-- Repeat forward search: <ESC> / --------------------------------------
+
+The sequence <ESC> /  can be used to repeat the last search. It will use
+the last search string to search forward like <ENTER> / and <ENTER> ".
+
+
+-- Repeat backward search: <ESC> \ ------------------------------------
+
+This is like <ESC> /  except that it searches backwards for the last
+search string. On a long file, backward search using patterns (described
+below) can be much slower than search without any pattern elements in
+the string.
+
+
+-- Search pattern elements --------------------------------------------
+
+To match things like control characters, Ved graphics characters,
+or Ved special space characters, you can use all `backslash' sequences
+that are recognised in Pop-11 strings. These are described in `Backslash
+in Strings & Character Constants' in REF *ITEMISE. For example,
+
+    <ENTER> /\t
+
+finds a `tab' character, whereas
+
+    <ENTER> /\St
+
+would search for a `trailing space' character.
+
+Note that if you specify character attributes (using \[...] or \{...} ),
+these will be ignored in the search string. (However, they are not
+ignored in substitute strings, see 'Substitution pattern elements'
+below.)
+
+The search string can also contain special 'regular expression' search
+symbols, which control the search used in the above <ENTER> commands.
+
+The following table  summarises the search  options that are  available.
+TEACH *REGEXP gives  more examples of  regular expressions. REF  *REGEXP
+gives full details of the Poplog regular expression matcher.
+
+    Pattern     Meaning
+    -------     -------
+    @. or @?    match any single character
+    @*          match zero or more occurrences of the previous character
+    @^ or @a    constrains a match to the start of the line
+    @$ or @z    constrains a match to the end of the line
+    @<          constrains match to the start of a word boundary
+    @>          constrains match to the end of a word boundary
+    @{_N@}       matches _N occurrences of previous character, where _N is
+                a positive integer.
+    @{_N,@}      matches _N or more occurrences of the previous character
+    @{_N,_M@}     match at least _N, at most _M occurrences of previous
+                character, where _N and _M are positive integers
+    @[...@]     match any character between the brackets, where ... is
+                any characters e.g. abc or range of characters e.g. A-Z
+    @[^...@]    match any character except those between the brackets
+    @(...@)     denotes a sub-expression for use with @_N
+    @_N          match a repeat of the _N'th sub-expression where _N is
+                a number 1-9
+    @_C          match _C where _C is the search delimiter or `@'
+    @i          turns off case sensitivity for subsequent letters
+    @c          turns on case sensitivity for subsequent letters
+
+Examples using each pattern are given below.
+
+@^ or @a -- anchor search at beginning of line.
+
+    To specify that the word must occur at the beginning of a line, use
+    the symbol "@^" before the word. E.g.
+
+        <ENTER> /@^define
+
+    finds lines that begin with 'define'.
+
+    You can also use @a, which is provided for backward compatibility.
+
+@$ or @z -- anchor search at end of line
+
+    To search for "define" at the end of the line, use the symbol "@$"
+    after the word:
+
+        <ENTER> /define@$
+
+    Note that "@$@^" will match a line break.
+
+    You can also use @z, which is provided for backward compatibility.
+
+@. or @? -- match any character
+
+    To search for strings containing some specified and some arbitrary
+    characters use @. to indicate each arbitrary character. E.g.
+
+        <ENTER> /@.at
+
+    will find all the following: cat hat mat tat rat ...
+    It will also find embedded forms, e.g. catch that smattering ...
+    This can be suppressed by using <ENTER> "
+
+    You can also use @?, which is provided for backward compatibility.
+
+@* -- match zero or more occurrences of the previous pattern
+
+    To search for a character repeated zero or more times (up to the end
+    of a line) use the @* pattern. E.g.
+
+        <ENTER> /ap@*
+
+    will match 'a', 'ap', 'appp', 'appppp', etc.
+
+    More usefully, to search for any character repeated any number of
+    times, use @.@*  E.g.
+
+        <ENTER> /define @.@*;
+
+    will find 'define ', followed by any number of characters, followed
+    by ';',
+
+    Note that you can constrain the start and end of the match to word
+    boundaries using <ENTER> "
+
+@[ and @] -- match range of characters
+
+    To search for any one of a set of characters, place them between
+    @[ and @]. E.g.
+
+        <ENTER> /@[ABC@]nd
+
+    will find And, Bnd or Cnd. You can also use the '-' sign to indicate
+    a range of characters, E.g.
+
+        <ENTER> /@[A-Z@]ile
+
+    will match Tile, File, Zile, or anything else that starts with an
+    upper case letter followed by 'ile'. You can use the same technique for
+    numbers:
+
+        <ENTER> /@[1-9@]
+
+    will find, 1, 2, 3, ..., 9.
+
+    Use @[ and @] with @* to specify zero or more occurrences of any of
+    the characters. E.g.
+
+        <ENTER> /repeat @[0-9@]@*
+
+    will match 'repeat ', 'repeat 1', repeat 59', 'repeat 214', or
+    repeat followed by any other integer.
+
+    If the first character after the @[ is ^, the pattern will match
+    anything except the characters between @[ and @]. E.g.
+
+        <ENTER> /@[^\s\t@]
+
+    finds the next character that is not a space or a tab character.
+
+@< -- anchor search to the start of a word
+
+    Use @< to search for a string which is the start of a word. E.g.
+
+        <ENTER> /@<mem
+
+    will find "member" but will not find "strmember" or "lmember".
+
+@> -- anchor search to the end of a word
+
+    To search for a word that ends in a particular pattern, use @> E.g.
+
+        <ENTER> /or@>
+
+    will find "or", "endfor" but not "ordinal".
+
+    Note that:
+
+        <ENTER> /@<define@>
+
+    is equivalent to
+
+        <ENTER> "define
+
+@( and @) -- specify a sub-expression
+
+    If you want to find a string that is repeated more than once, place
+    @( and @) around string and then use @1 to repeat it. This can
+    save typing. E.g.
+
+        <ENTER> /@(echo@)@1@1@1
+
+    will match four repetitions of 'echo'. You can use patterns inside
+    the @( and @), E.g.
+
+        <ENTER> /@(@.cho@) @1
+
+    will match 'echo echo' or ' Echo Echo'. Note that @1 repeats the
+    same string of characters as was previously matched by the
+    expression enclosed in @( @), so the above pattern will not find
+    'echo Echo' or 'Echo echo'.
+
+    There can be up to nine @( @) expressions in a search. Use @2 to
+    repeat the second expression, @3 to repeat the third, etc.
+
+@{ and @} -- match a range of occurrences
+
+    To find a range of occurrences of a pattern, use @{ and @}. E.g.
+
+        <ENTER> /p@{1,3@}
+
+    will match one, two or three p's. If you don't specify the second
+    number, as many matches as possible are done, up to the end of the
+    line. E.g.
+
+        <ENTER> /p@{1,@}
+
+    finds as many consecutive p's as possible. @{ @} combines with other
+    search patterns as well. E.g.
+
+        <ENTER> /@[A-Z@]@{1,5@}
+
+    will find up to five upper case letters next to each other.
+
+@i -- make the following characters case-insensitive
+
+    Use @i to find both uppercase and lowercase characters. E.g.
+
+        <ENTER>/@ifile
+
+    finds 'File', 'fIlE', 'FILE', 'file', etc.
+
+@c -- makes the following characters case-sensitive
+
+    Just as @i turns off case sensitivity, @c turns it back on again. So
+    if you want to ignore the case of some of the letters in the middle
+    of a string, surround them with an @i and @c E.g.
+
+        <ENTER>/define @ifoo@c with_props
+
+    finds 'define Foo with_props', 'define fOo with_props', etc.
+
+@@ -- match the single character "@"
+
+@C -- where C is one of "/", "\", """, or "`" - use C
+
+    In order to search for a string containing the current search
+    string delimiter precede it with "@".
+
+
+-- Examples -----------------------------------------------------------
+
+To find a string containing "d" and "e" separated by any other character
+use the symbol "@." to match an arbitrary character, e.g.
+
+    <ENTER> /d@.e
+
+this will search for the first occurrence of any of "dae" "dbe", etc.
+Similarly
+
+    <ENTER> /d@.@.@.ne
+
+will find "define" or "dryane" or "debone".
+
+    <ENTER> /@/usr@/lib
+
+will search forward for an occurrence of the unix file path name
+/usr/lib.
+
+        <ENTER> /@@@@
+
+will search for a string containing "@@".
+
+If you give an empty search string, e.g. press ENTER and type the
+command:
+
+        /
+
+then Ved will simply use the same search string as in your last search
+command (or substitute command - see below).
+
+If the search finds the wrong occurrence you can use the REDO key (see
+HELP *VEDKEYS).  This is the "repeat last command" key. The search will
+be repeated.
+
+WARNING: If Ved cannot find the string by searching to the end of the
+file it goes to the top of the file and looks for the first occurrence
+it can find from there. This 'wrap-around' feature is useful but can be
+confusing. The line number of the cursor is always displayed on the
+command line to keep you informed.
+
+You can search backwards using the '\' symbol, thus: press enter, then
+type:
+
+        \define
+
+to search backwards for an occurrence of 'define'. Backward search will
+'wrap around' from the top to the bottom of the file if it cannot find
+the string.
+
+
+-- Search options -----------------------------------------------------
+
+After the second delimiter of a search command you can specify
+additional parameters to control the search.
+
+For example, to find 'define', but without wrapping over the end of the
+file, do:
+
+        <ENTER> /define/ -wrap
+
+The -wrap turns off 'wrap-around' for the search - the searching stops
+when it reaches the end of the file.
+
+CAUTION: The space before the '-wrap' can be omitted, but this may lead
+to confusion when doing backward searches with <ENTER> \ so its better
+to include a space.
+
+Just as the minus sign turns off an option, you can use the plus sign to
+force an option to be on. E.g.
+
+        <ENTER> /define/ +back
+
+will make the search go backwards even though you used <ENTER> /
+
+You can specify a number after the second delimiter to make the search
+find a specific occurrence of a string. E.g.
+
+        <ENTER> /define/ 3
+
+finds the third occurrence of 'define' forward from the current position.
+You could also use:
+
+        <ENTER> /define/ -3
+
+to find the third occurrence of 'define' before the cursor (looking
+backwards).
+
+The following table summarises search options:
+
+    Option    Description
+    --------------------------------------------------------------------
+    back      +back forces the  search to go  backwards. -back  forces
+              the search to go forwards.
+
+    case      +case makes the search case sensitive. Use -case to ignore
+              the case of letters.
+
+    embed     +embed matches embedded occurrences. -embed constrains the
+              search to non-embedded items.
+
+    here      +here starts the search from the  cursor. -here always
+              searches from the start of the region.
+
+    wrap      +wrap enables 'wrap-around'. -wrap makes the search stop
+              at the end of the search region.
+
+    N         an integer _N finds the _N'th occurrence of STRING. If _N
+              is negative, the direction of the search is reversed.
+
+See REF * VED_/ for full details of search options.
+
+
+-- Searching a region of the text -------------------------------------
+
+You can restrict a search to a specified 'region' of the file. You
+do this by typing the name of the region after the last delimiter of the
+search command and before any options. E.g.
+
+        <ENTER> /if/ range
+
+will find 'if' within the marked range (see HELP *MARK). Other regions
+you can use include "line", "procedure", and "word", E.g.
+
+        <ENTER> /e/ word
+
+finds the letter 'e' in the word that your cursor is positioned over.
+
+See REF * VED_/ for a list of all of the regions and options that are
+available.
+
+
+-- XVed users ---------------------------------------------------------
+
+If you are using XVed, you can set XVed so that after a search the
+matching text is highlighted. To do this, either do:
+
+    <ENTER> xved SearchDoesSelect true
+
+or add the following line to your .Xdefaults:
+
+    XVed*SearchDoesSelect: true
+
+When you see this highlighted text you have three options: If you hit
+the DEL key the highlighted text will be deleted. If you start typing in
+some characters, the highlighted text will be replaced by what you type.
+If you move the cursor, the highlight is cleared and the text is left
+intact.
+
+
+-- The combined "search and substitute" command: <ENTER> s ------------
+
+Suppose you wish to replace an occurrence of "deffine" with "define". You
+can type ENTER, then:
+
+    s/deffine/define
+
+and press RETURN.
+
+Ved will search for an occurrence of "deffine" and wiggle the cursor to
+catch your eye. You then have five options:
+
+    (a) press "y" to do the substitution and stop.
+
+    (b) press RETURN to do the substitution and go on to the next
+        occurrence of the search string.
+
+    (c) press DEL to leave this occurrence and then go on to the next
+        one
+
+    (d) press "n" to stop without doing the substitution.
+
+    (e) press "g" to do the substitution and continue to do it globally
+        throughout the rest of the region.
+
+Option (b) is specially useful, since it allows you to go through the
+file changing lots of occurrences of a string, checking each case.
+(See also <ENTER> gs, below)
+
+If you want to ensure that it does not find an embedded occurrence of
+"deffine" use '"' instead of '/', i.e.
+
+        <ENTER> s"deffine"define
+
+then <RETURN>. This will not replace 'enddeffine'.
+
+
+-- Substitute pattern elements ----------------------------------------
+
+Just as you can use special search pattern elements in the search
+string, there are a few special symbols that you can occur in the
+substitute string:
+
+@n -- substitute in a line break
+
+    E.g. to put a line break before occurrences of "rabbit", do
+
+        <ENTER> s/rabbit/@nrabbit
+
+    (You can also use \n for the same purpose.)
+
+@& -- substitute in the character string matched by the search.
+
+    If you want to repeat the search string in the replacement string
+    use "@&" to save retyping. E.g. to replace "rabbit" with "rabbits",
+    type the command
+
+        <ENTER> s/rabbit/@&s
+
+
+@p -- pastes in the contents of the clipboard (XVed only)
+
+    If you are running XVed, you can use the '@p' pattern to substitute
+    in whatever is currently held on the X clipboard (The CLIPBOARD
+    selection, not the PRIMARY selection).
+
+    This allows you to select some text, copy it to the clipboard, and
+    then use the text as part of a substitution command.
+
+@_N -- where _N is a digit 1-9, substitute in the N'th sub-expression
+
+    If you have placed an @( and @) around part of the search pattern,
+    you can substitute in the text that matched between these brackets
+    using @1, @2, @3, etc. E.g.
+
+        <ENTER> s/define @(foo@)/@1
+
+    Replaces 'define foo' with 'foo'. A more sophisticated example is:
+
+        <ENTER> s/;;; @(@.@*@)/ @/* @1 *@/
+
+    which finds ';;; ' followed by any text (to the end of the line)
+    and replaces it with /* <text> */, changing ';;;' style comments
+    into /* */ style comments.
+
+As for the search string, the substitute string may also contain any
+`backslash' sequence recognised in a Pop-11 string.
+
+[You might want to skip the rest of this section on first reading.]
+
+Unlike the search string, however, character attributes specified
+with \[...] or \{...} (see REF *ITEMISE) are not ignored, i.e. they
+are substituted in. For example:
+
+    s/HELP/\{b}HELP
+
+Changes occurrences of 'HELP' to bold 'HELP'.
+
+When you are using @&, @p, or @N (where N is a digit), you can place a
+character attribute specification before the @ sign. Any attributes
+given to the `@' character are added to those of the relevant text
+before it is placed in the buffer.
+
+You can specify other attribute combination modes other than adding by
+using either +, -, ~ or = immediately after the @, e.g. @-& @~p or @=1.
+They have the following meanings:
+
+    +       the attributes of the @ are added to the text
+    -       the attributes of the @ are removed from the text
+    =       the text is shown using the same attributes as the @
+    ~       toggles the attributes set on the @.
+
+In other words, @+& means 'the text that was matched by the search
+including its character attributes' and @-& means 'the text that was
+matched by the search excluding its character attributes'. E.g.
+
+        <ENTER> s/HELP/@-&
+
+removes all character attributes from occurrences of 'HELP'.
+
+So
+        <ENTER> s/rabbit/\{b}@&
+
+changes 'rabbit' to bold 'rabbit' and underlined '______rabbit' to bold
+and underlined '______rabbit'.
+
+whereas
+        <ENTER> s/rabbit/\{b}@-&
+
+replaces both 'rabbit' and underlined '______rabbit' with bold 'rabbit'.
+
+This is very useful when using the @( and @) in conjunction with @N
+to repeat the text. E.g.
+
+        <ENTER> s/;;; @(@.@*@)/;;; \{b}@1
+
+finds ';;; ' followed by any number of characters up to the end of
+the line, and makes all the characters following the ';;;' appear in
+bold.
+
+On the other hand:
+
+        <ENTER> s/;;; @(@.@*@)/;;; @-1
+
+finds ';;; ' followed by any text up to the end of the line, and
+substitutes it with ';;; ' followed by the same text, but with no
+character attributes - undoing the changes made by the previous example.
+
+
+-- Notes on string delimiters to be ignored on a first reading --------
+
+As with search commands, you can use \ or ` instead of / or " to look
+backwards for strings to substitute.
+
+However you should avoid using \ as a delimiter in substitutions since
+it is very hard to tell whether the \ is acting as a delimiter or the
+start of a backslash string sequence. Instead you can use a / as the
+delimiter and specify the "+back" option (see below).
+
+Also, instead of one of the above delimiters, you can use any other
+"string delimiter", which can be any non-alphanumeric character, e.g.
+"." or "," or ";", as in
+
+    <ENTER> s.cat.cats
+
+<ENTER> s can also be given an empty search string, meaning "use the
+previous search string, e.g.
+
+        <ENTER> s//bunny
+
+The two slashes, without a space indicate an empty search string, and
+will cause the previous search string to be used.
+
+If you type <ENTER> s without a search or substitute string then it will
+use the last search string (whether used by S or by the search command)
+and also the last substitute string. E.g.
+
+        <ENTER> s
+
+will again look for 'rabbit' and replace it with 'bunny'.
+
+
+-- Substitution options -----------------------------------------------
+
+After the third delimiter of an <ENTER> s substitution command you can
+specify additional parameters to control the search and substitution.
+
+<ENTER> s accepts all of the options available to the search commands.
+
+In addition, you can use the following options:
+
+    -ask
+        turns off 'asking' - substitutions are done without asking
+        your permission before each replace.
+
+    -every
+        turns off 'every' - instead of replacing every match on a line,
+        only the first (forward search) or last (backward search) match
+        on each line is replaced, and the rest of the line is ignored.
+
+    -verbose
+        turns off 'verbose' - when used with '-ask', the substitutions
+        are done without recording progress on the status line. This
+        can save time when there are hundreds of substitutions to
+        perform.
+
+Note that with <ENTER> s if you specify a number after the second
+delimiter, Ved does at most that many substitutions. For example:
+
+    <ENTER> s/rabbit/bunny/ 5
+
+will replace the next five occurrences of rabbit with bunny, asking your
+permission before each replace.
+
+
+-- Global substitutions: the '-ask' option ----------------------------
+
+You can use the '-ask' (or 'without asking') option to <ENTER> s to make
+Ved replace ALL occurrences of a string globally in the file, without
+asking your permission for each one. E.g. press ENTER then
+
+    s/rabbit/bunny/ -ask
+
+then <RETURN> to replace all occurrences of 'rabbit' with 'bunny'. You
+can use the symbol '"' instead of '/' to mean don't replace an embedded
+substring. E.g. to replace "the", with "that", but not inside "there"
+etc. do
+
+        <ENTER> s"the"that" -ask
+
+When you do a global substitution, Ved will first copy the text as it
+stands into -vveddump-. If you then realise that you have incorrectly
+substituted some text, you can use <ENTER> yank to recover the lines of
+the buffer as they were before the substitution.
+
+If you don't want to copy the buffer before each global substitution
+(e.g. if a file is very large), you can turn this feature off by
+assigning -false- to vedsafesubstitute.
+
+
+-- Substitution using regions -----------------------------------------
+
+You can restrict a substitute to a specified 'region' of the file. You
+do this by typing the name of the region after the last delimiter of the
+substitute command and before any options. For example:
+
+        <ENTER> s/defien/define/ range
+
+will change occurrences of 'defien' to 'define' in the marked range.
+(see HELP *VEDMARKED).
+
+Other regions that you can use are "line", "procedure" and "paragraph".
+
+
+-- Shortcuts ----------------------------------------------------------
+
+Options to the search and substitute commands can be abbreviated to
+one or more letters, to save typing.
+
+Thus, instead of using '-wrap', you could simply type '-w'. E.g.
+
+    <ENTER> /define/ -w
+
+Its worth using the full names at first to help you remember the option
+names.
+
+You can also abbreviate region names to one or more letters. E.g.
+
+    <ENTER> s/deffine/define/ r -a
+
+means substitute 'deffine' for 'define' in the marked range without
+asking.
+
+In cases where two region start with the same letter, you can type two
+or more letters to disambiguate them.
+
+Ved provides a set of pre-defined commonly used substitute commands
+which are shorthands for typing <ENTER> s commands with certain options.
+These all use the same syntax as the <ENTER> s commands (though they
+ignore any options typed after the final delimiter). E.g.
+
+    <ENTER> gs/deffine/define
+
+performs a 'global' substitution of 'deffine' for 'define', replacing
+all occurrences without asking the user first. This is the same as
+typing:
+
+    <ENTER> s/deffine/define/ -ask
+
+Other shorthand commands are:
+
+  <ENTER> gsr -- global substitute range
+
+        substitutes all occurrences of a string within the marked range.
+        See HELP *MARK.
+
+  <ENTER> gsp -- global substitute procedure
+
+        substitutes all occurrences of a string within the current
+        procedure. See HELP *ved_mcp.
+
+  <ENTER> gsl -- global substitute line
+
+        substitutes all occurrences of a string on the current line.
+
+  <ENTER> sgs -- silent global substitute
+
+        like <ENTER> gs, except that substitutions are done silently.
+
+  <ENTER> sgsr -- silent global substitute range
+
+        like <ENTER> gsr, except that substitutions are done silently.
+
+
+-- Creating your own search or substitute commands --------------------
+
+All Ved search and substitute commands are in fact implemented as
+closures of a single  procedure, -ved_search_or_substitute-. You  can
+add  your   own customised search commands by creating closures of this
+procedure.
+
+For example, to define an <ENTER> fwr which finds a non-embedded word in the
+marked  range, you can do:
+
+    define global ved_fwr
+        = ved_search_or_substitute(%'range -embed', false%);
+    enddefine;
+
+The first argument to ved_search_or_substitute is a string containing
+options to use for the search. If this is -false-, then the command uses
+options typed by the user after the final delimiter.
+
+The second argument is -false- if the command is only a search, and
+-true- if the command is a search and substitute.
+
+You can use the newly defined <ENTER> fwr to look for the word "define"
+in the marked range:
+
+        <ENTER> fwr/define
+
+or to look backward for the word "if" in the marked range:
+
+        <ENTER> fwr\if
+
+As a second example, define an <ENTER> bcs which performs a backwards
+caseless search:
+
+    define global ved_bcs
+        = ved_search_or_substitute(%'+back -case', false%);
+    enddefine;
+
+You can use it to look backwards for "file", "File", "fIlE", etc.:
+
+    <ENTER> bcs/file
+
+Finally, to define a substitute command which globally substitutes
+characters in the current word, use:
+
+    define global ved_gsw
+        = ved_search_or_substitute(%'word -ask', true%);
+    enddefine;
+
+Now try it:
+
+    <ENTER>gsw/a/b
+
+changes all 'a' characters to 'b' characters in the current word.
+
+
+-- Notes for experienced Ved users ------------------------------------
+
+If you are familiar with the Ved search facilities that existed in
+Poplog 14 you should read this section to learn about the differences
+between the old Ved search mechanism and the new mechanism...
+
+
+You should find that all of the search/substitute commands that you are
+familiar with continue to work in the same way, with the following
+changes/additions:
+
+1) Extended search patterns
+
+There is a new and much larger set of `@' patterns that you can now use.
+These include @*, @[ ... @] and others. The following table lists the
+new @ patterns:
+
+    Pattern     Meaning
+    -------     -------
+    @*          match zero or more occurrences of the previous character
+    @<          constrains match to the start of a word boundary
+    @>          constrains match to the end of a word boundary
+    @{_N@}       matches _N occurrences of previous character, where _N is
+                a positive integer.
+    @{_N,@}      matches _N or more occurrences of the previous character
+    @{_N,_M@}     match at least _N, at most _M occurrences of previous
+                character, where _N and _M are positive integers
+    @[...@]     match any character between the brackets, where ... is
+                any characters e.g. abc or range of characters e.g. A-Z
+    @[^...@]    match any character except those between the brackets
+    @(...@)     denotes a sub-expression for use with @_N
+    @_N          match a repeat of the _N'th sub-expression where _N is
+                a number 1-9
+    @i          turns off case sensitivity for subsequent letters
+    @c          turns on case sensitivity for subsequent letters
+
+Some examples are:
+
+    <ENTER> /@[a-z@]
+
+finds the next lower case letter.
+
+    <ENTER> /define @.@*
+
+finds 'define ' followed by any number of characters to the end of the
+line.
+
+    <ENTER> /@<for
+
+finds words starting with 'for', e.g. 'for', 'foreach', 'forevery',
+but not 'endfor'.
+
+    <ENTER> /the @ived@c editor
+
+finds 'the Ved editor', 'the VeD editor', 'the Ved editor', etc.
+
+For more details, use <ENTER> g to go to the section:
+ -- Search pattern elements
+
+2) Extended search parameters
+
+You can now provide extra search parameters after the second delimiter
+of a search command. These parameters control attributes such as what
+region of the buffer to search, which direction to search, whether the
+search wraps around the end of the search region, and whether the search
+should be case sensitive or case insensitive.
+
+Some examples are:
+
+    <ENTER> /define/ range
+
+looks for 'define' in the marked range.
+
+    <ENTER> /e/ word
+
+looks for the letter 'e' in the current word.
+
+    <ENTER> "if" 3
+
+looks for the third occurrence of "if".
+
+For more details, use <ENTER> g to go to the section:
+ -- Search options
+
+3) Backward searches
+
+Note that backward searches now wrap around the top of the file and
+continue searching at the end of the file. You can use the '-wrap'
+option to turn this off.
+
+4) Extended substitution patterns
+
+There are a few more substitution patterns:
+
+    Pattern     Meaning
+    -------     -------
+    @p          pastes in the contents of the clipboard (XVed only).
+    @_N          where _N is 1-9, substitute the _N'th sub-expression.
+
+For more details and examples, use <ENTER> g to go to the section:
+ -- Substitute pattern elements
+
+5) Extended substitution options
+
+The <ENTER> s command can now also take extra parameters after the final
+delimiter, and processes them in the same way as the search commands do.
+There are a few additional options that are available only to <ENTER> s
+commands.
+
+Some examples are:
+
+    <ENTER> s/e/X/ word -ask
+
+substitutes the letter 'e' for 'X' in the current word without asking
+first.
+
+    <ENTER> s/'/"/ -every
+
+Replaces only the first occurrence of ' on each line with ".
+
+    <ENTER> s/alice/jane/ 5
+
+Replaces the next 5 occurrences of 'alice' with 'jane'.
+
+For more details and examples, use <ENTER> g to go to the section:
+ -- Substitution options
+
+6) 'Safe' substitution
+
+When you do a global substitution, Ved will first copy the text as it
+stands into -vveddump-. If you then realise that you have incorrectly
+substituted some text, you can use <ENTER> yank to recover the lines of
+the buffer as they were before the substitution.
+
+For global substitutes in the marked range or in any other region, only
+those lines that might be effected by the substitution are copied.
+
+This copying can take time if the buffer is very large,  and it is not
+compatible with earlier versions of Ved. If you don't want to copy the
+buffer before each global substitution you can turn this feature off by
+doing:
+
+    false -> vedsafesubstitute;
+
+
+-- Notes for VI, ED, GREP and AWK users -------------------------------
+
+If you are familiar with the regular expression search patterns
+found in VI or ED, or are a GREP or AWK, read this section to
+learn about the differences between their search patterns and the
+search patterns used in Ved.
+
+Note that this topic is discussed in more detail in REF * REGEXP in the
+section 'Poplog Regular Expressions'.
+
+1) The Escape Character
+
+Instead of using `\' as the character to specify search wildcards, Ved
+uses the `@' character. This is because `\' is already used by the
+Poplog string itemiser to represent control characters and other special
+ASCII characters.
+
+Thus, in Ved, instead of typing:
+
+    <ENTER> /\<int\>
+
+you type:
+
+    <ENTER> /@<int@>
+
+2) The patterns ^ $ . * [ and ]
+
+In Ved, for backward compatibility with earlier search facilities, if
+you want to use any of the special wildcards above, you should precede
+them by the pattern escape character `@'. So instead of writing:
+
+    c.*[a-z]
+
+You use:
+
+    c@.@*@[a-z@]
+
+
+-- See Also -----------------------------------------------------------
+
+    REF  * VEDSEARCH - Regular expression searching in Ved.
+
+    HELP * ASCII
+    HELP * VED             - overview of Ved facilities and HELP files.
+    HELP * VED_G, *ENTER_G - Searching for section headings
+    REF  * REGEXP          - The regular expression matcher
+    REF  * VEDCOMMS        - Other ENTER commands
+    REF  * VEDPROCS        - Ved system procedures
+    REF  * VEDVARS         - Ved global variables
+
+    HELP * VED             - Overview of other Ved facilities
+    TEACH *VEDEXPAND       - Command line substitution mechanism
+
+
+--- C.all/teach/vedsearch
+--- Copyright University of Sussex 1995. All rights reserved.

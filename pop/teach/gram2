@@ -1,0 +1,466 @@
+TEACH GRAM2                                    Aaron Sloman October 2011
+                                                    Based on older teach
+                                                files by several authors
+
+
+               GENERATING AND ANALYSING SENTENCES (PART 2)
+               ------------------------------------------
+
+           [NB THIS IS A FIRST DRAFT -- USE AT YOUR OWN RISK!]
+
+This is a  sequel to  TEACH GRAM1,  which introduced  the idea  of a
+formal grammar as a sort of program  and showed how it could be used  to
+control  generation   of   linguistic  structures   (phrases,   clauses,
+sentences)
+
+This sequel goes into more detail than I originally intended. It may be
+better to split it into smaller separate TEACH FILES. Please provide
+feedback.
+
+There will be further sequels, combining the grammar ideas with other
+ideas, e.g. planning, communicating, perceiving.
+
+Please look at the mini introduction to editing commands if you have not
+previously done so or need revision:
+
+    <ENTER> teach minived <RETURN>
+
+
+CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Motivation: why we need to be able to analyse sentences
+ -- A blocks-world grammar and lexicon
+ -- -- EXERCISE 1: Extending the examples given
+ -- -- EXERCISE 2: Create test examples and devise a notation
+ -- A very incomplete grammar and lexicon
+ -- -- EXERCISE 3: use generate with your grammar and lexicon
+ -- -- EXERCISE 4: extend  blocks_gram blocks_lex with adverbs
+ -- -- Copying example output into your program file
+ -- TO BE ADDED
+
+=======================================================================
+
+-- Motivation: why we need to be able to analyse sentences
+
+If someone says
+
+    Please put the box next to the green chair on the table
+
+that request could have two very different interpretations.
+
+Both share these assumptions:
+
+    There is a box
+    There is a green chair
+    There is a table
+
+On one interpretation the box is next to the green chair, and the
+request is to move it from there to a location on the table.
+
+On the other interpretation there is a green chair on the table (perhaps
+a model chair?) and the request is to move the box on the table next to
+the green chair.
+
+How could a robot deal with such requests?
+
+It is impossible to work out simply from grammatical structures and the
+meanings of the words which interpretation is correct. But at least it
+is possible to work out that there are those two interpretations and
+then use some aspect of the context to decide which interpretation is
+correct. This teach file introduces ways in which a grammar can guide
+the interpretation of sentences by breaking them up into meaningful
+parts, in this case
+
+    Please
+    put
+    the box
+    next to
+    the green chair
+    on the table
+
+where some of those parts also have parts that contribute to the
+meaning, e.g. the determiner "the", the adjective "green" and the noun
+"chair"
+
+-- A blocks-world grammar and lexicon
+
+This section could lead into a major project. For now just skim it,
+and come back later (or dwell on it) if you are interested.
+
+Using the ideas in the previous teach file we could try to construct a
+grammar that can be used to give simple commands and then later extend
+it to ask simple questions, and then show how the Pop11 grammar library
+can parse those commands and questions, or in some cases why a more
+powerful library (called TPARSE, introduced later) is needed.
+
+Suppose we want to allow questions and commands, and we want both to be
+able to refer to things with properties (e.g. size, colour, shape),
+spatial relations (e.g. next to, inside, on,) and actions that can be
+requested or commanded (e.g. put, place, pick up). We may allow some
+objects to have unique names, e.g. Box2, Block3, Table1).
+
+Using the ideas of the previous teach file, and the above comments we
+can allow things to be referred to by different sorts of constructs
+using:
+
+    names:      Box2, Block3, Table1, Fred, Mary ...
+
+    size adjectives:  big, small, tiny ...
+
+    colour adjectives: blue, brown, yellow, ...
+
+    material adjectives: wooden, glass, plastic, ...
+
+    "determiner" words that can be followed by a noun
+    or a qualified noun phrase: the, a, some, any, that ...
+
+    prepositions that indicate spatial relations
+        next to, inside, above, ...
+
+    action words
+        put, place, fetch,
+
+and for questions
+
+    thing query word: which, what
+
+    person query word: who
+
+    place query word: where
+
+
+-- -- EXERCISE 1: Extending the examples given
+
+    Try extending those lists. E.g. what other query words could be
+    required in an intelligent domestic robot?
+
+    If you wish to work on this topic it may be a good idea to copy the
+    above into a new file owned by you. You can mark the range of text
+    you want to copy (F1 or ESC m, to start, and F2, or ESC M)
+
+    Then start a new file e.g.
+        ENTER ved my_gram2.p RETURN
+    (NB: don't try to use spaces in file names: they cause trouble
+    in linux and Ved will be confused by them. Underscores are fine).
+
+    Then, with the editor cursor in the new file, you can invoke
+    Ved's "Transcribe In" command, abbreviated to 'ti':
+        ENTER mi RETURN
+
+    Then save the new file, to be safe:
+        ENTER w1 RETURN
+
+
+-- -- EXERCISE 2: Create test examples and devise a notation
+
+Using the lists of components in Exercise 1, create some examples of
+questions, commands and assertions, and devise a notation for showing
+how your sentences are constructed from the components specified.
+
+Tip 1:
+It is useful to separate the lexicon, which contains lists of words
+of the various allowed types, from the grammar that specifies ways in
+which larger structures can be composed from smaller structures.
+
+The previous teach file TEACH * GRAM1 illustrated that separation.
+
+    (you can go back to it by putting the ved cursor where the
+    above asterisk is and typing: ESC h)
+
+Tip 2:
+Use abbreviations, similar to those used in the previous teach file.
+E.g.
+    S for sentence
+    QS for question sentence
+    CS for command sentence
+
+    SizeAdj, ColourAdj, ...
+
+    V (for verbs)
+
+    TQ for Thing query word
+    PQ for place query word
+
+    Det for determiner.
+
+You probably won't have time to do a complete job of specifying such a
+grammar and lexicon. But even starting the task can be very illuminating
+and help us not only to think about the problems of modelling linguistic
+communication, but also the problems of giving a machine the ability to
+think about or perceive its environment.
+
+-- A very incomplete grammar and lexicon ------------------------------
+
+Here is a fairly simple version of a grammar and lexicon for a tiny
+subset of the blocks world. You can try extending it, after playing with
+it.
+
+vars blocks_gram blocks_lex;
+
+[
+    ;;; A sentence is a command or a question
+    ;;; LIB GRAMMAR requires the grammar to start with 's'
+    [s [COM] [QUEST]]
+    ;;; A question asks about
+    [QUEST
+        ;;; the location of an object
+        [WH_LOC VBE NP]
+        ;;; what is in some spatial relation
+        [WH_THING VBE PP]
+        ;;; which member of a category is in some relationship
+        [WH_SELECT SNP VBE PP]
+        ;;; whether a specified object is in some relationship
+        [VBE NP PP]
+    ]
+    ;;; Two sorts of commands
+    [COM [V NP PP] [V NP ONTO_PP]]
+    ;;; Noun phrases can be
+    [NP
+        ;;; a pronoun
+        [PN]
+        ;;; determiner and simple NP
+        [DET SNP]
+        ;;; determiner, simple NP and prepositional phrase
+        [DET SNP PP]
+    ]
+    ;;; Simple NP can be a noun or adjective phrase + noun
+    [SNP [NOUN] [AP NOUN]]
+    ;;; adjective phrase is one or more adjectives
+    [AP [ADJ] [ADJ AP]]
+    ;;; prepositional phrase is preposition + NP
+    [PP [PREP NP]]
+    ;;; Target prepositional phrase indicating a location
+    [ONTO_PP [ONTO_PREP NP]]
+] -> blocks_gram;
+
+;;; Now the lexicon. Try adding some words where you think more could fit.
+[
+    [NOUN       block box table one]
+    [PN         it]
+    ;;; we cheat by inventing compound words
+    [V          put move pickup putdown]
+    [VBE        is]
+    ;;; question words location, identity, selection
+    [WH_LOC     where]
+    [WH_THING    what]
+    [WH_SELECT    which]
+    ;;; It might be better to divide this into different kinds of
+    ;;; adjectives, e.g. COLOUR_ADJ SIZE_ADJ
+    [ADJ        white red blue green big small large little]
+    [PREP       on above over]
+    [ONTO_PREP  onto]
+    [DET        each every the a some]
+] -> blocks_lex;
+
+
+Mark that grammar and lexicon from the 'vars' declaration to the
+last line, i.e.
+    ] -> blocks_lex;
+
+(USE keys F1 and F2, or ESC m and ESC M to mark the range)
+
+Then start a new file:
+
+    ENTER ved blocks_gram.p
+
+Then copy (transcribe) in the marked range
+
+    ENTER ti
+
+And then edit the new file, as you wish, as suggested below.
+
+Now test your grammar and lexicon.
+
+-- -- EXERCISE 3: use generate with your grammar and lexicon
+
+Use the generate command illustrated in TEACH * GRAM1 to generate
+sentences from the above grammar and lexicon. You can create some
+test commands inside a "comment".
+
+Add a comment at the end or at the top of the file. It should start
+with a line like this:
+
+    /* SOME TESTS
+
+and end with a line like this:
+
+    */
+
+Everything between those two lines will be ignored if you compile the
+whole file. But individual test commands inside the comment can be run
+using ESC-d, or marking a range and using CTRL-d
+
+Put the following text into your comment. In the teach file you can mark
+the text using F1 and F2, then go into your blocks_gram.p file, put the
+cursor in a blank like inside the comment and copy (transcribe) in the
+marked range with the command ENTER ti
+
+Here are some tests you can copy into your 'commented' area.
+
+;;; Compile this with ESC d
+    uses grammar
+
+
+;;; Try a few test runs, and see if you get any surprises, using ESC d
+
+    generate(blocks_gram, blocks_lex) ==>
+
+;;; or mark this range (F1, F2) then compile it (CTRL-d), after increasing
+;;; the maximum recursion level from its default (10) to 15:
+
+    15 -> maxlevel;
+
+    repeat 5 times
+        generate(blocks_gram, blocks_lex) ==>
+    endrepeat;
+
+;;; End of instructions to copy in.
+
+If you get odd results when you run those commands, think about how you
+can alter the grammar and the lexicon to prevent them.
+
+Try to explain the difference between values 10 and 15 for maxlevel.
+
+Examples with maxlevel set to 10
+
+** [which blue table is on it]
+** [is it on it]
+** [which little table is above it]
+** [putdown it onto it]
+** [move some one above it]
+** [move it over it]
+
+Examples with maxlevel set to 15
+
+** [put it onto a blue table above a box]
+** [which little big table is above some big block]
+** [put each one over every small one above it over each one]
+** [where is every large box on the one]
+** [is the table on some white blue one on each table]
+
+Are there some sentences here, or in your output, which you think
+should be excluded by the grammar. Could you modify the grammar so
+as to exclude them?
+
+E.g. should you distinguish different sorts of adjectives (e.g. colour
+adjectives, size adjectives, shape adjectives, and use new grammar rules
+to specify ways in which they can be combined in an adjectival phrase?
+
+After adding more words to your lexicon you can try to ensure that the
+grammar and lexicon together generate sensible sentences.
+
+-- -- EXERCISE 4: extend  blocks_gram blocks_lex with adverbs
+
+Try extending the above grammar and lexicon, and perhaps splitting some
+of the categories into sub-categories that bring out important
+differences between similar types of verbal expression.
+
+For example, can you add a new category, adverbs ([ADV ...]) into
+blocks-lex? Adverbs are words that can modify verbs, or adjectives or
+other adverbs, such as
+
+    slowly, carefully, kindly, almost, very
+
+More examples are given here:
+
+    http://grammar.ccc.commnet.edu/grammar/adverbs.htm
+
+and other online 'grammar tutorials'.
+
+Look at the sentences generated by your previous generate commands.
+
+Try to think of places in which you could insert adverbs so that the
+sentences do not become nonsensical. After doing a number of such
+experiments, try inventing some grammar rules so as to allow such
+constructs to be generated.
+
+-- -- Copying example output into your program file
+
+Note: if you wish to copy examples of output from the output.p file into
+your file blocks_gram.p you can edit the output file
+
+    ENTER ved output.p
+
+Then using F1 and F2 mark the lines of output you wish to save.
+Then using ESC x (or an ENTER ved .... command) return to your previous
+file.
+
+Make sure your saved output is not treated as program code by pop11: put
+the output either between the existing comment brackets, or inside a new
+comment:
+
+/*
+
+*/
+
+After marking the required portion of output.p, put the Ved cursor
+where you want the output to go, and, as before, use ENTER ti
+to Transcribe (copy) the marked range In from the output.p file.
+
+You can also type some extra text in at the top of the comment saying
+how the examples were generated, e.g. your examples might start like
+this:
+
+/*
+Using 'generate'. defined in LIB GRAMMAR, with maxlevel set to 15,
+the blocks_gram and blocks_lex, produced the following:
+
+** [pickup it onto each white little block on a block]
+
+...etc...
+
+*/
+
+The next exercise will be to use LIB GRAMMAR to create parsing
+procedures from your blocks_lex and blocks_gram rules and then use the
+parsers to test whether sentences you type in are legal according to the
+lexicon and grammar. You can also use the parsers to show how the
+examples generated by the program conform to the grammar and lexicon.
+
+This will be TEACH GRAM3
+
+It will extend some of the material already in TEACH GRAMMAR
+
+-- TO BE ADDED --------------------------------------------------------
+
+Further developments of these ideas
+
+Designing and implementing a parser, instead of using lib grammar
+
+Combining parsing with other components in a complete architecture, e.g.
+for a chatbot or simple expert system, or travel adviser.
+
+Combine the above ideas with an image analyser to generate descriptions
+of what is in various images.
+
+Combine the above ideas with a program for making pictures, and make it
+draw a picture when given a sentence describing the desired contents.
+
+What other applications can you think of?
+
+-- Further reading ----------------------------------------------------
+
+Revision
+
+Editor mechanisms:
+    TEACH * RENAME_OUTPUT
+    TEACH * BUFFERS
+    TEACH * ESSENTIALKEYS
+    TEACH * MINIVED
+    TEACH * MARK
+
+Grammar tutorials:
+    TEACH * GRAM0
+    TEACH * GRAM1
+    TEACH * GRAM2 this file
+
+Planned extension: TEACH * GRAM 3
+
+Further work
+
+    TEACH * ISASENT
+    TEACH * PARSESENT
+    TEACH * PARSING
+
+--- $usepop/pop/teach/gram2
+--- University of Birmingham 2011. All rights reserved. ------

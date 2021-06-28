@@ -1,0 +1,506 @@
+TEACH SHOWARRAY                            David Young, January 1988
+
+LIB SHOWARRAY is a library to print rectangular regions of arrays of
+numbers, either as tables of numerical values or as rectangular blocks
+of characters (with special provision for showing zero-crossings). It
+may be used, up to a point, to inspect arrays representing images.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- General
+ -- Simple use
+ -- General interface
+ -- Resizing
+ -- Characters and value ranges
+ -- Underlying procedures
+ -- Global variables
+ -- Looking at large arrays
+ -- Sending the output to a file
+
+-- General ------------------------------------------------------------
+
+Only 2-dimensional arrays (see HELP * ARRAYS) may be printed. The first
+index into an array specifies the x-coordinate or column, increasing
+from left to right, and the second index specifies the y-coordinate or
+row, increasing from top to bottom (though this latter direction may be
+reversed if necessary). The library is intended to be used mainly with
+arrays storing numerical values.
+
+Arrays, or parts of arrays, may be printed as
+
+    - tables of numbers:
+
+             2.00 2.24 2.45 2.65 2.83 3.00
+             2.24 2.45 2.65 2.83 3.00 3.16
+             2.45 2.65 2.83 3.00 3.16 3.32
+
+    - blocks of characters, in which different characters stand for
+    different ranges of numerical values:
+
+              ..,,:::xxx%%%IIIOOOOMMMM###
+             ..,,:::xxx%%%IIIOOOOMMMM####
+            ..,,:::xxx%%%IIIOOOOMMMM#####
+
+    - graphics characters representing zero-crossing positions.
+
+The second sort of output can provide a surprisingly good 'picture' on
+most terminals and printers, if the characters used are graded so that
+'brighter' characters, like '#', stand for higher values.
+
+The last sort of output can't be shown in this file as the characters
+used are terminal-dependent.
+
+In the simplest sort of printing, each value or each character stands
+for one element of the array. Sometimes it is convenient to compress or
+expand the representation, for instance in order to make it fit on a
+terminal screen, or to make a block of the array with equal numbers of
+rows and columns print as a square on the screen. The library has
+facilities for stretching and compressing arrays both horizontally and
+vertically to achieve any desired scaling.
+
+When blocks of characters are being printed, each character usually has
+to stand for a range of values. A variety of ways of establishing this
+mapping is provided.
+
+The library can also print simple axes, so that the positions of
+features in an array can be read off.
+
+-- Simple use ---------------------------------------------------------
+
+Three routines give a simple interface, when great flexibility is not
+required. If axes are required, assign <true> to the global variable
+SA_PRINT_AXES. If the array needs to be printed the other way up (ie the
+y-index increasing upwards), assign <true> to SA_YUP.
+
+
+                               ----------
+
+    sa_simple_nums(<array>)
+
+This procedure prints out the whole of an array with one number per
+element. It is not suitable for large arrays. An attempt is made to
+print a sensible number of decimal places. (See details below of the
+variable SA_SIGFIGS for how to change the number of digits printed.)
+
+For example:
+
+    vars arr;
+    newarray([1 10 2 4], nonop +) -> arr;   ;;; See HELP * NEWARRAY
+    sa_simple_nums(arr);
+
+will print out:
+
+      3  4  5  6  7  8  9 10 11 12
+      4  5  6  7  8  9 10 11 12 13
+      5  6  7  8  9 10 11 12 13 14
+
+                               ----------
+
+    sa_simple_asis (<array>)
+
+This procedure prints the whole of an array with one character per
+element, using a standard set of characters. (See details of the
+variable SA_GREYS for how to change the characters used.) It is not
+suitable for large arrays.
+
+For example:
+
+    newarray([1 8 1 8],nonop +) -> arr;
+    sa_simple_asis(arr);
+
+      .,,:x%
+     .,,:x%%
+    .,,:x%%I
+    ,,:x%%IO
+    ,:x%%IOO
+    :x%%IOOM
+    x%%IOOM#
+    %%IOOM##
+
+Note that this has 8 rows and 8 columns, but isn't square on the screen
+(unless you have a very unusual terminal) because characters are higher
+than they are wide.
+
+Here '#' represents the largest values, down to a space character for
+the smallest. If you print another array using SA_SIMPLE_ASIS a given
+character won't necessarily represent the same value range. The
+characters represent equal ranges of values, covering the entire spread
+from the largest to the smallest value in the array being printed.
+
+                               ----------
+
+    sa_simple_fitscreen (<array>)
+
+This behaves similarly but adjusts the size of the block of characters
+to fill the screen as far as possible, whilst trying to make its shape
+correspond to the 'shape' of the array. Thus the 8 x 8 array defined
+above will print as a large block of text which should be almost square,
+and which will stretch either right across the screen or from top to
+bottom. With a small array like that, each array element will be
+represented by a block of characters, whereas for a large array each
+character will represent the average valuye of a block of array
+elements. This procedure can thus be useful for getting an overview of a
+large array, though of course definition will be lost.
+
+Again, the assignment of value ranges to characters will vary from array
+to array, and the actual characters used can be changed using SA_GREYS.
+See the description of the variable SA_ASPECT_RATIO for how to change
+the shape of the block of characters on the screen.
+
+-- General interface --------------------------------------------------
+
+This procedure provides a more flexible interface, giving greater
+control over the way the array is printed.
+
+    showarray (<array>, <region_spec>, <resize_spec>, <type_spec>,
+            <char_string>);
+
+The arguments to this are:
+
+<array> - A 2-dimensional array of numbers.
+
+<region_spec>
+    - specifies the part of the array that is to be printed. If this is
+    a list, it specifies the region of the array in the same way as the
+    first argument to * NEWARRAY specifies the bounds of the original
+    array. Eg if <region_spec> is [2 6 3 9] then columns 2 to 6 and rows
+    3 to 9 inclusive will be printed. If this argument is not a list,
+    the whole of the array is printed.
+
+<resize_spec>
+    - specifies the size and shape of the block of characters. If it is
+    not a list or vector, or the word "fitscreen", then one character is
+    printed for each element. If it is a list or vector then it must
+    have 2 or 3 elements and:
+
+        The first element gives the maximum number of columns of
+    printing.
+        The second element gives the maximum number of rows of printing.
+        The third element, if present, gives the aspect ratio.
+
+    See the explanation of resizing below.
+
+    If the word "fitscreen" is given, then an attempt is made to make
+    the block of printing fit neatly on the screen, with the aspect
+    ratio set to SA_ASPECT_RATIO.
+
+<type_spec>
+    - specifies the assignment of value ranges to characters. It must be
+    a list or one of the following words: EVEN, LOG, HISTO, FIG, DIFF,
+    SIGN, NUMS or ZEROS (in lower case). For an explanation of these,
+    see below.
+
+<char_string>
+    - A string of the characters to be used in printing. The first
+    character in the string will represent smaller values than the
+    second, and so on.
+
+As a simple example, this call to SHOWARRAY will do the same as a call to
+SA_SIMPLE_ASIS:
+
+    showarray(arr, "whole", "asis", "even", sa_greys);
+
+(Here the words WHOLE and ASIS could be replaced by FALSE or anything
+that isn't a list or vector.)
+
+This call will print the zero-crossings for the whole of an array:
+
+    showarray(arr, "whole", "asis", "zeros", '');
+
+though there are no zero-crossings in the example array we have been
+using - a test array with a zero crossings could be generated by
+
+    newarray([-5 5 -5 5],nonop *) -> arr;
+
+-- Resizing -----------------------------------------------------------
+
+Resizing is particularly intended for use when the output is blocks of
+characters (including zero-crossings). It works with numerical output
+too, but this description will be in terms of character blocks.
+
+The resizing argument to SHOWARRAY may be used to determine how big the
+block of printout should be. If the word "fitscreen" is given (or
+SA_SIMPLE_FITSCREEN is called) then the number of rows is reduced
+relative to the number of columns by a factor equal to SA_ASPECT_RATIO
+(which is user assignable). Thus suppose the whole of an array of 215
+rows and 215 columns is to be printed. If the block of text had the same
+number of rows as columns its height would be much greater than its
+width (on most terminals). To make it look square on a terminal on which
+the characters are 2.15 times as high as they are wide, 215 columns and
+100 rows could be printed. Setting SA_ASPECT_RATIO to 2.15 (the default)
+will achieve this ratio of columns to rows.
+
+In fact, 215 columns and 100 rows is more than most screens can display.
+Once the ratio of columns to rows in the printout has been established,
+the "fitscreen" option causes the array to be shrunk or expanded to fit
+on the screen as well as possible. As the ratio of rows to columns has
+been fixed already, the character block will usually be limited either
+by the width of the screen, or by the height of the screen, but not by
+both.
+
+When the size of the character block has been established, the values of
+the original array are either averaged or repeated locally to force a
+match to the required size.
+
+More control can be exerted if a list or vector is passed in the
+<resize_spec> argument to SHOWARRAY. The third element then specifies
+the aspect ratio to be used. In general, if the array (or the region of
+it as specified in the <region_spec> argument) has M columns and N rows,
+and the aspect ratio is A, then the ratio of columns to rows in the
+character block will be close to (M*A)/N. (If the list or vector has
+only two elements the aspect ratio defaults to unity, NOT to
+SA_ASPECT_RATIO.)
+
+The first and second elements of the list or vector specify the maximum
+width and height respectively of the block of characters. Either the
+width of the block will equal the maximum width, or the height will
+equal the maximum height, depending on the aspect ratio. By making
+maximum width very large, the size of the block can be made to depend on
+the specified maximum height, and vice versa.
+
+-- Characters and value ranges ----------------------------------------
+
+When printing out blocks of characters, it is not usually possible to
+have a different character for each different value stored in an array.
+The range of values which is represented by each character is
+established by the <type_spec> argument to SHOWARRAY. The argument may
+be a list to set up the ranges explicitly (see below under SA_PRINT) or
+it may be a word giving one of a series of options. In the descriptions
+of the options, read 'region' for 'array' if the <region_spec> argument
+is being used.
+
+even
+    - The range between the largest value and the smallest value in the
+    array (or region to be printed) is divided into equal parts and one
+    character assigned to each. The first character in the <char_string>
+    argument is assigned to the smallest values, the last to the
+    largest. Eg, if the array has values from 1 to 90, and <char_string>
+    is '.x#', then a '.' will be printed for values from 1 to 30, an 'x'
+    for values from 31 to 60, and a '#' for values from 61 to 90.
+
+log
+    - This is the same as taking the logarithm of every entry in the
+    array, then using the EVEN option. Eg if the array has values from 1
+    to 1000, and <char_string> is '.x#', then a '.' will be printed for
+    values from 1 to 10, an 'x' for values greater than 10 up to 100,
+    and a '#' for values greater than 100 up to 1000. If this option is
+    used, all the values in the array must be greater than 0.
+
+histo
+    - The value ranges are chosen so as to attempt to equalise the
+    number of times each character in <char_string> is printed. This is
+    known as 'histogram equalisation'. The first character in the string
+    still represents the smallest values. In general the ranges for
+    different characters will be different sizes. Eg if an array
+    contained the value 1 in 20 elements and the values 2, 3 and 4 in 5
+    elements each, and if <char_string> was 'x#', then 'x' will be
+    printed for the value 1 and '#' for any of the values 2, 3 or 4. (The
+    EVEN option would give 1 and 2 to 'x' and 3 and 4 to '#'.)
+
+diff
+    - If this is specified, each different value in the array is printed
+    as a different character, taken from <char_string> with the first
+    character standing for the smallest value. If there are more
+    different values in the array than there are characters in the
+    string, a mishap will result, so this can only be used for arrays
+    with a small variety of values.
+
+fig -
+    This allows each value to be printed as its most significant digit.
+    If only the integers 0 to 9 are present in the array, then the
+    character printed will just be one of the characters '0' to '9' as
+    appropriate. If the numbers have fractional parts, then these will
+    be ignored and only the integer part will print, except for numbers
+    between 0.1 and 1.0, where 'a' will stand for numbers from 0.1 to
+    just under 0.2, 'b' for 0.2 to just under 0.3 and so on. If the
+    largest number in the array is greater than or equal to 10, then the
+    printout will be as if all the numbers had been divided by a power
+    of 10 to bring the maximum to somewhere between 1 and 10. Negative
+    numbers print as spaces. The <char_string> argument must be present
+    but is ignored.
+
+sign
+    - The character '-' is printed for values less than 0, otherwise '+'
+    is printed. <char_string> must be present, but is ignored.
+
+zeros
+    - Graphics characters are used (where possible) to show the position
+    of zero crossings in the array (ie places where adjacent elements
+    have opposite signs). Warning: resizing a large array can cause
+    big disruption of the small-scale zero-crossings. <char_string> must
+    be present, but is ignored.
+
+General warning: if resizing is in operation, the mapping from values to
+characters is done after resizing the array. If fewer characters are
+printed than there are array elements, the averaging process may change
+the mapping compared to that produced when the array is printed one for
+one.
+
+-- Underlying procedures ----------------------------------------------
+
+It is useful to be able to use the underlying procedures when the
+general-purpose interface SHOWARRAY does not provide enough flexibility.
+For instance, if the same value to character mappings are required for
+different arrays, they can be saved and reused, or if a large array is
+to be printed in a number of ways it can be resized once and different
+character mappings applied.
+
+                               ----------
+
+    sa_limit(<array>,<region_spec>,<xlim>,<ylim>,<aspect>) -> <newarray>
+
+This resizes an array following the rules in the "resizing" section
+above. A new array of the required dimensions is returned but no
+printing is done. <array> and <region_spec> are as in SHOWARRAY, and the
+<xlim>, <ylim> and <aspect> arguments are the same as the components of
+the <resize_spec> argument to SHOWARRAY described above.
+
+                               ----------
+
+    sa_resize(<array>,<region_spec>,<newsize>) -> <newarray>
+
+This is the underlying resizing procedure, which does averaging or
+repetition to force a region of an array to a particular size. <array>
+is the array, <region_spec> is as in SHOWARRAY, and <newsize> is the
+boundslist of the new array, which is returned. Thus the call
+
+    sa_resize(arr,[5 10 50 100],[1 10 1 10]) -> newarray;
+
+will (if ARR is big enough) return a 10 x 10 array in which columns 5 to
+10 of the original array have been stretched out and rows 50 to 100 of
+the original array have been squeezed down to fit.
+
+                               ----------
+
+    sa_print(<array>,<region_spec>,<levels_&_chars>)
+
+This is the underlying printing procedure for character blocks. The
+first two arguments are as in SHOWARRAY. The third is a list specifying
+how characters are mapped onto value ranges, and has the format:
+
+    [char_1 val_1 char_2 val_2 ... char_n-1 val_n-1 char_n]
+
+where there are n characters, and the values are in increasing order. A
+value in the array which is greater than or equal to val_i and less than
+val_i+1 will be printed as char_i. (Any value less than val_1 will print
+as char_1 and any value greater than or equal to val_n-1 will print as
+char_n.) So for example if <levels_&_chars> is
+
+    [`a` 10 `b` 20 `c` 30 `d`]
+
+and the array has only integers in it, then 9 or less will print as 'a',
+10 to 19 will print as 'b', 20 to 29 will print as 'c' and 30 and over
+will print as 'd'. If the array has non-integer numbers, then anything
+up to but not including 10 will print as 'a', and so on.
+
+SA_PRINT can't print zero-crossings. The procedure to do that is only
+accessible via SHOWARRAY, with ZEROS as the <type_spec> argument.
+
+If an array element is a string or a word, the first character will be
+printed regardless of the <levels_&_chars> argument.
+
+                               ----------
+
+    sa_chars(<array>,<region_spec>,<type_spec>,<char_string>)
+        -> <levels_&_chars>
+
+The arguments are as for SHOWARRAY (except that <type_spec> may not be
+ZEROS or NUMS), but rather than doing any printing this routine returns
+a <levels_&_chars> list suitable for passing to SA_PRINT. If <type_spec>
+is a list it is returned unchanged; otherwise it must be one of the
+words listed under 'Characters and value ranges'. Routine SHOWARRAY
+calls SA_CHARS after it has used SA_LIMIT to do any resizing needed.
+
+                               ----------
+
+    sa_prnums(<array>,<region_spec>,<integer1>,<integer2>)
+
+This is the underlying procedure to print a table of numerical values.
+<array> and <region_spec> are as for SHOWARRAY, <integer1> and
+<integer2> are as for * PRNUM. This calls SA_PRINT, and is called by
+SHOWARRAY with what should be sensible defaults for the two integers.
+
+-- Global variables ---------------------------------------------------
+
+sa_greys
+    - is initialised to a suitable string of characters for some
+    terminals, but may need modifying to suit others (particularly those
+    that use black on white). SA_SIMPLE_ASIS and SA_SIMPLE_FITSCREEN
+    refer to it; it may be used as the <char_string> argument to
+    SHOWARRAY and other routines.
+
+sa_yup
+    - is used by SA_PRINT to decide which way up to print the array. It
+    is initialised to <false> unless it has been set before the library
+    is loaded.
+
+sa_aspect_ratio
+    - is the default aspect ratio for SA_SIMPLE_FITSCREEN and the
+    FITSCREEN option in SHOWARRAY. It is initialised to a suitable value
+    for a Visual 200 and may need to be modified for other terminals.
+
+sa_sigfigs
+    - determines the maximum number of significant figures printed for
+    each value by SA_SIMPLE_NUMS and the NUMS option to SHOWARRAY. It is
+    intialised to 6. Ignored by SA_PRNUMS.
+
+sa_print_axes
+
+    - is initialised to <false>. If set to <true>, axes showing row and
+    column numbers will be printed above or below and to the left of the
+    output. These numbers refer to rows and columns in the original
+    array, before any resizing. Each number on the horizontal axis
+    should be read from top to bottom.
+
+    If a list is assigned to this variable, it must contain 4 elements
+    and will be taken to specify the values to give the axis numbers,
+    overriding the array row and column numbers. The first two elements
+    give the values of the left and right hand ends of the horizontal
+    axis and the last two the values of the top and bottom ends of the
+    vertical axis. (Bottom and top ends if SA_YUP is true.) The axes'
+    ends are taken to be half a character outside the range of printed
+    characters - ie at the positions on the page where you would draw a
+    box round the main output.
+
+sa_chardata
+    - is initialised to false. If set to <true>, the array will be
+    assumed to hold integers representing character codes. No character
+    replacement will be done - <type_spec> arguments will be ignored. It
+    does not make sense to use resizing while this is true. It is mainly
+    intended for internal use by the library.
+
+-- Looking at large arrays --------------------------------------------
+
+Sometimes it is desirable to look at large arrays without resizing them.
+One way is to use the <region_spec> argument to look at the array
+piecemeal, through small windows as it were. Another way is to get a
+large block of characters into a VED buffer and then to move about it
+using the cursor movement commands.
+
+If you try this from VED, you will find it takes a long time, because
+(at the time of writing), VED is very slow at sideways scrolling and
+insists on doing a lot of it. One way round this is to send the output
+to a file and then read it into VED again - see the next section.
+
+-- Sending the output to a file ---------------------------------------
+
+Since SA_PRINT uses * CUCHAROUT, you can just reassign to this variable
+in order to send the characters direct to a file. (Note that this does
+not provide a good means of storing an array.) To close the file, apply
+CUCHAROUT to TERMIN. For instance
+
+    discout('temp') -> cucharout;
+    sa_simple_asis(arr);
+    cucharout(termin);
+
+Don't forget to delete the file when you've finished with it.
+
+See Also
+
+HELP * ARRAYS
+TEACH * READARRAY
+SHOWLIB * READARRAY
+SHOWLIB * SHOWARRAY
+
+--- C.all/teach/showarray ----------------------------------------------
+--- Copyright University of Sussex 1988. All rights reserved. ----------

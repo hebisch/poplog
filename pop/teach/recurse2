@@ -1,0 +1,240 @@
+TEACH RECURSE2                                 Updated Aaron Sloman 1989
+
+
+                        RECURSION and REPETITION
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Prerequisites
+ -- Introduction
+ -- Defining "square" recursively
+ -- Defining polygon recursively
+ -- Defining "squiral"
+
+-- Prerequisites ------------------------------------------------------
+
+This file assumes that you have already read TEACH * RECURSE1,
+introducing the basic idea of a recursive procedure.
+
+It also assumes that you have learnt to use the POP-11 turtle for
+drawing pictures in a two-dimensional array (or in the VED buffer), as
+explained in TEACH * TURTLE or TEACH * VTURTLE (the latter uses VED.)
+
+In this teach file the idea of recursion is illustrated in different
+contexts, concerned with drawing pictures. If you are not interested
+in this use of recursion you could simply skip to TEACH RECURSE2
+
+In several of the files and mini-projects, you will find that we define
+procedures in terms of themselves, that is recursively. This is because
+there are many programming tasks which are achieved fairly simply with
+the aid of recursion, and which would be much harder to do by other
+means.
+
+-- Introduction -------------------------------------------------------
+
+Here are a few exercises to help you get used to recursive programs
+involving numbers. The other TEACH files will give you lots of practice
+with recursion on lists.
+
+All the examples which follow could be done using 'looping'
+constructions, e.g. REPEAT, or UNTIL, or WHILE statments. One great
+disadvantage of this method is that if you want the computer to give you
+an indication of when it is re-starting a loop you have to re-define the
+procedure to include extra print instructions. However, if you use
+recursion to restart a process, then you can use the TRACE facility to
+achieve this. This can help enormously to speed up de-bugging and is
+also useful for demonstrating your programs at work.
+
+-- Defining "square" recursively --------------------------------------
+
+One of the procedures in the TEACH * TURTLE was intended to draw a
+square.
+
+    define square (side);
+        repeat 4 times
+            draw(side);
+            turn(90);
+        endrepeat;
+    enddefine;
+
+   This used the "schema"
+
+    repeat <number> times <action> endrepeat;
+
+Suppose we wanted to make a slightly more general procedure, which,
+instead of drawing only four times could draw a number of lines
+determined by an argument, and which, instead of always turning through
+ninety degrees would also turn through an amount specified by an
+argument. We could again use the REPEAT construction, thus:
+
+    define polygon (side, angle, number);
+        repeat number times
+            draw(side);
+            turn(angle);
+        endrepeat;
+    enddefine;
+
+How would you define SQUARE in terms of this procedure?
+
+   define square (side);
+        polygon(....., ....., .....)
+   enddefine;
+
+   Complete this definition and try it out.
+
+Instead of using REPEAT we can use recursion to define the procedure
+POLYGON. The "schema" for this is:
+
+-- Defining polygon recursively ---------------------------------------
+
+   define polygon (side, angle, number);
+        if <not yet finished> then
+            <draw one side and turn>
+            <restart with number reduced>
+        endif;
+   enddefine;
+
+Try to replace the bits of English with POP-11?
+
+    <not yet finished> should be replaced by a test whether there
+    are still some lines to be drawn, i.e. a test whether NUMBER is
+    bigger than 0.
+
+    <draw one side and turn> should be replaced by turtle commands
+    using DRAW and TURN, with appropriate arguments. (See the TURTLE
+    and VTURTLE teach files.)
+
+    <restart with NUMBER reduced> requires a call of POLYGON, i.e.
+    the procedure being defined, with NUMBER-1 as its last argument,
+    and the remaining two arguments unaltered.
+
+Notice that the recursive call must include as many arguments as the
+procedure being defined has formal parameters (in this case three).
+
+Test your definition of polygon when you've completed it. Try drawing an
+octagon with it.
+
+
+-- Defining "squiral" -------------------------------------------------
+
+    define squiral(number, distance, subtract);
+        repeat number times
+            draw(distance);
+            turn(90);
+            distance - subtract ->distance;
+        endrepeat
+    enddefine;
+
+The use of "REPEAT"......."ENDREPEAT" makes it easy to get a program to
+do something a specified number of times. But how is this achieved?
+Could you write a program like squiral without using REPEAT? (If you
+think you can, then try it before reading on).
+
+Here is one way of thinking about SQUIRAL. We want to do something a
+specified number of times, i.e. NUMBER times. There are two main cases
+to consider, somewhat like the two cases in the definition of factorial
+and sum, in TEACH RECURSE1. The cases (for SQUIRAL) are:
+
+    (a) NUMBER is 0, i.e. there's nothing more to be done (doing
+        something 0 times is the same as not doing it!).
+    (b) NUMBER is greater than 0, i.e. you still have to perform the
+        action.
+
+Why should we consider case (a) at all? The answer is that it is helpful
+do deal with case (b) in such a way that you do the action once, then
+reduce NUMBER by 1, and start again. So although you never ask for the
+action to be performed zero times, the program will eventually get down
+to a zero value for NUMBER.
+
+We thus have the following "schema" for the program:
+
+    define squiral(number,  distance, subtract);
+        if number > 0 then
+            <do the action>
+            <call squiral again with number reduced by 1
+            and distance reduced by subtract>
+        endif
+    enddefine;
+
+where the action is:
+
+    draw(distance);
+    turn(90);
+
+Problem: what will this do when NUMBER is 0?
+
+In the original version of SQUIRAL we also included an instruction to
+reduce the value of DISTANCE by the amount specified in SUBTRACT. Now
+instead of doing that as part of the "action", we can simply give an
+appropriate second argument to our recursive call of SQUIRAL, i.e.
+DISTANCE - SUBTRACT instead of DISTANCE. So the
+    recursive call looks like this:
+
+        squiral(number - 1, distance - subtract, subtract)
+
+i.e. start SQUIRAL again with NUMBER reduced by 1, with DISTANCE reduced
+by SUBTRACT and with the same value for SUBTRACT as before.
+
+Complete this version of SQUIRAL and try it out.
+
+
+-- A different stopping condition for squiral -------------------------
+
+One reason why this method is perhaps preferable, is that you can now
+easily modify the definition of SQUIRAL so that it has a more complex
+stopping condition. The last version of SQUIRAL stopped as soon as
+NUMBER had the value 0. More precisely, it continued drawing so long as
+the value of NUMBER was greater than 0.
+
+Suppose you want to make the program continue drawing until the turtle
+reaches a position where its X-coordinate is between 10 and 15. You
+can do this simply by changing what comes between IF and THEN:
+
+        if  xposition < 10  or  15 < xposition then
+
+Alternatively you may wish to combine the new continuation condition
+with the old one, so that the drawing stops if either NUMBER gets down
+to 0 or the turtle gets to a certain range of locations.
+
+Suppose the picture has size 21 by 21. Redefine SQUIRAL so that drawing
+stops if ever the turtle gets to within two steps from the centre of the
+picture (the position [11 11]), or NUMBER gets down to zero.
+
+You will probably find it helpful to use the procedure ABS (absolute
+value of a number). abs(num) is always positive or 0, never negative,
+whether num is positive or not. Eg.
+
+    abs(66) =>
+    ** 66
+    abs(-66) =>
+    ** 66
+    abs(0) =>
+    ** 0
+
+We can use this to find out whether YPOSITION differs from 11 by more
+than 2, I.e. use the test
+
+        abs(yposition - 11) > 2
+
+The new definition will start:
+
+    define squiral (number, distance, subtract);
+        if  number > 0
+        and ....
+
+   Can you complete it?
+
+
+-- Further reading ----------------------------------------------------
+
+To find out about the turtle:
+
+TEACH TURTLE, or TEACH VTURTLE
+
+For more on recursive list processing See
+
+TEACH * RECURSE3  TEACH * SETS and TEACH * SETS2
+
+
+--- C.all/teach/recurse2
+--- Copyright University of Sussex 1990. All rights reserved. ----------

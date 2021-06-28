@@ -1,0 +1,256 @@
+TEACH STATS                                               A. Sloman Jan 1983
+
+
+Before working through this file you may find it useful to read
+    TEACH ARITH
+
+-- DOING STATISTICS IN POP-11 -----------------------------------------------
+There is a myth that POP-11 is not a good language for doing arithmetic in.
+Maybe programs don't run quite as fast as with Pascal, but human time is
+considerably reduced, and program development puts a much smaller load on the
+computer, because you don't change systems so often.
+
+-- FINDING AN AVERAGE -------------------------------------------------------
+
+To find the average of all the numbers in a list, you have to add up the
+numbers, then divide by the length of the list. So the average of
+    [ 1 2 3]    is 2
+of
+    [ 5 6 7 8]  is 6.5
+
+First you need a procedure which will add up all the numbers in a list.
+Lets call it TOTAL.
+We define TOTAL so that it looks at each item in the list and adds it to a
+running total, the final value of which is produced as the result.
+
+    define total(list) -> tot;
+        ;;; add up numbers in list
+        vars item;
+        0 -> tot;
+        for item in list do
+            tot + item -> tot;
+        endfor;
+    enddefine;
+
+Type that in then test it, making sure it produces the right totals
+
+    total([1 2 3])=>
+    total([66 33 11])=>
+
+-- How it works -------------------------------------------------------------
+The crucial bit is the following
+        for item in list do
+            tot + item -> tot;
+        endfor;
+
+Note FOR is a syntax word telling POP-11 that this is a 'loop' instruction,
+i.e. something to be obeyed repeatedly.
+The word ENDFOR merely says where the action to be repeated ends.
+
+The whole thing tells POP-11 to take each element of the list in turn, and
+assign it to the variable ITEM, then to do the line in the middle -- the
+'action':
+        tot + item -> tot;
+
+This command takes the previous value of TOT and adds the value of ITEM to
+it, then makes the result the new value of TOT.
+
+Notice that this assumes that TOT is already a number. So we need the line:
+        0 -> tot;
+
+to make sure that TOT starts off with a number as a value.
+
+Now look back at your procedure TOTAL and make sure you know what it all
+means. Try it on several lists and make sure the totals are right. Then try
+it on a long list of big numbers.
+
+-- TOTAL must be given only numbers -----------------------------------------
+The line:
+
+        tot + item -> tot;
+
+uses the arithmetic procedure "+". This works only for numbers. So you will
+get an error if you include something other than a number in the list, e.g. a
+word. to see what happens try:
+
+    total([1 2 three four]) =>
+
+-- Using TOTAL to find an average ------------------------------------------
+
+This is fairly straight-forward. To find the average, find the total of the
+list, then divide by the number in the list. We can use the POP-11 procedure
+length for the last part:
+
+    define average(list) -> av;
+        total(list)/length(list) -> av
+    enddefine;
+
+In the middle line "/" means "divided by".
+
+Now test your procedure with different lists of numbers
+
+    average([ 1 2 3])=>
+    average([ 1 2 3 4 5 6])=>
+    average([40 50 60])=>
+    average([ 200 300 400 500])=>
+
+-- Averaging an empty lists? ------------------------------------------------
+
+What happens if the list is empty? Try
+    average([]) =>
+
+You'll get a mishap. Instead you can change the procedure AVERAGE so that it
+checks itself for an empty list.
+
+    define average(list) -> av;
+        if list = [] then
+            mishap('CANNOT AVERAGE EMPTY LIST',[])
+        else
+            total(list)/length(list) -> av
+        endif
+    enddefine;
+
+Now try
+    average([]) =>
+
+-- Finding the sum of squares of numbers in a list --------------------------
+This is something often required in statistics, though we need not enquire
+why now. Here is a way to do it. Try it.
+
+    define sumsq_list(list) -> tot;
+        ;;; find sum of squares of numbers in list
+        vars item;
+        0 -> tot;
+        for item in list do
+            item * item + tot -> tot
+        endfor;
+    enddefine;
+
+Now try it
+    sumsq_list([ 1 2 3]) =>
+
+This is very like the procedure TOTAL except for the line
+
+            item * item + tot -> tot
+
+The first part 'item * item' says multiply the number by itself, i.e. find
+its square. Then add it to TOT the running total. So in the end the value of
+TOT will be the sum of all the squares.
+
+-- Standard Deviation -------------------------------------------------------
+You can use SUMSQ_LIST to define a procedure to compute the standard
+deviation of a list of numbers, i.e. find the sum of the squares of the
+differences of the numbers and the average. Then divide by one less than
+the number of elements in the list. Here is one way to do it.
+
+define stand_dev(list) -> dev;
+    vars item sumsqs av;
+    0 -> sumsqs;                ;;; this starts the sum of squares
+    average(list) -> av;        ;;; find the average for the list
+    for item in list do
+                                ;;; find square of deviation from average
+                                ;;; and add to sumsqs
+        (item - av) * (item - av) + sumsqs -> sumsqs;
+    endfor;
+    sumsqs/(length(list) - 1) -> dev;
+                                ;;; actually this is the variance
+                                ;;; so take its square root to get
+                                ;;; standard deviation
+    sqrt(dev) -> dev
+enddefine;
+
+
+Now try this on various lists, and trace average and total so that you can
+see how they are being used:
+
+    trace average, total;
+    stand_dev([1 2 3]) =>
+    stand_dev([10 11 12]) =>
+    stand_dev([1 2 3 4 5]) =>
+    stand_dev([10 20 30 40 50]) =>
+
+    vars data;
+    [ 5 10 15 6 11 16 7 11 13 8 5 17 6] -> data;
+    stand_dev(data) =>
+
+Suppose you have five subjects each with 4 scores on four tests, and you want
+to find for each test the mean and the standard deviation over all the
+subjects, and store the results in a file.
+
+You can put in the data in a list of lists, e.g.
+    vars data;
+    [ [ 5 20 31 15]     ;;; four scores for subject 1
+      [ 6 22 35 12]     ;;; subject 2
+      [ 4 20 29 16]
+      [ 5 23 34 16]
+      [ 7 19 28 24]
+    ] -> data;
+
+We have write a procedure to go through all the data working out the mean and
+standard deviation for test number N, where N is 1, 2, 3, or 4
+
+    define resultsfortest(n,list) -> mean -> dev;
+        vars scores subj;
+        [% for subj in list do subj(n) endfor%] -> scores;
+        average(scores) -> mean;
+        stand_dev(scores) -> dev;
+    enddefine;
+
+You can then get the results for test number 3 thus;
+    resultsfortest(3,data) =>
+    ** 3.04959 31.4
+
+We can now define a procedure to do it for all the tests, and print out the
+results.
+
+    define allresults(num,list);
+        ;;; num is the number of tests, list the list of records for
+        ;;; all subjects
+        vars test_num mean dev;
+        for test_num from 1 to num do
+            resultsfortest(test_num,list) -> mean -> dev;
+            pr('RESULTS FOR TEST No: ' >< test_num
+                >< ': Mean:\t' >< mean
+                ><'\tStandard Deviation:\t' >< dev);
+            pr(newline);
+        endfor;
+    enddefine;
+
+then
+    allresults(4,data);
+
+Will cause the following to be printed out:
+
+RESULTS FOR TEST No: 1: Mean:   5.4     Standard Deviation: 1.14018
+RESULTS FOR TEST No: 2: Mean:   20.8    Standard Deviation: 1.64317
+RESULTS FOR TEST No: 3: Mean:   31.4    Standard Deviation: 3.04959
+RESULTS FOR TEST No: 4: Mean:   16.6    Standard Deviation: 4.44972
+
+If you want the output to go to a named file, define a procedure thus:
+
+    define fileresults(num,list,filename);
+        ;;; num the number of tests, list the list of data
+        vars cucharout;
+        discout(filename) -> cucharout; ;;; prepare to print into file
+        allresults(num,list);
+        pr(termin);                     ;;; close the file
+    enddefine;
+
+
+NOTE:
+This technique is not particularly efficient, since for each test it first
+makes a list of all the numbers and then finds the mean and standard
+deviation for that test. And it does this separately for each test.
+It would be possible to redefine ALLRESULTS to go through all the data
+once, working out all the means and deviations in parallel. But that would be
+somewhat tedious, and for small data sets not worth the trouble.
+
+There is an additional inefficiency in that all the data are put into a single
+list, the whole of which has to be constructed before the program is run.
+For very large amounts of data this overhead could be intolerable, and it
+would be preferable to store the data in a file, and just read in a record at
+a time. Again, there is no problem about doing this in POP-11.
+
+
+--- C.all//teach/stats
+--- Copyright University of Sussex 1991. All rights reserved. ----------

@@ -1,0 +1,871 @@
+TEACH DATABASE                                 Revised A.Sloman Oct 1987
+                                       Updated for use with "!" Oct 1996
+                                                        Updated Feb 1999
+
+This TEACH file introduces the Pop-11 database. It assumes that you have
+some experience with Pop-11 lists and the Pop-11 matcher, e.g.
+    TEACH LISTS
+    TEACH MATCHES
+    TEACH ARROW
+
+
+                       THE POP-11 DATABASE PACKAGE
+                       ===========================
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Introduction: storing and using information
+ -- The POP-11 database
+ -- Prerequisites for this teach file
+ -- Why we want a database
+ -- The initial value of 'database' is an empty list
+ -- Storing some 'facts' about Steve
+ -- Storing more 'facts' about other people
+ -- The POP-11 system doesn't really know whats in the database
+ -- We could define 'add' for ourselves
+ -- Teach arrow may be useful to you
+ -- There is nothing special to the word 'database'
+ -- We can check if things are in the database
+ -- Present can take a pattern containing variables
+ -- Pattern variables should be declared
+ -- A more formal definition of -present-
+ -- A example using present in a procedure
+ -- Use lookup when you are sure some information can be found
+ -- The lookup procedure
+ -- Grandmothers
+ -- How grannies are found
+ -- The procedure maternal_granny produces a result
+ -- You could have defined lookup yourself
+ -- How to clear the database
+ -- How to remove selected items from the database
+ -- An example of how to use 'remove'
+ -- Remove - like present but not add - can be given query variables
+ -- Remove can't remove something that isn't there
+ -- Summary of the database procedures
+ -- Using flush(<pattern>) to remove many items
+ -- Generalising present: foreach ... endforeach
+ -- Definitions of procedures like present and remove
+ -- Revision questions
+ -- Further reading
+
+-- Introduction: storing and using information -------------------------
+
+Intelligent  (and  even  some  unintelligent)  systems  need  to   store
+information. Some  kinds of  storage are  implicit, some  explicit.  For
+example, in the rules you may have learnt for doing long division  there
+is a lot of  implicit information about how  symbols on paper  represent
+numbers. Some people think that all  the information in human brains  is
+stored implicitly  in  complex  states of  tangled  interconnections  of
+neurons.
+
+Yet it seems that we have, and need, some explicit information, such  as
+"Ronald's phone number  is 123456",  "Paris is the  capital of  France",
+"oxygen is an element", or "No  student who owes fees to the  University
+can graduate". These are "propositional" items, things that can be  said
+to be  true or  false. There  are other  kinds of  explicit  information
+stores, for example images, maps, 3-D models, family trees. Human beings
+use many kinds of such representations, and so can computers.
+
+Giving computers human  abilities either for  practical purposes or  for
+the purpose of investigating theories of  mind requires us to find  ways
+of storing and using different kinds of information, and using the  same
+kind of information in different ways.
+
+This is  a large  and complex  topic. For  example, besides  information
+stored explicitly  it is  usually necessary  to use  inference rules  or
+inference procedures  to derive  new information.  For instance  a  rule
+saying that "taller" is a transitive relation enables you to start  from
+two facts like
+
+    "Mary is taller than Joe"     and    "Joe is taller than Fred"
+
+to derive  a third.  So even  an explicit  information store  will  have
+implicit information,  which depends  on what  inference procedures  are
+used.
+
+Computer scientists have developed  many different ways of  representing
+and manipulating information in computers. This teach file  introduces a
+subset  of  techniques  that  have  been  found  useful  in   Artificial
+Intelligence, though they are similar to techniques than can be  applied
+elsewhere. The aim is to introduce the basic ideas and show how they can
+be made to work on  a computer, but without  worrying about how to  cope
+with the problems of efficiency that arise when the information store is
+very large  and  complex:  in  that  case  the  techniques  need  to  be
+generalised.
+
+We introduce the  basic techniques  through a  collection of  procedures
+that operate on what is called the POP-11 "database"
+
+
+-- The POP-11 database ------------------------------------------------
+
+"Database" is a  collective name for  a set  of ideas about  how to  use
+lists to store 'propositions',  or 'facts'. This  is often a  convenient
+technique to use in programs which build descriptions of 'micro worlds'.
+
+For example if you  wish to store information  about a group of  people,
+you can make a list of lists of the form
+
+    [occupation mary doctor]
+    [occupation joe janitor]
+    [age mary 27]
+    [age joe 45]
+
+and so on.  (Other formats  for storing  the same  information are  also
+possible). Later you may  want to ask questions  about who is a  doctor,
+who are all the people who are doctors aged under 45 and so on.
+
+You may also  wish the computer  to perform actions  concerning all  the
+people satisfying some description. The  database package allows you  to
+do all this easily, using the following procedures, amongst others:
+
+    ADD which adds a 'fact' to the database
+    REMOVE which removes a fact
+    PRESENT which checks if a fact is in the database
+    LOOKUP which also accesses the database.
+
+
+-- Prerequisites for this teach file ----------------------------------
+
+Before reading the rest of this  teach file you should be familiar  with
+the editor,  marking  a  range, compiling  a  range,  switching  between
+different VED  files  and  TEACH  files,  defining  procedures,  testing
+procedures by  running  them  in your  'output'  file,  declaring  local
+variables in a procedure, and using the POP-11 matcher.
+
+The teach files introducing these ideas are:
+
+    TEACH VED, MARK, LMR, VEDPOP, BUFFERS, MATCHES, DEFINE
+    TEACH TRACE  shows how to trace and untrace procedures
+
+If you wish to go deeper, try:
+
+    TEACH MOREVED, VARS, LISTS, MATCHES2, ARROW, STACK
+
+Relevant chapters of the POP-11 Primer (TEACH PRIMER) are
+
+    Chapter 6 - Lists
+    Chapter 7 - the POP-11 matcher and the POP-11 database
+
+
+
+-- Why we want a database ----------------------------------------------
+
+The reason for  wanting a  'database' package is  to allow  us to  write
+programs which have  some pretensions  to being  more intelligent  than,
+say, ELIZA. The main problem with ELIZA was that it didn't remember what
+it had  been told  (nor,  obviously, use  it  to make  inferences).  The
+database package enables a  program to store a  collection of facts  and
+retrieve them using the pattern matcher.
+
+The database has many  many uses. It can  be used when writing  planning
+programs, game  playing  programs,  vision programs  and  programs  that
+understand a  subset  of natural  language.  A  very common  use  is  to
+represent a  situation,  or 'micro-world'  by  storing a  collection  of
+propositions  about  the  world.  Changes  in  the  world  can  then  be
+represented by changes in the database.
+
+(TEACH * RIVER illustrates this sort of use of the database.)
+
+The database is just a list of lists. So the procedures that operate  on
+the database are built out of procedures that procedures that operate on
+lists of lists, adding lists,  removing lists, searching for lists  that
+match a pattern, and so on.
+
+
+-- The initial value of 'database' is an empty list --------------------
+
+We  are  assuming  that  the  world  can  be  described  by  a  list  of
+propositions. This is  disputable, but  often useful. You  can find  out
+what is in the database by giving the following command to POP-11  (i.e.
+mark and compile it).
+
+    database ==>
+
+You may previously have met the print arrow "=>". The pretty-print arrow
+"==>" is good for formatting long lists of lists, though it doesn't make
+any difference  with  short lists.  So  we  always use  "==>"  with  the
+database.
+
+Initially, the database is empty; that is the variable 'database' has as
+its 'value' an empty list.
+
+    database ==>
+    ** []
+
+
+-- Storing some 'facts' about Steve ------------------------------------
+
+Suppose we wanted to store the fact that Steve Hardy (who first designed
+the POP-11 database and wrote the first version of this teach file) is a
+teacher. We could 'add'  a list which is  like an English sentence,  for
+example:
+
+    add([steve is a teacher]);
+
+We could also store that he likes apple pie:
+
+    add([steve likes apple pie]);
+
+Mark and compile those two commands then print out the database with the
+command:
+
+    database ==>
+
+it should print out:
+
+    ** [[steve likes apple pie] [steve is a teacher]]
+
+
+-- Storing more 'facts' about other people -----------------------------
+
+Now try adding some more facts to the database, for example:
+
+    add([aaron is a teacher]);
+    add([aaron likes jam tart]);
+    add([julie is a teacher]);
+    add([julie likes baked haddock]);
+    database ==>
+
+If you mark and load that lot, and compare the effect of
+
+    database =>
+    database ==>
+
+You'll see the  advantage in  the pretty  print arrow.  Notice that  the
+latest items ADDed to the database are the first items printed. I.e. the
+items go into the database in the  reverse order. This is because it  is
+more efficient to add  something to the  front of a list  to make a  new
+list than to chug  all the way  down the list  to the end  to add a  new
+item.
+
+
+-- The POP-11 system doesn't really know whats in the database ---------
+
+Just because one element of the list which is the value of 'database' is
+
+    [steve is a teacher]
+
+does NOT mean that the computer KNOWS that Steve is a teacher, any  more
+then ELIZA knows what it is to be unhappy. All that is happening is that
+various 'list structures' are being built and modified in the computer's
+short term memory. We can 'add' any list to the database, for example:
+
+    add([foo baz]);
+    database ==>
+
+Try that. Any list given as argument (i.e. input) to the procedure -add-
+simply gets  added  to  the  list  of  lists  stored  as  the  value  of
+'database'.
+
+In what  follows we'll  give some  trivial examples  of the  use of  the
+database. If you wish you can invent alternative examples which are more
+serious. Try out the facilities using your own examples.
+
+
+-- We could define 'add' for ourselves ---------------------------------
+
+You could, if you wish, define your own version of 'add'. Create a  file
+(called, perhaps 'store.p') with  the following procedure definition  in
+it:
+
+    define store(fact);
+        [^fact ^^database] -> database
+    enddefine;
+
+Note that  there is  only ONE  up-arrow before  'fact', but  two  before
+'database'. After typing this definition into a file, load and mark  it,
+then in your 'output' file test it with a command like:
+
+    store([roberts is a politician]);
+    store([roberts cares about people]);
+    database ==>
+
+
+-- Teach arrow may be useful to you ------------------------------------
+
+Let's look a bit more closely at the definition of STORE:
+
+The first line says  we are defining a  procedure called "store"  which,
+when it is run, will be given one argument (input) called "fact" (and it
+is not going to produce any result):
+
+            define store(fact);
+
+The next line has two parts. The first part:
+
+            [^fact ^^database]
+
+Says: build a list containing:
+    the value of the variable fact,
+and also
+    all the elements in the list which is the value of the variable
+        database
+
+The list will be left on 'the stack' when it has been built.
+
+The second part of the line:
+
+        -> database
+
+Says: take what is on the top of the stack and assign it to be the value
+of the variable database.
+
+If you are unsure about the  difference between the single up-arrow  and
+the double up-arrow then look at TEACH * ARROW.
+
+
+-- There is nothing special to the word 'database' ---------------------
+
+To summarize, the 'database' is NOT  some special sort of object; it  is
+just another POP-11 variable. Its value is a list of lists. We choose to
+interpret 'database' as  a collection  of 'facts' -  but POP-11  doesn't
+interpret the list at all; as far as POP-11 is concerned, 'database'  is
+a list like any other list. We could, if we chose, store the database in
+a variable called, say, X32 and use a procedure named YYY to add  things
+to the database, thus:
+
+    vars x32 = [];  ;;; declare X32 and initialise it with an empty list
+
+    define yyy(z);
+        [^z ^^x32] -> x32;      ;;; add the value of z to the list x32
+    enddefine;
+
+Functionally, this  is equivalent  to ADD  and STORE.  If you  mark  and
+compile those lines you can then test them by marking and compiling  the
+following:
+
+    yyy([steve is a teacher]);
+    yyy([steve likes apple pie]);
+    yyy([julie likes baked haddock]);
+    yyy([xxx yyy zzz]);
+    x32 ==>
+
+Try that to convince yourself that the  names used are of value ONLY  to
+people and are arbitrary symbols chosen for OUR convenience.
+
+
+-- We can check if things are in the database --------------------------
+
+A database that  can only be  added to is  a bit useless.  We need  some
+simple way of testing to see if some item is 'present' in the 'database'
+(or 'stored'  in  the 'database'  or  'yyyed'  in the  'x32').  Try  the
+following:
+
+    present([steve is a teacher]) =>
+    present([steve likes baked haddock]) =>
+    present([aaron likes jam tart]) =>
+
+Some of  these  should  produce  the  result  <true>  and  some  <false>
+depending on whether the list given as argument to -present- is found in
+the database or not.
+
+Pronounce "present" in the way you would say "Fred was present in class"
+not in  the  way you  would  say  "I'll present you with a medal".  (The
+accent is on the first syllable in the former.)
+
+
+-- Present can take a pattern containing variables ---------------------
+
+You should already have met the use of 'pattern variables' in connection
+with MATCHES (patterns can be used  as the second argument to  MATCHES).
+-present- can also be given a pattern as its argument, i.e. a list  with
+one or more pattern variables.
+
+
+    present( ![julie likes ??x] ) =>
+    x =>
+    present( ![??x likes apple pie] ) =>
+    x =>
+
+Note that when there is a variable preceded by "?" or "??" in a pattern
+used to search the database, you should put "!" in front of the pattern,
+for reasons explained in TEACH * MATCHES
+
+When -present- produces the result TRUE,  the variable "it" can be  used
+to find out exactly what it was that matched the pattern:
+
+    it =>
+    ** [steve likes apple pie]
+
+
+-- Pattern variables should be declared -------------------------------
+
+Notice that the first time you use  a word as a pattern variable  POP-11
+prints out something like
+
+    ;;; DECLARING VARIABLE x
+
+You should avoid that  by always first declaring  the variables you  are
+going to use, e.g. try the following:
+
+    vars person, what;
+
+    present( ![??person likes ??what] ) =>
+
+    person, what =>
+
+Declaring variables before you  use them is  not always essential  since
+POP-11 declares them for you. But it is an important indication that you
+are thinking clearly. It also saves time by stopping POP-11 searching in
+the library to see if the variable is declared there.
+
+Sometimes it is absolutely  essential to declare  a pattern variable  as
+"local" to a procedure, to stop it interfering with other procedures, as
+you'll discover later.
+
+
+-- A more formal definition of -present- -------------------------------
+
+The word "present"  is not pronounced  as in "present  arms". It's  like
+"who is present here today". I.e. the stress is on the first syllable.
+
+1. -present- is a procedure of one argument and one result.
+
+2. Its  argument  is  a list,  which  may  be a  pattern,  i.e.  a  list
+containing pattern elements (see TEACH MATCHES, TEACH MATCHES2).
+
+3. It returns the result TRUE if the the argument matches an item in the
+database, and returns the result FALSE otherwise.
+
+4. If there are 'query variables' in the argument given to -present-  it
+then if a matching  item is found the  variables will have their  values
+set appropriately, as with -matches-.
+
+5. If  a matching  item is  found in  the database,  then that  item  is
+assigned to be the value of the variable "it", so that programs can tell
+exactly what was found.
+
+
+-- A example using present in a procedure ------------------------------
+
+-present- returns true or false since  we usually use it between IF  and
+THEN. Here is an example of a simple procedure called "scold" using  the
+database:
+
+It takes a list as  argument, and uses that  list to construct a  longer
+list to give to  -present- and decides what  to do depending on  whether
+that list is found in the database:
+
+    define scold(person);
+        if present([^^person is at the pub]) then
+            [i always knew ^^person was a drunkard] =>
+        else
+            [i always knew ^^person was to be trusted] =>
+        endif
+    enddefine;
+
+Note that the use of "^^person" inside list brackets causes Pop-11 to
+create a new list containing the elements of the list held in the
+variable person. This new list is given to the procedure present, which
+then compares it against items in the database. It stops if it finds one
+that matches, and returns TRUE. Otherwise it returns FALSE. That is why
+present can be used in a condition, i.e. between "if" and "then".
+
+Mark and load that procedure and then try using it, for example:
+
+    scold([steve]);
+    ** [i always knew steve was to be trusted]
+
+Then see what the effect of the following is:
+
+    add([steve is at the pub]);
+    database ==>
+    scold([steve]);
+
+
+SCOLD varies its behaviour  depending on what is  in the database.  This
+depends essentially on the use  of -present- in the "condition"  between
+IF and THEN in the definition of SCOLD. (Compare the use of -matches- in
+conditions in TEACH RESPOND).
+
+
+-- Use lookup when you are sure some information can be found ----------
+
+Sometimes you KNOW there will be a certain sort of item in the database,
+i.e. one matching a pattern with a  variable, and all you want to do  is
+set the value of the variable. You can then use LOOKUP. E.g.
+
+  lookup( ![freddy likes ??x] );    ;;; use semi-colon, not print arrow
+  x =>
+
+E.g. you  know there  is an  entry in  the telephone  directory for  the
+University, so if you look it up you are only searching the directory to
+find WHAT the number is, not WHETHER  there is one. So if the  directory
+were a database, you'd do:
+
+  lookup( ![phone number university ??x] );
+  x =>
+
+rather than:
+
+  present( ![phone number university ??x] ) =>
+
+The latter will print out <TRUE>,  telling you there is a phone  number.
+But you know that already.
+
+By comparison, lookup doesn't  tell you that there  is one, but it  does
+give the variable x the  value of the phone  numbr. Also if there  isn't
+one, lookup  will produce  a mishap,  whereas present  just returns  the
+result false, which could be useful in a conditional expression.
+
+
+-- The lookup procedure ------------------------------------------------
+
+lookup is like -present-,  in that it takes  a pattern to match  against
+different database items. It searches through the database looking for a
+matching item.
+
+However, it doesn't return any result. I.e. it doesn't leave anything on
+the stack. If  a suitable item  is found in  the database, i.e.  MATCHES
+gives the result TRUE, then this is used as a condition for -lookup-  to
+stop searching.
+
+If no  matching item is found  in the database,  then -lookup-  causes a
+MISHAP. Try:
+
+    lookup( ![??x likes climbing glaciers] );
+
+Roughly, lookup is to   present as -->    is to   matches. The operator
+"-->" is defined in TEACH MATCHARROW
+
+
+-- Grandmothers --------------------------------------------------------
+
+Lookup is useful when you KNOW that  an item is in the DATABASE and  are
+only interested in the  values of query variables.  For example, if  you
+knew that the database  contained information about everybody's  mother,
+then you could write a program to find someone's maternal grandmother,
+as follows. Note that because we are here using lookup with pattern
+variables, ??temp and ??x, inside a procedure definition, we use the
+pattern prefix to convert the pattern, as explained in TEACH MATCHES.
+
+    define maternal_granny(person) -> x;
+        lvars temp;
+        lookup(! [the mother of ^^person is ??temp]);
+        lookup(! [the mother of ^^temp is ??x]);
+    enddefine;
+
+If you left out the two occurrences of "!" you would have to insert a
+"vars" variable declaration for the two pattern variables:
+
+    vars temp, x;
+
+You wouldn't use "lookup" for a procedure called AUNT, since you cannot
+be sure that everyone has an aunt.
+
+Put the granny procedure into a test file, e.g. test.p, load it and try
+it out, after  first  adding suitable information to the database.
+
+    add([the mother of joe is jane]);
+    add([the mother of jane is betty]);
+
+which of the following should give a mishap?
+
+    maternal_granny([joe]) =>
+    maternal_granny([jane]) =>
+
+Exercise: try defining a procedure called paternal_granny, then test it
+with some examples. It should find paternal grandmothers. Do the same
+with maternal and paternal grandfathers.
+
+
+-- How grannies are found ----------------------------------------------
+
+Let's look at how the procedure works.
+
+    define maternal_granny(person) -> x;    ;;; one input, one result
+        lvars temp;
+        lookup( ! [the mother of ^^person is ??temp] );
+        lookup( ! [the mother of ^^temp is ??x] );
+    enddefine;
+
+Notice that although lookup doesn't produce a result, the first call  of
+lookup, if successful, does give a  value to the  variable TEMP, because
+of the use  of "??", which means "set the value of".  That value is
+USED by "^^temp" in the  second call of lookup to find a value for the
+variable X, i.e.
+
+      lookup( ! [the mother of ^^temp is ??x]);
+
+The value of TEMP  is USED because  of "^^" which  means "use the  value
+of". (Or more strictly  "include the elements of  the list which is  the
+value of..."). By contrast the value of X is changed, because of "??".
+
+
+-- The procedure maternal_granny produces a result --------------------
+
+The variable X  is defined  (in the  top line)  to be  an 'output  local
+variable' for the procedure maternal_granny, so the value found for X is
+left on the stack when maternal_granny has finished.
+
+So LOOKUP, which doesn't  produce a result, is  used to find the  result
+which maternal_granny has to produce. I.e. LOOKUP gives X a value, which
+is then used as the result. (Look back at the definition, and make  sure
+you understand all this.)
+
+
+-- You could have defined lookup yourself ------------------------------
+
+LOOKUP is defined in  terms of -present-. Here  is a procedure which  is
+just like lookup, except that it is called FINDIT.
+
+    define findit(pattern);
+        if not(present(pattern)) then
+            mishap('FINDIT FAILURE', [^pattern]);
+        endif;
+    enddefine;
+
+The variables in the pattern will get their values when -present-  calls
+MATCHES. If present does  not produce the result  TRUE, then the  mishap
+occurs. (The procedure MISHAP, which takes two arguments, a message  and
+a list of troublesome objects) is built into POP-11.)
+
+If you wish you can type in and test FINDIT:
+
+    vars likes, x;
+    findit( ![??likes apple pie] );
+    findit( ![uncle tom lives at ??x] );
+
+
+-- How to clear the database -------------------------------------------
+
+By now you  may have quite  a big  collection of 'facts'  stored in  the
+'database'. You  can 'clear'  the  database simply  by assigning  a  new
+value, say an empty list, to it; for example:
+
+    [] -> database;
+    database ==>
+
+
+-- How to remove selected items from the database ----------------------
+
+We now introduce yet  another procedure, called  REMOVE, which (how  did
+you guess?)  removes an  item from  the database.  Put some  items  into
+database, for example:
+
+    add([mary kisses john]);
+    add([john kisses jane]);
+    add([steve kisses tarina]);
+    database ==>
+
+
+-- An example of how to use 'remove' -----------------------------------
+
+Now remove some items from the database, for example:
+
+    remove([john kisses jane]);
+    database ==>
+
+
+-- Remove - like present but not add - can be given query variables ----
+
+Notice how REMOVE, like ADD, is a 'silent' procedure - it causes nothing
+to be printed. Also it produces no result on the stack. Despite this  it
+is not useless, for it changes the value of the variable DATABASE.  That
+is, it has a 'side effect'.
+
+REMOVE, like PRESENT (but not ADD) can be given an item containing query
+variables although this is less useful than in PRESENT, for example:
+
+    remove( ![steve kisses ??x] );
+
+will REMOVE  a fact  about Steve's  romantic habits  from the  DATABASE.
+Note that we need "!" because there is a "??" variable.
+
+Should there be several such facts (heaven forbid) then REMOVE will pick
+just one for removal. Either way,  the query variables (in this case  X)
+will be set  as appropriate.  (In case your  program needs  to know  who
+steve used to kiss before the evidence was removed.)
+
+If remove is used in a procedure definition, it is important to put "!"
+before a pattern that contains lvars variables.
+
+    remove( ![steve kisses ??x] );
+
+
+-- Remove can't remove something that isn't there ----------------------
+
+What do you suppose REMOVE  will do if the item  to be deleted isn't  in
+the database to begin with? Try it and see:
+
+    remove([ronald kisses nancy]);
+
+
+-- Summary of the database procedures ----------------------------------
+
+In summary, the four  main database procedures  are ADD, PRESENT  LOOKUP
+and REMOVE.
+
+ADD adds its argument to the database.
+
+PRESENT produces the result TRUE if,  and only if, its argument  matches
+something in the database. If it does, the item is assigned to IT.
+
+LOOKUP produces a mishap if the argument does not match anything in  the
+database. If it does match, the matching item is assigned to IT.
+
+REMOVE removes  the  first item  in  the  database found  to  match  its
+argument. The item found is assigned to IT
+
+PRESENT and REMOVE  can be given  arguments containing query  variables,
+i.e. patterns.
+
+DATABASE is a simple POP-11 variable which has as value a list.
+
+-- Using flush(<pattern>) to remove many items ------------------------
+
+If you want to remove EVERYTHING that matches a pattern, then use the
+procedure FLUSH.
+
+e.g.
+    flush([joe ==]);
+
+will remove all database items starting with the word "joe". If there
+are no such items, it does nothing. It does not produce a mishap, as
+remove would in such a case.
+
+    remove([xxx yyy]);
+    ;;; MISHAP - ATTEMPT TO REMOVE NON-EXISTENT ITEM
+    ;;; INVOLVING:  [xxx yyy]
+    ;;; FILE     :  ...teach/database   LINE NUMBER:  725
+    ;;; DOING    :  remove ....
+
+Whereas
+    flush([xxx yyy]);
+
+simply does nothing. Try it.
+
+You can remove every item in the database using
+
+    flush( [==] );
+
+That is equivalent to
+    [] -> database;
+
+(provided that your database contains only lists: there should not be
+anything else in it.)
+
+
+-- Generalising present: foreach ... endforeach
+
+The procedure flush generalises remove by removing everything that
+matches the pattern.
+
+You might wish to generalise present by doing something with every item
+that matches a pattern. You can use the "foreach" syntactic form, to do
+this. It defines a loop whose body is executed once every time the
+pattern given matches something in the database. E.g.
+
+    foreach ![?x likes ?y] do
+        ;;; print out the information in a different way
+        [^y is liked by ^x] =>
+    endforeach;
+
+See TEACH FOREACH for more on this. TEACH FOREVERY defines an even more
+powerful construct.
+
+
+-- Definitions of procedures like present and remove -------------------
+
+    (This section can be ignored on first reading)
+
+For the record,  here are the  definitions of two  procedures which  act
+very like PRESENT and  REMOVE. Different names are  used so that if  you
+try them out, you'll still be able to use the system defined procedures.
+Since an understanding of how PRESENT is defined is not essential to its
+use, there is no discussion of these two definitions.
+
+    define check(fact) -> result;
+        if database matches [== ^fact ==] then
+            true -> result;
+        else
+            false -> result;
+        endif;
+    enddefine;
+
+NB the space between "==" and "^" is ESSENTIAL. Otherwise POP-11  thinks
+you mean the list to contain the symbol "==^" because 'sign'  characters
+join up with each other just as letters do in the word "fact".
+
+In the case  of REMOVE  we need to  replace the  original database  with
+everything that  was in  it before  the 'fact'  was removed.  Here  is a
+procedure called RETRACT which works roughly like REMOVE.
+
+    define retract(fact);
+
+        ;;; declare the pattern variables
+        lvars before, after;
+        if database matches ![??before ^fact ??after] then
+            [^^before ^^after] -> database;
+        else
+            mishap([RETRACT FAILURE], [^fact]);
+        endif
+    enddefine;
+
+Notice the use of the "??" variables in the line:
+
+      if database matches ! [??before ^fact ??after] then
+
+We can't  use just  "==" as  in CHECK,  because we  want to  know  which
+elements came before the fact, and  which came after, in order to  build
+the new list (using ^^ ) which is to be the database.
+
+
+-- Revision questions --------------------------------------------------
+
+What you have read  and done so  far introduces the  basic ideas of  the
+POP-11 database. Namely it is a list of lists, which can be conveniently
+used as a memory store for a set of facts.
+
+You have met  two procedures  for changing the  database. One  procedure
+enlarges the database,  and one  deletes items from  the database.  What
+were they called?
+
+What sort of input do they take? Do they produce results (on the stack)?
+
+You have met two procedure for searching the database, one which takes a
+pattern and produces  a TRUE  or FALSE result  (on the  stack), and  one
+which takes a pattern and returns no result if a matching item is found,
+but causes  a  mishap if  no  matching item  is  found. What  are  these
+procedures called?
+
+How can you clear the database completely (i.e. make sure nothing is in
+it) ?
+
+
+-- Further reading ----------------------------------------------------
+
+HELP * DATABASE summarises the main database facilities.
+HELP * MATCHES  summarises the pattern matcher.
+
+See also Chapter 7 of the Pop-11 primer.
+
+If this teach file is your  first introduction to the database, you  may
+find it helpful to pause here and try TEACH * RIVER2.    This introduces
+you to a  collection  of  library  procedures  which  use  the  database
+to represent a simple world, and changes in the world. It also discusses
+alternative ways of representing the same information.  Often choosing a
+good way is difficult.
+
+You can then do  TEACH * FOREACH,  to find out  how to write  procedures
+which do something to each item in the database matching a pattern.
+
+TEACH * INFECT shows how to define procedures which simulate the  spread
+of infection.  This illustrates  the use  of the  database to  represent
+spreading effects.
+
+TEACH * DATATHINK shows how to define procedures which make inferences.
+
+TEACH * RIVERCHAT shows how to combine mechanisms which manipulate the
+database with a conversational "front end" using a pattern matcher.
+
+
+The section on "Prerequisites" above, refers to relevant chapters of the
+Pop11 Primer.
+
+--- C.all/teach/database --------------------------------------------------
+--- Copyright University of Sussex 1987. All rights reserved. ----------
+
+--- $poplocal/local/teach/database
+--- Copyright University of Birmingham 1999. All rights reserved. ------

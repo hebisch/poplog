@@ -1,0 +1,538 @@
+TEACH POPCORE                                    Aaron Sloman Sept 2000
+
+This is a modified version of the Sussex local file HELP TPOP, by Mike
+Sharples, and is very close to the summary of Pop-11 in the book
+Computers and Thought edited by Sharples et al. However, it is more
+up to date, and reflects local extensions at Birmingham.
+
+This file lists a powerful subset of the words and constructs of Poplog
+Pop-11 which together are sufficient for a great many interesting
+programs.
+
+Those items in the left column not enclosed in angle brackets <...> are
+Pop-11 reserved words (i.e. they have a special meaning to Pop-11).
+Words in angle brackets refer to a syntactic category. A relevant online
+help or teach file is indicated by an asterisk, e.g. * MATCHES.
+
+To read the file in VED place the cursor on the asterisk and type
+    ESC h or else do "ENTER help matches"
+    Sometimes the TEACH command will produce a different file,
+        e.g. ENTER teach matches
+
+
+CONTENTS
+
+ -- Basic data types
+ -- Comments
+ -- Variable declarations
+ -- Miscellaneous
+ -- Printing facilities
+ -- Assignments
+ -- Inserting values in lists and vectors using ("^" and "^^")
+ -- Defining procedures
+ -- Miscellaneous 2
+ -- Arithmetic operators
+ -- Logical connectives
+ -- Variable formats for the matcher
+ -- Looping expressions
+ -- Arrays
+ -- Tracing utilities
+ -- FURTHER READING
+
+ITEM        DESCRIPTION AND HELP FILE            EXAMPLE
+----        -------------------------            -------
+
+-- Basic data types
+
+<Word>      A letter followed by a series of     "cat"
+            letters or digits (including the     "a_long_word"
+            underscore). It may also be          "M1"
+            a series of signs such as $          "#$#$#$#"
+            A word is put in double quotes,
+            except within a list or vector
+            expression. *WORDS
+
+<String>    Can contain arbitrary characters.    'A funny %$%### string'
+            Constructed using single quotes.
+            Can contain "special" characters, E.g.
+            \n (newline), \t (tab) *STRINGS      '\ta tab\nand a newline'
+
+<Number>    One or more digits, with an          55
+            optional decimal point. *NUMBERS     3.14159
+                                                 4.25e10
+
+<List>      A series of text items, such as      [a b c d]
+            words, numbers, other lists, or      [1 Acacia Avenue]
+            strings, within square brackets.     ['a string' 33 cat]
+            *LISTS                               [[CAT CHAT][DOG CHIEN]]
+
+[% ... %]   Decorated list brackets can be       [% for x from 1 to 5 do
+            used with enclosed Pop-11 commands           x
+            to make a list. *PERCENT                endfor %] =>
+                                                 ** [1 2 3 4 5]
+
+<vector>    Like a list, but cannot be extended  {a four word vector}
+            and takes up less space.
+
+{% ... %}   Like decorated list brackets can     {% 3+3, 99*9 %} =>
+            contain Pop-11 commands.             ** {6 891}
+
+<record>    A kind of structure with a specific  recordclass triple
+            number of components and particular    first second third;
+            procedures for accessing and         constriple(1, 2, 3) =>
+            updating them, etc. *RECORDCLASS     ** <triple 1 2 3>
+            (Or see *defclass)
+
+-- Comments
+
+;;;         Begins a comment (text that will     ;;; This is a comment.
+            be ignored by Pop-11). The comment
+            ends at the end of the line. *COMMENT
+
+/* ... */   An alternative form of comment.      /* comments can go
+                                                    over several lines */
+
+-- Variable declarations
+
+vars        Used to declare local or global      vars x, y, z;
+            non-lexical variables. *VARS         vars num = 10;
+            (Don't use vars for local
+            variables except in a <pattern>).
+
+lvars       Used to declare local or global      lvars x, y, z;
+            lexical variables *LVARS             lvars num = 99;
+
+-- Miscellaneous
+
+;           Semi colon terminates commands.        vars a; 100 -> a;
+            I.e. separates imperatives. It is
+            a separator.
+
+<undef>     A type of object that is the         vars xxx;
+            default value for a variable that    xxx=>
+            has been declared, but not had a     ** <undef xxx>
+            value assigned to it.
+            REF * IDENT/'Undef Records'
+
+undef       This special constant refers to an   undef =>
+            item which is often used as the      ** undef
+            default value for components of a
+            new structure (e.g. an <array>).
+
+-- Printing facilities
+
+=>          Print arrow. *PRINTARROW             3 + 4 =>
+                                                 ** 7
+==>         Pretty print arrow (prints a long
+            list or vector tidily). *PRINTARROW
+
+pr          Prints an item (word, string, list,    pr(list);
+            vector, etc. without "**" or newline.  pr('The cat');
+
+ppr         Like pr, but (a) prints lists minus    ppr([[the][cat]]);
+            any list brackets, and (b) prints a    the cat
+            space after each item. *PPR
+
+spr         Like pr, but prints a following space  spr("a");spr("b");
+            *SPR                                   a b
+
+npr         Like pr, but prints a newline after    npr("a");npr("b");
+            each item. * NPR, *PRINTING            a
+                                                   b
+
+printf      For more sophisticated printing see    printf(
+            *PRINTF                                  '%p plus %p gives %p',
+                                                            [2 3 5]);
+                                                   2 plus 3 gives 5
+
+-- Assignments
+
+->          Assignment arrow. Assigns a value    vars a;
+            to a variable. TEACH * STACK         100 -> a;
+            Also invokes updaters, and is used   33 -> hd(list);
+            in defining procedures with output
+            locals. See below.                   Compare: vars a = 100;
+
+->>         Like assignment arrow, but first     hd(x) ->> a -> b;
+            duplicates object on stack, so that
+            e.g. it can be assigned twice.
+
+-- Inserting values in lists and vectors using ("^" and "^^")
+
+^           Includes the value of an expression  vars animal = "cat";
+            in a list or vector expression.      [the ^animal sat]=>
+            *ARROW                               ** [the cat sat]
+
+^^          Includes the elements of a list     vars beasts = [cat pig];
+            inside another list. *ARROW         [the ^^beasts sat] =>
+                                                ** [the cat pig sat]
+
+^  ^^       NOTE: these also work for vectors
+
+-- Defining procedures
+
+<Procedure> A 'package' of Pop-11 commands,      hd, sqrt, maplist,
+            usually with a name. May have an     *, -, subscr, etc.
+            updater *PROCEDURES *DEFINE          are all built-in
+            Some procedures are built-in some    procedures.
+            user-defined.
+
+define      Start and end of a                define perim(width,height);
+enddefine   procedure definition *DEFINE         return(2*width + 2*height)
+                                              enddefine;
+
+return      Terminates execution of the        define first_and_last(list);
+            current procedure, and returns        return(hd(list),
+            to whatever invoked it.                  last(list))
+            Analogous to "goto enddefine".     enddefine;
+            Items in brackets after return
+            are left on the stack. *RETURN
+
+->          Indicates an 'output local' in      define perim2(w,h)->result;
+            a procedure header line. An            2*w + 2*h -> result;
+            alternative to 'return' as a        enddefine;
+            way of specifying the result of
+            a procedure call. *DEFINE, *STACK
+
+-- Miscellaneous 2
+
+readline()  A Pop-11 procedure that prints a ?   readline() -> input_words;
+            and then waits for input from the
+            terminal. Any words, numbers or
+            strings typed on the line after
+            the ? are returned in a list.
+            *READLINE
+
+date()      A procedure that returns a list      date()=>
+            giving the current time and date.    ** [18 Sep 1985 11 47 16]
+            *DATE
+
+length(<item>)                                   length([the cat sat])=>
+            A procedure that returns the         ** 3
+            length of an item. *LENGTH           length("iguana")=>
+            The length of a item is the number   ** 6
+            of components it contains.
+
+<Subscript>
+            An element can be picked from a      vars sentence animal;
+            list by giving its position in       [the cat sat] -> sentence;
+            brackets after the name              sentence(2) -> animal;
+            *LISTSUMMARY
+
+oneof(<list>)                                    vars throw =
+            Returns an element picked at random      oneof([1 2 3 4 5 6]);
+            from a list. *ONEOF
+
+-- Arithmetic operators
+
++           Adds one number to another.          width+height->half_perim;
+
+*           Multiplies two numbers.              3.14159*d -> circum;
+
+/           Divides one number by another.       total/items->average;
+            Warning: dividing one integer by
+            another can give a "ratio" which     10/5, 3/4 =>
+            may print as, e.g. 3_/4              ** 2 3_/4
+
+abs         When applied to a positive or         abs(-10) =>
+            negative number returns its           ** 10
+            absolute value (always positive)
+            *ABS
+
+pop_pr_ratios                                    false -> pop_pr_ratios;
+            This Pop-11 variable controls how
+            ratios are printed. If made false    10/5, 3/4 =>
+            it makes ratios print as decimals.   ** 2 0.75
+
+//          Divides one integer by another to    10//3
+            get dividend and remainder,           -> (remainder,dividend);
+
+**          Raises one number to the power of    2**3 =>
+            another.                             ** 8
+
+>           Compares two numbers. The result is   if x > 3 then .... endif
+            true if the first is greater.
+
+>=          Compares two numbers. The result is
+            true if the first is greater or equal.
+
+<           Compares two numbers. The result is   4 < 3  =>
+            true if the first is smaller.         ** <false>
+
+<=          Compares two numbers. The result is
+            true if the first is smaller than or
+            equal to the second.
+
+(   )       Round brackets have two uses. They    (3+2)*4 =>
+            can alter the order of evaluation in  ** 20
+            expressions, or following a variable  perim(45,23) =>
+            or expression they can signify        ** 136
+            procedure invocation. Any arguments
+            to the procedure go in the brackets.
+
+true        These are constants which hold the    true =>
+false       two special boolean values <true>     ** <true>
+            and <false> used in conditionals      false =>
+            and loop termination tests. *BOOLEAN  ** <false>
+
+=           Tests whether two items are equal    if a = 100 then ...
+            *EQUAL
+            It can also be used to initalise     vars x = [1 2 3];
+            a variable;
+
+==          Tests whether items are identical   if a == [cat] then ...
+
+/=          Tests whether two items are unequal. a /= b
+            (Looks inside structures) * EQUAL
+
+/==         Tests whether two items are not      a /== "cat"
+            identical.
+            (Does not look inside structures)
+
+
+-- Logical connectives
+(E.g. for use in conditionals)
+
+and         Forms the 'conjunction' of two       if x > 0 and x < 100 then
+            boolean expressions. *AND
+
+or          Forms the 'disjunction' of two       word="cat" or word="puss"
+            boolean expressions. *OR
+
+not         Negates a boolean expression.      not(list matches [== cat ==])
+            *NOT
+
+if          Marks the start of an 'if'           if english == "cat" then
+            conditional. *IF                        "chat"=>
+                                                 endif;
+then        Ends the condition part of an 'if'
+            conditional. *THEN (Also used with
+            "unless")
+
+elseif      Begins a second (or subsequent)      if english == "cat" then
+            condition in an 'if' statement.        "chat" =>
+            *ELSEIF                              elseif english == "dog" then
+                                                   "chien" =>
+else        Marks the beginning of the           else
+            "default" course of action in          [I dont know] =>
+            a conditional. *ELSE                 endif;
+
+endif       Marks the end of a conditional.
+            *ENDIF
+
+-- Variable formats for the matcher
+matches     Compares a list with a pattern.      vars sentence;
+            It returns true if they match,       [the cat sat] -> sentence;
+            false otherwise. It will also        sentence matches [= cat =] =>
+            "bind" variables in the pattern,     ** <true>
+            if there are any. *MATCHES
+
+=           Matches one item inside a list       mylist matches [= cat sat]
+            pattern.
+
+==          Matches zero or more items inside    mylist matches [== cat ==]
+            a pattern.
+
+?<variable> Matches one item inside a list       mylist matches [?first ==]
+            pattern and makes that the value
+            of the variable. *MATCHES
+
+??<variable>                                     alist matches
+            Matches zero or more items within         [?first ??rest] =>
+            a list pattern and makes the list
+            of matched items the value of the    ** <true>
+            variable. *MATCHES
+
+!           Use in front of a pattern to make    mylist matches
+            the variables lvars                    ![?first ??rest] =>
+
+database    A Pop-11 variable whose value is     database ==>
+            the database, a list of lists,
+            used with add, remove, present, etc.
+            *DATABASE
+
+add(<list>)                                      add([john loves mary]);
+            Puts an item into the database.
+            *ADD
+
+remove(<pattern>)                                remove([john loves =]);
+            Removes the first item matching
+            the pattern from the database.
+            *REMOVE
+
+flush(<pattern>)                                 flush([== loves ==]);
+            Removes all items matching the
+            pattern from the database.
+            *FLUSH
+
+present(<pattern>)                              if present([?x loves mary])
+            Searches the database for an        then
+            item  matching the database and        x=>
+            returns true if it is found,        endif;
+            false otherwise. Binds variables
+            in the pattern. *PRESENT
+
+allpresent(<list of patterns>)                if allpresent(
+            Searches the database for items     [[?x loves ?y]
+            that consistently match all the         [?y loves ?z]])
+            patterns, and returns true if     then
+            this succeeds and false otherwise    [Triangle ^x ^y ^z] =>
+            Binds variables in the pattern.   endif;
+            *ALLPRESENT
+
+
+it          A variable that is set by 'add',    if present([?x loves mary])
+            'remove', 'present' and 'foreach'.  then
+            Its value is the last item found        it=>
+            in the database. *IT                endif;
+
+
+-- Looping expressions
+
+repeat      Marks the start of a repeat loop.    repeat
+            *REPEAT                                readline()->line;
+                                                   quitif(line /== []);
+endrepeat   Marks the end of a repeat loop.      endrepeat;
+            *ENDREPEAT
+
+times       Indicates the number of times a      repeat 4 times;
+            repeat loop is to be repeated (If    "."=>
+            it is omitted then looping is        endrepeat;
+            forever, unless halted by quitif).
+            *TIMES
+
+quitif(<expression>)                             vars n = 2;
+            If the expression is true then       repeat;
+            quit the loop. This example and        quitif(n > 1000);
+            the one using the while loop           n =>
+            below are equivalent (ie they          n*n -> n;
+            give the same result). *QUITIF       endrepeat;
+
+while       Marks the start of a while loop.     vars n = 2;
+            *WHILE                               while n <= 1000 do
+                                                    n =>
+do          Ends the condition part of a            n*n -> n;
+            'while', 'for', or 'foreach' loop.   endwhile;
+            *DO
+
+endwhile    Marks the end of a while loop.
+            *ENDWHILE
+
+for         Marks the start of a for loop.       for x in [paris london] do
+            *FOR                                   [^x is a city]=>
+                                                 endfor;
+endfor      Marks the end of a for loop.
+            *ENDFOR
+            Note: there are many different forms
+            of for ... endfor loops.
+            See *LOOPS, *FOR.
+
+foreach     Marks the start of a foreach loop,   vars x y;
+            which matches a pattern against      foreach [?x loves ?y] do
+            each item in the database. *FOREACH     it=>
+                                                 endforeach;
+endforeach  Marks the end of a foreach.
+            *FOREACH
+
+forevery    Like foreach, but takes a list of    forevery
+            patterns and tries all possible         [[?x ison ?y]
+            ways of matching them all                [?y ison ?z]]
+            consistently with items in the       do
+            database. *FOREVERY                      them =>
+                                                     [^x is above ^z] =>
+endforevery Syntax word used at the end of       endforevery;
+            a "foreach" loop.
+
+-- Arrays
+
+<array>     A compound data object with N dimensions
+            whose components can be accessed or
+            updated using N numerical subscripts.
+            *ARRAYS
+
+newarray    The simplest procedure to create a    vars ten_by_seven =
+            Pop-11 array. * NEWARRAY                 newarray(
+                                                          [1 10 -3 3]);
+
+boundslist  When applied to an array returns a    boundslist(
+            list containing for each dimension        ten_by_seven) =>
+            the upper and lower bounds.           ** [1 10 -3 3]
+
+
+-- Tracing utilities
+
+trace <names of procedures>                       trace add first_and_last;
+            A command that alters procedures so
+            they print out helpful information.
+            (NB. You can trace built-in
+            procedures like 'hd' and 'tl'). *TRACE
+
+untrace <names of procedures>                    untrace add first_and_last;
+            A command that switches off tracing
+            of the named procedures. *TRACE
+
+untraceall  Switches off any traces.*UNTRACEALL   untraceall;
+
+See also *INSPECT and *DEBUGGER
+
+
+-- FURTHER READING
+See:
+
+The Pop-11 Primer, by A.Sloman, available online as TEACH PRIMER
+and also available in hard copy from the School of Computer Science
+Library.
+
+TEACH * FACES,  * GSTART,  * USEFULKEYS
+
+TEACH *LISTS, *LISTSUMMARY,
+
+TEACH *BOXES *POPSUMMARY, *DEFINE, *STACK, *VARS
+
+TEACH * DATABASE, * FOREACH
+
+HELP * WORDS, *LISTS, *MATH, *LOOPS, *CONTROL, *ARRAYS, *STRINGS
+
+HELP * MATCHES, *PRINT, *TRACE, *RECURSION
+
+TEACH * RECURSION, * SETS, * SETS2, * FUNCTIONAL.STYLE
+
+
+M. Sharples, et al.
+Computers and Thought,
+MIT Press, 1989
+    (This is an introduction to cognitive science using Pop-11
+    programming examples as illustrations.)
+
+James Anderson(ed)
+Pop-11 Comes of Age
+Ellis Horwood, 1989
+A collection of papers on the history of dialects of Pop, the
+features and benefits of the language, and some applications using
+Pop-11.
+
+Chris Thornton & Benedict du Boulay (1992)
+ Artificial Intelligence Through Search
+ Kluwer Academic (Paperback version Intellect Books)
+ (An introduction to AI using Pop-11 and Prolog. A good
+ way to learn Prolog if you know Pop-11 or vice versa.)
+
+
+WARNING: books published before 1995 are likely to have out of
+date information about Pop-11, though the core ideas are unchanged.
+
+In the Poplog system there is a large collection of REF files
+giving definitive information about Pop-11. These files are mostly
+useful for experts, but occasionally you'll find that information you
+need is available nowhere else.
+
+The pop-forum email list and comp.lang.pop internet news group are also
+useful sources of information. There is a lot of pop-11 material
+available by ftp from the Birmingham Poplog directory
+
+    http://www.cs.bham.ac.uk/research/poplog/freepoplog.html
+
+There is a version of Poplog (including Pop-11) for a PC running linux.
+
+--- $poplocal/local/teach/popcore
+--- Copyright University of Birmingham 2000. All rights reserved. ------

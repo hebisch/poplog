@@ -1,0 +1,1445 @@
+TEACH SETS                                 Revised Aaron Sloman Nov 1989
+                                               Slightly revised Oct 2001
+
+             An INTRODUCTION TO SET MANIPULATION USING LISTS
+             ===============================================
+
+CONTENTS
+
+ -- Introduction
+ -- Differences between lists and sets
+ -- Prerequisites for this teach file
+ -- A first example
+ -- Checking whether a person has a property
+ -- Defining iselement with a "for" loop
+ -- Re-doing iselement as a recursive program
+ -- Using the matcher to define iselement recursively
+ -- How to do it
+ -- Words need to be quoted to refer to themselves
+ -- Defining the procedure ismale
+ -- A procedure to test for two properties: happyman
+ -- Finding an item with a property
+ -- Using valof
+ -- A schema for FINDONE
+ -- How to specify a procedure
+ -- Specifying internal and external semantics
+ -- Using ENTER procheader
+ -- Specifying FINDONE
+ -- FINDALL
+ -- Digression: findintegers
+ -- Now let's return to findall
+ -- A schema for FINDALL
+ -- If you need help
+ -- It still doesn't work?
+ -- A set of properties: findset
+ -- Help with recursive issubset
+ -- Some advice on testing
+ -- Returning to FINDSET
+ -- If you needed help
+ -- A different findset
+ -- Further reading
+
+-- Introduction -------------------------------------------------------
+
+One common use of a  list is to represent a  set of objects. It is  then
+possible to  write programs  that  perform operations  on the  list,  to
+represent operations on  the set  represented. The empty  list []  would
+then represent the empty set. Sets of sets are then represented as lists
+of lists, and operations  on sets of  sets can also  then be defined  as
+operations on lists.
+
+For example, the following are common operations on objects (represented
+here as O1, O2, O3, ....) and sets represented here as S1, S2, S3, ...):
+
+(1) Test whether O1 is a member of the set S1
+
+(2) Test whether the set S1 is a subset of the set S2
+
+(3) Given an object O1 and a set S1, containing O1, create set S2
+containing all the elements of S1 except O1
+
+(4) Given two sets S1 and S2, create the "union" set S3, containing
+all the elements that are EITHER in S1 or S2 (or both).
+
+(5) Given two sets S1 and S2 create the "intersection" set S3,
+containing all the elements that are in BOTH S1 and S2.
+
+(6) Generalize (4) and (5) as follows: given S, a set containing sets
+S1, S2, S3 ... Sn as its elements, create the union of all of S1 to Sn
+or the intersection of all of S1 to Sn.
+
+(7) Given two sets S1 and S2, create the "difference" set S3, such that
+S3 contains all the objects in S1 that are not in S2
+
+(8) Given an object O1 and a set S containing sets S1, S2,... Sn, create
+a new set of sets containing all and only the sets that contain O1.
+
+(9) Define a predicate (a procedure returning a boolean --- true or false
+--- result) which tests whether O is a member of S.
+
+(10) Define a predicate which tests whether S1 is a subset of S2.
+
+(11) Define a predicate which tests whether S1 intersects S2, i.e.
+whether they have any elements in common (so that their intersection is
+not the empty set).
+
+(12) Define a predicate which tests whether S1 and S2 are the same set,
+i.e. contain exactly the same elements (not necessarily represented in
+the same order in the lists representing the sets).
+
+(13) Given a set S1 and a predicate P create a set S2 containing all the
+elements of S1 that satisfy the predicate P (i.e. the set of all the
+objects such that P returns true when applied to them).
+
+(14) Given a set S and a predicate P, define a new predicate that
+returns true if and only if every object in S satisfies P.
+
+(15) Given a set S and a predicate P define a new predicate that returns
+true if at least ONE object in S satisfies P, and false if none do.
+
+(16) Given a set S and a predicate P define a counting procedure that
+returns an integer N such that N is the number of objects in S that
+satisfy the predicate P.
+
+(17) Given a set S some of whose elements are sets, and some of them
+have elements as sets, and some of those sets have elements of sets,
+i.e. so that sets can occur to arbitrary depth, create a new set
+containing all the "atomic objects" (i.e. the non-sets) that are either
+in S or in one of the elements of S or one of the elements of the
+elements of S or .... (In short if we think of S as a tree of sets,
+create the set of the "leaves" or "tips" of the tree, sometimes called
+its "fringe".
+
+These are just illustrations of operations on sets that are often  found
+to be useful. There are many more. You could try to extend this list.
+
+AI programming languages often provide built-in or library procedures
+that perform these tasks. However, it often turns out that a particular
+operation that you require is not available, so it is useful to develop
+the techniques required for building procedures to perform such
+operations on sets. This will also help to develop general programming
+techniques. The exercises in this teach file, in TEACH SETS2 and in
+TEACH LISTQUESTIONS are designed to help you develop these techniques.
+
+
+-- Differences between lists and sets ---------------------------------
+
+Notice that lists are not exactly like sets: for example the items in a
+list have an order, whereas sets are just collections of things without
+any particular order. Further, lists may have repeated elements, as in
+
+    [Fred John Mary Fred Sue]
+
+whereas sets contain each item only once. For these reasons the use of
+lists to represent sets requires some care. For example you can't simply
+form the union of two sets S1 and S2 (i.e. the set containing everything
+that is in at least one of S1 and S2) simply by concatenating the
+corresponding two lists, for that could produce repeated elements, as in
+
+    [Tom Dick Sue] <> [Dick Mary Joe] =>
+    ** [Tom Dick Sue Dick Mary Joe]
+
+Similarly, because the order of elements is immaterial in sets, the
+two lists
+
+    [Tom Dick Sue]   [Sue Tom Dick]
+
+would represent the same set. So you cannot use the equality tester
+"=" or the match operator "matches" to test for whether two sets are
+the same.
+
+    [Tom Dick Sue] = [Sue Tom Dick] =>
+    ** <false>
+
+
+-- Prerequisites for this teach file ----------------------------------
+
+Before trying these exercises,  you should be fluent  in the use of  the
+editor and know how to mark ranges in files in order to copy them,  load
+them etc (TEACH  * MARK, TEACH  * LMR). It  will also be  useful if  you
+worked through the following:
+
+TEACH * RESPOND teaches the use of conditionals.
+
+TEACH * LISTS, * DEFINE, * VARS, * MATCHES, * ARROW,
+The section on lists in TEACH * PERCENT.
+
+TEACH * ARITH       introduces some "loop" instructions
+TEACH * RECURSE1    introduces recursion
+
+You may also find that TEACH * STACK is useful.
+
+
+-- A first example ----------------------------------------------------
+
+Suppose we want to store  information about several people,  declaring a
+variable for each person, and then  assigning a list of descriptions  to
+that variable.
+
+E.g. if John is male, happy, single, a clerk and tall, then we could do
+the following.
+
+    vars john;
+    [male happy single clerk tall] -> john;
+
+and similar things for other people. We could then have a list called
+"people" with the names of all the people, e.g.
+
+    vars people;
+    [john ethel mary fred] -> people;
+
+You could declare variables and  construct suitable lists of  properties
+for the other people. (For now, let's not worry about whether this  is a
+GOOD  way  to  represent  information  about  people.  Choosing  a  good
+representation for a particular task is often very difficult, and  there
+are very many different ways the same information can be represented  in
+a computer.)
+
+We now have  the following situation:  the variable "people"  contains a
+list of names of people, and for each person the name is also a variable
+containing a  list  of  properties  of that  person.  For  example,  The
+variable "john" represents information about about John. We should now
+be able to write programs to examine those lists, in order to answer
+questions, for example:
+
+    Does John have the property "tall" ?
+    Does Ethel have the properties "rich" and "clever"?
+    Does Fred have either the property "rich" or the property "clever"?
+
+Additional tasks that  you might require  a program to perform would  be
+such things as "find all the people  who are tall" (i.e. make a list  of
+their names), or "find all  the people who are  tall and either rich  or
+happy".
+
+Try thinking about how these tasks break down into sub-tasks. This  will
+help you anticipate some of the  problems discussed in the rest of  this
+file.
+
+-- Checking whether a person has a property ---------------------------
+
+How can a program check whether a person has a property (using the above
+representation of properties)?
+
+We see immediately from the list  assigned to "john" that John is  tall,
+but that it is not  known whether he is fat.  How? When asked, a  person
+might say  something like  the  following: "Well  I  look at  the  list,
+starting at the left  hand end and  going along the  list to the  right,
+until I come across  the appropriate word.  If I get to  the end of  the
+list before finding the word, I know the property isn't in the list."
+
+Pop-11 includes a built in procedure member, that can be used to perform
+this test (try it):
+
+    member("tall", john) =>
+    ** <true>
+    member("fat", john) =>
+    ** <false>
+
+For now, suppose the procedure member  did not exist, and you  therefore
+had to define a procedure  called "iselement" that behaved like  member.
+How would you do it?
+
+-- Defining iselement with a "for" loop -------------------------------
+
+One easy way  is to use  the built-in "for"  loop mechanism that  Pop-11
+provides, that enables you to use the format
+
+    for <variable> in <list> do <actions> endfor;
+
+So you could define a procedure called iselement thus
+
+    define iselement(item, list) -> result;
+        ;;; take in one item, and a list, and return a truth value,
+        ;;; true if the item is in the list, otherwise false.
+
+        lvars element;
+
+        for element in list do
+            if element = item then
+                ;;; found it
+                true -> result;
+                return();           ;;; leave the procedure now
+            endif;
+        endfor;
+
+        ;;; failed to find the item in the list so
+        false -> result;
+    enddefine;
+
+(Not all  the  semi-colons  are essential  -  those  immediately  before
+closing brackets like "endif", "endfor" and "enddefine" can be omitted.)
+
+Type that in and test it with various combinations of arguments:
+
+    iselement(3, [1 2 3 4]) =>
+    iselement(3, [1 2 3]) =>
+    iselement(1, [1 2 3 4]) =>
+    iselement(3, []) =>          ;;; always check the "empty list case
+
+    vars john;
+    [male happy single clerk tall] -> john;
+    iselement("tall", john) =>
+
+
+-- Re-doing iselement as a recursive program --------------------------
+
+Now consider  how you  might  have written  the procedure  iselement  if
+Pop-11 had not contained any  looping constructs, like "for ...  endfor"
+or "while .... endwhile", "until ... enduntil" etc.
+
+We are going to  assume that "if" is  available (as introduced in  TEACH
+RESPOND), and that procedures can be  defined and "called", not only  by
+other procedures,  but also  by themselves.  We'll see  that, as  if  by
+magic, the procedure iselement can call itself, in order to get the same
+effect as a looping instruction.  This is called "recursion". Later  you
+will learn that recursion is useful  in some cases where loops would  be
+very clumsy.
+
+Before  proceeding you  must  know  about  output  local  variables  (as
+explained in TEACH DEFINE). You  will also need to  know how to use  the
+procedure HD to  get the  first element  of a list,  and TL  to get  the
+"tail" i.e. a list composed of  all but the first element, as  explained
+in TEACH LISTS. Thus, if "list" is a variable whose value is a list, and
+"item" is another variable,  whose value is anything  (e.g. a word)  the
+expression
+
+    item = hd(list)
+
+is a "boolean" (i.e. true or false) expression that will be true if  the
+first element  of list  is  the same  thing  as item,  otherwise  false.
+(Experienced programmers may  like to look  at HELP *  EQUAL to see  how
+POP-11 deals with different kinds of equality.)
+
+Using these ideas, let's  work up to a  new definition of the  procedure
+iselement.
+
+Imagine the procedure iselement is running  and that it has input  local
+variables item and list, and an output local variable called result, and
+the input variables have been given values thus:
+
+    vars item, list;
+    3 -> item;
+    [1 2 3 4] -> list;
+
+How can  we check  if item  is in  the list?  We can  first see  if  the
+following is true
+
+    item = hd(list)
+
+is it?
+
+If it is true, then all the  procedure iselement has to do is to  assign
+true to its output local variable, and then stop.
+
+Otherwise, if it isn't true, then it can do the same test on the tail of
+the list, i.e.
+
+    item = hd(tl(list))
+
+If that is true it  can assign true to result  and stop. If not then  it
+has to check the next thing in the list
+
+    item = hd(tl(tl(list)))
+
+But how many times will it have to do this? Without knowing the lengths
+of the lists we can't tell. And if we want the procedure to work on
+lists of ANY length, then we need some way of going on indefinitely.
+
+Now, if the  procedure we  are defining  already has  an instruction  to
+compare item  with  hd(list)  (as above),  then  instead  of  explicitly
+looking at the head  of the tail of  the list and then  the head of  the
+tail of the tail, etc, it can just call itself "recursively". There's
+the magic (until you get used to it).
+
+Thus we can come up with the following schema (which has a bug, but will
+work in some cases):
+
+    define iselement(item, list) -> result;
+
+        if item = hd(list) then
+            true -> result;
+        elseif iselement(item, tl(list)) then
+            ;;; the item was found (somewhere) in the recursive call, so
+            true -> result;
+        endif;
+
+    enddefine;
+
+Try  defining  that.  Notice  that  the  embedded  (recursive)  call  of
+iselement has to take TWO arguments, because iselement is being  defined
+as a procedure that takes two arguments. Notice also that the  recursive
+call can succeed (produce TRUE) not  just because the very next  element
+in the list matches item, but because a later one did.
+
+It should already be clear that something is wrong, because there is  no
+case in which FALSE is assigned to the result.
+
+Nevertheless, you can compile that procedure then test it:
+
+    iselement(3, [1 2 3 4]) =>
+    iselement(3, [1 3]) =>
+
+So far so good. You can even see how it works if you trace the procedure
+and redo those commands.
+
+    trace iselement;
+    iselement(3, [1 2 3 4]) =>
+etc.
+
+But suppose you search for something that isn't in the list - what
+happens?
+
+    iselement(99, [1 2 3]) =>
+
+    > iselement 99 [1 2 3]
+    !> iselement 99 [2 3]
+    !!> iselement 99 [3]
+    !!!> iselement 99 []
+
+    ;;; MISHAP - NON-EMPTY LIST NEEDED
+    ;;; INVOLVING:  []
+    ;;; DOING    :  hd iselement iselement iselement iselement ...
+
+When iselement failed to find  99 at the head  of the original list,  it
+went into recursion and tried on the tail. So it then failed to find  it
+at the head of that, and recursed again. Eventually it tried to  compare
+99 with the head of  the empty list.
+
+But hd([])  produced  an error  (see  TEACH LISTS).  And  the  procedure
+aborted.
+
+Clearly the  procedure  iselement  has  to be  able  to  cope  with  the
+"terminating" case when it gets the empty list as its second argument.
+
+You might think that all  you need is to add  an extra "else" clause  to
+deal with the case where list is the empty list, thus:
+
+    define iselement(item, list) -> result;
+
+        if item = hd(list) then
+            true -> result;
+        elseif iselement(item, tl(list)) then
+            true -> result;
+        else
+            false -> result;
+        endif;
+
+    enddefine;
+
+You can try that  and test it  on the same examples  as before, and  you
+will find that it  still eventually produces an  error when the item  is
+not in the list, because it eventually  gets down to the empty list  and
+tries to take the hd of the list.
+
+I.e. the "else" clause comes  TOO LATE in the  procedure - at least  too
+late to handle  the empty list,  because the error  produced by  testing
+hd([]) has already occurred.
+
+It is possible to get round this using the matcher, which doesn't
+produce an error, but can do the test.
+
+
+-- Using the matcher to define iselement recursively ------------------
+
+Instead of
+
+        if item = hd(list) then
+
+we can do
+
+        if list matches [^item ==] then
+
+This condition is true if the list starts with item, no matter what
+comes after it, even if nothing comes after it.
+
+This is a bit wasteful,  as we have to  build a pattern containing  item
+every time, in order to do the comparison, but never mind that for now.
+
+Try the following and test it:
+
+    define iselement(item, list) -> result;
+
+        lvars item, list, result;
+
+        if list matches [^item ==] then
+            true -> result;
+        elseif iselement(item, tl(list)) then
+            true -> result;
+        else
+            false -> result;
+        endif;
+
+    enddefine;
+
+If you try  that you  will now  find that  instead of  getting an  error
+message from hd saying  NON-EMPTY LIST NEEDED you  will get it from  tl,
+because of the line containing tl(list).
+
+You could overcome that problem by again using the pattern matcher
+and using an extra variable to dig out the tail of the list, thus
+
+    define iselement(item, list) -> result;
+
+        lvars rest;  ;;; new variable for tail of list
+
+        if list matches [^item ==] then
+            true -> result;
+        elseif list matches ![= ??rest] and iselement(item, rest) then
+            true -> result;
+        else
+            false -> result;
+        endif;
+
+    enddefine;
+
+Notice the use of "and" to join two conditions to form a more complex
+condition.
+
+Now test it as before
+
+    iselement(99, [1 2 3]) =>
+    iselement(3, [1 2 3 4]) =>
+    iselement(3, []) =>
+    iselement("tall", john) =>
+    iselement("fat", john) =>
+
+It works, but  it's pretty  clumsy. It  needs the  extra local  variable
+(rest) for the second call of the matcher and we have to make a  special
+list containing the item for the first test.
+
+We can avoid all that if instead of starting by testing the head or  the
+tail of the list, we check whether it has a head or tail. I.e. FIRST see
+if the  list  is empty.  If  it is  empty,  what should  the  result  of
+iselement be?
+
+-- How to do it -------------------------------------------------------
+
+Try completing the following schema.
+
+     define iselement(item, list) -> result;
+       if  <the list is empty> then
+            false -> result;
+       elseif  <the item is the first element of the list> then
+            true -> result;
+       else
+            <use ISELEMENT to search for the item in the TL of the
+            list and assign the outcome to RESULT>
+       endif
+     enddefine;
+
+So, at each  stage of the  process there are  three options, either  the
+list is empty, or the  item is the first element  of the list, or it  is
+not and  we have  to try  the tail!  The above  schema represents  these
+options, using the IF statement.
+
+By putting the test for the empty  list near the beginning we make  sure
+that if it IS empty, the procedure stops and does not try testing the hd
+or the tl of the list.
+
+That is one of many possible schemas for the required procedure.
+
+If you have managed to define a procedure, test it:
+    iselement(3, [ 1 2 3 4])=>
+    iselement("tall", john) =>
+    iselement("fat", john) =>
+
+These tests should each produce **<true> or **<false>
+
+If  you  did  not   manage  to  complete   that  schema  for   iselement
+successfully, look at TEACH SETS1.
+
+If you find the example hard to follow you could try TEACH RECURSION for
+some more examples and explanation.
+
+-- Words need to be quoted to refer to themselves ---------------------
+
+The list john included the word "single". So try this
+
+     john=>
+
+     iselement(single, john) =>
+
+You will find that Pop-11 declares "single" as a variable, gives it an
+"undef object" as a value, and then iselement fails to find the undef
+object in the list john. So its result is false.
+
+In order to get the desired effect, i.e. searching for the word "single"
+itself in the list, rather than its value as a variable, you have to
+enclose it in double quots (i.e. WORD quotes, not string quotes):
+
+     iselement("single", john) =>
+
+It should now work.
+
+Can you explain why
+     iselement("single","john") =>
+
+does not work? If not, ask for help. The difference between a word and a
+list is crucial.
+
+Compare
+     iselement("single", valof("john")) =>
+
+That works, because, if "john" is the name of a variable, then
+    valof("john")
+and
+    john
+
+are equivalent Pop-11 expressions denoting the value of the variable.
+(Actually, if you use sections later on you will find that they are not
+equivalent in all contexts.)
+
+Try experimenting with ISELEMENT,  creating several more variables  like
+"john" and checking that the ISELEMENT process does in fact work. E.g.
+
+    vars mary;
+    [female happy married teacher thin tall] -> mary;
+
+    iselement("male", mary) =>
+
+-- Defining the procedure ismale --------------------------------------
+
+If your program frequently needs to check whether something has the
+property male, then you can define a procedure called "ismale" to
+do this:
+
+    define ismale(person) -> result;
+        ;;; Person is a list of words. Return true if the
+        ;;; list contains "male" otherwise return false.
+
+        iselement("male", person) -> result;
+
+    enddefine;
+
+Test it:
+
+    ismale(john) =>
+    ismale(mary) =>
+
+Define a similar procedure called "ishappy" which takes a list of words
+as input and returns true if the list contains "happy" otherwise false.
+
+-- A procedure to test for two properties: happyman -------------------
+
+Try writing a procedure called HAPPYMAN which takes a single argument, a
+list, and returns  TRUE if  that list represents  a happy  man. I.e.  it
+should test for whether the list  contains both "happy" and "male".  The
+easiest method is to use the two procedures ismale and ishappy,  defined
+in terms of iselement.
+
+You could also try defining it directly in terms of iselement. Either
+way the following schema should work:
+
+    define happyman(list) -> result;
+
+       if  <list represents a male> then
+            if <list represents a happy thing> then
+                true -> result
+            else
+                false -> result
+            endif
+        else
+            false -> result
+        endif
+
+    enddefine
+
+Test your procedure:
+
+     happyman(john)=>
+     happyman([ male old hungry])=>
+     happyman(mary) =>
+
+
+Some questions:
+
+(a) Why did the above schema need TWO "else"s.
+
+(b) The nested IF ... ENDIF expression does a test, and if it is
+    true assigns true to result and if it is false, assigns false
+    to result. Can it be written so that it achieves the same thing
+    without using IF at all?
+
+(c) Can you write the whole procedure without using IF at all. Just
+    use "and", and assign the result of "and" to result?
+
+    Use the fact that if <E1> is an expression and <E2> is an
+    expression, then
+        <E1> and <E2>
+    is also an expression with a result that is FALSE if both <E1> and
+    <E2> have the value false, otherwise it has the same value as <E2>.
+    So you can use imperatives of the form
+
+        <E1> and <E2> -> result;
+
+(If <E1> is false, the whole thing is false without <E2> being
+evaluated. This is often useful for preventing an error that
+will occur if the preconditions of <E2> are not satisfied.)
+
+("OR" is another useful infix "boolean" operator.
+    See HELP * AND, HELP * OR, HELP * BOOLEAN)
+
+
+-- Finding an item with a property ------------------------------------
+
+Suppose we had a list of people thus:
+
+    vars people;
+
+    [john ethel mary fred] -> people;
+
+    vars john, ethel, mary, fred;
+
+    [male happy single clerk tall] -> john;
+    [female unhappy single prime_minister ] -> ethel;
+    [female happy married teacher thin tall] -> mary;
+    [male small typist old] -> fred;
+
+where each element of the list of people has been declared as an
+ordinary variable and assigned a list representing the person. A
+question one might want to ask is "do you know of a happy person?" or
+"do you know of a clerk?". The answer should be either the name of the
+person or FALSE.
+
+More precisely, suppose we want to define a procedure called "findone"
+that takes a word, representing a property, and a list of names of
+people, and then returns true or false, thus:
+
+    findone("male", people) =>
+    ** john
+    findone("old", people) =>
+    ** fred
+    findone("female", [john fred]) =>
+    ** false
+
+The procedure findone  must look at  each item in  the list (its  second
+argument), and can use iselement to see  if the property name is in  the
+corresponding list of properties. But how does it get the  corresponding
+list of properties?
+
+The items in the list are WORDS, and there are lists of properties
+corresponding to them as their VALUES. To deal with this you need to
+know about the built in Pop-11 procedure "valof", which, when given a
+word that has been declared as a variable, returns its value.
+
+-- Using valof --------------------------------------------------------
+
+Assuming that the above declarations and assignments have been compiled,
+try the following:
+
+     "john" =>
+     john =>
+     valof("john") =>
+     valof(john) =>
+
+It should be clear that the second and third of these have the same
+effect. Now consider
+
+    vars item;
+    "john" -> item;
+
+What will the following print? (Try to work it out before trying):
+
+    item =>
+    valof(item) =>
+    valof("item") =>
+
+VALOF produces an error if you apply it to anything but a word. Now  try
+all these:
+
+     vars list;
+     [john ethel] -> list;
+     "list" =>
+     list =>
+     valof("list") =>
+     hd(list) =>
+     valof(hd(list)) =>
+     valof(list) =>
+
+If you are not  thoroughly confused, you should  now have the  following
+model (remembering  that  inside list  brackets  words are  quoted,  not
+replaced by  their values  -- unless  you  use "^"  or "^^"  or  percent
+signs):
+
+"list"
+  |
+  +--valof--->[john  ethel]
+                 |     |
+                 |     +-valof-->[female unhappy single prime_minister]
+                 |
+                 +-valof-->[male happy single clerk tall]
+
+The list called -people- can be thought of in the same way, except that
+it would require a bigger diagram.
+
+Thus if our procedure findone is to search down a list of words naming
+people, then test for the corresponding property, it has to use valof on
+each name to get at the list of properties.
+
+-- A schema for FINDONE -----------------------------------------------
+
+Although findone could be defined using "for ... endfor" like the  first
+version of  "iselement" above,  it is  a useful  exercise to  try  using
+recursion.
+
+Below is  a schema  for findone.
+
+You should be able to use the procedure iselement defined above, in  the
+ELSEIF line. You will also have to use valof(hd(list)). Don't be worried
+by the fact both iselement and findone both use a local variable "list".
+Because it is  local in  both cases,  the two  uses of  "list" will  not
+interact. Each procedure  effectively has its  own "private" version  of
+the variable.
+
+Try completing this schema:
+
+    define findone(prop, list) -> result;
+       if  <no more in the list> then
+            false -> result
+       elseif  <valof first element has property> then
+            <first element> -> result
+       else
+            findone(prop, tl(list) -> result
+       endif
+     enddefine;
+
+
+-- How to specify a procedure ------------------------------------------
+
+In thinking about designing a procedure like FINDONE you have to  have a
+very clear idea of  what you are trying  to do. Produce a  specification
+for the procedure before you try writing any Pop-11 code.
+
+The specification for a procedure should contain the following items,
+each set out with its own sub-heading, for clarity.
+
+(a) A specification of the type(s) of arguments (if any), e.g.
+    "it takes a list of words and an integer"
+    "it takes a list (of anything) and a procedure of one
+     argument producing an integer as a result"
+     etc.
+
+(b) A specification of the type(s) of outputs (if any) e.g.
+    "it produces a list of integers"
+    "it produces either false or an integer"
+    "it produces two results, a list and a boolean (true or false)"
+    etc.
+
+NB the  specification  of types  of  inputs  and outpus  should  not  be
+concerned with what they look like  when typed in or printed out.  (E.g.
+it is not relevant  to talk about commas  and spaces and list  brackets:
+these are not  objects that will  be in the  machine when the  procedure
+runs). So the  arguments should be  specified in terms  of the kinds  of
+objects (integers, words, lists, lists of  lists, etc) that will be  put
+on the stack as input(s) for the procedure, and similarly the outputs.
+
+In specifying the TYPES of inputs and outputs you don't say how the
+output is derived from the input. That comes in the next section when
+you say WHAT the procedure does.
+
+(c) A description of WHAT the procedure does - without saying HOW it
+    does it. This should say how the results are related to the input,
+    without describing the method by which the results are produced.
+
+    This section should also include a specification of any side-effects
+    the procedure may produce (i.e. effects it has other than taking
+    arguments off the stack or putting results on the stack.
+
+    Side-effects could include reading something from the terminal,
+    printing something to the terminal, changing a file, changing the
+    value of a global variable, such as "database") - though in general
+    changing global variables is something to be avoided if possible,
+    as it can lead to obscure errors.
+
+(d) Some typical test cases, with an indication of what the procedure
+    does with them (not how it does it). The test cases should include
+    "limiting" or "extreme" test cases, e.g. empty lists as input, lists
+    of only one argument, lists where the item searched for is at the
+    beginning, lists where it is at the end, lists that don't contain
+    what is searched for, etc. Selecting a good range of test cases is
+    not always easy, but is crucial to good design. The test cases can
+    be described using simulated program executions, e.g.
+
+    iselement(99, []) =>
+    ** <false>
+    iselement(99, [99]) =>
+    ** <true>
+    iselement(99, [a b 3 4 c d]) =>
+    ** <false>
+    iselement(99, [a b 96 c 97 d 99]) =>
+    ** <true>
+    iselement(99, [a [99] b]) =>
+    ** <false>
+
+    and so on.
+
+(e)  When  you  have  specified  all  that  you  can  begin  to  write a
+description of  HOW the  procedure  should work  in  order to  meet  its
+specification. E.g.
+
+    iselement takes a word W and a list L and it searches down the
+    list checking to see if any item in the list is the same as W.
+    If it finds such an item it terminates the search and returns
+    TRUE as its result. If it gets to the end of L without finding
+    W it returns FALSE as its result.
+
+Notice  that  the  specification  does   not  say  anything  about   the
+programming language used, it does not include any bits of code, and  it
+is written using concepts that should  be clear to someone who does  not
+know the programming language.
+
+
+-- Specifying internal and external semantics -------------------------
+
+In chapter 2 of the Pop-11 Primer (TEACH PRIMER, also accessible online
+as
+    http://www.cs.bham.ac.uk/research/poplog/primer/ )
+
+a distinction is made between the internal semantics of a program and
+the external semantics.
+
+The internal semantics of a program is concerned with which objects and
+processes inside the computer are referred to by the program code.
+
+Some programs which deal with a particular domain of application also
+have an external semantics if they refer to entities, within that
+domain.
+
+In the specification of iselement above only the internal semantics were
+referred to, e.g. :
+
+    "it takes a list of words and an integer"
+
+    "it produces a list of integers"
+
+However in some cases the words may refer to people and the integer may
+refer to an age or a salary. In the context of a project or application
+program, the comments explaining a procedure may need to state both the
+internal and the external semantics of the input and output variables
+and the procedure (e.g. "it returns a list of vectors of words and
+numbers, representing all the employees whose salary is less than that
+given").
+
+-- Using ENTER procheader ---------------------------------------------
+
+To simplify the task of producing a header comment it is useful to use
+the VED command ENTER procheader, described in HELP VED_PROCHEADER
+which is available at Birmingham or at the FreePoplog site:
+     http://www.cs.bham.ac.uk/research/poplog/freepoplog.html
+
+
+
+-- Specifying FINDONE -------------------------------------------------
+
+(a) Types of arguments
+    FINDONE takes two arguments, a word and a list of words, naming
+    people. The words in the list should already have been declared as
+    Pop-11 variables and their values should be lists of words
+    indicating properties of people.
+
+(b) Type of output
+    FINDONE produces either FALSE or a word as its output
+
+(c) What the procedure does.
+    Given a word W and a list of people's names P it produces the
+    first name in P that denotes a list containing W. If there is
+    no such name it produces FALSE.
+
+    It has no side effects.
+
+(d) Typical test cases
+
+    findone("happy", []) =>
+    ** <false>
+
+    ;;; assume lists -john- and -ethel- etc exist as defined above
+    findone("female", [john ethel]) =>
+    ** ethel
+
+    findone("rich", [john ethel]) =>
+    ** <false>
+
+    vars people;
+    [john ethel mary fred] -> people;
+
+     findone("typist", people) =>
+    ** fred
+
+     findone("angry", people) =>
+    ** <false>
+
+Now  try  writing  the  code  for   FINDONE,  so  that  it  meets   this
+specification, using the SCHEMA presented above, or any other method you
+like.
+
+When finished write down a description of HOW it does it, along the
+lines illustrated with the description of iselement under (e) in the
+previous section.
+
+
+-- FINDALL ------------------------------------------------------------
+
+It's harder to answer questions of the form "Find all the people who are
+clerks", for example:
+
+     findall("male", people) =>
+    ** [john fred]
+    findall("rich", people) =>
+    ** []
+
+In order to solve this task you have to know how to traverse a list,
+testing each element, and make a list of all those that pass the test.
+
+-- Digression: findintegers -------------------------------------------
+
+Here, for example, is a procedure that takes a list and returns a list
+of all the integers in it. We use the built in procedure "isinteger"
+which produces TRUE if applied to an integer, and FALSE if applied to
+anything else. (An integer is a "whole" number, positive or negative,
+e.g. 0 3 999 -5 -392, but not 3.5 or -77.111).
+
+
+    define findintegers(list) -> result;
+
+        lvars item;
+
+        [% for item in list do
+            if isinteger(item) then item endif
+           endfor
+        %] -> result
+
+    enddefine;
+
+
+Notice that the line
+
+            if isinteger(item) then item endif
+
+puts things on the stack if and only if they are integers, and the  list
+brackets with percents [% ...  %] make a list  of everything put on  the
+stack, between them. Because the percents are used, the list brackets do
+not quote all the enclosed text: instead the text is treated as  program
+and the program is run. See the list examples in TEACH PERCENT.
+
+Try that out
+
+    findintegers([1 2 3 cat mouse 99 6]) =>
+    ** [1 2 3 99 6]
+    findintegers([one 1 two 2]) =>
+    ** [1 2]
+    findintegers([one two three]) =>
+    ** []
+
+Try some other tests. E.g. what should it do with the empty list?
+
+Doing it recursively is a bit more  tricky if you have not met the  idea
+previously. Try completing the following schema, replacing the dots  and
+the bits of English in angle brackets, with bits of Pop-11:
+
+    define findintegers(list) -> result;
+
+        if list = [] then
+            .... -> result
+
+        elseif isinteger(hd(list)) then
+
+            <find the integers in the tail of the list, stick
+                the head of the list on the front> -> result
+        else
+            .... -> result
+
+        endif
+
+    enddefine;
+
+Notice that  there are  two recursive  calls here.  Try completing  that
+schema, and then test it on the above examples, with tracing where
+necessary to help you understand what is going on.
+
+You can do it with  only one recursive call if  you use an extra  nested
+conditional and modify it thus:
+
+    define findintegers(list) -> result;
+
+        if list = [] then
+            .... -> result
+        else
+            findintegers(tl(list)) -> result;
+
+            if isinteger(hd(list)) then
+                <add the hd of the list to the front of result>
+            endif
+
+        endif
+
+    enddefine;
+
+Once again, try completing that schema, and then test it on all the
+previous examples of findinteger.
+
+-- Now let's return to findall ----------------------------------------
+
+Findall is supposed to take a word W, and a list L of people, i.e. a
+list of names of lists,. It should return a list of names, i.e. the
+names of people whose descriptions include the word W.
+
+     findall("male", people) =>
+
+That should print out something like:
+
+    ** [john fred]
+
+You could try using the "for item in list" format with [% ... %] to make
+a list of all the things found that satisfy the test of the form
+
+    if iselement(prop, valof(hd(list))) then
+
+as in the iterative definition of findintegers.
+
+Alternatively try doing it recursively, on the model of the recursive
+definition of findintegers.
+
+Remember that before you start trying to write the Pop-11 definition for
+the procedure  it is  essential to  be  clear about  what you  want  the
+procedure  to  do.  Follow  the  example  given  above,  and  write  the
+specification in steps (a) to (e) as was done above for "iselement" (and
+"findone").
+
+Examine all the test cases carefully and make sure that your plan for it
+covers all the cases. Make sure that it always returns a list, even if
+it's the empty list.
+
+If you use recursion make sure that you give the recursive call the
+correct types of inputs (see the specification for the inputs), and also
+make sure that you use the result of the recursive call properly (i.e.
+the list it produces).
+
+-- A schema for FINDALL -----------------------------------------------
+
+Here is a suitable  recursive schema for  findall. Remember that  you'll
+have to use iselement as  well as the procedure valof  on the hd of  the
+list (as in findone, above).
+
+    define findall(prop, list) -> result;
+
+        if  <list is empty> then
+
+            [] -> result;   ;;; i.e. empty set is result
+
+        else
+            <get all the items in the tail of the list that
+                have the property> -> result;
+
+            if <the first item in the list has the property> then
+                <add it to the front of the result>
+            endif;
+
+        endif;
+    enddefine;
+
+Try testing it, with
+
+     findall("female", people) =>
+     ** [ethel mary]
+
+and other examples. To see what is going on trace findall and iselement.
+
+
+-- If you need help ---------------------------------------------------------
+
+If you didn't succeed, try completing this:
+
+    define findall(prop, list) -> result;
+        if  <list is empty> then
+            [] -> result;   ;;; i.e. empty set is result
+        else
+            findall(prop, tl(list)) -> result;
+            if <the first item in the list has the property> then
+                ;;; add it to the result
+                [^(hd(list)) ^^result] -> result;
+            endif;
+        endif;
+    enddefine;
+
+N.B. When  you  complete the  second  conditional, VALOF  is  needed  as
+before, so that,  for example,  ISELEMENT looks in  the list  associated
+with "john", not in the word "john" itself.
+
+Test your procedure. Try Tracing it and ISELEMENT, when you do.
+
+
+-- It still doesn't work? ---------------------------------------------
+
+If you didn't manage, try typing in this
+
+     define findall(prop, list) -> result;
+
+       if  list = [] then
+           [] -> result
+       else
+           findall(prop, tl(list)) -> result;
+
+           ;;; Got all the things from the tail. Check whether the hd
+           ;;; of the list needs to be added to the front of result
+
+           if iselement(prop, valof(hd(list))) then
+                ;;; create a new result list, using the hd of the list
+                ;;; and the old result, got from the recursive call
+
+                [^(hd(list))  ^^result] -> result
+            endif;
+       endif;
+     enddefine;
+
+Then try:
+     trace findall;
+     findall("happy", people) =>
+     findall("female", people) =>
+
+
+Try other tests. If you haven't traced ISELEMENT trace it too - though
+you may get a lot of printout.
+
+
+-- A set of properties: findset ---------------------------------------
+
+A yet harder task is to find ALL the people with a set of properties, for
+example:
+
+     findset([male happy], people) =>
+
+In order to do  this you will  need to define  a procedure that  takes a
+list of properties and a person (in the form of a list) and then returns
+true if the person has all the properties.
+
+E.g. suppose  we call  it has_all, then
+
+    has_all([male tall], john) =>
+    ** <true>
+    has_all([female tall], john) =>
+    ** <false>
+
+What should we do if the first list is empty?
+    has_all([], john) =>
+
+It turns out to be convenient to  assume that if increasing the list  of
+properties provides a  tougher, more restrictive,  test, then having  an
+empty list of properties means that everyone passes the test. I.e.
+
+    has_all([], john) =>
+    ** <true>
+
+And the same would apply to mary, ethel etc.
+
+The only really tricky bit is
+
+    <the person has all the properties>.
+
+You may  find it  useful to  define a  procedure called  ISSUBSET  which
+checks if every element of  one list is in  another. It should take  two
+sets and see  if all the  elements of  the first are  ISELEMENTs of  the
+second. can then write:
+
+       elseif issubset(proplist, valof(hd(thinglist)))
+
+Try defining ISSUBSET iteratively (using "for item in littleset do ...")
+and recursively.
+
+
+-- Help with recursive issubset ---------------------------------------
+
+Here is a recursive schema for ISSUBSET:
+
+     define issubset(littleset, bigset) -> result;
+
+       if  <littleset is empty> then
+            <result is TRUE>
+       elseif  <head of littleset is in bigset> then
+            if <tail of littleset is a subset of bigset> then
+                <result is TRUE>
+            else
+                <result is FALSE>
+            endif
+       else
+            <result is FALSE>
+       endif
+
+     enddefine;
+
+Try completing that. Test it, then use it to define FINDSET. Then test
+FINDSET, tracing everything.
+
+-- Some advice on testing ---------------------------------------------
+
+An important point: whenever you define a new procedure TEST it. Try  to
+make sure it works  on all the limiting  cases, e.g. empty lists,  lists
+with "target" items at the beginning or at the end, lists with only  one
+item, etc.  Try to  make sure  you have  covered all  the  significantly
+different cases in your tests. Plan those tests BEFORE you write the
+procedure definition, so that you can use them in thinking about what
+the procedure has to do, i.e. you can make sure it covers all the
+different cases that can arise.
+
+NEVER type in a long list of procedures and then try testing them all by
+running one high  level procedure that  runs all the  others. That  will
+ensure that you waste a lot of time searching for obscure bugs.
+
+Keep a set of test cases in the file, e.g. in comment brackets
+
+    /*
+        test1
+        test2
+        .....
+    */
+
+so that you can conveniently re-run the tests if you change the program.
+ALWAYS re-run them after every change. Make sure that the first tests
+are SIMPLE ones, so that if procedure doesn't work on them it should be
+easier to find out why not.
+
+By including the test cases in a comment, you can safely load the  whole
+file without running the tests every time.
+
+-- Returning to FINDSET -----------------------------------------------
+
+What should we get with an empty list of properties:
+
+    findset([], people) =>
+
+It all depends on how you interpret that command. Depending how you  had
+defined your procedures, POP-11 is likely  to interpret it to mean  find
+the set of people without any constraint at all, i.e. it will  produce a
+list of ALL the people. This is  quite natural if you think of the  fact
+that adding more properties will REDUCE the list of people. E.g. if  you
+give the property "happy" then that  selects the subset that are  happy.
+If you give the properties "happy"  and "male" then the second  property
+will (usually) select an even smaller subset from the first.
+
+So if you have no properties it  should not reduce the list at all.  The
+above definition of issubset is consistent with that line of thought.
+
+The procedure FINDSET takes a list of properties and a list of things. It is
+to 'return' a list of those things which have ALL the given properties. Here
+is a recursive schema for FINDSET:
+
+     define findset(proplist, thinglist) -> result;
+       if  <thinglist is empty> then
+            <the result is the empty set>
+       else
+            ;;; recursively call findset on the tail
+            <get all the things in the tail of thinglist that have
+            all the properties> -> result;
+
+            ;;; now use issubset to see if the head of thinglist should
+            ;;; be included in the result
+            if <valof hd of thinglist has all the properties> then
+                <add it to result> -> result
+            endif
+
+       endif
+     enddefine;
+
+It may look VERY odd that you have to work on the tail before the  head.
+At first it  may appear  that the  procedure can't  do anything  because
+nothing can get added to the result till everything else has been added.
+
+But the crucial point is that ultimately the recursion gets down to  the
+empty list [],  and this final  recursive call returns  a result of  [],
+after which it works  back through thinglist from  right to left as  the
+recursion unwinds, adding items to the result if they satisfy the  test.
+You should be able to see this by tracing the procedure.
+(The "sum" example in TEACH RECURSION is similar.)
+
+Try completing that, and test it if you succeed.
+
+
+
+-- If you needed help -------------------------------------------------
+
+If you didn't manage try completing this template:
+
+     define findset(proplist, thinglist) -> result;
+       if  <thinglist is empty> then
+            [] -> result
+       else
+            ;;; recursively call findset on the tail
+            <get all the things in the tail of thinglist that have
+            all the properties> -> result;
+
+            ;;; Now use issubset to see if the head of thinglist should
+            ;;; be included in the result
+            if issubset(proplist, valof(hd(thinglist)) then
+                [^(hd(thinglist) ^^result] -> result
+            endif
+       endif
+     enddefine;
+
+
+-- A different findset ------------------------------------------------
+
+Can you understand this alternative definition of FINDSET, which makes
+use of the previously defined FINDALL:
+
+    define findset(proplist, thinglist) -> result;
+
+        if  proplist == [] then
+            thinglist -> result
+        else
+            findset(tl(proplist), findall(hd(proplist), thinglist))
+                -> result
+        endif
+    enddefine;
+
+(This assumes that you have already defined FINDALL)
+
+Try defining and testing it, tracing everything to see how it works.
+
+Incidentally, the Pop-11 system includes a procedure MEMBER, which  does
+what your procedure ISELEMENT does. So  you don't really need to  define
+your own. You can  change all occurrences of  ISELEMENT above to  MEMBER
+(except in the definition of ISELEMENT).
+
+NOTE: the above procedure uses "==" in the test. That is because the
+empty list [] is a unique object and therefore the test can come out
+true ONLY if the value of proplist is exactly that object. There is no
+need to test whether it is a similar type of object with similar
+contents, as "=" does. So using "==" saves time.
+
+For more on that topic see
+    HELP EQUAL
+
+and HELP EFFICIENCY
+
+-- Further reading ----------------------------------------------------
+
+Several teach files have been mentioned already, including
+
+TEACH * LISTS, * RECURSION
+
+Additional exercises on list processing can be found in
+TEACH * RECURSE2
+TEACH * RECURSE3
+TEACH * LISTQUESTIONS
+TEACH * SETS2   -- takes you through a collection "set" operations.
+
+See the POP-11 Primer, chapter 6, also available online at
+
+    http://www.cs.bham.ac.uk/research/poplog/primer/
+
+There are additional list processing exercises in some of the books
+listed in the file HELP *POPREFS:
+
+    Laventhol
+        (e.g. chapter 5)
+and
+    Barrett, Ramsay and Sloman
+        (e.g. chapter 7)
+
+Both books may be out of print by now. Also they use an older syntax for
+Pop-11, which still works, though often the new syntax is clearer.
+
+    --- C.all/teach/sets
+    --- Copyright University of Sussex 1989. All rights reserved. ----------
+
+--- $poplocal/local/teach/sets
+--- Copyright University of Birmingham 2001. All rights reserved. ------

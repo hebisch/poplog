@@ -1,0 +1,1410 @@
+TEACH PROGSTYLE                                  Aaron Sloman June 1988
+
+            SOME RECOMMENDATIONS REGARDING PROGRAMMING STYLE
+                              Aaron Sloman
+                       School of Computer Science
+                      The University of Birmingham
+
+These notes are intended primarily to alert students to some of the
+issues that arise in designing, implementing and documenting good
+programs. They are by no means definitive, certainly not comprehensive,
+probably could be organised better, and will not be equally applicable
+to all programming languages. The examples given are all in Pop-11,
+which is a very general and powerful language. Most of the comments are
+language independent, though some will not be applicable to all
+programming languages.
+
+Above all it is important to remember that even experienced programmers
+can disagree on matters of style: Why should programming be different
+from composing a poem, sonata or picture?
+
+
+CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Introduction
+ -- Choose meaningful identifiers
+ -- Choosing identifiers: start from the program specification
+ -- Global variables and use of header files
+ -- Don't bury numbers and other constants in the text
+ -- Using commas and spaces
+ -- Comments
+ -- Other Documentation
+ -- Indentation
+ -- Indentation styles for conditionals and loops
+ -- Use short procedure definitions
+ -- Use comments to enhance opening and closing brackets
+ -- Avoid goto and labels
+ -- Finite state machines without goto
+ -- Abnormal loop exits or re-starts
+ -- Make the control structure clearly visible
+ -- Input locals for the top-level procedure
+ -- Communicate via arguments and results, not via globals
+ -- Use of nested procedure definitions to avoid global variables
+ -- File-local lexicals
+ -- Calling procedures defined elsewhere
+ -- When to use "vars" and "lvars"
+ -- Trace printing
+ -- Using popready instead of tracing
+ -- Use closures instead of popval
+ -- Turn repeated code fragments into subroutines with names
+ -- Turn similar code fragments into super-routines
+ -- Choosing data-types
+ -- Data-abstraction
+ -- Efficiency vs clarity
+ -- Using the stack to build lists or vectors
+ -- Miscellaneous
+ -- Defining macros and syntax words
+ -- Test commands
+
+-- Introduction -------------------------------------------------------
+
+Students (and others) are recommended to take the following points into
+account in designing programs. If necessary, be prepared to throw away
+first drafts and start again, in order to produce a satisfactory
+program.
+
+Style is particularly important when two or more people have to work on
+the same programe (as often happens in commercial organisations), or if
+the same programmer is going to have to work on it from time to time,
+with an opportunity to forget details during the intervening intervals.
+
+Good style also tends to go with efficiency, clarity, modularity,
+freedom from bugs, and ease of maintenance, though often efficiency
+is worth sacrificing for the sake of the other objectives.
+
+There are many disagreements about style. So the suggestions made here
+are not all universally agreed. If you deviate from these suggestions
+make sure you do so knowingly and for good reasons.
+
+You may find that some parts of this file refer to things you have not
+yet learnt about. In that case, if you do not understand them, the best
+thing is to ignore them for now (or follow up cross references to HELP
+or REF files and learn about them).
+
+-- Choose meaningful identifiers --------------------------------------
+
+Don't use short variable names as if you were writing in BASIC (e.g. x,
+y, b1, b2, etc). Use meaningful names, separating parts with
+underscores. (Unfortunately, for historical reasons this principle has
+not always been followed in the choice of names for POP-11 variables and
+procedures.)
+
+You can use short names for conventional uses, e.g. the following are
+well understood conventions for  2-D and 3-D co-ordinates of points:
+
+    x,y, x1,y1, x2,y2, x,y,z   etc.
+
+You can use i,j, for iterating over elements of a vector or array, but
+it is generally better to use a more meaningful name.
+
+Use meaningful procedure names, not things like f or proc1.
+
+If the names are complex, separate parts with underscores e.g.
+"sort_items" not "sortitems". (You'll soon get used to typing the
+underscore!) Some people would prefer "SortItems". (Lisp users might
+prefer "sort-items", but in Pop-11 that would be interpreted as an
+arithmetic expression applying the subtraction operator to the values of
+"sort" and "items").
+
+There is no correct style for complex identifiers: choose a style and
+stick to it. Pop-11 system and library identifiers tend to use the
+underscore (sort_items) rather than capitalisation (SortItems).
+However, some specialised modules (e.g. the X windows package), where
+names would get too long with underscores, use capitalisation instead.
+
+The choice of meaningful identifiers is specially important for global
+identifiers that may be used in different parts of the program, far from
+the declaration and explanatory comment. An example is the use of the
+identifiers "database" and "it", in connection with the procedures
+-add-, -remove-, -present- -lookup- etc. in Pop-11. All these procedures
+use -database- and -it- non-locally to make it unnecessary always to
+pass in two extra parameters and assign two extra results. In the case
+of "it" especially this can lead to unwanted interactions -- the name
+was not well chosen. Perhaps it should have been "last_matched_item".
+(See HELP * DATABASE for a summary, TEACH * DATABASE for more details.)
+
+The need to choose meaningful names applies to procedures as well as
+other global identifiers. If the name is well chosen, a reader will not
+constantly have to refer back to the definition to be reminded of what
+its purpose is.
+
+It is also important to ensure that the names chosen for global
+variables are unlikely to interact with other names. So NEVER use short
+names for global variables since these are more likely to be re-invented
+for a different purpose, either by yourself at a later date, or by
+another programmer working on the same program with you. (Our choice of
+"it" for the last database item accessed violates this rule.)
+
+It is also a good idea to prefix all global variables in a library
+program with something indicating the type of package they belong to, so
+that they are less likely to clash with other identifiers, and also a
+user who has compiled the package and trips over the identifier can get
+a clue as to where it comes from. (The same applies to procedure names.)
+This is why most identifiers concerned with the editor VED start with
+"ved". Those which define ENTER commands start with "ved_". (Some of the
+non-procedure global variables used by system procedures start with
+"vved", for historical reasons.)
+
+E.g. if you build a statistics package you could make sure that all the
+global variables and the procedures have names starting with "stat_".
+
+-- Choosing identifiers: start from the program specification ---------
+
+Most programs are not merely intended to manipulate structures inside
+the computer. They are designed for a purpose. Usually that purpose
+relates to things outside the computer. For instance it may be a program
+to manipulate information about employees in a company, or to analyse
+English sentences, or to simulate the behaviour of a machine.
+
+Before designing the program make sure you have a clear idea of the
+"ontology" you wish to represent. I.e. what are the objects, what kinds
+of properties can they have, what kinds of relationships can they have,
+and what kinds of processes involving them will occur? When you have
+good clear answers to these questions, write them down in English as a
+specification for your program. You can then choose identifier names
+that correspond to the words and phrases in the specification, e.g.
+
+    employee, employee_first_name, employee_surname, employee_salary,
+    promote_employee, allocate_task_employee,
+
+and so on.
+
+A common type of procedure is a predicate, i.e. something that takes an
+argument, applies some test to that argument and then returns the result
+TRUE or FALSE. In Pop-11 it is common do use prefix "is" for such
+procedures, e.g. isnumber, isword, ispair, isdecimal, isprocedure, and
+many more. If you follow this convention, this will help to make your
+programs more readable, e.g.
+
+    if isword(x) then ...
+
+is a bit clearer than
+
+    if word(x) then ...
+
+Another common type of procedure is one that converts one type of thing
+to another. Or more precisely, it takes an argument of one type and
+returns a related result of another type. It is usual to define the name
+of such a procedure by putting "to" or "_to_" between the two type
+names, though there are exceptions in Pop-11. For example here is a
+procedure that takes a string of characters and produces a list of the
+words in the string.
+
+    define string_to_list(string) -> list;
+        lvars string, item_repeater, item, list;
+        incharitem(stringin(string)) -> item_repeater;
+        [%until (item_repeater() ->> item) == termin do item enduntil%]
+            -> list
+    enddefine;
+
+There are many other subtle points to consider. For example if you are
+defining a procedure that returns a type of object, you can use a noun
+as the name (or part of the name) of the procedure. However, if the
+procedure merely does something, without returning a result, it is
+probably better to use a verb rather than a noun. So you can use
+"salary" as the name of a procedure that returns the salary of its
+argument, and "promote" as the name of a procedure that changes the
+status of its argument.
+
+-- Global variables and use of header files ---------------------------
+
+Generally avoid global variables for communication between procedures -
+instead pass arguments and return results using input and output
+parameters, as explained below.
+
+Use of global variables can make programs harder to understand and
+harder to debug. If the values are passed as arguments and results then
+when the procedures are traced you can see what's going on.
+
+Some globals are acceptable if they are truly intended to represent a
+global state of the whole system. Don't use a global variable just to
+communicate between two or three procedures, unless there is a very good
+reason why they should share some common information.
+
+Declare globals at top of file
+    initialise them there (if they are initalised globally)
+    comment on them there
+
+If they are global only within a section, declare and comment on them
+near the top of the section. (See HELP * SECTIONS)
+
+If the declarations of and comments on global variables are all in one
+place, then the reader can find them easily if they are used in some
+procedure without an explanatory comment.
+
+If your program is made of several files and there are some global
+variables used in two or more of them, then collect all the variables
+into a single "header" file in which they are declared and commented
+(like Unix ".h" files). Some people use the convention that a Pop-11
+file of this kind has the suffix ".ph" to indicate that it is a "header"
+file.
+
+-- Don't bury numbers and other constants in the text -----------------
+
+Don't bury important, changeable, numbers in your program. E.g. if the
+number 250 is used somewhere in your code, replace it with an identifier
+explaining what it is, e.g. MAX_PROCESS_SIZE and declare it at the top
+of the file (or in a header file).
+
+If you are worried about efficiency make it a macro rather than an
+ordinary variable. (See HELP * MACRO. But also note the warning there
+about introducing confusing syntax).
+
+It is OK to use the numbers 0 and 2 in
+
+    for x from 0 by 2 to max_thingy_whatsit do .... endfor
+
+because their meaning is so clear and the effect of the numbers is
+localised - i.e. you are saying "step through the even integers".
+(However it might be better to have a direct way of saying this!)
+
+The comment about not burying numbers in the text applies also to other
+constants that are accessed in different places and might change. E.g.
+if a variable that is local to one procedure but accessed by others is
+initialised with a word or string, then replace the word or string with
+a globally defined variable or macro, declared at the top of the file,
+or in a header file.
+
+E.g. at the top of the file do
+
+    vars macro KEYWORD = ["byebye"];
+
+Then somewhere in the file
+
+    define controller (...);
+        vars keyword=KEYWORD;
+        .....
+
+etc.
+
+-- Using commas and spaces --------------------------------------------
+
+If you declare several variables at once, separate them using commas,
+e.g.
+    vars x, y, z;
+not
+    vars x y z;
+
+POP-11 allows the latter for compatibility with older versions of the
+POP language, especially POP2.
+
+However, you will have to include commas if you include initialisations,
+e.g.
+    vars x = 0, y = 0, z = 0;
+
+So it is just as well to use commas always.
+
+Some people leave out the spaces, as in:
+
+    vars x=0,y=0,z=0;
+
+but this sort of thing can be harder to read. Use spaces to make code
+legible. This is a useful general rule, though it must be admitted that
+not everyone agrees with it: some prefer the more concise form.
+
+Similarly, instead of something like
+
+    foo(a,b*g(h))
+
+use the following, especially where sub-expressions are more complex:
+
+    foo(a, b * g(h))
+
+or even
+
+    foo( a, b * g( h ) )
+
+(actually I've known only one person who really likes the latter -- some
+people object to the extra spaces).
+
+-- Comments -----------------------------------------------------------
+
+Be liberal with comments. It is often a good idea to write a comment on
+every procedure BEFORE you write the code. You are then more likely to
+get the code right first time. But when you change the program make sure
+you update the comments.
+
+There are different sorts of comments. At the top of the file, or in a
+special file containing global declarations there should be comments
+explaining what the global variables are for.
+
+Before each procedure, or just after the header line inside the
+procedure definition, there should be a comment explaining what the
+procedure does. Unless it is VERY obvious from identifier names, say
+what sorts of inputs the procedure takes, what sorts of results it
+produces, what sorts of side-effects it has (e.g. changing a database or
+some global variables).
+
+There is no point including comments that simply repeat what the code
+says, e.g. the following comment is pointless
+
+    x -> hd(tl(list));      ;;; make x second element of list
+
+Do however, explain what is going on when it isn't obvious, e.g.
+
+    x -> hd(tl(list));      ;;; change the person's wife
+
+However, if you choose good names for procedures and datastructures,
+then the code will be "self-documenting", i.e. will explain the intended
+semantics. e.g.
+
+    person1 -> wife_of(person2);
+
+(See section on "Data-abstraction", below)
+
+If you are working on a real project with other people, producing code
+that others may have to maintain, use comments either in the header of
+the file, or at the end, to record all changes and the reasons for them.
+
+Many programmers prefer such "change-notes" to go in reverse
+chronological order so that it is easy to find the latest change.
+
+
+-- Other Documentation ------------------------------------------------
+
+In addition to comments in the program text it is important, and very
+difficult, to produce good documentation. There are several kinds of
+documentation:
+
+ o Research reports describing problems, concepts and techniques
+   relevant to the program
+
+ o A user manual explaining what the program does and how to use it.
+    This is often usefully broken up into different categories e.g.
+        - Introduction and how to get started
+        - Tutorial examples
+        - Reference manual (complete, terse and well indexe)
+
+ o System documentation describing implementation details
+    This can be essential for people who have to extend or
+    maintain the program.
+
+-- Indentation --------------------------------------------------------
+
+Use indentation to show the structure of the program. The following
+VED commands can be used liberally.
+    <ENTER> j    (justify marked range)
+    <ENTER> jcp  (justify current procedure)
+
+Automatic indentation may go wrong if you have complex strings or lists:
+the contents of the strings or lists will not be treated as program text
+to be justified.
+
+Inside a long comment in a program file, if you want the text justified
+but not in the style of a program you can use
+
+    <ENTER> fill
+
+to justify a marked range.
+
+-- Indentation styles for conditionals and loops ----------------------
+
+Personal preferences vary. There are two styles common among POP-11
+users, illustrated by the following examples.
+
+Style A ("then" or "do" at the beginning of line)
+
+    if      <condition1>
+    then    <action1>
+    elseif  <condition2>
+    then    <action2>
+        .....
+    else    <default action>
+    endif
+
+and
+
+    while   <condition>
+    do      <action>
+        .....
+    endwhile
+
+Style B ("then" or "do" at end of line)
+    if      <condition1> then
+        <action1>
+    elseif  <condition2> then
+        <action2>
+        .....
+    else
+        <default action>
+    endif
+
+    while   <condition> do
+        <action>
+        .....
+    endwhile
+
+A third style is sometimes used for multi-branch conditionals when the
+actions are short, i.e. Style C
+
+    if      <condition1> then <action1>
+    elseif  <condition2> then <action2>
+        .....
+    else <default action>
+    endif
+
+There is not (and probably never will be) a consensus as to which style
+is best. The choice can sometimes depend on how the program is to be
+read. E.g. if an editor is used showing only a few lines at a time, then
+style C may be preferable, since you can see most of the code at once.
+Style B may be preferred when the "actions" go over several lines, since
+those lines are then clearly grouped together and indented. Style A may
+be preferred when there are complex conditionals, using "and" and "or",
+e.g.
+
+    if   .....
+    and  ....
+    or   ....
+    then ....
+
+Whichever style you use, you should make sure that indentation is used
+to show which parts of the program are nested within others. E.g. if you
+have a complex instruction (if...endif, or while...endwhile) occurring
+between "then" and "elseif" in a conditional, make sure that the whole
+of the embedded instruction is more deeply nested than the opening syntax
+words of the enclosing conditional, e.g.
+
+    if .... then
+        .....
+        while .... do
+            .....
+        endwhile;
+        ....
+    endif;
+
+
+The main criterion you should always use is: has the program been laid
+out so that it will not be too hard to read (including seeing the
+control structure)?
+
+-- Use short procedure definitions ------------------------------------
+
+Avoid long and complex procedures. If a procedure definition can't fit
+on a screen then ask yourself if it could be broken into shorter
+procedures. Shorter procedures are generally easier to understand and
+the use of meaningful names for chunks of code instead of the chunks of
+code themselves also helps.
+
+E.g. you might have a loop that contains lots of instructions in the
+body of the loop. Consider turning them into a procedure call, to a
+procedure defined elsewhere -- a subroutine. This will generally make
+your program more readable.
+
+Assignments done in the loop will instead have to be handled by passing
+values in by giving arguments to the subroutine and then letting it
+return results that may be assigned to variables in the calling
+procedures. (Unless you have VERY good reasons, avoid using a shared
+global variable for the communication.)
+
+Similarly if you have a long multi-branch conditional with lots of
+alternative complex actions, try replacing the actions by calls to
+sub-procedures that have meaningful names.
+
+-- Use comments to enhance opening and closing brackets ---------------
+
+Unlike Lisp, Pop-11 has many opening and closing brackets, e.g.
+
+    (           )
+    [           ]
+    {           }
+    if          endif
+    define      enddefine
+    while       endwhile
+
+and so on. These help readability and enable the compiler to do more
+checking at compile time. However, if a procedure has a number of nested
+expressions it may be difficult for the reader to keep track of them,
+even if the indentation shows clearly how things are nested. For
+instance, the procedure may unavoidably be too long to fit within an
+editor window. In that case you can help the reader by using the same
+comment at the beginning and end of a complex expression, to show how
+opening and closing brackets match. E.g.
+
+    /*test age*/
+    if age < 5 then
+        ....
+    elseif age < 10 then
+        ....
+        ....
+    else
+        ....
+    endif /*test age*/
+
+Similarly, if a procedure definition is too long to see all at once,
+e.g.
+
+    define long_procedure(.....);
+        ...
+        ...
+    enddefine /*long_procedure*/;
+
+(Ideally these bracket-comments should be defined as part of the
+language, so that the compiler can use them for extra checking.)
+
+
+-- Avoid goto and labels ----------------------------------------------
+
+Avoid use of "goto" except where there is very good reason. (There
+usually isn't). It is normally possible to replace goto and labels with
+conditionals, loops and additional procedures holding instructions that
+you want to "jump to" from different places in a big procedure.
+
+Some people defend the use of goto for "exception handling", e.g. if
+there is a bit of a procedure that handles errors, labelled "error:". In
+that case "goto error" is thought of (by some) as acceptable. Other
+people would prefer to call an error-handling procedure in that
+situation, e.g. the POP-11 procedure -mishap-, or some user-defined
+error handler (that might use -exitfrom- or -catch- and -throw-).
+
+-- Finite state machines without goto ---------------------------------
+
+Some people would use labels and "goto" for implementing a "finite state
+machine", using a procedure with different portions labelled e.g. as
+state1: state2: etc. Then "goto state2" implements a state transition.
+On the other hand it would normally be better to make all the state
+transitions go via a "switch" at the top of a loop, using -go_on-.
+
+The structure would then be something like this (possibly using more
+meaningfile names for the state labels):
+
+    1 -> next_state;
+    repeat
+        go_on next_state to state1 state2 state3 ... else error;
+
+    state1:
+        ....
+        .... -> next_state;
+        nextloop();
+    state2:
+        ....
+        .... -> next_state;
+        nextloop();
+     ....etc. etc....
+    endrepeat;
+    error:
+        ...
+
+Each state works out for itself what the next state should be and
+assigns the corresponding number to next_state.
+
+Although going back to the top of the loop for every state transition is
+slightly less efficient than jumping direct to the next label, the
+advantage of this method is that you can call a tracing or checking
+procedure between "repeat" and "go_on", and since all the state
+transitions go through this point, all state transitions can then be
+traced. It is also easy to make some special action occur on every state
+transition, e.g. recording the sequence of states in a database, or even
+calling a special supervisor procedure to decide what the next state
+should be.
+
+An alternative, that some would prefer, would be to represent each state
+with a procedure, then a control procedure can repeatedly call the
+procedure that is currently pointed to by a variable -next_state-.
+Each procedure, when run, could decide which procedure to assign
+to -next_state- before it exits.
+
+-- Abnormal loop exits or re-starts -----------------------------------
+
+For abnormal exit or abnormal re-starts in a loop use quitif,
+quitunless, nextif, nextunless instead of goto, or instead of
+    if .... then  quitloop....endif
+
+This is because it is better to make the major control instructions
+"stand out" instead of being buried inside other instructions. This
+is why <ENTER> j (or jcp) will line them up with the looping keywords,
+like "repeat" "while", "for" "endwhile" etc.
+
+From version 13.5 of Poplog, POP-11 also includes "returnif" and
+"returnunless".
+
+Among Pop-11 procedures that transfer control out of the current
+procedure are:
+
+    setpop, chain,
+    chainto, chainfrom, exitto, exitfrom,
+and
+    throw (used with catch)
+
+Some people regard all these as essentially unstructured, though they
+can be very useful. However, don't use them unless you really have to,
+and then take a lot of care to make it clear what is going on. E.g.
+where you call a procedure than might exit abnormally it is worth
+including a comment to that effect.
+
+    define foo ....
+        ....
+        baz( .....);    ;;; may invoke exitfrom(foo)
+        .....
+    enddefine;
+
+(These special syntax words for transferring control should probably
+have had underscores in their names, and perhaps used upper case to make
+them stand out. But it's too late to change now.)
+
+-- Make the control structure clearly visible -------------------------
+
+In addition avoiding buried occurrences of control commands like return,
+quitloop, nextloop, it is good to use indentation to show that different
+bits of program are alternatives to each other and will not both be
+executed.
+
+The following form does not live up to this.
+
+    define foo...;
+        if condition then
+                ....
+                return()
+        endif;
+        ;;; this  bit is not done if condition is true
+        ....
+    enddefine;
+
+whereas this one does
+
+    define foo...;
+        if condition then
+            ....
+        else
+            ;;; now it is clear that this bit is not always done
+            ....
+        endif
+    enddefine;
+
+In this case the call of -return- before "else" is redundant.
+
+However, there are many people who use the first form and find it clear
+enough. Moreover, the latter can cause indentation to get deeper,
+requiring lines to be broken to avoid going off the screen.
+
+-- Input locals for the top-level procedure ---------------------------
+
+Even when you have chosen to make certain variables global, it is
+sometimes a good idea to use them as input locals (not lexical locals)
+for the main (top-level) procedure that gets your program running. You
+can then easily test the program with different initial values for these
+global variables by running the top level procedure with different
+arguments.
+
+However, you may want each successive run to start from the values
+produced by the previous run, which is not possibile if the variables
+are local. For instance, a database that might be created in one run
+could be used in a second run. In that case you would not want the
+database to be the value of a local variable.
+
+When you have a collection of such global variables it is often useful
+to define a procedure to re-initialise the values, like the procedure
+-start- in LIB * RIVER. This is specially useful during testing and
+debugging, if there are global variables that get changed while running
+the program.
+
+Making the variables local would removes the possibility of having the
+values of those variables accessible for debugging purposes when the
+top-level procedure exits.
+
+Note that if you make the global variables local to the top-level
+procedure in this way, then they should be declared local using "vars"
+or "dlocal", and not using "lvars". I.e. they must be dynamic locals,
+not lexical locals.
+
+Make sure that it is easy for the reader of your program to find the
+main top-level or controlling procedure if there is one. E.g. it could
+be the first procedure defined. However, sometimes it will be too hard
+to understand if one has not first read the definitions of the
+procedures that it invokes. This can be alleviated if you choose good
+(long) names for all the procedures.
+
+
+-- Communicate via arguments and results, not via globals -------------
+
+If a variable is local to a procedure P but is accessed non-locally in
+other procedure(s) Q, R, S, ask yourself why it isn't local to the other
+procedure(s) instead.
+
+It may be used for communication between them. But then using inputs and
+outputs (on the stack) would be better. E.g. instead of using -mydata-
+as a global variable changed by running Q, do
+
+    Q(mydata) -> mydata;
+
+I.e. when Q is run it gets the current value of mydata as input. It can
+then change it as much as it needs to, as long as the revised version is
+returned as a result, that can be assigned back to mydata in the calling
+procedure. This is more modular than making Q use -mydata- as a
+non-local variable.
+
+This technique can break down if there is ever an "abnormal exit" (using
+exitto, exitfrom, breakto, breakfrom, or throw (and catch)) that passes
+right through Q to its calling procedure. In that case the assignment of
+the new result to -mydata- may not be done.
+
+-- Use of nested procedure definitions to avoid global variables ------
+
+If you must use a variable that is local to one procedure and non-local
+to another, it is sometimes best to nest the definition of the second
+inside the first, and make the variable in question lexically scoped, to
+prevent unwanted interactions. The variable "counter" is an example in
+the following. It is local to count_list, but accessed non-locally by
+test_and_increment.
+
+    define count_list(list, predicate) -> counter;
+        ;;; count items in list that satisfy the predicate
+        lvars list, predicate, counter=0;
+
+        define test_and_increment(item);
+            lvars item;
+            if predicate(item) then counter + 1 -> counter endif
+        enddefine;
+
+        applist(list,test_and_increment)
+    enddefine;
+
+    count_list([1 3 cat dog 3 4 mouse], isword) =>
+    ** 3
+
+(Some would prefer the names "CountList" and "TestAndIncrement".)
+
+If test_and_increment is not to be accessible outside count_list, then
+you should make it "lexically scoped", by defining it as
+
+        define lvars test_and_increment(item);
+            etc
+
+Moreover, if the sub-procedure is not to be changeable even within
+count_list, then you should define it as a lexical constant, i.e.
+
+        define lconstant test_and_increment(item);
+
+Sometimes, when a procedure like test_and_increment uses a non-local
+variable (e.g. counter) like this, it is called from inside a variety of
+different procedures that localise the varible, (as -add- -lookup-
+-present- etc. use the variable -database- and -pr- uses -cucharout-).
+
+In that case, you can't define the procedure as local to the procedure
+in which the variable (database, or cucharout) is declared. You should
+therefore make sure that the global variable has a name that is unlikely
+to clash with variables used for other purposes. E.g. don't use "num" to
+represent a number. You could instead use "num_of_people", for instance.
+
+-- File-local lexicals ------------------------------------------------
+
+Sometimes the use of global variables is unavoidable. The use of
+sections (mentioned below) can be used to minimise unwanted
+interactions, but it may be simpler to restrict access to a single file.
+A variable that is used non-locally by a set of procedures defined in
+the same file can be declared lexically local to that FILE by declaring
+it outside all the procedures using "lvars" (or "lconstant" if it is not
+to be changed). It can then be accessed by all the procedures in that
+file, but cannot be accessed by anything else. This is sometimes called
+a "file-local" lexical variable.
+
+If you need to make a file-local lexical variable local to a procedure
+in that file, so that it can temporarily change the value of the
+variable then re-set its value on exit, as with non-lexical variables
+declared using "vars", then you should use "dlocal" instead lf "lvars"
+to make it local. (You can't use "vars" to make a lexical variable
+local.) So the layout might be something like this:
+
+    lvars mydata=[];    ;;; global file-local lexical variable
+
+    define top_level(mydata,....);
+        dlocal mydata, ....;        ;;; make mydata local
+        ...........
+        ...another_proc(...)...     ;;; a procedure that accesses it
+        ....etc....
+    enddefine;
+
+    define another_proc(.....);     ;;; called by top_level
+        .....
+        ... mydata ...              ;;; mydata used non locally
+        .....
+    enddefine;
+
+(Something declared as a constant or lconstant can't be made local using
+either "vars" or "dlocal").
+
+-- Calling procedures defined elsewhere -------------------------------
+
+If a procedure is to be used in a file before it is defined, then put a
+declaration for the procedure name near the top of the file with a
+comment saying that it is a procedure defined below.
+
+Declaring the procedures in advance will both suppress annoying
+"DECLARING VARIABLE" warning messages, and save time, since whenever the
+POP-11 compiler meets an undeclared variable it searches through library
+files to see whether there is one with the same name (plus '.p'), in
+which case it will autoload it. That search for an autoloadable version
+of an undeclared procedure can slow things down for you and other users
+of the machine.
+
+In addition having a comment at the top of the file makes it easy for
+the reader to see what a procedure does, when looking at another
+procedure that calls it. Some programmers would recommend having
+comments and declarations for ALL procedures at the top of the file.
+
+If a procedure is used which is defined in another file, then for every
+file that uses it insert a comment saying which file it is defined in,
+or prepare a master file, saying for each procedure where it is defined.
+On unix you can use "fgrep"
+E.g
+
+    fgrep "define " foo.p baz.p grum.p > index
+
+will create a file containing all the procedure headings in the three
+named files. (It won't find all the places where a procedure may be
+assigned to a global procedure variable though.) (Instead of "fgrep" you
+can use the faster "bm" on some Unix machines. See Unix "man" files for
+"grep", "fgrep" and "bm".)
+
+
+-- When to use "vars" and "lvars" -------------------------------------
+
+Use lvars for local variables by default. This will reduce the risk of
+unwanted interactions between programs.
+(Why? See HELP *LVARS, *LEXICAL).
+
+Use "vars" only to declare local variables that you really must access
+from (non-locally defined) procedures defined elsewhere, or if you wish
+to make a temporary, localised, change to the value of a variable used
+by a number of different procedures, e.g. database, cucharout,
+interrupt, prmishap. You can also use "dlocal" instead of "vars" to
+declare a variable local, this will work also for lexically scoped
+variables. ("dlocal" provides very powerful mechanisms for "dynamic
+local expressions", described in HELP * DLOCAL and REF * VMCODE).
+
+There is an implementation restriction on the use of lvars: at present
+you need to use "vars" for query variables used with the pattern matcher
+i.e. preceded by "?" or "??" in patterns given to MATCHES. You don't
+need to use "vars" for variables used with "^" or "^^". (The reason for
+the difference is very subtle.) (One day we shall provide a version of
+matcher that can cope with lexical variables.)
+
+If a procedure produces a result, include an appropriate "output local"
+(i.e. a result variable) in the procedure heading, e.g.
+
+    define calculate_temperature(object, time, place) -> temperature;
+        etc
+
+(See HELP * DEFINE). Using output locals like -temperature- makes it
+immediately clear to the reader that the procedure will produce a
+result, and also makes it easier for programs that produce indexes or
+cross-reference files to provide more information.
+
+There are some programmers who prefer not to use output locals when the
+procedure is short and very clear. In that case make sure that a comment
+explains that a result is returned, and what sort. E.g. the following is
+acceptable on this view, since using an ouput local would probably look
+clumsy.
+
+    define iselement(item,list);    ;;; returns a boolean
+        lvars item, list;
+        if null(list) then false
+        else item == hd(list) or iselement(item,tl(list))
+        endif
+    enddefine;
+
+This is often called the "functional" style of programming. Some would
+argue that it is much clearer to type:
+
+    define iselement(item,list) -> boolean;
+        lvars item, list boolean;
+        if null(list) then false
+        else item == hd(list) or iselement(item,tl(list))
+        endif -> boolean
+    enddefine;
+
+However, adding the extra variable does reduce efficiency. The value
+is assigned to the variable, from the stack, then as soon as the
+procedure exits it is put back on the stack. A really clever compiler
+would remove the inefficiency.
+
+If a procedure returns a result under some conditions make sure it
+returns a result under ALL conditions (or produces an error). The case
+where no result of the appropriate kind is found by the procedure is
+usually indicated by returning false. The procedure can then be called
+thus using the non-destructive assignment arrow:
+
+    if calculate_temperature(...) ->> temperature then
+        ... temperature ...
+    else ....
+
+or, with slightly less efficiency, but more clarity:
+
+    calculate_temperature(...) -> temperature;
+    if temperature then
+        ... temperature ...
+    else ....
+
+A closely related point: whenever you write a conditional instruction,
+if there is no "else" clause ask yourself why. Sometimes there should be
+an error check there. This is especially important if you use the
+conditional as an EXPRESSION, i.e. something denoting a value that can
+be assigned or used as argument for a procedure. E.g. the lack of an
+ELSE clause could produce a stack underflow error here:
+
+    if     .. then ...
+    elseif .. then ...
+    endif -> myvar;
+
+-- Trace printing -----------------------------------------------------
+
+There are two main ways to produce trace output for the purpose of
+showing what a program is doing. One is to use the "trace" command to
+turn on automatic tracing of entry and exit for procedures.
+    See HELP * TRACE.
+
+The other is to introduce your own printing commands into your
+procedures, so that they print appropriate messages when run. This is
+often useful because the standard Pop-11 trace facility, which merely
+indicates what happens at procedure entry and exit, is sometimes not
+enough. E.g. you may want to print something informative at different
+stages within a procedure, and you may not wish to print ALL the
+arguments and results.
+
+If you use lots of trace print commands, define a procedure (e.g. called
+my_trace_print) to do the trace printing only if some variable e.g.
+chatty_trace is TRUE. You can also make it produce more or less verbose
+printout depending on what value chatty_trace has.
+
+If you include a test for an error condition, don't just print out an
+error message. Make sure the program doesn't continue, unless the error
+is non-fatal. The way to invoke errors is to use the procedure
+mishap (see HELP * MISHAP).
+
+-- Using popready instead of tracing ----------------------------------
+
+Sometimes, especially in trying to debug programs, it is not possible to
+determine in advance what should be printed out. In that case it is
+often useful to insert "breakpoints", i.e. points at which the program
+will pause, and allow you to interrogate the values of variables and
+examine data-structures that have been built up.
+
+The easiest way to do this is to call the procedure -popready- which
+simply calls the POP-11 compiler to compile a stream of input commands
+typed in by you. See HELP * POPREADY for details. If you do
+
+    popready -> interrupt;
+
+within a procedure, then if you type the interrupt character (usually
+CTRL-C) inside a call of that procedure, then instead of your program
+being aborted and setpop invoked, it will suspend the program and call
+-popready-, as will the occurrence of an error. For use of -popready-
+with "load marked range" in VED see HELP * VEDPOPREADY.
+
+Unfortunately, it is not possible at present during a break to get at
+the values of variables declared as lexical, i.e. using "lvars". So it
+is sometimes useful during development to use "vars" to declare
+non-lexical local variables, and then change them to lexical variables
+using "lvars" when a program has been debugged. Occasionally this will
+change the behaviour of your program because there is an undetected bug
+involving interaction between different procedures!
+
+
+-- Use closures instead of popval -------------------------------------
+
+[This section is for advanced programmers]
+
+If you find yourself defining a procedure that uses -popval- to compile
+a list defining some big POP-11 procedure, you should seriously consider
+whether you can instead use partial application.
+
+For example, here is a use of popval
+
+    define makeproc(x,y,z);
+        popval([procedure; ...^x...^y...^z... enddefine]);
+    enddefine;
+
+which each time it is called compiles a procedure using different values
+of x, y, and z for parts of the procedure body.
+
+Instead, you can do,
+
+    define makeproc(x,y,z) -> result;
+        lvars x,y,z,result;
+
+        ;;; a generic procedure of three arguments is partially applied
+        ;;; to x,y,z
+        procedure(x,y,z);
+            lvars x,y,z,....;
+            ...x ... y... z...
+        enddefine(%x,y,z%) -> result
+
+    enddefine;
+
+I.e. if the list given to -popval- is built slightly differently each
+time the procedure is run, then you could instead define a general
+procedure which covers the various cases, and use closures (i.e. partial
+applications) of that procedure to create the special cases. This will
+save time, since the general procedure need only be compiled once, and
+save space because the big procedure will be shared between all the
+closures. The Popvalled procedure may run a bit faster, however.
+ See HELP *PARTAPPLY, TEACH *PERCENT/apply
+
+The same variables don't need to be used inside the nested
+procedure as outside. E.g. the following would be equivalent to the
+above, and some may find it clearer
+
+    define makeproc(x,y,z) -> result;
+        lvars x,y,z,result;
+        procedure(a,b,c);
+            lvars a,b,c,....;
+            ...a ... b... c...
+        enddefine(%x,y,z%) -> result
+    enddefine;
+
+
+-- Turn repeated code fragments into subroutines with names -----------
+
+If you find yourself repeatedly writing the same bit of program,
+see if you can instead produce a single procedure (a sub-routine) with
+a meaningful name, and then use calls to that procedure all over the
+place. This will make your program more compact, more readable, and
+only slightly slower. Also by tracing the procedure you will find
+debugging easier.
+
+If you are writing, all over the place,
+
+    hd(tl(tl(...))
+
+to get or update the third element of a list, do
+
+    define third_element(list);
+        hd(tl(tl(list)
+    enddefine;
+
+    define updaterof third_element(list);
+        ;;; takes one thing off stack
+        -> hd(tl(tl(list)
+    enddefine;
+
+If the bit of program replaced is bigger, the savings in space will be
+bigger, and the readability advantage will be bigger.
+
+This is an example where the better style can reduce speed, since
+the extra procedure call will slow things down. It may still be worth
+doing to make the program easier to maintain and extend.
+
+An alternative that doesn't sacrifice efficiency is to define a macro or
+syntax word called "third_element" that will look like a procedure call,
+but will actually be replaced at compile time by the faster in-line
+instructions. (See HELP * INLINE, HELP * MACRO.).
+
+If you define something that is used in such a way that it looks like a
+procedure but isn't, it's a good idea to adopt a convention to indicate
+that it is a macro or syntax word rather than a procedure, e.g. using
+capital letters.
+
+For an example of a definition of a simple macro look at the library
+definition of -lib-
+
+See SHOWLIB * LIB, HELP * LIB
+
+For an example of a definition of a syntax word, look at the library
+defining -foreach-
+
+    SHOWLIB * FOREACH
+
+
+-- Turn similar code fragments into super-routines --------------------
+
+If you find yourself defining two (or more) biggish procedures that do
+more or less the same thing but differ slightly in various places, that
+is often a sign that something has gone wrong: you have not found the
+right level of generality. Instead see if you can define a single
+procedure (a super-routine) that can be parametrised to produce the
+different special cases. A bit of code that has to be different in the
+different specialisations may be handled by giving a procedure as
+argument to the super-routine. Different procedures can cope with
+the different special cases. (E.g. in this sense procedures like
+syssort, applist, maplist and appdata are super-routines.)
+
+Specialised procedures can be define by partially applying the
+super-routine, and giving the closures thus produced meaningful names.
+E.g.
+    vars procedure(
+        sort_alpha = syssort(% alphabefore%),
+        sort_revalpha = syssort(% alphabefore <> not%),
+        sort_increasing = syssort(%nonop < %),
+        sort_decreasing = syssort(%nonop > %));
+
+Deriving the different cases from one super-routine will make it easier
+to maintain the program, because if modifications are needed then
+instead of having to make the change to all the special procedures you
+can just change the super-routine once. (Sometimes, though, you want to
+change it for one application only, in which case you may have to define
+a separate procedure).
+
+
+-- Choosing data-types ------------------------------------------------
+
+If you are storing things in lists or vectors to represent different
+kinds of entities, considering defining special types of records or
+vectors for those entities (see * RECORDCLASS, * VECTORCLASS).
+
+Try very hard before you write your program to be clear about what kinds
+of entities your program is concerned with - people, houses, families,
+marriages, actions, or whatever. Choose a data-representation that
+matches the structure of what you are doing. Clear thinking about what
+needs to be represented in a program and a good choice of structures for
+that purpose can be the first steps towards designing a good program.
+
+If you happen to have an example that deals with three families DON'T
+write your program using a variable for each family. You will then find
+it hard to generalise to more than three families. Instead have a list
+(or similar structure) called families that contains all the three
+families and make your procedures independent of how many items there
+are in the list.
+
+Make sure you have a clear idea about the different kinds of procedures
+that are concerned with the different kinds of entities. If there are
+different groups of procedures concerned with different groups of
+entities then make the layout of the program reflect this. Put bits of
+program concerned with the same things together.
+
+-- Data-abstraction ---------------------------------------------------
+
+Use data-abstraction wherever possible. I.e. if you are using
+a three element list to represent something, e.g. mother, father
+and children, then don't write all over the place:
+
+    hd(tl(family))
+or
+    family(2)
+
+to get at the father. This makes the program hard to understand and
+commits you to a particular implementation that is hard to change.
+
+Instead, define a procedure called (e.g.) father_of
+
+    define father_of(family);
+        lvars family;
+        hd(tl(family))
+    enddefine;
+
+Or if you are worried about efficiency do:
+
+    vars procedure father_of = tl <>  hd;
+
+    "father_of" -> pdprops(father_of);
+
+Similarly you could make "mother_of" a synonym for "hd", giving you the
+option to change the definition later without having to search for all
+the occurrences of "hd" that need to be changed.
+(See HELP *SYSSYNONYM)
+
+If you introduce these named procedures your program will be more
+modular, readable and maintainable. E.g. you can later change the
+representation of families without having to change all the occurrences
+of hd(tl(...)). Instead you just change the definition of father_of,
+mother_of etc.
+
+-- Efficiency vs clarity ----------------------------------------------
+
+Don't try to be clever leaving things lying around on the stack for the
+sake of efficiency. That is a good way to produce obscure bugs, and the
+efficiency gains are generally not worth the loss of reliability.
+
+Try to avoid generating unnecessary garbage collections. E.g. GCs are
+produced if you repeatedly add something to the right hand end of a list
+instead of the left end, in a loop. If necessary put things on the left
+in the loop, then reverse the list at the end. (See HELP EFFICIENCY)
+
+If you read HELP EFFICIENCY avoid the use of fast_ procedures except
+where you are very sure you know what you are doing. They are dangerous,
+especially if you use the UPDATER of things like fast_front,
+fast_subscrv, etc.
+
+Wherever there is a choice between efficiency and clarity, go for
+clarity (except perhaps where that slows things down enormously). It is
+specially important to go for clarity whilst you are developing the
+programme and its specification. When it is all fully specified and
+debugged, trying to improve performance may be a good idea.
+
+-- Using the stack to build lists or vectors --------------------------
+
+However, when you seem to have to choose between clarity and efficiency
+it is sometimes possible to change your design so that the clearer
+program is also the more efficient one. E.g. instead of going round a
+loop adding things to the right hand end of a list (which will generate
+lots of garbage collections), you can put the loop inside [% ... %].
+E.g. instead of
+
+Style A.
+    [] -> list;
+    for item in item_list do
+        ......
+        [^^list ^item] -> list;     ;;; list construction buried in code
+        ......
+    endfor;
+
+You can write the following, which makes it very clear that inside
+the brackets a list is being built up:
+
+Style B.
+    [%
+      for item in item_list do
+        ......
+        item   ;;; i.e. leave the item on the stack
+        ......
+      endfor
+    %] -> list;
+
+Notice that by changing the list brackets to vector brackets {%...%} you
+can use Style B to create a vector of items found in a loop. Also, using
+the form:
+
+    cons_with <constructor> {% ..... %}
+
+you can put the items into any type of structure for which there is a
+constructor procedure that takes N items on the stack plus the integer N
+saying how many there are, and puts the N items into an appropriate
+structure. Possible values for <constructor> are
+    conslist, consvector, consstring, consword, consintvec,
+    consshortvec, and other constructors defined by users.
+
+This technique for constructing vectors, strings, etc. is not possible
+in most languages, where you would first have to collect the items into
+a list, then, when you know how many there are, create a vector and copy
+the items over, the original list then becoming garbage.
+
+Note that since most languages do not have an open user stack you would
+not be able to use Style B even for lists. In that case the most common
+form would be something like the following, in which each new element is
+put on the front of the list, and the final list is reversed at the end
+
+Style C
+    [] -> list;
+    for item in item_list do
+        ......
+        cons(item,list) -> list;    ;;; list construction buried in code
+        ......
+    endfor;
+    rev(list) -> list;              ;;; or use ncrev to avoid garbage
+
+
+Styles A and C have one advantage, namely that within the loop the
+partly constructed list is accessible as the value of the variable
+"list".
+
+The method of style B can be used for building a list of elements found
+and left on the stack during a procedure call. For example, here is a
+procedure that takes a binary tree (list of lists of list...) and a
+predicate, and puts on the stack all the atoms of the tree that satisfy
+the predicate.
+
+    define search_tree(tree,pred);
+        lvars tree, procedure pred;
+        if atom(tree) then
+            if pred(tree) then tree endif
+        else
+            search_tree(front(tree),pred), search_tree(back(tree),pred)
+        endif
+    enddefine;
+
+(Use -hd- and -tl- instead of -front- and -back- if you want to use
+dynamic lists).
+
+Then use list or vector brackets as above to collect all the items found
+into a single structure, e.g.
+
+    [% search_tree([1 a [2 b 3 c [4 d] [5 e]] 6 f],isword)%] =>
+    ** [a b c d e f]
+
+In a language without an open stack you'd either have to either use a
+global variable to collect the items found, or else return partial lists
+from each recursive call, and repeatedly join them together to produce
+intermediate lists, a very messy procedure.
+
+-- Miscellaneous ------------------------------------------------------
+
+In Pop-11 it is often very convenient to treat a vector as a function
+and apply it to a number to access an element, as in my_vector(x). The
+alternative form
+
+    subscrv(x, my_vector)
+
+will be slightly more efficient, will make it clear that my_vector must
+be a vector (otherwise an error will occur), and may make it easier
+later to optimise by replacing subscrv with fast_subscrv. However the
+alternative form is more convenient if the value of a variable is
+sometimes a list, sometimes a vector, somtimes something else. E.g.
+
+    define third(item);
+        item(3)
+    enddefine;
+
+-- Defining macros and syntax words -----------------------------------
+
+[This section is for advanced programmers]
+
+In POP-11 it is possible to define syntactic extensions to the language,
+or sometimes simple abbreviations, using macros or syntax words. Both
+macros and syntax procedures are invoked at compile time when the name
+of the procedure is encountered by the compiler. So they can cause
+things to happen at compile time, such as re-arrangement of the text
+input stream (macros) or planting of commands for the compiler (syntax
+words). For details see
+
+On macros:
+    HELP * MACRO,  HELP * DEFINE/Macros,   REF * PROGLIST/Macro
+On syntax words:
+    HELP * DEFINE/Syntax,  REF * POPCOMPILE/Example, REF * VMCODE
+
+In both cases there is a temptation to write the program so that the
+macro or syntax procedure actually does something other than re-arrange
+the input stream or plant code, for instance declaring a variable and
+assigning something to it. E.g. here is a macro "var0" that declares
+a variable and assigns "0" to it;
+
+    define macro var0 word;
+        popval([vars ^word;]);
+        0 -> valof(word)
+    enddefine;
+
+Unfortunately, this cannot be used to declare a local variable. It can
+also go wrong if you use sections. So, instead the instructions to do
+this should (in a macro) be put back on proglist, e.g.
+
+    define macro var0 word;
+        "vars", word, ";", 0, "->", word, ";"
+    enddefine;
+or
+    define macro var0 word;
+        "vars", word, "=", 0, ";"
+    enddefine;
+
+This will now allow LOCAL variable declarations of the form
+
+    var0 x;
+
+However, it will generally be better to define a syntax procedure for
+this kind of thing unless there is some special reason why rearrangement
+of input stream is required (as in LIB * SWITCHON, HELP * SWITCHON) as
+opposed to directly planting code. So as a syntax procedure the above
+would become:
+
+    define syntax var0;
+        lvars word = itemread();
+        pop11_need_nextitem(";");
+        sysVARS(word,0);    ;;; declare the word as ordinary identifier
+        sysPUSHQ(0);
+        sysPOP(word)
+    enddefine;
+
+
+-- Test commands ------------------------------------------------------
+
+Don't include test runs or calls of your procedures in the same files
+as the definitions. This will make it impossible to compile the files
+without running the tests.
+
+While developing the program build up a file a test commands. After
+every major change run the tests and make sure that they all produce
+the correct printout. If necessary keep the previous printout in a file
+and use the unix "diff" command to see what has changed.
+
+Don't change the tests that have previously worked. Only add new ones.
+If you delete old ones you may fail to detect new bugs.
+
+SUGGESTIONS FOR IMPROVEMENT AND EXTENSIONS WELCOME
+
+--- $poplocal/local/teach/progstyle

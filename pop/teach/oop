@@ -1,0 +1,950 @@
+TEACH OOP (DRAFT - COMMENTS WELCOME)           Aaron Sloman October 1994
+                                                        Revised Dec 1998
+
+
+This file was written originally for AI students learning Pop-11 (which
+includes various object oriented extensions), but it should be useful
+and intelligible to other students.
+
+It gives a short introduction to concepts of object oriented programming
+(OOP), along with a potted history, and provides some pointers to online
+information about OOP in Poplog and in particular the OBJECTCLASS
+package which extends Pop-11 with sophisticated object oriented
+programming facilities.
+
+It also mentions a variety of experimental OOP libraries previously
+implemented within Pop-11.
+
+
+CONTENTS - (Use <ENTER> g to access required sections)
+
+
+ -- History
+ -- What is object oriented programming?
+ -- -- Confusions about OOP
+ -- -- OOP and "message sending"
+ -- -- Message sending considered harmful
+ -- -- Data encapsulation and abstract data-types
+ -- What is OOP really? (A silly question)
+ -- Questions worth asking about OOP
+ -- Typical features of OOP Languages
+ -- -- Single and Multiple inheritance
+ -- -- Mixins
+ -- -- Methods
+ -- -- Static vs dynamic methods
+ -- -- Single vs multi methods
+ -- Inheritable features
+ -- -- Data Features associated with a class:
+ -- -- Procedural Features associated with a class:
+ -- Additional features
+ -- OOP and AI
+ -- Previous OOP extensions to Pop-11
+ -- . LIB OBJ         (circa 1983)
+ -- . LIB NEWOBJ      (circa 1985)
+ -- . LIB FRAMES      (1985, or earlier)
+ -- . LIB FLAVOURS    (circa 1985)
+ -- . LIB OBJECTCLASS (circa 1991)
+ -- Further reading (Packages using Objectclass)
+ -- Object Oriented Design Methodologies
+
+-- History ------------------------------------------------------------
+
+I'll start with an incomplete history. Don't treat this as
+authoritative: it is based only on what I've learnt since around 1970. A
+more complete history would require substantial research.
+
+The first language that combined several OOP ideas was SIMULA-67,
+described in a book called Simula Begin, by Nygaard et al. Simula was
+very influential though many of those who were indirectly influenced by
+its ideas were unaware of the fact.
+
+SMALLTALK was developed by AI researchers at Xerox Parc in Palo Alto
+during the 1970s and was used among other things for implementing one of
+the early mouse and windows interfaces on a machine developed at XEROX.
+Some of those ideas were later taken over by Apple and used in the Apple
+Macintosh.
+
+An extension to Lisp called "FLAVORS" was produced at MIT in the late
+70s and early 80s. This was later replaced by CLOS after Common Lisp had
+been adopted as a standard by (some!) of the Lisp user community.
+
+In the mid 80s a library called FLAVOURS, partly modelled on Lisp
+FLAVORS was added to Pop-11. In the early 90s a sub-language called
+OBJECTCLASS more closely related to CLOS was added to Pop-11. (See
+further information below.)
+
+A different strand of development arose in the early 80s out of attempts
+to add OO features to conventional non-interactive languages, such as C
+and Pascal, e.g. Objective-C, C++, Object Pascal, and many other
+languages were developed in parallel. C++ became the most widely used of
+these, probably because it was so close to C and compilers were
+developed for a wide range of computers and operating systems.
+
+Eiffel was a language developed around the same time from what some
+people regard as a cleaner theoretical base. ADA was for a time used
+widely by professional software engineers especially in military
+contexts. It was designed to support concurrency, with some object
+oriented features, along with a mathematically precise specification,
+designed to support safety critical applications and military
+applications where there was no room for error.
+
+There were also various "object oriented" extensions to Prolog, and to
+database systems.
+
+During the 1980s there were also many software applications developed
+using ideas associated with "object orientation" in a variety of
+interpretations. For instance the X window system which provides the
+basis of all the graphics and mouse-based interaction on Unix systems
+was explicitly designed with an object oriented methodology, especially
+the use of inheritance (explained below), even though the language used
+to implement most X facilities is C.
+
+During the 1980s much confusion (discussed below) reigned regarding what
+"object oriented" meant, and that confusion survives today. In fact
+there was a collection of more or less independent ideas, and different
+people focused on different subsets of the ideas, according to their
+interests and their prior knowledge. (Most computer scientists and
+software engineers have only a limited knowledge of the variety of
+languages and language features in existence.)
+
+In the early 90s various attempts were made to start again with powerful
+new languages designed entirely within an Object Oriented framework
+(though not everyone agreed on what that meant). A language called
+"Dylan" developed by Apple and Harlequin was largely inspired by
+Scheme, a lisp-like functional language.
+
+Java, developed at the same time by Sun, spread much faster than Dylan
+and eventually completely eclipsed it, although many people think Dylan
+was inherently a much better (cleaner, more powerful, language). Java
+was designed specifically to support remote access to computers in
+connection with World Wide Web browsers, and that was one of the
+features which led to its rapid spread.
+
+One problem is that the different developers do not use "object" or
+"object oriented" in the same way, so that there is an incredible amount
+of confusion and hype (hyperbole)!
+
+There is a useful potted history of OO ideas in Chapter 2 of Booch.
+It also contains a good bibliography, though such things easily get out
+of date, and you may need to use bibliographic search mechanisms to get
+important recent reports surveys.
+
+
+-- What is object oriented programming? --------------------------
+
+-- -- Confusions about OOP
+
+For a while there were many people who thought that object-oriented
+systems are systems associated with windows and pointing devices. This
+was simply a confusion arising from the fact that object oriented
+systems provide excellent mechanisms for implementing window/mouse
+mechanism.
+
+Another persistent confusion is that object oriented programming has
+something to do with thinking about objects or using objects in the
+machine.
+
+But that notion is too vague to be of any interest: many programming
+styles and programming languages use data-structures which are objects,
+such as lists, records, vectors and arrays, which may include static
+information and have associated procedures that can be run to access,
+update, or make use of the information.
+
+Moreover, all sorts of programs include things that represent objects
+outside the machine, for instance, databases of information about
+employees in a firm, simulation models of a factory or mechanism. This
+is not a feature unique to object oriented programming.
+
+-- -- OOP and "message sending"
+
+A related confusion is that object oriented programming has something to
+do a distinction between
+
+(a) applying a procedure (function) to a object
+
+and
+
+(b) sending a message to an object, and allowing the object to
+    decide what to do.
+
+This may be a useful idea in a distributed system where objects can
+reside on remote machines, requiring something like messages to be sent
+across a network, but in other contexts, message sending can simply be
+seen as "syntactic sugar" for a special type of procedure call
+(sometimes referred to as "method invocation"). Moreover it is a
+RESTRICTIVE syntax because it enforces an asymmetry which is sometimes
+unnatural.
+
+E.g. The following syntax might be used for sending a message to a
+graphical object O1 saying, in effect, "link yourself to objects O2
+and O3":
+
+    O1 <- link_to(O2, O3)
+
+A variant of this notation might use a dot rather an an arrow to
+represent sending a message:
+
+    O1.link_to(O2, O3)
+
+Since this is really invoking a procedure to do something involving O1,
+O2 and O3, this can be seen as syntactic sugar for something which could
+just as well be expressed as:
+
+    link_to(O1, O2, O3)
+
+or perhaps, sending a message to all three saying "link yourselves to
+one another":
+
+    (O1, O2, O3) <- link_to
+
+The first form, which treats O1 as special, might be used in cases where
+the link_to method is specifically defined in the context of objects of
+the type to which O1 belongs. The asymmetric syntax shows that O1 is
+treated differently from O2 and O3, and that might be useful in some
+cases. But does it justify a special syntax? We often use procedures
+(functions) in connection with two or more objects which are treated
+differently, e.g.
+
+    member(item, list)
+
+Why should we be required to express this as:
+
+    item <- member(list)
+    "Item, tell me, are you in list?"
+or
+    list <- member(item)
+    "List, tell me, is item in you?"
+
+
+-- -- Message sending considered harmful
+
+Some people who have used most of the features of object-oriented
+languages have found the kind of enforced asymmetry required in message
+sending unhelpful and restrictive.
+
+For example, a vision program given two line segments and required to
+find where their intersection is, is inherently symmetric, so that being
+forced to write
+
+    line1 <- intersect(line2)
+
+rather than
+
+    intersect(line1, line2)
+
+is just a source of confusion and unnecessary difficulty. Likewise, if
+you have a method for finding where a line intersects a circle, why
+should you have to write
+
+    line1 <- intersect(circ1)
+
+rather than
+
+    circ1 <- intersect(line1)
+
+Why not simply define a method which takes a line and a circle and can
+be invoked as
+
+    intersect(line1, circ1)
+
+returning a list of intersection points?
+
+It is often supposed that something like the message sending syntax is
+needed because it allows the behaviour of the "link_to" method to depend
+on the TYPE of thing O1 is. I.e. O1 is in control of the action
+produced.
+
+However there are object oriented languages (E.g. CLOS, the Common Lisp
+Object System, and OBJECTCLASS in Pop-11) which allow method invocation
+to use the second form, AND allow the type of behaviour to depend on the
+types of ALL the objects, not just ONE of them. Thus you could have an
+intersect method which behaves appropriately when given two lines, a
+line and a circle, a circle and a line, two circles, etc. A different
+definition of the method is given for each combination of types.
+
+These are therefore not ordinary procedures, which can only have ONE
+definition, and so they are sometimes referred to as "generic
+functions", or simply "methods".
+
+This ability to use the same procedure name in connection with different
+procedures for handling different combinations of types of arguments is
+sometimes called "overloading", and sometimes "polymorphism". It is
+sometimes available in languages which have nothing to do with object
+oriented programming, such as Algol68.
+
+These languages simply generalise the fact, which is common to most
+programming languages, and very widely accepted, namely that infix
+arithmetic functions like:
+
+    +  *  /
+
+and also printing procedures and equality tests, all have to do
+different things depending on the types of their arguments.
+
+E.g. in a language which allows "+" to be used with combinations of
+integers and reals, there have to be four different types of behaviours,
+to cope with all these cases:
+
+    3 + 4,  3.0 + 4,  3 + 4.0,  3.0 + 4.0
+
+In languages like Pop-11 and Common Lisp, which include ratios, big
+integers and complex numbers even more combinations are required!
+
+E.g. in Pop-11 all the following are legal and will produce a result:
+
+    3 + 3  =>
+    3.5 + 3  =>
+    3 + 3.5  =>
+    3 + 7/2  =>
+    3/4 + 77.5  =>
+    3/4 + sqrt(-1) =>
+
+
+Likewise equality testing and printing often use a common syntax,
+involving the same form of procedure invocation, but require different
+behaviours depending on the types of the objects involved. Printing an
+integer, a real, a string, and a list involve very different procedures.
+
+I.e. these arithmetic, printing, and equality functions are already
+generic functions (overloaded functions).
+
+In most languages there are some built in overloaded functions, but
+USERS of the language are not allowed to define new ones. OOP languages
+generally do allow that (though in a restricted format where message
+sending is used). However this is a feature of data-abstraction, rather
+than something specific to OOP.
+
+For these reasons I regard it as a serious mistake to attempt to
+DEFINE OOP in terms of the use of a "message sending" syntax, which
+enforces an asymmetry between the different sorts of objects to which a
+method is applied. Rather message sending is just one form of syntax
+that can be used in connection with overloading and data-encapsulation
+(defined below).
+
+Many of the well known OOP languages (and the Pop-11 Flavours system) do
+use some form of message sending syntax, but it is also the case that
+some very powerful OOP languages, including the Common Lisp Object
+System (CLOS) and Pop-11 Objectclass do not do so.
+
+So "message sending" is merely an OPTIONAL FEATURE of an object oriented
+language, found in some OOP languages, but not in others.
+
+-- -- Data encapsulation and abstract data-types
+
+Another common idea is that OOP is about data-encapsulation: having
+data-structures (objects) that make use of some internal representation
+that is not "publicised" and which cannot be used directly from outside
+the code that defines those objects. Instead the data in an object
+always has to be accessed by means of procedures that provide an
+interface to the objects, or by sending a message to the object.
+
+This is a very important programming idea: it allows different subsets
+of a program, or packages, to be developed and used in a way that allows
+the developers of each package to make various kinds of "hidden" changes
+and improvements without those who use the packages having to change
+their code.
+
+For instance, a class of lists could be defined in which there is an
+empty list nil (or [] in Pop-11) two main list constructors :: and <>
+where :: creates a new list by adding an item to an old list:
+
+    x :: list
+
+and <> creates a new list by concatenating two old lists:
+
+    list1 <> list2
+
+and two list-accessing procedures hd (head) and tl (tail) which can be
+applied to a non-empty list, with hd(list) returning the first item in
+the list and tl(list) returning a (possibly empty) list containing
+everything except the first item.
+
+The idea in data-encapsulation is that the programmer who develops lists
+and procedures for constructing and manipulating lists, such as ::, <>,
+hd, tl, need not specify how lists are represented in the machine nor
+how the procedures work in detail. For instance they may invoke "hidden"
+store management procedures for creating new lists when needed.
+
+Making such a distinction between "public" information about a type of
+data with associated procedures and the "hidden" or "private" details
+is also sometimes described as "data abstraction".
+
+A class of data can be defined entirely in terms of how the instances of
+the class behave "from outside," without any mention of how the data are
+implemented.
+
+For example, lists and the main procedures which operate on them could
+be defined by equations specifying how the list-accessing and list
+constructing functions behave, e.g.
+
+1. The head of a list created by adding x to the front of a list is x:
+
+                hd(x :: list) = x
+
+2. The tail of a list created by adding x to the front of a list is that
+list:
+
+                tl(x :: list) = list
+
+3. Applying HD or TL to the empty list produces an error:
+
+                hd(nil)   = error
+                tl(nil)   = error
+
+4. Concatenating list with the empty list, or the empty list with list
+returns the original list:
+
+                list <> nil   = list
+                 nil <> list  = list
+
+5. If the result of adding x to the front of list1 is concatenated with
+list2, then that produces the same list as adding x to the result of
+concatenating list1 with list2:
+
+        (x :: list1) <> list2   =  x :: (list1 <> list2)
+
+and so on.
+
+Those "axioms" define a collection of operations on lists without
+specifying how the lists are implemented in the machine. (They are often
+implemented as "chained pairs" as depicted in TEACH BOXES, but
+alternative implementations are possible.)
+
+By using the abstract specification of lists in terms of HOW THEY
+BEHAVE, we give the programmer all the information that is needed for
+writing programs that create and manipulate lists.
+
+(Sometimes there are issues to do with maximising efficiency, which may
+depend on having additional information about internal representations.)
+
+This use of abstract data types is very important for ensuring that
+programs are correct (relative to their specification) and that
+different people working on the same large project know exactly what
+they can expect from one another.
+
+However, it does not require any special language support: a really good
+programmer can program like this in any language. It is a matter of
+programming discipline, rather than a type of language, though some
+languages may provide better support for it than others.
+
+For example, the defclass mechanism in Pop-11 (see REF * DEFCLASS),
+which can be used to define new record classes or vector classes (as
+described in HELP * RECORDCLASS, HELP * VECTORCLASS) provides some
+support for data abstraction, as does DEFSTRUCT in Common Lisp.
+
+Related techniques exist in other languages, such as ML (described
+briefly in HELP * PML). But Pop-11, LISP and ML are not normally
+regarded as object oriented languages simply because they provide data
+abstraction/encapsulation in this sense.
+
+
+-- What is OOP really? (A silly question) -----------------------------
+
+It should be clear now that this is a silly question, because it has no
+answer!
+
+The phrase "object oriented programming" has come to connote a
+collection of ideas, and arguing about which of these ideas is somehow
+correct, or THE defining condition of object orientedness, is just
+silly. (Such silliness is often displayed in discussions in internet
+news groups such as comp.object, comp.lang.clos, comp.lang.dylan.)
+
+We could ask: which are the most important ideas typically associated
+with object oriented programming languages. Different people would give
+different answers.
+
+My personal answer is: support for inheritance (described below) and
+overloading.
+
+That's because after many years of programming in a variety of styles I
+have found that the combination of these two features (especially with
+multiple inheritance) can provide very powerful support for production
+of complex software packages which can be extended in different ways in
+different contexts without the risks involved in having to extend them
+by re-writing existing code.
+
+The extensions supported include using packages written for different
+purposes in a new application combining those purposes: that is where
+multiple inheritance (described below) is particularly useful.
+
+E.g. in the Pop-11 RCLIB package there is a collection of processes for
+creating and manipulating pictures on the screen and using the mouse to
+manipulate them. In the Pop-11 SIM_AGENT toolkit there are classes and
+methods concerned with managing processes involving a collection of
+interacting simulated agents and objects. These two sets of classes and
+methods can be combined to produce a simulation with a graphical
+interface by introducing new classes and methods which inherit structure
+and behaviours from the two pre-existing packages.
+
+The other features normally associated with OOP, e.g. data abstraction,
+and data-encapsulation, are also important, and perhaps more
+fundamental, but they are much older, very widely used outside the
+context of OOP, and do not to the same extent require special features
+to be built into the language. However inheritance and overloading
+require the programming language to include special mechanisms (at
+compile time and at run time.)
+
+-- Questions worth asking about OOP -----------------------------------
+
+Instead of having "religious" debates about which are the correct ideas,
+or what OOP "really" is, what we need to do is understand that there is
+an important collection of ideas which have been developed in the
+context of a variety of programming languages since computers first
+became available. Different subsets of those ideas can be combined for
+different purposes.  We need to know:
+
+o what the full collection of features in various object oriented
+  languages is
+
+o how they work
+
+o when they are useful and when they are not useful in the production
+  of software
+
+o which combinations of the features fit well in different programming
+  contexts
+
+o what sorts of tools are needed to make them available
+
+o which syntactic forms are available for these features
+
+o what the pros and cons of different syntactic forms are
+
+o what sorts of development environments support the use of the various
+  features.
+
+-- Typical features of OOP Languages ----------------------------------
+
+OOP Systems generally provide some subset of the following.
+
+o A means of defining classes of objects, where a class is an abstract
+specification which can have many instances. (In some languages a class
+is itself an instance of a higher order metaclass.)
+
+o A means of creating instances of classes, where instances of the same
+class will generally have a structure inherited from the class
+definition, and may contain (initially) dome default information also
+inherited from the class definition. This is instance-inheritance.
+Instances of classes are often referred to as "objects". (In some
+OOP languages classes are themselves just a special type of object.
+In others there is a sharp distinction.)
+
+o Provisions for defining a new subclass of an existing class (its
+superclass). The subclass will "inherit" various features from its
+superclass, including a structure (a set of slots or fields capable of
+having values) some default values (for slots), and some methods
+defined for the superclass.
+
+Example:
+If class C2 (e.g. accountant) is a subclass of class C1 (e.g. employee)
+then instances of C2 will inherit both from the superclass C1 (e.g. all
+employees have a salary and an employer) and from the subclass C2 (e.g.
+accountants have a minimum initial salary).
+
+The inheritance by C2 of some of C1's features can be called
+class-inheritance. If a1 is an instance of C2, i.e. an actual accountant
+object, then its inheritance of features from the classes C2 and
+(indirectly C1) can be called instance-inheritance.
+
+o Some OOP languages allow a class to have more than one superclass,
+i.e. they support "multiple inheritance".
+
+
+-- -- Single and Multiple inheritance
+
+o 'Single-inheritance' systems allow each class to have only one
+super-class, so that from any object or sub-class, there is a single
+chain of 'upward' links through classes.
+
+o 'Multiple-inheritance' systems allow a class to be defined as a
+sub-class of more than one super-class, so that the upward links branch
+out in tree-like fashion, requiring a searching operation to find
+information in super-classes. With single inheritance finding
+information requires simply looking up a non-branching chain of
+superclasses.
+
+NOTE: OBJECTCLASS provides multiple inheritance, so that you can define
+the class 'teacher' as a sub-class of both 'person' and 'worker'.
+For examples see TEACH * OBJECTCLASS_EXAMPLE
+
+
+-- -- Mixins
+
+o Mixins are a kind of class that can have no instances in themselves
+but can be combined with other classes.
+
+Thus instead of having employee as a stand-alone class we could have it
+as a "mixin" which can be combined with other classes such as plumber,
+carpenter, builder, to produce new subclasses called employed_plumber,
+employed_carpenter etc.
+
+Mixins work only in systems that allow multiple inheritance, since the
+combined class has to inherit from both the mixin and its other
+superclass or superclasses. Mixins are often specially useful because of
+the methods associated with them.
+
+
+-- -- Methods
+
+o OOP languages typically provide some means of defining "methods"
+associated with a class (and automatically inherited by all its
+sub-classes). Thus the class person might have a method called birthday,
+which when applied to an instance of a person increases that person's
+age by 1. If employee is a subclass of person then the birthday method
+will also be applicable to all instances of employee (i.e. all
+employees). Likewise if teacher is a subclass of employee then all
+teachers will have the birthday method. However it may be possible to
+define a specialised version of the birthday method for a particular
+subclass. E.g. for the class sailor the method might post a greeting
+for the sailor to pick up at the next port of call.
+
+Multiple inheritance systems support more complex ways of inheriting
+methods. If a method name (e.g. M) is used to define methods for two
+classes C1 and C2 (i.e. different methods with the same name), and then
+a new class C3 is defined which inherits from both C1 and C2, a decision
+has to be taken regarding which version of M will be inherited by
+instances of C3. Typically that will depend on whether C1 was listed
+before C2 or C2 before C1 in specifying the definition of class C3.
+Some languages with multiple inheritance may provide syntax for
+specifying the superclass from which the method should be selected,
+e.g.
+    M(c: as C1)     apply to c, the version of M defined for C1
+
+o Method invocation may use a message sending or a function application
+syntax, as explained above.
+
+E.g. running the birthday method may look like one or other of
+these (or some variant):
+
+    john <-- birthday
+
+    birthday(john)
+
+In either case what happens depends on the class(es) that john belongs
+to, and how they have defined the birthday method. I.e. invoking
+apparently the same method can produce different sorts of behaviour for
+different sorts of objects. This is sometimes also called "overloading".
+
+In systems that use the second form of syntax (e.g. OBJECTCLASS, CLOS)
+methods are often referred to as generic functions, or multi-methods,
+because the method selection is based on the classes of all the
+arguments, not just the first one.
+
+-- -- Static vs dynamic methods
+
+o In some languages every constant and every variable, and every complex
+expression built out of procedure calls, variables, and constants has a
+fixed "type" that can be determined at compile time.
+
+For instance in many languages if a variable X has been declared as of
+type "integer" then no legal program can ever assign to it a decimal
+number or ratio. Thus if an overloaded method is applied to X, the
+compiler can work out at compile time which version of the method is to
+be used, and the program will run fast.
+
+In other languages, such as Pop-11 and Lisp and Prolog, there is more
+flexibility, since a variable can have different types of values at
+different times during the running of the program. That means that
+decisions about which methods are appropriate have to be made at run
+time, not compile time.
+
+Methods that allow run-time selection on the basis of the actual types
+of objects can be called dynamic methods. They work only when the
+implementation ensures that each and every object carries information
+about its type with it. So this gives greater flexibility at the cost of
+extra space (usually) and reduced speed because of the run time checks.
+
+This disadvantage is sometimes worth putting up with because of the
+extra flexibility, especially in AI programming environments. Where
+either maximum speed or a compile-time guarantee that the program will
+never have a "method failure" is required, static methods may be
+preferred.
+
+
+-- -- Single vs multi methods
+
+o Some languages that support the generic function style of OOP allow
+the behaviour of the method to depend not only on the the type of the
+first argument but on the combination of types of all the arguments.
+
+For example a language for designing graphical systems may allow you to
+specify that a link should be drawn between two objects, but allow the
+method definitions to be different depending whether it is a link
+between a square and a square, a square and a circle, a circle and a
+circle, and so on. (This was illustrated above, in the discussion of
+restrictions of message sending.)
+
+For a language without multi-methods you have to specify within the
+methods for each class how instances of that class should be linked to
+instances of other classes.
+
+E.g. you specify for the class circle a method that checks whether it is
+being asked to link itself to a square, a triangle or another circle and
+then takes appropriate action. For some applications this is quite
+natural, whereas for many applications it is very arbitrary to put
+that "how to link" information with just ONE of the classes, instead of
+defining a method that is explicitly defined to handle TWO classes, in a
+symmetric way.
+
+(This is one of those topics that can easily generate stupid theological
+debates about which is "right". It all depends on the problem, or
+perhaps on the style the programmer is used to, or perhaps on how the
+program has to interface with other programs.)
+
+
+-- Inheritable features -----------------------------------------------
+
+An OOP system may provide, associated with each class, data features and
+procedural features, as follows.
+
+-- -- Data Features associated with a class:
+
+D1. A set of 'slots' or 'fields' with particular names, to be found in
+    each instance of the class.
+
+D2. Default values or 'fillers' for these slots.
+
+D3. A set of data associated globally with the class.
+
+-- -- Procedural Features associated with a class:
+
+P1. Actions to be performed when a new subclass is created.
+
+P2. Actions to be performed when a new instance of the class is created.
+
+P3. Actions to be performed when an instance (object) is sent a message.
+
+P4. Actions to be performed when a slot or field in an instance is
+    accessed or updated.
+
+P5. Actions to be performed when information associated globally with
+    the class is accessed or updated.
+
+P6. Actions to be performed when an instance is destroyed.
+
+All of these features, except perhaps D3 and P5 should be inherited
+from superclasses by their sub-classes.
+
+-- Additional features ------------------------------------------------
+
+There are additional features of some object oriented systems which
+are not found in all, e.g.
+
+1. The ability to have classes which are also objects. This would enable
+a class to be both an instance of a more abstract type of class (a
+METACLASS) and also a subclass of a more general class at the same level
+of abstraction. This can add considerably to the flexibility of the
+system. (Pop-11 Flavours has meta-flavours, but Objectclass does not
+support this.)
+
+2. The ability to alter a class after some instances have been created,
+e.g. by adding a new information slot to the class, and have the
+instances automatically feel the effects. This can be useful during
+development and debugging but complicates the implementation and reduces
+efficiency.
+
+This is another way in which Pop-11 Flavours is more flexible than
+Objectclass. However both of them allow you to redefine methods after
+instances have been created: the new versions of the methods will work
+on pre-existing agents.
+
+
+3. Some systems, e.g. Smalltalk-80, provide powerful mouse and window
+browsing tools. Objectclass has a limited browsing capability
+described in REF * OBJECTCLASS/Browsing
+
+
+-- OOP and AI ---------------------------------------------------------
+
+The relevance of OOP to AI is debatable. During the 1970s and 1980s a
+considerable amount of work was done on developing the notion of a
+Frame-based knowledge representation formalism. Examples included FRL,
+KL1, KLONE, KRYPTON, and then later systems like KEE, ART,
+Knowledgecraft, CLASSIC and more besides. You can find discussions of
+some of these in:
+
+Brachman, R.J. and Levesque, H.J. (eds). 1985 Readings in knowledge
+representation} Los Altos, CA: Morgan Kaufmann 1985.
+
+Frame systems tend to be similar to Object Oriented Programming
+languages with additional features, e.g. extra methods of inference
+besides "isa" inheritance from superclasses, extra constraints and
+checking on values that are put in slots, more abstract ways of
+specifying classes, and so on.
+
+When these languages were first introduced they generated heated debates
+about whether frames actually did anything that could not be done with
+logic alone. See especially the paper on the logic of Frames by Pat
+Hayes in the Brachman and Levesque collection.
+
+At least we can say that for some purposes, an OOP system may be useful
+for knowledge which has to be 'compiled' into an efficient, special
+purpose, representation.
+
+-- Previous OOP extensions to Pop-11 ----------------------------------
+
+At various times a number of Pop-11 users have experimented with object
+oriented extensions to Pop-11.
+
+
+-- . LIB OBJ         (circa 1983)
+
+LIB * OBJ (available at Sussex and Birmingham) was a package for object
+oriented programming, implemented by Aaron Sloman using POP-11 processes
+(HELP * PROCESS) to represent objects, around May 1983.
+
+
+-- . LIB NEWOBJ      (circa 1985)
+
+
+LIB * NEWOBJ (distributed with Poplog) extends this to provide multiple
+inheritance and some other extensions and bug-fixes, including a
+separation between 'start_actions' and 'default_actions', previously
+confused. For more information see HELP * NEWOBJ
+
+
+-- . LIB FRAMES      (1985, or earlier)
+
+LIB * FRAMES (available at Sussex and Birmingham) provides a
+transcription to Pop-11 by Rudi Lutz, around 1985, of the Frame system
+described in the LISP book by P.H. Winston and B. Horn, For details see
+TEACH * FRAMES. This is an implementation (or partial implementation?)
+of the language known as KRL (Knowledge Representation Language), partly
+inspired by Marvin Minsky's paper on Frames as a representation for
+knowledge, published around 1975 and represented in several collections of
+AI papers in the 1970s.
+
+
+-- . LIB FLAVOURS    (circa 1985)
+
+LIB * FLAVOURS (distributed with Poplog) was an ambitious system
+implemented by Mark Rubinstein, modelled loosely on the ZetaLisp FLAVORS
+system, developed at MIT within the MIT Lisp environment and used on
+LISP Machines. The key ideas are introduced in TEACH * FLAVOURS.
+
+The FLAVOURS system was quite widely used by a number of projects based
+on Pop-11, as it is very flexible, though it suffered from a number of
+defects
+
+    (a) It introduces a type of syntax which is very different from
+        that of Pop-11, unlike Objectclass, which fits very well with
+        the Pop-11 syntax
+
+    (b) It is fairly slow: that is a consequence of the flexibility,
+        which allows class definitions to be changed after instances
+        have been defined.
+
+    (c) Where a method involving two objects is inherently symmetric
+        (E.g. a method to link two objects on the screen) you are forced
+        to treat it as asymmetric because it is invoked by sending a
+        message to one of the objects. The message can mention the
+        other. This is a defect common to all OOP systems based on message
+        sending, as opposed to treating method invocation as a
+        generalisation of procedure application.
+
+OBJECTCLASS overcomes these limitations, but is not quite so flexible.
+E.g. it does not allow a class definition to be changed after instances
+have been created, though methods can be redefined after instances have
+been created.
+
+For more information on FLAVOURS see the following documentation:
+
+HELP * FLAVOURS lists available documentation
+
+REF  * FLAVOURS is a reference file for the flavours system.
+HELP * FLAVOUR_LIBRARY lists the flavours and messages provided in
+    the autoloadable library.
+HELP * METAFLAVOURS describes the instances that represent flavours.
+
+
+-- . LIB OBJECTCLASS (circa 1991)
+
+
+LIB * OBJECTCLASS (distributed with Poplog) was designed by Steve Knight
+(now Leach) at Hewlett Packard Research Laboratories, Bristol, then
+integrated with Poplog by Rob Duncan at Sussex University. It maps OOP
+ideas onto existing Pop-11 concepts. The correspondence of ideas is as
+follows (extracted from HELP * OBJECTCLASS):
+
+    methods:
+        procedures, which act according to the type of their arguments
+
+    instances:
+        records, the instance variables of which are simply the fields
+        of the record and are accessed by appropriate methods
+
+    classes:
+        keys, although the keys that  play the role of classes are given
+        some extra fields (via hidden properties) so that they can
+        provide inheritance of behaviour
+        See REF * KEYS, for more on this. Also HELP * CLASSES
+
+Because this is a natural mapping, the overhead of a method call is
+relatively low.  This means that the objectclass package provides an
+efficient means of doing object-oriented programming.
+
+TEACH * OBJECTCLASS_EXAMPLE
+    provides a gentle introduction to OOP, based on OBJECTCLASS syntax.
+
+TEACH * ADVENT_OBJECTCLASS
+    shows how to implement the beginnings of an adventure game.
+
+HELP * OBJECTCLASS
+    gives a more complete overview.
+
+REF * OBJECTCLASS
+    gives full gory details
+
+-- Further reading (Packages using Objectclass) -----------------------
+
+LIB * SIM_AGENT
+
+    Describes a package which combines the object oriented features of
+    Objectclass with some of the "rule-based system" toolkit
+    LIB POPRULEBASE. The package is intended to define a framework for
+    exploring architectures for intelligent interacting agents.
+    The inheritance mechanism of Objectclass provides many convenient
+    features, allowing aspects of the package to be tailored differently
+    for different classes of objects.
+
+HELP * RCLIB
+    (Available at Birmingham) Describes an alternative extension to
+    RC_GRAPHIC, based on Objectclass providing a range of useful tools
+    including control panels, movable objects, etc.
+
+The above two packages are available in the Birmingham Poplog ftp
+directory
+    ftp://ftp.cs.bham.ac.uk/pub/dist/poplog
+
+HELP * GO
+    Describes the Graphical Objects library, which combines objectclass
+    and the rc_graphic system (HELP * RC_GRAPHIC) along with additional
+    X window facilities (e.g. event handlers), in a sophisticated
+    graphical package. (GO is distributed with Poplog.)
+
+-- Object Oriented Design Methodologies -------------------------------
+
+In addition to OOP languages people have tried to develop OO methods,
+OO design methods. For example, see
+
+Grady Booch: Object Oriented Design, The Benjamin Cummings Publishing
+Company Inc. 1991.
+
+Another such method, developed by researchers at Hewlett Packard, called
+the "fusion method", is described in:
+
+Derek Coleman, et. al.,  "O-O Development - The Fusion Method."
+          Prentice-Hall Object-Oriented Series. ISBN 0-13-338823-9
+
+For a collaborative project on user interface design environments I
+wrote some notes on "Structure Sharing Ontology Oriented Design"
+available online at Birmingham in the file ~axs/pap/ssood.90.11.03
+(Available on request from outside Birmingham.)
+
+NOTE: At Birmingham there is a file TEACH * OOPS.ORIG, which is the
+original teach file circulated by Steve Knight (Hewlett Packard
+Research Labs), who designed and implemented the OBJECTCLASS library.
+
+
+--- $poplocal/local/teach/oop
+--- Copyright University of Birmingham 1998. All rights reserved. ------

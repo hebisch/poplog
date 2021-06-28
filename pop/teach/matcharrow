@@ -1,0 +1,411 @@
+TEACH MATCHARROW                                Aaron Sloman 29 Sep 1996
+(Also TEACH MATCHES2)
+                                            Updated to use "!" Sept 1996
+
+Using the operator "-->"
+
+This teach file assumes that you have read through TEACH * MATCHES.
+It introduces new uses of the POP-11 matcher, not to test a condition,
+but to "extract" components of a list unconditionally.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- A NEW OPERATION "-->"
+ -- Using "-->" to dig out components of a list
+ -- Using "-->" to extract a "segment" of a list
+ -- Using --> to extract items between two given items
+ -- You can use "restricted" pattern variables to control the match
+ -- Using an integer to restrict the length of a matched segment
+ -- Using  --> to extract portions of nested sub-lists
+ -- Using "-->" in a procedure
+ -- Some exercises using -->
+ -- Further reading
+
+-- A NEW OPERATION "-->" ----------------------------------------------
+
+Sometimes you know the general form of a list, but you merely want to
+get at one or more specific elements. For instance, you may wish to dig
+out the first, or the last element, for some purpose. Often, we want to
+perform some operation on all the elements of a list, so we start by
+doing it to the first element, and then continue on the remainder. For
+this purpose it is sometimes useful to be able to dig out the first
+element, and then to dig out all the remaining elements and make a list
+of them.
+
+In cases like this where we know in advance that the list will match a
+pattern, and we are just using the matcher to dig out components and
+assign them to variables, we use the operation '-->', instead of
+MATCHES. The only difference is that MATCHES produces a RESULT, which it
+leaves on the stack, to be printed out by '=>', or possibly used in a
+conditional instruction, which will do one thing if the result is true,
+and another thing if the result is false. By contrast '-->' does not
+produce a result. It merely does the match. If however it cannot do the
+match (i.e. if MATCHES would have produced the result FALSE), then '-->'
+causes a mishap to occur. Try the following, to POP11, by using the
+LOADLINE command (or the CompileLine menu option from the Compiling
+menu):
+
+This example produces a boolean result:
+
+    [1 2 3] matches [1 2 3] =>
+
+as does this
+
+    [1 2 3] matches [3 2 1] =>
+
+Because "matches" produces a true or false result it can be used in
+tests, e.g. in conditional instructions or in testing whether to
+terminate a loop.
+
+The operator "-->" is different. Try these two:
+
+    [1 2 3] --> [1 2 3] =>
+
+    [1 2 3] --> [3 2 1] =>
+
+Note that the first one does not produce any result, whereas the second
+one produces a "MISHAP" and interrupts the program. That means that the
+operator "-->" can be used to check that your program is working as it
+should do, and if not produce an error message. If everything is OK it
+allows the program to continue.
+
+But it also has a more important use.
+
+-- Using "-->" to dig out components of a list ------------------------
+
+Sometimes you know that a list has exactly five elements, and you
+wish to extract the fourth one. You can use the matcher arrow to
+check that the list is of the right format (i.e. checking that the
+program has not gone wrong before this point) and also assign the
+fourth element to a pattern variable. Here is how
+
+    vars item;
+
+    [Fred sat on the mat] --> [= = = ?item =];
+
+    item =>
+
+Compare what happens if you do this:
+
+    [The cat sat on the mat] --> [= = = ?item =];
+
+Look closely at the error message, especially lines starting
+with "MISHAP", "INVOLVING"
+
+If a match fails it is undefined what the value of any of the
+pattern variables will be. A particular variable may or may not
+have been assigned a value before the match failed. Try:
+
+    item =>
+
+Try changinge those examples in various ways to see what happens.
+
+
+-- Using "-->" to extract a "segment" of a list -----------------------
+
+You can also use the matcher arrow with the "??" type of pattern
+variable to extract portions of a list containing several elements. For
+example in these examples it can be used to extract the successive
+"tails" of the list:
+
+    vars rest;
+
+    [1 2 3] --> [1 ??rest];
+
+    rest =>
+
+    [1 2 3] --> [1 2 ??rest];
+
+    rest =>
+
+    [1 2 3] --> [1 2 3 ??rest];
+
+    rest =>
+
+You can use "=" if you don't care what the intermediate elements
+of the list are, as in
+
+    [the cat sat on the furry mat] --> [= = ??rest];
+
+    rest =>
+
+-- Using --> to extract items between two given items -----------------
+
+What will this do:
+
+    vars list = [every person in the room is a member of the club];
+
+    vars phrase1,phrase2;
+
+    list --> [every ??phrase1 is ??phrase2];
+
+    phrase1 =>
+
+    phrase2 =>
+
+Vary the example and see waht happens.
+
+-- You can use "restricted" pattern variables to control the match ----
+
+A colon ":" following a pattern variable can be used to restrict what
+it is matched with. Here are some examples where what follows the colon
+is the name of a predicate, a testing procedure, e.g. isword, isnumber,
+islist.
+
+Try to work out what the following will do before you use LOADLINE
+on them:
+
+    vars
+        item, item2,
+        testlist = ['a string' 4 cat [a list] 3 dog];
+
+
+    testlist --> [== ?item:isnumber ==];
+
+    item =>
+
+    testlist --> [== ?item:isstring ==];
+
+    item =>
+
+    testlist --> [== ?item:isword ==];
+
+    item =>
+
+    testlist --> [== ?item:islist ==];
+
+    item =>
+
+You can also use a restriction on one variable to control what is
+matched by another, e.g. by using the following pattern to get
+the second item following the first number:
+
+    testlist --> [== ?item:isnumber = ?item2 ==];
+
+    item2 =>
+
+What happens if you try to find the item preceding the string? Try this:
+
+    testlist --> [?item2 ?item:isstring == ];
+
+It can't be done with this list.
+
+
+-- Using an integer to restrict the length of a matched segment -------
+
+You can use an integer following the colon to restricte the length
+of a matching list. For example see what happens with these examples:
+
+    vars item, list;
+
+    [1 2 3 4] --> [??list:3 ==];
+    list =>
+
+That extracted a list containing the first three items.
+
+Compare
+
+    [1 2 3 4] --> [== ??list:3];
+    list =>
+
+You could also search for an element of the "top level" list which
+is an embedded list of a given length.
+
+    vars
+        list,
+        lists = [[a] [a b] [a b c] [a b c d] [a b c d e]];
+
+    lists --> [== ?list:2 ==];
+    list =>
+
+    lists --> [== ?list:4 ==];
+    list =>
+
+    lists --> [== ?list:8 ==];
+    list =>
+
+
+-- Using  --> to extract portions of nested sub-lists -----------------
+
+Lists can contain other lists. If you know that a list has several
+sublists and you wish to extract a list containing the first three
+elements of the third sublist it is very easy using a "restricted"
+pattern variable, thus:
+
+    vars
+        sublist,
+        lists = [[ a b ] [ 1 2 3 4] [ A B C D E F] [99 88 66]];
+
+    lists --> [= = [??sublist:3 ==] ==];
+
+    sublist =>
+
+
+Write down a command to create a list containing the last two elements
+of the second  embedded list. It should assign the list [3 4] to the
+variable sublist.
+
+
+
+
+-- Using "-->" in a procedure ---------------------------------
+
+We could use the operation --> to define a procedure to produce the last
+element of a given list.
+
+Try compiling this procedure (Load Current Procedure). Note that we
+declare result using "vars" to ensure that the pattern element ?result
+works as expected.
+
+define final(list) -> result;
+    vars result;    ;;; pattern variable
+
+    list --> [== ?result]
+
+enddefine;
+
+Then test it
+
+/*
+    final([a b c d]) =>
+    final([a]) =>
+    final([ [a b] [c d] [e f] ]) =>
+    final([]) =>
+*/
+
+NOTE: if you don't wish to declare the pattern variable as "vars" you
+must precede the whole pattern with "!", as in
+
+define final(list) -> result;
+    list --> ![== ?result]
+enddefine;
+
+The output local variable "result" is automatically declared as lvars.
+So it need not be declared prior to use in the pattern that sets the
+value, because the use of "!" allows lvars variables to be used as
+pattern variables.
+
+Compile that, and check that the above tests sill all work (apart from
+the one that previously produced a mishap).
+
+
+You could also have used --> to define a procedure to produce the
+the 'tail' of a list, i.e. a list containing all but the first element
+
+define tail(list) ->result;
+    vars x, result;
+    list --> [?x ??result]
+enddefine;
+
+Test it
+
+    tail([ a b c d]) =>
+    tail ([abcd]) =>
+
+Actually the definition of TAIL is wasteful. It includes the variable X,
+whose value is not used. The item '?X' was there just to ensure that
+RESULT was not given the whole list. To do this we can use '=', which
+matches exactly one item but doesn't care what it is.
+
+define tail(list) ->result;
+    vars result;
+    list --> [= ??result]
+enddefine;
+
+test it:
+    tail([a b c d]) =>
+
+Note that, as before, you could leave out the "vars result" if you put
+"!" before the opening list bracket.
+
+N.B. in the definition of TAIL it is important to have a space between
+
+    "=" and "??"
+
+for otherwise POP11 will make them 'stick together' to form a bigger
+symbol, which it will then not recognize. Try, without the space:
+
+    [1 2 3] --> [ =??result];
+
+Similarly, you could define a procedure head to get the first element.
+
+define head(list) -> result;
+    list --> ![?result ==]
+enddefine;
+
+    head([ a b c ]) =>
+    head([]) =>
+
+actually, Pop-11 already has such a procedure, called hd:
+
+    hd([a b c d])=>
+
+which is also like
+
+    [a b c d](1) =>
+
+(Often, in Pop-11 there is more than one way to do the same thing.
+Choose the method which you think makes your programs clearest.)
+
+
+-- Some exercises using --> -------------------------------------------
+
+Use the match operation --> to define a procedure which produces the
+second element of a list. Then test your procedure.
+
+Now define a procedure which will produce a list containing all
+but the first and last elements in a list.
+
+define middle(list) -> result;
+    vars result;
+        list --> .....
+enddefine;
+
+complete that and test it with several examples.
+
+Try it using "!" and without the "vars" declaration.
+
+
+
+Did you do this?
+
+    define middle(list) -> result;
+        list --> ![= ??result = ]
+    enddefine;
+
+NB it is important to leave a space between '=' and '??', as explained
+previously. Test that:
+
+    middle([mary had a little lamb]) =>
+
+This might be a good point at which to pause, and make notes on
+everything you've learnt so far. Try to think of ways in which it
+might be useful in a program like Eliza, or some other program which
+tries to 'understand' or at least analyse sentences. (What's the
+difference?)
+
+Exercise: explain the difference between "matches" and "-->"
+
+    (It may help if you understand how the stack works. See TEACH STACK.)
+
+-- Further reading ----------------------------------------------------
+
+TEACH * RESPOND will help you understand MATCHES better through practice
+using it.
+
+For more on the use of "MATCHES" and "-->" to define simple procedures,
+See TEACH * MOREMATCH. (This file has not yet been updated for Poplog
+version 15 or later.)
+
+For a concise summary  see HELP * MATCHES.
+
+TEACH ARROW gives more practice on the use of ^^ and ^ in lists.
+
+For more on lists, see TEACH LISTS.
+
+TEACH * LISTSUMMARY gives an overview of list manipulating facilities.
+
+
+--- $poplocal/local/teach/matcharrow
+--- Copyright University of Birmingham 1996. All rights reserved. ------

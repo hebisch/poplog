@@ -1,0 +1,454 @@
+TEACH FOREACH                                         A. Sloman Nov 1982
+                                         Updated to use "!" October 1996
+
+This file introduces the following looping syntax for doing something
+with all items in the database that match a given pattern:
+
+    foreach <pattern> do <actions> endforeach
+or
+    foreach ! <pattern> do <actions> endforeach
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Prerequisites for this file
+ -- What is foreach for?
+ -- An example database
+ -- The procedure present finds one thing only
+ -- foreach iterates selectively over the whole database
+ -- The syntax of foreach
+ -- Where do the men live?
+ -- Making a list of information from database
+ -- How allof works
+ -- Exercise define allof2
+ -- An alternative formulation, using [% ... %]
+ -- Exercise: Finding the occupants of a town
+
+              DOING SOMETHING WITH A SET OF DATABASE ITEMS
+              ============================================
+
+-- Prerequisites for this file ----------------------------------------
+
+This file assumes that you are familiar with the use of MATCHES to
+compare a list and a pattern (e.g. see TEACH * MATCHES), and that you
+already know that the Pop-11 database is a list of lists that can be
+searched using procedures based on the matcher (as in TEACH * DATABASE).
+
+You should be familiar with the role of the variable prefixes "?" and
+"??" in patterns, to SET the value of a variable, and the role of the
+single and double uparrows "^" and "^^" to USE the existing value of a
+variable. (See TEACH * ARROW.)
+
+As explained in TEACH * MATCHES, if you define a procedure that uses a
+pattern containing pattern variables preceded by "?" or "??", then you
+should use "!" in front of the pattern, so that the pattern variables
+can be used as lvars, reducing the risk of unwanted interactions between
+procedures using the same variables.
+
+
+-- What is foreach for? -----------------------------------------------
+
+Suppose you have a collection of facts stored in the database about
+people, their relations, their jobs, their possessions, etc. You can use
+a pattern to select items from the database. E.g. [?person isa teacher]
+would match database items such as
+    [suzie isa teacher]
+    [john isa teacher]
+
+If you wish to find only one item matching the pattern then you can use
+present or lookup (explained in TEACH * DATABASE). If you wish to find
+all the matching items, e.g. all the people who are teachers, then you
+can use foreach, e.g. using a form like this, which will perform some
+action on each person recorded as a teacher.
+
+    foreach [?person isa teacher] do ....person.... endforeach;
+
+or, inside a procedure definition, using the "!" prefix
+
+    foreach ! [?person isa teacher] do ....person.... endforeach;
+
+Note the occurrence of "?" before person means that person is a pattern
+variable. It will therefore need to be declared as a variable. Outside a
+procedure definition you can use
+    vars person;
+
+Inside a procedure definition use "lvars".
+
+-- An example database ------------------------------------------------
+
+Lets demonstrate with a database of information about some people. You
+may find it convenient to put the following examples into a file of your
+own called something like database.p, or foreach.p. You can delete the
+file later on. Insert this procedure definition:
+
+    define people();
+        ;;; clear the database and set up a collection of "initial" facts
+        []  -> database;
+        add([joe isa man]);
+        add([jill isa woman]);
+        add([joe lives_in london]);
+        add([jill lives_in brighton]);
+        add([bill isa man]);
+        add([sue isa woman]);
+        add([bill lives_in london]);
+        add([sue lives_in paris]);
+    enddefine;
+
+You could extend this procedure with more examples of the same general
+kind, if you wish.
+
+Note 1. We could use "is a" as two separate words, and "lives in" as two
+separate words. That would certainly work, but would require more
+storage space, and would slightly slow down searching the database.
+
+Note 2. Instead of all those separate add(<list>) commands you can use a
+single command calling the procedure alladd with a list of lists, e.g.
+
+    alladd([
+            [joe isa man]
+            [jill isa woman]
+            ....
+            [sue lives_in paris]])
+
+We'll use this procedure every time we want to start off with a new database.
+Try it out:
+
+    ;;; Empty the database
+    [] -> database;
+    database ==>
+    ;;; Initialise the database.
+    people();
+    database ==>
+
+-- The procedure present finds one thing only -------------------------
+
+We have information about several women in the database, but if you do
+    vars x;
+    present([??x isa woman])=>
+    x =>
+and then do it again
+    present([??x isa woman])=>
+    x =>
+
+you'll see that it always finds the same thing (provided the database has not
+changed in between).
+
+That's fine if you just want to get the name of any one woman. But suppose
+you want to find the names of all of them?
+
+
+-- foreach iterates selectively over the whole database ---------------------
+
+The POP11 syntax word 'FOREACH' can be used to solve the problem.
+Try the following:
+
+    vars x;
+    foreach [??x isa woman] in database do x => endforeach;
+
+Every time the pattern matches a database item, the instruction "x=>" in
+the body of the loop will be obeyed. (This is called a loop because it
+does the same instruction repeatedly, though with a different value for
+"x" each time.)
+
+Inside a procedure definition you would do this
+    lvars x;
+    foreach ! [??x isa woman] in database do x => endforeach;
+
+
+-- The syntax of foreach ------------------------------------------
+
+FOREACH is used in the format:
+
+    FOREACH <pattern> IN <list of lists> DO <action> ENDFOREACH
+
+It uses MATCHES to compare each of the lists against the <pattern>, and every
+time the match is successful it does the <action>.
+
+When the <list of lists> is the DATABASE, you can leave out the 'IN....' bit.
+
+E.g. try
+
+    foreach [??x isa woman] do x => endforeach;
+
+I.e. since you don't say in WHAT list of lists, it assumes you mean in the
+database.
+
+Try getting foreach to print out all the names of all the MEN.
+
+-- Where do the men live? ------------------------------------------------
+
+Here is how you can make FOREACH print out the home towns of all the men
+
+    ;;; set up the database with information about people
+    people();
+    ;;; find where all the men live
+    vars place, x;
+    foreach [??x isa man] do
+      lookup([^^x lives_in ??place]);
+      [the home of ^x is ^^place] =>
+    endforeach;
+
+Try that. Then try doing the same for all the women.
+
+Then try printing out all the people who live in london.
+
+See what difference it makes if you replace "^x" with "^^x" in the last
+action.
+
+Also see what difference it makes if you use a single query in the
+pattern:
+
+    vars place, x;
+    foreach [?x isa man] do
+      lookup([^x lives_in ??place]);
+      [the home of ^x is ^^place] =>
+    endforeach;
+
+Why did changing the "??x" to "?x" mean that "^^x" had to be changed to
+"^x" ?d (If you can't answer that, ask for help. Understanding it is
+very important in using the pattern matcher and the database).
+
+You can mark and load the above instruction and it should work, after
+you have run the people procedure. However, if the above instruction
+were used inside a procedure definition, you could use "!" in front of
+all the patterns, without the "vars" declaration. Look closely at the
+above and decide which list expressions are patterns that need to be
+preceded by "!".
+
+Then compare your decision with the occurrences in this procedure:
+
+    define where_men();
+        ;;; find where all the men live
+        ;;; declare the pattern variables
+        lvars x, place;
+        foreach ! [?x isa man] do
+            lookup( ! [^x lives_in ??place]);
+            [the home of ^x is ^^place] =>
+        endforeach;
+    enddefine;
+
+Compile that and then test it
+
+    where_men();
+
+Can you generalise that to define a procedure that takes either the word
+"man" or the word "woman" and prints out where all the instances live.
+
+    define where_live(type);
+        ;;; Find everything that isa type and print out where they live
+        [The home of each ^type] =>
+        ;;; declare pattern variables
+        lvars x, place;
+        foreach ! [?x isa ... ] do
+            lookup( ! [^x lives_in ??place]);
+            [the home of ^x is ^^place] =>
+        endforeach;
+
+    enddefine;
+
+What should replace the "..." in the foreach line? Why?
+
+Test this after making sure the people database is set up:
+
+    people();
+    where_live("man");
+    where_live("woman");
+
+-- Making a list of information from database ----------------------------
+
+So far all our FOREACH loops have merely printed something out each time.
+Suppose we wanted a procedure which could make a list of all the women, or a
+list of all the men. We'd need to go through the database as before searching
+for things matching a certain pattern. But each time we found the appropriate
+item, instead of printing it out, we can add it to a list.
+
+We'll call our procedure ALLOF. It will take a list like [man] or [woman],
+i.e. a list containing what can follow 'isa' in a database entry. And it
+will use that to find corresponding individuals. Foreach such individual, it
+will add it to a list, which is finally to be returned as a result. Thus:
+
+    define allof(type) -> out;
+        ;;; type is a list , e.g. [man] or [woman].
+        ;;; out, the output variable, will be given a list of words.
+        ;;; Start out as the empty list, then build it up
+        [] -> out;
+
+        ;;; pattern variable
+        lvars person;
+        foreach ! [?person isa ^^type] do
+            [^person ^^out] -> out
+        endforeach;
+    enddefine;
+
+Type that into your test file and try it out:
+    allof([man]) =>
+    allof([woman]) =>
+
+It's a good idea to put test commands inside comment brackets, thus:
+
+/*
+    allof([man]) =>
+    allof([woman]) =>
+*/
+
+
+-- How allof works -------------------------------------------------
+
+To understand this procedure you need to remember how to build lists (e.g. as
+in TEACH ARROW).
+
+The line
+        [] -> out;
+
+initialises the variable OUT to contain an empty list. Then each time an item
+is found in the database matching the pattern
+
+        ! [?person isa ^^type]
+
+we add the value of PERSON to all the things already in OUT
+
+        [^person ^^out]
+
+and then assign the new list to be the new value of OUT
+
+            -> out
+
+When ENDDEFINE is reached, i.e. the procedure finishes running, then the
+value of OUT is left on the stack as the result of the procedure. By
+then the value of out should be a list of words. In some databases it
+could be an empty list, if nothing was found. In that case the body of
+the loop would never run. Check that, as follows:
+
+/*
+
+    allof([cat]) =>
+    allof([dog]) =>
+
+*/
+
+Look back at the procedure and make sure you can see how this
+description fits it.
+
+
+-- Exercise define allof2 ---------------------------------------------
+
+How would you have to change that procedure to make it take the word
+"man" or the word "woman" instead of the lists?
+
+Try changing the definition so that it defines a procedure called
+allof2, which takes a WORD rather than a LIST as input. What should
+replace the "...." below, and why?
+
+    define allof2(type) -> out;
+        ;;; type is a word, e.g. "man" or "woman".
+        ;;; out, the output variable, will be given a list of words.
+
+        lvars person;
+
+        [] -> out;
+        foreach ! [?person isa ...] do
+            [^person ^^out] -> out
+        endforeach;
+    enddefine;
+
+Test it
+/*
+    people();   ;;; defined above
+    allof2("man") =>
+    allof2("woman") =>
+    allof2("mouse") =>
+
+*/
+
+
+-- An alternative formulation, using [% ... %] ------------------------
+
+Pop-11 allows the percent symbol to be used in list brackets to collect
+together into a list all the things left on the "user stack" in an
+instruction.
+
+E.g. try compiling this, or something similar (getting all the commas
+and spaces right):
+
+    [% 3, 4, 5 + 6 %] =>
+
+    [% repeat 6 times [cat on mat] endrepeat %] =>
+
+In each case, the instructions between the percent symbols will be obeyed,
+and things will be left on the stack, but [ .... ] will collect them into
+a list.
+
+We can use this to redefine ALLOF so that it doesn't have to explicitly
+build a bit of the list each time round. Instead, we put the foreach
+expression between "%....%" inside list brackets, and let the body of
+foreach put what's been found on the stack, each time. Call the new
+version ALLOF3:
+
+    define allof3(type) -> out;
+        ;;; Type is a word. Out is a list of words, i.e. names of persons
+
+        lvars person;
+
+        [%
+            foreach ! [?person isa ^type] do
+                person
+            endforeach
+        %] -> out
+    enddefine;
+
+I.e. the "foreach ... endforeach" loop between % ... % contains
+instructions which will put different values of PERSON on the stack, and
+at the end the square brackets will make a list, which is then assigned
+to OUT.
+
+Compare this version with the previous one. Which you use is a matter of
+taste. The only difference is that in the final list the items will be in a
+different order from the previous version. Test this.
+
+/*
+    people();   ;;; defined above
+    allof3("man") =>
+    allof3("woman") =>
+    allof3("mouse") =>
+
+*/
+
+-- Exercise: Finding the occupants of a town --------------------------
+
+Try to use the ideas just illustrated to define a procedure called
+"occupants" which takes the name of a town, e.g. a word like "london" or
+"brighton", and then makes a list of names of all the people who
+'lives_in' the town.
+
+    define occupants(place) -> list;
+        ;;; place is a word naming a place. Return a list of words
+        ;;; naming people who live at the place.
+        ........
+    enddefine;
+
+Use a pattern something like [?person lives_in ^place] in the FOREACH loop.
+
+Test your procedure:
+/*
+    occupants("london")=>
+    occupants("brighton")=>
+    occupants("berlin")=>
+*/
+
+--------------------------------------------------------------------
+
+If you forget the format for FOREACH and you want a reminder later, you can
+look at HELP * FOREACH, which gives a summary.
+
+Further examples of the use of FOREACH can be found in TEACH * INFECT
+
+A related facility is explained in HELP * WHICH
+
+
+HELP * FOREVERY describes forevery, a generalisation of foreach, as it
+takes a list of patterns, not just one pattern, and finds all possible
+ways of consistently matching items from the list with something in the
+database.
+
+--- $poplocal/local/teach/foreach
+--- Copyright University of Birmingham 1996. All rights reserved. ------

@@ -1,0 +1,496 @@
+TEACH PROLOG                       JL Cunningham, 1982, updated AS 1986
+
+CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Introduction to Prolog for POP-11 users
+ -- Running Prolog
+ -- Adding to the Prolog database: assert
+ -- Predicates
+ -- Constants and variables in Prolog
+ -- Predicate variables don't work
+ -- Retract
+ -- Lists in Prolog
+ -- Prolog patterns
+ -- Preparing assertions in a file
+ -- Running VED from Prolog
+ -- Inference rules in prolog
+ -- Reading rules and assertions from the terminal
+ -- Defining a paternal grandfather
+ -- Defining other relationships
+ -- Tracing in Prolog: spy
+ -- Built in predicates
+ -- ALPHABETIC LIST OF EVALUABLE PREDICATES.
+ -- Relevant reading
+
+-- Introduction to Prolog for POP-11 users ---------------------------
+If you are familiar with the POP-11 database then the easiest approach to
+programming in PROLOG may be to regard PROLOG as a kind of database, but
+a database that can actively work out new facts from rules you supply it
+with, i.e. make specified "inferences".
+
+(In PROLOG there is nothing corresponding to the POP variable DATABASE -
+the only way to "get at" the database is via the prolog equivalents of
+"add", "remove", "lookup", etc..)
+
+-- Running Prolog -----------------------------------------------------
+To run PROLOG log in and type
+to VMS or the Unix SHELL
+
+    prolog
+
+If there are different prolog systems on your machine, then you may
+have to give a different command to get the POPLOG Prolog, e.g.
+on VMS
+
+    pop11/prolog
+
+or on unix
+    pop11 -prolog
+
+will suffice.
+
+
+Prolog will respond with a message and then will prompt you with "?-".
+
+(It will also work if you type "prolog" to POP-11, e.g.
+     prolog
+
+but the prolog system then has to be loaded, and this takes a very long
+time.)
+
+-- Adding to the Prolog database: assert ------------------------------
+
+The equivalent to the POP-11 "add" procedure is called "assert" in
+PROLOG, but before you can use it you have to know about the syntactic
+differences between languages like POP-11 and PROLOG. In PROLOG, the
+basic data structure is called a "compound term". A prolog compound term
+looks rather like a POP-11 procedure call, e.g.
+        f(x,y)
+
+Run prolog, and after the prompt type
+
+        assert(f(x,y)).
+
+Don't forget the full stop after the compound term.
+
+This is like the POP 'add([f x y]);'. Prolog should respond "yes".
+
+Now try typing (after the prompt):
+
+        f(y,x).
+
+Prolog should respond "no" (notice that x,y and y,x are in a different
+order). It is not being argumentative, what you have typed is
+equivalent to the Pop11:
+
+        if present([f y x]) then "yes" => else "no" => endif;
+
+As you can see, prolog is considerably more concise than Pop11.
+
+Unfortunately, with this version of prolog, it is necessary to have at
+least one piece of information about 'f' before you are allowed to ask
+any questions about 'f', which is why it was necessary to 'assert' an
+'f' fact to the prolog database before asking the first question. This
+is actually a helpful feature fordebugging purposes later on.
+
+              *****************************************
+
+-- Predicates ---------------------------------------------------------
+Although you "can" use lists in prolog, the database is organised around
+the concept of predicates. A predicate is like a natural language
+sentence with one or more "holes", called "places", in it, e.g.
+
+        "The brother of Cain is ...."
+
+When the place is filled in, e.g. "The brother of Cain is George", we
+get a complete sentence which is either true or false (that is why
+procedures which return true or false are called predicates).
+
+In this example, of a one-place predicate, it is more sensible to take
+the two-place predicate:
+
+        "The brother of .... is ...."
+
+and to say that one of the holes in this two-place predicate has been
+filled in by "Cain". In Pop11 you could represent this with a list:
+
+        [brother cain ?a]
+
+whereas in prolog it looks like:
+        brother(cain,A).
+
+-- Constants and variables in Prolog ----------------------------------
+
+"Cain" must begin with a small "c" because of another syntactic
+convention of prolog: the equivalent of POP-11 words are "constant
+terms", and always begin with a small letter. This is as if POP-11 had
+the convention that instead of writing '"cain"' you could write "cain",
+but only for words starting with a small letter. (Numbers are also
+constant terms in both Prolog and Pop11).
+
+Words beginning with a capital letter in Prolog are variable terms
+(variables). So, now type (don't include the ?-, and don't forget the
+full stop).
+
+        ?- assert(brother(cain,abel)).
+        ?- brother(cain,A).
+        ?- brother(A,abel).
+        ?- brother(sam,A).
+        ?- brother(cain,abel).
+        ?- sister(cain,abel).
+
+and so on. On first reading, skip to next row of asterisks.
+
+-- Predicate variables don't work -------------------------------------
+Unfortunately, ?- RELN(cain,abel) won't work. It won't work because the
+designers of the prolog language didn't allow questions with a variable
+in the predicate position. This makes prolog programs more efficient. If
+you needed to find out what predicate is true of two given constants,
+then you could have asserted it differently, e.g.
+
+        ?- assert(fact(brother,cain,abel)).
+
+        ?- fact(RELN,cain,abel).
+
+              *****************************************
+
+-- Retract ------------------------------------------------------------
+The opposite of assert is "retract". Retract is like Pop11 "remove".
+
+              *****************************************
+
+-- Lists in Prolog ----------------------------------------------------
+As mentioned above, although the basic prolog data structure is a
+compound term, prolog also has lists. Prolog lists are like this:
+        [the,cat,sat,on,the,mat]
+
+The commas are necessary. There is nothing corresponding to the Pop11
+percent signs (nor is there ever any need for it, because of the
+aforementioned syntactic convention about constant and variable terms).
+
+It is not possible to directly assert (add) a list to the database, as
+in POP-11, but you can store items involving lists in the database. For
+example,
+
+        assert([this,and,that]).
+
+will cause prolog to protest, but
+
+        assert(blat([this,and,that])).
+
+is okay. Again, as in POP-11, you can use "patterns" to search for things
+in the prolog database. However Prolog patterns have a very different
+syntax from POP-11 patterns.
+
+-- Prolog patterns ----------------------------------------------------
+In Prolog the following pattern will match "A" to the head of a list,
+and "B" to the tail:
+
+        [A|B]
+
+Another example:
+
+        [x,y|R]
+
+This is a Prolog pattern that matches any list beginning with "x", then
+"y"; and "R" matches the rest of the list. So, "|R" is a bit like "??R"
+at the end of a list in POP-11. If this pattern is matched to
+
+        [x,y,z]     then R is matched to [z]
+        [x,y,w,v,u] then R is matched to [w,v,u]
+        [x,y]       then R is matched to []
+
+On first reading skip to next row of asterisks.
+
+You could assert facts like this: assert(fact([brother,cain,abel])).
+This is not the same as before: in the earlier example "fact" is a
+three-place predicate, and each place is filled by a constant. With the
+list brackets example, "fact" is a one-place predicate and the place is
+filled by a list.
+
+              *****************************************
+
+Lists are useful in prolog for data that might be of variable length,
+but for items of fixed length, like relationships, it is better not to
+use lists.
+
+              *****************************************
+
+-- Preparing assertions in a file -------------------------------------
+It is a nuisance to have to keep typing "assert", so prolog provides a
+facility for reading a file, and asserting each fact automatically.
+Using VED, prepare a file of family relationships, something like:
+
+        mother(luthien,dior).
+        father(beren,dior).
+        mother(nimloth,elwing).
+        father(dior,elwing).
+        mother(elwing,elrond).
+        mother(elwing,elros).
+        father(earendil,elrond).
+        father(earendil,elros).
+        father(elrond,arwen).
+        mother(celebrian,arwen).
+        mother(galadriel,celebrian).
+        father(celeborn,celebrian).
+
+-- Running VED from Prolog --------------------------------------------
+
+To call VED from inside prolog, you can do
+        ?- ved familytree.
+
+to mean 'edit the file called familytree'. Leave the editor as usual,
+and the file will be read into the prolog database. To read a file
+directly into the prolog database type the filename in list brackets
+(followed by fullstop), e.g.
+
+        ?- [familytree].
+
+-- Inference rules in prolog ------------------------------------------
+
+Now suppose you want to inform prolog about new relationships, e.g.
+paternal grandfather?  You need a rule saying that if X is the father
+of Y, and Y the father of Z, then X is the paternal grandfather of Z.
+Prolog will be able to use the rule to make an "inference".
+
+To create this rule, you just add a sentence to the database saying what
+you mean. Actually, prolog facts and rules, even though they end with
+fullstops, are called "clauses" (see TEACH CLAUSES if you are running
+prolog).
+
+Since "asserting" is such a nuisance it is easier to put the
+clause for this rule in a file.
+
+-- Reading rules and assertions from the terminal ---------------------
+
+If you want prolog to read from your terminal as if from a file, the
+special filename "user" can be used:
+
+        ?- [user].
+
+Every clause (fact or rule) typed now will be added to the database
+until you type the "end of file" character, usually <CTRL> D on Unix
+machines, and <CTRL> Z on VMS.
+
+-- Defining a paternal grandfather ------------------------------------
+The clause for making the paternal grandfather inference could be:
+
+        pgrand(X,Y) :- father(X,Z),father(Z,Y).
+
+You can translate that, roughly, as
+        'pgrand(X,Y) follows from father(X,Z) and father(Z,Y)'
+
+I.e. ":-" means "follows from", or "if", and "," can mean "and" in that
+context.
+
+Variable names used in one clause are completely separate from those in
+any other clause, so X,Y and Z can be used again without confusion. They
+are like local variables in a Pop11 procedure.
+
+
+-- Defining other relationships ---------------------------------------
+Consider the following:
+
+        aunt(X,Y) :- sister(X,P),parent(P,Y).
+
+What this clause says is "X is an aunt of Y if X is the sister of some
+person, P, and P is a parent of Y". But prolog doesn't know what a
+sister is, so lets add the information: "A person, say X, is the sister
+of another person, say Y, if she is a girl, and a sibling of Y".
+
+        sister(X,Y) :- female(X),sibling(X,Y).
+
+What do the following mean?
+
+        sibling(X,Y) :- parent(Z,X),parent(Z,Y).
+        female(X) :- mother(X,Y).
+
+In fact the definition of sibling is wrong, because it allows someone to
+be their own sibling, we must change the definition to:
+
+        sibling(X,Y) :- parent(Z,X),parent(Z,Y),not(X=Y).
+
+How do we define a parent? How about:
+
+        parent(X,Y) :- mother(X,Y).
+        parent(X,Y) :- father(X,Y).
+
+That says "X is a parent of Y if X is a mother of Y" and
+         "X is a parent of Y if X is a father of Y".
+
+Does this work? Try it!
+
+A more concise way of writing that could be:
+
+        parent(X,Y) :- mother(X,Y);father(X,Y).
+
+Whereas a "," means "and", a ";" means "or" (and ":-" means "if").
+
+Our definition of aunt does not include aunts by marriage. Add another
+clause to the database that tells prolog that the wife of an uncle is an
+aunt. Tell prolog a clause that will let it infer the wifeof
+relationship.
+
+              *****************************************
+
+-- Tracing in Prolog: spy ---------------------------------------------
+Suppose you tell prolog that the wife of an uncle is an aunt, and that
+the husband of an aunt is an uncle, then ask "?- uncle(beren,elrond)",
+what do you think will happen? Tell prolog to spy:
+
+        ?- spy.
+
+then try it. 'spy' is a debugging aid, that causes prolog to tell you
+what is happening and ask you what to do next at frequent intervals.
+When 'spy' prompts you, type 'h' return for a list of options. It is
+also possible to 'spy' individual relations, rather than everything.
+(See below, and HELP * SPY).
+
+              *****************************************
+
+Together with the list of "evaluable predicates" below, this is all you
+need to know to write many prolog programs. The only remaining things
+have to be explained in order to explain the "!" (pronounced "cut") to
+be explained in TEACH CUT (not yet written).
+
+-- Built in predicates ------------------------------------------------
+Below is a list of "evaluable predicates", some of which are "built in"
+to the prolog system, and some can be obtained by loading the prolog
+library file called 'useful'. Those marked with a crosshatch ("#") in
+the left margin are in that library file and to use any of these you
+must first load the 'useful' library file, i.e. do
+
+    ?- library(useful).
+
+Those evaluable predicates with an asterisk ("*") in the left margin are
+the ones I consider most likely to be of use to the beginning prolog
+programmer, others can be ignored for now but are included for
+completeness.
+
+The built in predicates are described in more detail in:
+    HELP * PREDICATES
+
+-- ALPHABETIC LIST OF EVALUABLE PREDICATES. ---------------------------
+
+*       !               Cut choices back as far as the last proper
+                        ancestor
+
+*       abort           Abort all current executions
+*#      append(X,Y,Z)   List Y appended to list X is list Z
+        arg(X,Y,Z)      The Xth argument in term Y is Z
+*       assert(X)       Add clause X to the database
+        asserta(X)      Put clause X in the database before
+                        others for the predicate
+        assertz(X)      Put clause X in the database after
+                        others for the predicate
+*       atom(X)         X is an atom
+        atomic(X)       X is an atom or an integer
+
+        break           Get a new invocation of the top level interpreter
+
+        call(X)         (The goal represented by term X)
+        clause(X,Y)     There is a clause in the database
+                        with head X and body Y
+        consult(X)      Read clauses and goals from file X (atom)
+
+*       debugging       Print the list of currently active spy points
+        display(X)      Write X on the current output in prefix format
+
+*       fail            (A goal that always fails)
+        functor(X,Y,Z)  X is a term whose functor is Y and arity Z
+
+        get(X)          Read characters and return X, the first printing
+                        char
+        get0(X)         Read the next character X (integer)
+                        from the current input
+
+        halt            Exit from system to DCL
+*       integer(X)      X is an integer
+
+        length(X,Y)     Y is the length of the list X
+*       library(X)      Load prolog library X
+*       listing(X)      List all clauses with atom X as predicate
+
+*#      member(X,Y)     X is a top-level member of list Y
+
+        name(X,Y)       Y is the list of the characters (integers) of
+                        X's name
+*       nl              A newline is taken on the current output
+        nodebug         Same as 'nospy' - remove all spy points
+        nonvar(X)       X is not a variable
+*       nospy           Remove all spy points, See "spy".
+*       nospy X         Remove any spy points on predicate X (atom
+                        or list)
+*       not(X)          (A goal that succeeds iff goal X fails)
+
+#       once(X)         Defined: once(X) :- X,!
+*       op(X,Y,Z)       Declare atom Z as an operator of type Y
+                        and precedence X
+
+        phrase(X,Y,Z)   used in certain prolog parsers
+*       print(X)        Write out X suitably, using "portray" if
+                        possible
+
+*       read(X)         Read term X (terminated by .) from current
+                        input
+        reconsult(X)    Read clauses from file X to change existing
+                        ones
+*       repeat          (A goal that succeeds in infinitely many
+                        different ways)
+*       retract(X)      Remove clause X from the database
+        retractall(X)   Retract all clauses that match X
+
+        see(X)          Switch current input to be from file X (atom)
+        seeing(X)       X is the current input file (atom)
+        seen            Close current input file, and switch
+                        back to standard input
+        skip(X)         Read characters until the code X appears
+*       spy             Set spy points on all clauses (see "spy X").
+*       spy X           Set a spy point on clauses for X (atom or list)
+
+        tab(X)          Print X spaces on the current output
+        tell(X)         Switch current output to be to file X (atom)
+        telling(X)      X is the current output file (atom)
+        told            Close current output file, and switch back
+                        to standard output
+*       true            (A goal that always succeeds)
+
+        var(X)          X is a variable (uninstantiated)
+
+*       write(X)        Write term X on current output (taking
+                        account of operators)
+
+*       X , Y           X and Y
+*       X ; Y           X or Y
+*       X < Y           Integer expression X evaluates to less
+                        than integer expression Y
+*       X = Y           X and Y are equal
+        X =.. Y         Y is the list of the functor of X and the
+                        arguments of X
+*       X =:= Y         Integer expressions X and Y are equal
+        X =< Y          Integer expression X is less than or
+                        equal to expression Y
+        X == Y          X and Y are identical
+*       X =\= Y         Integer expressions X and Y are not equal
+*       X > Y           Integer expression X is greater than
+                        integer expression Y
+        X >= Y          Integer expression X is greater than
+                        or equal to expression Y
+*       X is Y          Expression Y is evaluated as POP to give X
+                        (although Y is in prolog syntax)
+*       X \= Y          X and Y are not equal
+        X \== Y         X and Y are not identical
+
+*       [-X]            Equivalent to "reconsult(X)"
+        [X]             Equivalent to "consult(X)"
+
+-- Relevant reading -----------------------------------------------------
+
+    W.S.Clocksin & C.S.Mellish, Programming in Prolog
+
+    R.Kowalski, Logic for Problem Solving
+
+There is a large and growing collection of additional books on Prolog.
+
+--- C.all/teach/prolog
+--- Copyright University of Sussex 1989. All rights reserved. ----------

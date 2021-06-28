@@ -1,0 +1,372 @@
+TEACH LISTANSWERS                                          A. Sloman Feb 1984
+
+24 Aug 1999: Bug in one of the answers to question 1, fixed.
+
+
+                        Answers to TEACH LISTQUESTIONS
+                        ==============================
+
+There are no 'right' answers. Any of the problems could be solved in different
+ways, using different  programming techniques. Some of the  answers given here
+use recursive procedures, because these are  easier to trace. However, in most
+cases you  may find it  easier to understand  versions using UNTIL,  or WHILE.
+When  testing programs  which do  'WHILE ...  MATCHES  ...' you  can do  TRACE
+MATCHES; to get a better idea of what is going on.
+
+1)      define listify(list) -> result;
+              vars next,tail;
+              [] -> result;           ;;; initialise result
+              while   list matches [?next ??tail]
+              do      [^^result [^next] ] -> result;
+                      tail -> list;
+              endwhile
+        enddefine;
+
+Note that MATCHES  is  used  both to tell when it's time to stop, and to
+decompose  the  LIST into first element and the rest. It is essential to
+initialise RESULT, in line 3, otherwise the use of result in line 5 will
+cause problems the first time round the loop. Why?
+
+Here's a version which aviods the extra variable RIGHTS, and lets MATCHES
+assign  all  but  the  first element of LIST to LIST each time round the
+loop.  If  you  use  this  construction  be  very  careful  not  to   do
+Tl(LIST) -> LIST in addition to using ??LIST in the call of match.
+        define listify(list) -> result;
+              vars next;
+              [%
+                 while list matches [?next ??list]
+                 do    [^next ]
+                 endwhile
+              %] -> result
+        enddefine;
+
+This version uses [% ... %] to make a list of all the things put on  the
+stack  inside the UNTIL loop. The thing put on the stack each time round
+the loop is the list made just after DO, i.e. a  list  containing  NEXT.
+Notice  that  each  time  round  the  loop  LIST  will be different, and
+therefore so will NEXT.
+
+Here's a recursive version:
+        define listify(list) -> result;
+              vars x,rest;
+              if      list matches [?x ??rest]
+              then    listify(rest) -> result;   ;;; temporary
+                      [ [^x] ^^result] -> result;
+              else    [] -> result
+              endif
+        enddefine;
+
+or, equivalently, but more compact:
+        define listify(list) -> result;
+              vars x;
+              if      list matches [?x ??list]
+              then    [[^x] ^^( listify(rest) ) ]
+              else    []
+              endif -> result
+        enddefine;
+
+Here is a version using the FOR construction:
+
+        define listify(list) -> result;
+              vars next;
+              [ ^( for next in list do [^next ] endfor ) ] -> result
+        enddefine;
+
+
+Which of these versions do you find clearest?  If you try  HELP  MAPLIST
+you may be able to find a more compact definition.
+
+
+                ----------------------------------------
+
+2)      define doublel(list) -> result;
+              vars x;
+              [% for x in list do [% x + x %] endfor %] -> result
+        enddefine;
+
+or      define doublel(list);
+              maplist(list, procedure (x); 2 * x endprocedure)
+        enddefine;
+
+Note 'PROCEDURE' in POP11 introduces an anonymous procedure. Here the
+anonymous procedure doubles its input.
+
+                ----------------------------------------
+
+3)      define countw(list, item) -> total;
+            ;;; count occurrences of item in list
+              0 -> total;
+              while   list matches [== ^item ??list ]
+              do      1 + total -> total;
+              endwhile
+        enddefine;
+
+Note the need to initialise total before the  loop  begins.  Why?   Note
+that  LIST  gets  a different value each time round the WHILE loop. Why?
+You may find it helpful to TRACE MATCHES; if you test this.
+
+Here's a recursive version
+        define countw(list, item);
+            if list = [] then 0
+            elseif list matches [^item ??list] then
+                1 + countw(list,item)
+            else
+                countw(tl(list),item)
+            endif
+        enddefine;
+                ----------------------------------------
+
+4) Here's a version using FOR
+
+        define countp(list,pred) -> total;
+            ;;; return number of things in list which satisfy pred
+            vars item;
+            0 -> total;
+            for item in list do
+                if pred(item) then total + 1 -> total endif
+            endfor
+        enddefine;
+
+Here's a recursive method:
+        define countp(list,pred) -> total;
+              vars x,rest;
+              if      list matches [?x ??rest]
+              then    countp(rest, pred) -> total;   ;;;temporary
+                      if      pred(x)
+                      then    1 + total -> total
+                      endif;
+              else    0 -> total
+              endif
+        enddefine;
+
+You may find the following easier to understand:
+
+        define countp(list,pred) -> total;
+              vars x;
+              0 -> total;
+              while   list matches [== ?x:pred ??list]
+              do      1 + total -> total
+              endwhile
+        enddefine;
+
+This occurrence of ':PRED' after X restricts the match, so that it  will
+only accept values for X such that PRED(X) is TRUE.
+
+This could have been used in the answer to question 3, e.g.:
+        define countw(list,item);
+              countp(list, procedure (x); x = item endprocedure)
+        enddefine;
+
+                ----------------------------------------
+
+5) First an iterative answer:
+
+    define allbefore(list,word) -> result;
+        vars item;
+        [ ^(for item in list do
+                if item = word then quitloop() else item endif
+            endfor)] -> result;
+    enddefine;
+
+
+A recursive version:
+
+define allbefore(list,word)-> result;
+              vars x;
+              if      list matches [?x ??list]
+              and     x /= word
+              then    [^x  ^^( allbefore(rest, word) ) ] -> result;
+              else    [] -> result
+              endif
+        enddefine;
+
+Try tracing that procedure to see where it stops.  It's much  easier  to
+define ALLBEFORE using MATCHES!
+
+    define allbefore(list,word) -> result;
+        unless list matches [??result ^word ==] then
+            list -> result
+        endunless
+    enddefine;
+
+                ----------------------------------------
+
+6)      define allafter(list,word)-> result;
+              if      list = []
+              then    [] -> result
+              elseif  hd(list) = word
+              then    tl(list) -> result
+              else    allafter(tl(list),word) -> result
+              endif
+        enddefine;
+
+Again, using MATCHES makes this much easier:
+        define allafter(list,word) -> result;
+              unless  list matches [ == ^word ??result]
+              then    [] -> result
+              endunless
+        enddefine;
+
+Note how the value of RESULT is set by MATCHES if the WORD is found in
+LIST.
+
+                ----------------------------------------
+
+7)      define addup(list)-> sum;
+              if      list = []
+              then    0 -> sum
+              else    hd(list) + addup(tl(list)) -> sum
+              endif
+        enddefine;
+
+or
+        define addup(list) -> sum;
+            vars x;
+            0 -> sum;
+            for x in list do
+                sum + x -> sum
+            endfor;
+        enddefine;
+
+                ----------------------------------------
+
+8)      define more(list1,list2)->bigger;
+              if      addup(list1) > addup(list2)
+              then    list1 -> bigger
+              else    list2 -> bigger
+              endif
+        enddefine;
+
+                ----------------------------------------
+
+9)
+        define repeated(list) -> result;
+              vars x,rest;
+              [%while list matches [ ?x ??rest] do
+                      if rest matches [^x ==] then x endif;
+                      rest -> list
+               endwhile %] -> result
+        enddefine;
+
+How would this have to be different if it was to produce all items which
+occurred more than once in the list, not necessarily consecutively?
+
+                ----------------------------------------
+
+10)     define merge(list1,list2)-> result;
+              vars x,y;
+              [%while list1 matches [?x ??list1]
+                  and list2 matches [?y ??list2]
+                do    x, y
+                endwhile %] -> result;
+        enddefine;
+
+What should happen if the lists are of different lengths?
+
+                ----------------------------------------
+
+11)
+        define insert(num,list) -> result;
+            vars x, y, firstbit;
+            [%while list matches [?x ??y] and x < num do
+                     x;
+                     y -> list;
+                 endwhile%] -> firstbit;
+            [^^firstbit ^num ^^list] -> result;
+        enddefine;
+
+More compactly
+        define insert(num,list) -> result;
+            vars x, y ;
+            [%while list matches [?x ??y] and x < num do
+                     x;
+                     y -> list;
+              endwhile, num % ^^list] -> result;
+        enddefine;
+
+Compare:
+        define insert(num, list) -> result;
+              vars firstbit;
+              [%until list = [] or num < hd(list) do
+                      hd(list);
+                      tl(list) -> list;
+                enduntil%] -> firstbit;
+              [^^firstbit ^num ^^list] -> result;
+        enddefine;
+
+Or a recursive version:
+        define insert(num,list) -> result;
+            if list = [] or num < hd(list) then
+                [^num ^^list]
+            else [^(hd(list)) ^^(insert(num, tl(list))) ]
+            endif -> result
+        enddefine;
+
+                ----------------------------------------
+
+12)
+        define sort(list) -> result;
+              vars item;
+              [] -> result;
+              for item in list do
+                      insert(item, result) -> result
+              endfor
+        enddefine;
+
+OR a recursive version
+        define sort(list) -> result;
+              if      list = []
+              then    [] -> result
+              else    sort(tl(list)) -> result;    ;;; temporary value
+                      insert(hd(list), result) -> result;
+              endif
+        enddefine;
+Notice that POP11 doesn't really mind if you use the same  variable  for
+output  as  for input, in this case LIST. It could have be done for some
+of the earlier answers too.
+
+13)
+        vars memory;     [] -> memory;
+
+        define store(pattern);
+                [^pattern ^^memory] -> memory
+        enddefine;
+
+        define known(pattern)->result;
+                memory matches [== ^pattern ==] -> result
+        enddefine;
+
+        define recall(pattern);
+                unless  known(pattern) then
+                  mishap('RECALL ERROR - PATTERN NOT FOUND', [^pattern])
+                endif
+        enddefine;
+
+        define forget(pattern);
+                vars item;
+                [%for item in memory do
+                        unless  item matches pattern
+                        then    item
+                        endunless
+                endfor%]
+                        ->memory
+        enddefine;
+
+                ----------------------------------------
+
+14)
+        define picpoints()->list;
+            vars x y;
+            [] -> list;
+
+            for x from 1 to xmax do
+                for y from 1 to ymax do
+                    if      picture(x,y) /= space
+                    then    [[^x ^y]  ^^list] -> list
+                    endif
+                endfor
+            endfor
+        enddefine;
+
+
+See TEACH PICTURES for more on this.

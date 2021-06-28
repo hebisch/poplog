@@ -1,0 +1,227 @@
+TEACH VEDTIPS                                     A.Sloman December 1994
+
+Tips on tailoring VED
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Introduction
+ -- Getting rid of the menus
+ -- Changing key bindings
+ -- -- Using vedsetkey
+ -- -- Using vedset keys ... endvedset
+ -- -- Warning - multiple key sequences
+ -- Finding out which procedures are available
+ -- Mapping an ENTER command onto a key sequence
+ -- Mapping function keys to VED procedures
+ -- Getting help
+
+Note - this message is available as TEACH VEDTIPS
+
+-- Introduction -------------------------------------------------------
+
+Various students have asked me about modifying VED to make it more like
+editors that they are used to.
+
+Since VED is just a collection of Pop-11 procedures it is not very hard
+to make certain changes (others are harder). In particular if you want
+to change the keyboard mappings you can do so by modifying your
+vedinit.p file as follows:
+
+At the end of your file ~/vedinit.p you will find a definition of a
+procedure called vedinit. This procedure is run as soon as VED first
+starts up. The default version that students have been given is
+something like this:
+
+define vedinit();
+  ;;; Comment this out if you don't want the menus (use "ENTER menu" instead)
+    vedinput(veddo(%'menu'%))
+enddefine;
+
+Note that if you wish to add any extra commands as suggested below,
+you'll need a semi colon after the "))".
+
+-- Getting rid of the menus -------------------------------------------
+
+The first thing you may want is to get rid of the menus, so that VED
+starts up faster. You can do that by "commenting out" the vedinput
+command, i.e. make it look like this:
+
+    ;;; vedinput(veddo(%'menu'%));
+
+You can always ask for the menus after VED starts up, if you need them,
+by giving the command ENTER menu
+
+-- Changing key bindings ----------------------------------------------
+
+Changing key bindings means changing which VED procedures are invoked
+when you type a certain key, or key sequence. The default bindings
+(associations) between keys and procedures do not suit all users.
+
+You can change key bindings by adding commands to your vedinit procedure
+in the vedinit.p file. (First make sure there is a semi-colon after
+the vedinput command, if you don't already have one).
+
+There are two ways of changing the key bindings. One is to use the
+procedure vedsetkey, which takes a character string and the name of a
+function and maps the characters onto the function. This requires
+knowledge of how to represent character codes in strings.
+
+The other way is to use a special syntax form which is
+
+    vedset keys
+        ....
+    endvedset
+
+-- -- Using vedsetkey
+
+Suppose you wish to make the "back space" key delete the character to
+the left of the current VED cursor, a function usually mapped onto the
+DEL key.
+
+Using vedsetkey you would map a string containing the backspace
+character (represented in Pop-11 strings as "\b") onto the procedure
+vedchardelete thus:
+
+    vedsetkey('\b', "vedchardelete");
+
+(It is not essentialy to use the double quotes around the procedure
+name, though it does add flexibility: you can temporarily redefine the
+procedure in some contexts.) If you put the cursor on that line and
+type "ESC d" (or mark and load that line) then after that the backspace
+key will delete characters immediately to the left. Test that new key
+binding 12345 <- here. (Press backspace with the cursor to the right of
+the "5").
+
+Normally the character CTRL-r (represented in Pop-11 strings as "\^r")
+is mapped onto a procedure to delete the character under the VED cursor,
+using the procedure veddotdelete ("dot" often stands for "here" in unix
+systems). You might prefer to make it delete the character to the RIGHT
+of the VED cursor. You can do that as follows, by using "<>" to join two
+ved procedures together:
+
+    vedsetkey('\^r', vedcharright<>veddotdelete);
+
+This makes the CTRL-r character move the cursor right and then delete
+the character under the cursor. Load that line (ESC d) and try that
+here -> 12345
+
+For full details on how to represent control characters in strings see
+HELP * ASCII.
+
+
+-- -- Using vedset keys ... endvedset
+
+This is how you would use vedset to achieve the above two key bindings.
+
+    vedset keys
+
+        ;;; map backspace to delete char on left
+        chardelete  = \b
+
+        ;;; map CTRL-r to delete character on right
+        charright <> dotdelete  = ^r
+
+    endvedset;
+
+Note that the VED procedure names are not given in full in this context.
+Instead the first three characters 'ved' are left out. "vedset" will add
+them automatically.
+
+You can test that by marking the lines from "vedset" to "endvedset"
+and then loading (CTRL-d).
+
+The vedset notation has a language of its own. Full details are
+described in HELP * VEDSET
+
+-- -- Warning - multiple key sequences
+
+You can map a two character or three character sequence onto a VED
+procedure. However, if you do that then you must make sure that you
+do not need to use any initial subset of the sequence.
+
+E.g. if you decide that you want to use CTRL-r CTRL-e to mean
+delete to the end of the line, which you can do as follows:
+
+    vedsetkey('\^r\^e', "vedcleartail");
+
+or
+    vedset keys
+        cleartail = ctrl r ctrl e
+    endvedset;
+
+then you will not be able to use CTRL-r on its own, for after you have
+typed it VED will wait to see whether you are going to type CTRL-e or
+something else.
+
+-- Finding out which procedures are available -------------------------
+
+The file REF * VEDPROCS gives a lot of information about procedures that
+are available in VED which you can map onto key sequences.
+
+-- Mapping an ENTER command onto a key sequence -----------------------
+
+Many commands are normally given on the command line, but if there is
+one that you wish to use often then you can use veddo to create a
+procedure to do it.
+
+For example, suppose you wished to have a command to search backward to
+the beginning of the current procedure definition, i.e. a line starting
+with "define". You could do that by giving the command
+
+    ENTER \@adefine
+
+using the 'backslash' to search backwards, and using "@a" to mean, at
+the start of a line. Any such command can also be given in the form of a
+string, to the procedure veddo, except that because backslash is a
+special character in strings you have to repeat it to refer to itself!
+For instance the following command will search back for the line
+starting 'For ' -- try it:
+
+    veddo('\\@aFor ');
+
+By putting percents inside the parentheses you can make it postpone
+execution by forming a Pop-11 "closure", a procedure that can be run
+later on by giving the string to veddo:
+
+    veddo(% '\\@aFor ' %);
+
+If you obey that command it will not run veddo. It will just create the
+new procedure, and leave it on the Pop-11 stack, where it will do
+nothing.
+
+We can use that trick to create a collection of key bindings to search
+backwards, e.g. for "define" at the begining of a line, or for "if" or
+for "lvars" thus.
+
+    ;;; make CTRL-b CTRL-d search back for 'define ' at line start
+    vedsetkey('\^b\^d', veddo(% '\\@adefine ' %) );
+
+    ;;; make CTRL-b CTRL-i search back for 'if '
+    vedsetkey('\^b\^i', veddo(% '\\if ' %) );
+
+    ;;; make CTRL-b CTRL-l search back for 'lvars '
+    vedsetkey('\^b\^l', veddo(% '\\lvars ' %) );
+
+Unfortunately you cannot use closures with vedset ... endvedset.
+
+-- Mapping function keys to VED procedures ----------------------------
+
+There is no simple way of telling VED how to associate particular
+function keys with VED procedures. Instead you have to find out which
+characters are transmitted to VED when the function key is pressed. You
+can use the "ENTER dk" (Define Keys) command , as described in HELP dk.
+
+This is not ideal!
+
+The ENTER dk command will put new key bindings, using vedsetkey, into
+your vedinit.p file. You will then have to move them into your vedinit
+procedure definition. If you don't they may not work after VED starts
+up.
+
+-- Getting help -------------------------------------------------------
+
+If you wish to create a specific key binding and don't know how, ask for
+help. Email poplog-users.
+
+--- $poplocal/local/teach/vedtips
+--- The University of Birmingham 1994.  --------------------------------

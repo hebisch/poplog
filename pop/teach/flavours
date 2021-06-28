@@ -1,0 +1,1087 @@
+TEACH FLAVOURS                                 Mark Rubinstein  April 1986
+                                               Updated A.Schoter July 1991
+
+To make the package described in this teach file available you need to do
+
+    lib flavours;
+or
+    uses flavours;
+
+The package will take a long time to load and you are strongly urged to
+use the saved image provided by typing:
+
+    % pop11 -flavours
+
+to the shell.  (On VMS machines you should type:
+
+    $ pop11 /flavours
+
+to DCL).
+
+-- CONTENTS - (Use <ENTER> g to access sections) -----------------------
+
+ -- Introduction
+ -- Object Oriented Programming
+ -- Some Jargon
+ -- Some Syntax
+ -- Flavour Body
+ -- Instance creation
+ -- Message sending
+ -- Initial Values
+ -- Inheritance
+ -- Multiple Inheritance
+ -- The Vanilla Flavour
+ -- The Ordering of Components
+ -- Daemons
+ -- Message Receiving and the Default Method
+ -- Updater Messages
+ -- Active Variables
+ -- ANY_MESSSAGE daemons
+ -- IVALOF
+ -- The Initialise Message
+ -- Dynamic Instance Variables
+ -- Metaflavours
+ -- SELF, MESSAGE and MYFLAVOUR
+ -- Sending a message to SELF
+ -- More Jargon
+ -- Bugs and Omissions
+ -- See Also
+ -- Bibliography
+
+-- Introduction --------------------------------------------------------
+
+LIB FLAVOURS is an experimental package for object oriented programming
+within POP-11.  Work is being undertaken to examine different kinds of
+object oriented programming techniques and paradigms in order to consider
+how best they should be incorporated into the core of POPLOG.  Until then
+LIB FLAVOURS provides some features to be experimented with. A simpler
+system also providing object oriented techniques, based on the Poplog
+process mechanism, is LIB NEWOBJ described in HELP * NEWOBJ
+
+The ideas of this package are loosely based on those of the Zetalisp
+Flavors system but much has been inherited from other object oriented
+programming systems such as Smalltalk-80, Loops and Common Loops, Simula
+and actor languages.
+
+-- Object Oriented Programming -----------------------------------------
+
+The object oriented programmers view of traditional procedural programming
+is of procedures wildly attacking data which is defenceless and has no
+control over what the procedures do to it.  This has been called the 'rape
+and pillage' style of programming.  The object oriented programmers view
+of object oriented programming is of polite well behaved data objects
+passing messages to one another, each data object deciding for itself
+whether to accept the message and how to interpret what it means.  So goes
+the theory.
+
+Object oriented programming is to datatypes what structured programming is
+to procedures.  The idea is to shift the focus of attention from
+"procedures that do things to data" to "data to which things are done".
+The task is not to define the procedures which will manipulate data but to
+define data objects, their attributes and the way in which they may be
+examined or changed.  Data objects (and procedures) can communicate with
+data objects only through narrow, well defined channels.  Object-oriented
+programming lets a programmer implement a useful facility that presents
+the caller with a set of external interfaces, without requiring the caller
+to understand how the internal details of the implementation work.  In
+other words, a program that calls this facility can treat a the facility
+as a black box; the program knows what the facility's external interfaces
+guarantee to do, and that is all it needs to know.
+
+Objects are generally capable of doing two things.  They can store
+information about themselves and they can receive (or handle) messages
+which might ask them for information about their state or ask them to
+change some aspect or their internal state.  The store of the internal
+state is sometimes called "slots", "attributes" or "instance variables"
+and the description of how to handle or receive a particular message is
+called a "method".
+
+In most object oriented systems, including the one described here, a
+distinction is drawn between a description (or definition) of a class of
+objects and an instance of a class.  For example we can describe the
+features that are common to all professors (the class of professors) and
+then have instances of professors such as Aaron and Maggie. Features or
+attributes of professors might include their age, their telephone number
+or the subject of their inaugural lecture.  Messages that a professor
+object can respond to might for example include birthday, write-a-paper or
+give-a-lecture.  Both Aaron and Maggie, in their capacities as professors,
+ought to be able to respond to the same messages, but the values that they
+have for their attributes (such as telephone-number and
+inaugural-lecture-subject) should be different.  In the language of
+object-oriented systems, Aaron and Maggie are both 'instances' of the
+'class' professor.  As members of the same class they have values for the
+same attributes and are capable of responding to the same messages.  As
+different instances the actual values they have for the attributes are
+likely to be different.
+
+Another feature common to almost all object oriented systems is that of
+specialisation, or "inheritance".  This allows you to define one class,
+such as "vehicle" which encapsulates all the relevant features of
+vehicles, and then to define another class which belongs to the same class
+but is a specialisation of it.  For example a "car" is a kind of vehicle
+and has all the attributes and characteristics that vehicles have but
+might be considered to have some special attributes or characteristics
+such as number of doors, size of boot et cetera.  In the jargon of object
+oriented programming the class car is said to "inherit from" the class
+vehicle.  Object oriented systems that support inheritance allow you to
+specify that one class inherits from another and you then only need to
+specify what is special about the class.  Thus you can say that a car is a
+vehicle and not have to repeat all the details about vehicles - the system
+will copy that automatically for you.  The significance of inheritance and
+its implementation in this package is discussed later.
+
+-- Some Jargon ---------------------------------------------------------
+
+Here is some of the jargon to do with object oriented systems.
+
+ATTRIBUTE or (in this package) INSTANCE VARIABLE:
+    These are the names of the attributes or in an instance.  Instances of
+    the same class have the same instance variables but can have different
+    values for them.  For example "age" might be a attribute of the
+    flavour professor.  Maggie's value for age might be 23 while Aaron's
+    is 26.
+
+CLASS, OBJECT TYPE, or (in this package) FLAVOUR:
+    An object used to represent or describe a class or type of objects.
+    For example person, student, professor, car and so on.
+
+INHERITANCE
+    When a class of objects is specified as being like another existing
+    (previously defined) class but with some different or extra attributes
+    or characteristics then it can be said to inherit from the first
+    class.
+
+INSTANCE:
+    An object used to represent a particular individual entity (as opposed
+    to a class of entities).  For example, Mark, Alex, Aaron, Harry's
+    Morris Minor and so on.
+
+INSTANTIATE
+    Make a new instance of a flavour.
+
+MESSAGE:
+    This is how the objects communicate with each other and how the
+    outside world communicates with an object.  Instead of a procedure
+    being applied to a data object, a message is sent to that object.
+    Messages are sometimes made up of two components, the "selector" and
+    the "arguments".  Not all messages require arguments.  (In flavours
+    message selectors tend to be words.)
+
+METHOD:
+    This is what an object uses to respond to a particular message.
+    Methods are held by class or flavour objects and are available to all
+    instances of that class.  For example the person flavour may have a
+    method to handle a message whose selector is "birthday".  All
+    instances of person, such as john and harry will use that method if
+    they ever receiver the message birthday.  (In flavours methods tend to
+    be procedures).
+
+OBJECT:
+    A much abused term, used very loosely to refer to any data object.  In
+    the example above both Aaron and Maggie are objects but the class of
+    professors might also be referred to as an object.  In general an
+    object is supposed to represent some real-world entity, at an
+    appropriate level of granularity for the task in hand. Some systems
+    will use 'object' not only to refer to instances and classes but also
+    message, methods, numbers and so on.
+
+-- Some Syntax ---------------------------------------------------------
+
+In the flavours package the simplest way to define a flavour is to use the
+syntax form bracketed by flavour .. endflavour;  The general form is
+
+    flavour <name> [<options>];
+        <body>
+    endflavour;
+
+The particular options that can be used will be explained later.
+
+There is one important way in which the flavour syntax form differs from
+other syntax forms in POP-11.  When you first define a flavour a
+description is built for the given name of flavour.  If you then use the
+syntax again with the same name you will not build a new flavour
+definition but merely add to or alter the old one.  As you will see you
+can specify methods for the flavour in the body of the definition.  If you
+specify a method for responding to the message "birthday" in the body of
+the "professor" flavour and then later define the "professor" flavour to
+give a method for responding to the message "give-a-lecture" then
+"professors" will still be able to respond to the message "birthday"
+using the previous method.  If however in the new definition you define a
+method for responding to the message "birthday" then your new method will
+replace the old one.
+
+You should consider the flavour definition to be a re-enterable
+environment (somewhat in the same way as sections are) which you could
+re-enter as many times as you want to add or change the environment.
+Details of how to remove parts of the description from the environment are
+shown in HELP * METAFLAVOURS.
+
+-- Flavour Body --------------------------------------------------------
+
+The body of a flavour is composed of two kinds of declarations.
+Declarations of instance variable names (or slots) and definitions of
+methods.  Instance variables are declared using the syntax word "ivars".
+Its use is analogous to the POP-11 variable declaration syntax words
+"vars" and "lvars".  From then on all references within the
+flavour..endflavour brackets to the words declared as "ivars" will be
+treated as references to the appropriate slot of the instance to which the
+message is sent.
+
+Methods are defined exactly in the same way as procedures are defined
+except that the key words "defmethod" and "enddefmethod" are used instead
+of "define" and "enddefine".
+
+Here is a simple definition for a flavour to represent people.
+
+    flavour person;                 ;;; header
+    ivars name age sex;             ;;; three instance variables
+        defmethod birthday;         ;;; definition of a method to respond
+            age + 1 -> age;         ;;; to the message "birthday".
+            [happy birthday to ^name] =>
+        enddefmethod;
+        defmethod printself;        ;;; another method definition for
+            pr('<person ');         ;;; printing instances of person
+            pr(name);
+            pr('>');
+        enddefmethod;
+    endflavour;
+
+-- Instance creation ---------------------------------------------------
+
+Now that we have defined some of the details of what a person is like we
+need a way of creating an instance of this flavour.  The simplest way to
+do this is to use the procedure -make_instance-.  Make_instance takes a
+list, the first element of which should be the name of a flavour for which
+you want an instance created and the rest of the list should consist of
+pairs of elements of the form: slot-name initial-value.  For example:
+
+    vars adam;
+    make_instance([person name adam age 24 sex male]) -> adam;
+
+POPLOG will normally print an instance by sending it the message
+"printself".  So:
+
+    adam =>
+    ** <person adam>
+
+-- Message sending -----------------------------------------------------
+
+The syntax for sending a message is the backwards arrow "<-" used in the
+form:
+
+    instance <- selector(arg1, arg2, ... argn);
+
+Where the message consists only of a selector (i.e. there are no
+arguments) you can use the form is:
+
+    instance <- message;
+
+So using the example above we can find out adam's age by sending the
+message "age" to the instance adam (instances recognise messages that are
+the name of their instance variables to access the value of the
+appropriate slot):
+
+    adam<-age =>
+    ** 24
+
+we can send adam the message birthday:
+
+    adam <- birthday;
+    ** [happy birthday to adam]
+
+and if we now send the message "age" to adam we can see that it has been
+incremented.
+
+    adam <- age =>
+    ** 25
+
+There is a general procedure for sending messages (*SYSSENDMESSAGE), which
+the <- syntax uses and which is also made the class_apply (see HELP *
+CLASSES) of instances so you can apply instances to a message as a way of
+sending a message:
+
+    adam("age") =>
+    ** 25
+
+this is sometimes important since the message may be held in a variable
+and the <- syntax does not evaluate the selector (which is why it is not
+necessary to quote the word age when using the <- syntax).  For example if
+the value of the variable -mess- is the word "age" then
+
+    adam(mess);
+
+will send the message "age" to adam whereas
+
+    adam <- mess;
+
+will send the message "mess" to adam.
+
+In this package anything that sends a message to an object will wait for
+that object to reply or to finish dealing with the message before
+continuing.  This is not the case with all object oriented systems.
+
+See also the section below on sending a message to SELF.
+
+-- Initial Values ------------------------------------------------------
+
+We can define a method for instances of person that require an argument.
+The example shown below is "marry".  Note that I have introduced a new
+instance variable ("spouse") which all instances will automatically get a
+slot for.  I have also defined, in the flavour definition, an initial
+value for the slot (false) using the "=" syntax.  You can set an initial
+value for any instance variable in this way.  When a new instance is
+created the instance variable will start with the given initial value
+before the value (if any) specified in the list to -make_instance- is
+bound.  If no initial value is defined then the initial value will be
+*UNDEF.  If a new instance variable is defined then existing instances
+(such as the instance -adam- in this example) will get the given initial
+value for that slot.
+
+Note the use of the variable -self-.  At message sending time this is
+always bound to the instance receiving the message.
+
+    flavour person;     ;;; add to the definition of the flavour person;
+    ivars spouse=false; ;;; new iv (spouse) with initial value -false-
+        defmethod marry(person);
+        lvars person;
+            if person<-sex == sex then  ;;; see if we are different sexes
+                [hmm very modern] =>
+            endif;
+            if spouse then
+            ;;; check I am not already married to someone else
+                unless spouse == person do
+                    mishap('BIGAMY', [% self, spouse, person %]);
+                endunless
+            else
+            ;;; update my spouse slot
+                person -> spouse;
+            ;;; take the vows
+                [I ^name take ^(spouse<-name) to be my lawfully wedded
+                    other] =>
+            ;;; make sure that the other person knows that we are married
+                spouse <- marry(self);
+            endif;
+        enddefmethod;
+    endflavour;
+
+Now lets see what adam's spouse is:
+
+    adam <- spouse =>
+    ** <false>
+
+lets make a potential partner for adam:
+
+    vars eve;
+    make_instance([person name eve age 24 sex female]) -> eve;
+
+does eve have a spouse?
+
+    eve <- spouse =>
+    ** <false>
+
+adam and eve could aways get married:
+
+    adam <- marry(eve);
+    ** [I adam take eve to be my lawfully wedded other]
+    ** [I eve take adam to be my lawfully wedded other]
+
+now lets see their spouses
+
+    adam <- spouse =>
+    ** <person eve>
+
+    eve <- spouse =>
+    ** <person adam>
+
+Is adam the husband of his wife?
+
+    adam<-spouse<-spouse == adam =>
+    <true>
+
+-- Inheritance ---------------------------------------------------------
+
+We now want to define a flavour to define the class of professors.  We
+could make a flavour definition with slots such as name, age, sex, spouse,
+telephone_number, inaugural_lecture_subject and then copy the methods we
+have already defined for the person flavour and add the new ones for the
+professor-specific messages.  This would be a rather painful way of going
+about things.  It would also mean that if were to want to change the way
+that people responded to the message "marry" we would have to change the
+method both for the person flavour and the professor flavour (and any
+other flavours that we have defined for special classes of people).  What
+we want to say is that professors are special kinds of people that have
+all the attributes of people (and perhaps some others as well) and are
+capable of responding to all the messages that people can, as well as
+perhaps some special messages specific to professors.  The terminology for
+this is that the professor flavour "inherits" from the person flavour. We
+then say that "person" is a component of "professor".  This process is
+called "specialisation".
+
+We can specify the components of a flavour using the keyword "isa" on the
+header line of the flavour definition.  For example
+
+    flavour professor isa person;
+    ivars telephone_number inaugural_lecture_subject;
+        defmethod write_paper(subject);
+            [^name is writing a paper on ^subject] =>
+            /* code for a professor to write a paper */
+        enddefmethod;
+        defmethod printself;
+            pr('<professor '); pr(name); pr('>');
+        enddefmethod;
+    endflavour;
+
+This means that a professor has all the instance variables that a person
+has as well as the two extra ones specified.  It also means that a
+professor is capable of responding to all the messages that a person can
+as well as the extra message -write_paper- for which a method was (rather
+poorly) defined in the professor flavour.  Note that a professor now
+appears to have two methods for the message -printself-.  If the message
+printself is sent to a professor then the most specific method is used. In
+this case the one defined in the professor flavour.
+
+    vars aaron;
+    make_instance([professor name aaron sex male age 26
+        inaugural_lecture_subject computers_and_philosophy]) -> aaron;
+
+    aaron =>
+    ** <professor aaron>
+
+    aaron <- inaugural_lecture_subject =>
+    ** computers_and_philosophy
+
+    aaron <- birthday;
+    ** [happy birthday to aaron]
+
+    aaron <- age =>
+    ** 27
+
+    aaron <- write_paper("ai");
+    ** [aaron is writing a paper on ai]
+
+-- Multiple Inheritance ------------------------------------------------
+
+In many systems, including this flavours package, you can specify that a
+flavour should inherit from more than one flavour.  This feature is called
+multiple inheritance.
+
+Suppose that you wanted to create a special class of french professors.
+You could create a flavour called french_professor which inherits from
+professor and defines all the features (instance variables and methods)
+that are special to french professors.
+
+    flavour french_professor isa professor;
+        /* features special to french professors */
+    endflavour;
+
+Alternatively you could define a french person flavour which encompasses
+the features of frenchness and then mix the professor flavour with the
+french person flavour to create a flavour which encaptures the features of
+frenchness and the the features of professordom.  Given a french person
+flavour you can create the french professor flavour by doing:
+
+    flavour french_professor isa professor french_person;
+        /* features special to french professors that are not true
+            of professors in general or french people in general
+        */
+    endflavour;
+
+The advantages of creating a french professor by this second method is
+that you can keep all features of french people together and quite
+separate from details which are only true of french professors.  More
+importantly you now have a flavour for a french person that you can mix
+with other flavours. For example if you define a student flavour you can
+easily create a french student flavour.  If you do this then you can
+change some detail about french people and both the french professor
+flavour and the french student flavour will change automatically.  In this
+sense the french person flavour is a useful placeholder.
+
+Multiple Inheritance is often made out to be of more use than it is.  It
+is highly unlikely that a truck flavour and a toy flavour could be
+successfully mixed together to make a good toy truck flavour.
+
+-- The Vanilla Flavour -------------------------------------------------
+
+One of the flavours provided by the system is the vanilla flavour. All
+flavours inherit from this flavour by default, it is the root of all
+flavours.  Thus the following two flavour headings are equivalent:
+
+    flavour professor isa person;
+    flavour professor isa person vanilla;
+
+If you really don't wish to mix vanilla with a flavour then you should use
+the key word "novanilla" after the name of the flavour, viz:
+
+    flavour funny_flavour novanilla;
+(or
+    flavour funny_flavour novanilla isa silly_flavour;
+)
+
+There is very rarely a reason not to include vanilla.
+
+The vanilla flavour is a useful placeholder for methods that you want all
+flavours to respond to.  An example of this is the message "browseself"
+that the browser library introduces into the vanilla flavour.  The browser
+is described in HELP * BROWSESELF_MESSAGE.
+
+If you are interested in seeing how the vanilla flavour is initially
+defined then you should see LIB * VANILLA_FLAVOUR.  (N.B. This will only
+work if you already have the flavours system loaded).
+
+-- The Ordering of Components ------------------------------------------
+
+Multiple inheritance can lead to a complex network, or lattice, or flavour
+components from which a flavour might inherit instance variables and
+methods.  For example the situation we have already described might be
+displayed something like this.
+
+                          /-------\
+                          |VANILLA|
+                          \+-+-+-+/
+                 +---------+ | | |
+              /--+---\ +-----+ | |
+              |PERSON| |       | |
+              \-+--+-/ |       | +----------+
+                |  |   |       |            |
+                |  +---|-----+ |            |
+                |      |     | |            |
+              /-+------+\   /+-+----------\ |
+              |PROFESSOR|   |FRENCH PERSON| |
+              \------+--/   \-+-----------/ |
+                     |        |  +----------+
+                     |        |  |
+                  /--+--------+--+-\
+                  |FRENCH PROFESSOR|
+                  \----------------/
+
+The inheritance of instance variables is simple since all flavours inherit
+a union of the set of instance variables defined by their components.  The
+inheritance of methods is more complicated.  Suppose a method for the
+message M was defined in french_person and in person then it is important
+to know which method will be invoked if you send the message M to a
+instance of french professor.
+
+When such a conflict arises the package uses a class precedence list to
+determine precedence for the method.  The default method for constructing
+a class precedence list is that described by Stefik & Bobrow 1986. The
+class precedence list is computed by starting with the first (leftmost)
+component and proceeding depth-first UP TO JOINS.  For example the
+precedence list for french_professor first visits the flavours in the left
+branch (french_professor, professor) and then the right branch
+(french_person) and then the join (person) and up from there.  So the
+full precedence list for french professor would be french_professor,
+professor, french_person, person, vanilla.  A precedence list should never
+include the same flavour twice.
+
+The left-to-right provision makes it possible to indicate which classes
+take precedence.  The up-to-joins provision makes sense for the adding of
+flavours that add some special features but which are not necessarily full
+descriptions of any particular kind of object.  Examples of such flavours
+that provide useful features or placeholders but which it would not make
+sense to instantiate are named_object and vanilla.  Such flavours are
+sometimes called MIXINS.  The ability to add in mixins is one of the
+better uses of multiple inheritance.
+
+The precedence ordering described here is the default precedence ordering.
+It is possible to define flavours that use a different precedence
+ordering, for details see HELP * METAFLAVOURS
+
+-- Daemons -------------------------------------------------------------
+
+Sometimes a flavour will want not only to use the method defined in one of
+its components but also to do some other action.  For example if you have
+an object representing part of a diagram on a screen it may have parts of
+the diagram attached to it for which it is responsible.  If the object
+receives a message to move then it will want to pass the message on to the
+parts of the diagram for which it is responsible.  (An object that
+automatically instantiates a group of inter-connected objects is sometimes
+called a composite object.)  Another example might be that you want
+professors to check if they have reached retirement age whenever they get
+a "birthday" message.  In both of these cases you do not want to replicate
+the actual method that would be used for responding to the message since
+that would be both repetitive and time-wasting, and, more significantly
+would go against the object-oriented "black-box" paradigm.  That is it
+shouldn't be necessary for the professor to know how a birthday method is
+implemented, or if the diagram-part has a visible-box flavour as the
+components which handles its visual aspect, it should not be necessary for
+the diagram-part to know how the move is actually achieved.  In particular
+you may want to change how the move is achieved in which case you should
+only need to change the visible-box flavour, and not the diagram-part
+flavour.
+
+There are two ways that object oriented programming systems achieve this
+functionality.  The first (which is not adopted in this system) is to have
+some syntax for saying within a method definition "now go and do what you
+would have done had this method not been here".  This might be the keyword
+"sendsuper" (send the message on to my super class) so that you could
+have a method that looks like this.
+
+    flavour diagram_part isa visible_box;
+    ivars mysubparts;
+        defmethod move(params);
+        lvars params part;
+            for part in mysubparts do
+                part <- move(params);
+            endfor;
+            sendsuper;          ;;; THIS WILL NOT WORK IN FLAVOURS
+        enddefmethod;
+    endflavour;
+
+The way that flavours achieve this functionality is to use daemons.
+Daemons are extra methods that can fire before (or after) a primary method
+to modify or add to the action of the method.  Thus you may do:
+
+    flavour diagram_part isa visible_box;
+    ivars mysubparts;
+        defmethod before move(params) -> params;    ;;; THIS WILL WORK
+        lvars params part;
+            for part in mysubparts do
+                part <- move(params);
+            endfor;
+        enddefmethod;
+    endflavour;
+
+NOTE: that the daemon, which takes the argument part of the message
+(params) off the stack must replace it on the stack for the primary
+method.  In this case it is done by returning the argument as a result.
+
+-- Message Receiving and the Default Method ----------------------------
+
+We are now in a position to look at what happens when a message M is sent
+to an instance I of flavour F.  If F, or any of the flavours in the
+precedence list for F has a method for M or if M is the name of an
+instance variable of F then the message is accepted.  If the message is
+accepted then each of the flavours in the precedence list for F (which
+includes F itself) is looked at for a before daemon appropriate to M, and
+all such daemons found are executed.  Then the primary method found for M
+is executed (if no primary method was found, but M is the name of an
+instance variable then the value of that instance variable in I is
+returned as a result).  Then each of the flavours in the precedence list
+is looked at IN REVERSE ORDER for after daemons appropriate to the message
+M.  All such daemons are executed.
+
+To summarise all before daemons are run in the precedence list order (by
+default most-specific first), then the first primary method found in the
+precedence list (most-specific first) is executed and the all the after
+daemons are run in the reverse order of the before daemons (least-specific
+first).
+
+If the message is not accepted then an attempt is made to send the message
+"default_method" with the original message M as argument.  Any
+"default_method" daemons are executed.  If the message default_method is
+not accepted then a MISHAP will occur.
+
+One of the useful things that VANILLA provides is a definition for
+"default_method".  This will try and autoload a file called M_message
+(where M is the message) and if the object -self- will then respond to the
+message it will re-send it to -self-. If no such file is found, or if self
+will still not accept the message, then a MISHAP is called. This provides
+a mechanism for autoloading messages into flavours.  HELP *
+FLAVOUR_LIBRARY gives details of autoloadable flavours and messages that
+are provided.
+
+-- Updater Messages ----------------------------------------------------
+
+The flavours package, like POP-11 itself, recognises a distinction between
+messages per se and message sent in the updater position.  For example the
+following are distinguished.
+
+    adam <- age;
+    3 -> adam<-age;
+
+When a message M is sent in update mode then a defined updater of method M
+is looked for (in the same way as described above) or if that is not found
+then if the message is the name of an instance variable it is assumed that
+the message is meant to update (alter) the instance variable for the
+instance.  You define the updater of a method in the same way as updaters
+of POP-11 procedures.
+
+    flavour write_stream isa stream;
+        defmethod updaterof nextchar;
+            .
+            .
+        enddefmethod;
+    endflavour;
+
+When a message is updating then only updater daemons are executed.  These
+are similarly defined viz:
+
+    defmethod before updaterof location; .....
+OR
+    defmethod after updaterof location; .....
+
+-- Active Variables ----------------------------------------------------
+
+Since daemons are executed on instance variable access and update you can
+create "active" variables - variables that have actions associated with
+them to be run when they are accessed or updated.  A distinction should be
+drawn however between instance variable access within the flavour and
+instance variable action by message sending.  Only the second kind will
+cause daemons to fire.  For example look at this fragment of code for an
+adventure program in which location is an active instance variable for the
+player flavour.  In the method "go" it is necessary to send self the
+updater message for location.  While the method could just do:
+
+    place -> location;
+
+to alter the instance variable for self's location, this would not have
+caused the daemons to fire.
+
+    flavour player;
+    ivars location;
+        defmethod before updaterof location;
+            location <- player_leaves(self);    ;;; tell room I'm leaving
+        enddefmethod;
+        defmethod after updaterof location;
+            location <- player_enters(self);    ;;; tell new room I'm here
+        enddefmethod;
+        defmethod go(direction);
+        lvars direction place;
+            location(direction) -> place;
+            if place then
+                place -> self<-location;
+            else
+                [^name chose a wrong direction] =>
+            endif;
+        enddefmethod;
+    endflavour;
+
+See the section on sending a message to self below.
+
+-- ANY_MESSSAGE daemons ------------------------------------------------
+
+Sometimes you might want to perform a special action before or after any
+message is a sent to an instance.  In this case it would be very tiresome
+to have to write a daemon for all the possible messages, instead you can
+write a special daemon, called -any_message-.  All "before" any_message
+daemons will be called when a message is sent to an appropriate instance
+(before normal "before" daemons) and all "after" ones will be called
+afterwards.  As with normal daemons there are four varieties - before,
+before updaterof, after and after updaterof.
+
+A before any_message daemon will be called even if there is no method to
+receive the message.
+
+The message which is being sent will be held in the variable -message-
+(see below).
+
+-- IVALOF --------------------------------------------------------------
+
+Sometime you want to access or update the instance variable of a slot
+without firing any daemons.  To do this you can use the procedure -ivalof-
+(which has an updater).  This is also sometimes necessary when a method
+has the the same name as an instance variable (when a method shadows an
+instance variable).  The form of ivalof is ivalof(instance, ivar_name);
+
+    ivalof(aaron, "age") =>
+    ** 27
+
+-- The Initialise Message ----------------------------------------------
+
+One of the methods that vanilla provides is "initialise".  It is this
+method that uses the tail of the list provided to -make_instance-.
+-make_instance- makes a instance of the flavour named in the head of the
+list (by sending the message "new" to the appropriate metaflavour, as will
+be described below) and then sends the message initialise to the instance
+with the tail of the list as argument.  The initialise method defined in
+vanilla continuously takes the next two things from the front of the list
+and sends an update message to self with the first thing as the message
+and the second as the value updating.  It could have been defined as:
+
+    defmethod initialise(initlist);
+    vars message value;
+        while initlist matches [?message ?value ??initlist] do
+            value -> self(message);
+        endwhile;
+    enddefmethod;
+
+of course other flavours can define "initialise" methods that shadow the
+vanilla one.  (See LIB * VANILLA_FLAVOUR for the full definition.)  It is
+often useful to know that the message initialise message is going to be
+sent to an instance either to check that necessary instance variables have
+been set up correctly or to assign initial values to instance variables
+that cannot be evaluated at flavour definition time (using the ivars
+iv=val; syntax).  It can also be used by composite objects for creating
+the necessary sub-objects for which it is responsible.  For example:
+
+    flavour person;
+        defmethod before initialise(initlist) -> initlist;
+            ;;; this is just for demonstration purposes
+            [initlist is ^initlist]=>
+        enddefmethod;
+        defmethod after initialise;
+            if sex == undef then
+                mishap('PERSON BORN WITHOUT A SEX', [^self]);
+            endif;
+            [new person called ^name is born] =>
+        enddefmethod;
+    endflavour;
+
+    vars maggie;
+    make_instance([professor name maggie age 23 sex female
+        inaugural_lecture_subject 'AI and natural man']) -> maggie;
+    ** [initlist is [name maggie age 23 sex female
+            inaugural_lecture_subject AI and natural man]]
+    ** [new person called maggie is born]
+
+-- Dynamic Instance Variables ------------------------------------------
+
+The instance variables described so far are all LEXICALLY scoped.  That is
+only references to instance variable V textually inside definitions of
+flavours that have defined or inherited an instance variable V will access
+the appropriate slot of the instance when the message is sent.  The only
+way that a procedure outside the textual scope of the flavour definition
+can access or change a slot of an instance is by sending self a message
+(or using IVALOF on self).
+
+Sometimes this is not what is required.  For example suppose that you have
+objects that represent lines that are going to be drawn by the *TURTLE
+package.  One of the variables that the turtle package makes use of is
+HEADING and it might be useful if each of the line instances has its own
+value for heading which would be set whenever a message is sent to it.
+You could have a before daemon that fired before every message that might
+want to use the turtle drawing facility doing something like:
+
+    defmethod before drawself;
+        myheading -> heading;
+    enddefmethod;
+
+but this would be inelegant and verbose.  Instead you can declare an
+instance variable to be a dynamic instance variable.  This means that when
+a message is sent to an instance of the flavour the value of the dynamic
+variable is set to that saved for the instance receiving the message and
+when the message has finished the value of the dynamic variable is saved
+in the instance.   Here is a silly example
+
+    vars x;
+    define silly;       ;;; a procedure outside the lexical scope of a
+        [x is ^x] =>    ;;; flavour
+        26 -> x;
+    enddefine;
+
+    flavour funny;
+    divars x;           ;;; x is a DYNAMIC instance variable.
+        defmethod m;
+            silly();    ;;; call the outside procedure.
+        enddefmethod;
+    endflavour;
+
+    vars inst;
+    make_instance([funny x 0]) -> inst;
+
+    inst <- m;          ;;; call it once.
+    ** [x is 0]
+
+    inst <- m;          ;;; call it again - x picked up the value set in
+    ** [x is 26]        ;;; silly.
+
+It is mistake to redeclare the type of an instance variable.  If you wish
+to change the type of an instance variable then it is necessary to cancel
+the instance variable first and redeclare it of another type.  You cancel
+an instance variable of a flavour by sending a message to its metaflavour.
+
+-- Metaflavours --------------------------------------------------------
+
+When you define a new flavour the system needs to keep the description of
+the flavour somewhere.  The place it keeps this description is an instance
+of a special flavour (called a metaflavour) assigned to a variable called
+<name>_flavour.  For example we have already defined flavours for persons
+and professors so we can find the metaflavours thus.
+
+    person_flavour =>
+    ** <flavour person>
+
+    professor_flavour =>
+    ** <flavour professor>
+
+The values of these variables are instances of a flavour provided by the
+system called flavour.  These instances, known as metaflavours, are
+instances in the same way that adam and aaron are instances.  The only
+difference is that flavour of these instances (the flavour flavour) is
+recognized as being special in the sense that it represents a flavour.
+The flavour flavour is itself an instance of a metaflavour, but in this
+case the metaflavour is not flavour but ... metaflavour.
+
+    flavour_flavour =>
+    ** <metaflavour flavour>
+
+Metaflavours can be used for examining and changing the flavour
+environment that they represent.  For more details about metaflavours, see
+HELP * METAFLAVOURS.
+
+-- SELF, MESSAGE and MYFLAVOUR -----------------------------------------
+
+As has been seen above methods can refer to SELF which will be bound to
+the instance receiving the message at message-sending time.  There are
+three special variables like this: SELF, MESSAGE and MYFLAVOUR.  At
+message-sending time SELF will be bound to the instance receiving the
+message, MESSAGE will be bound to the selector of the message (which
+should be a word) and MYFLAVOUR which will be bound to the instance's
+metaflavour.  All three variables have full dynamic scoping (they can be
+referred to outside the textual scope of flavour records) but they are
+special in that they are not instance variables and therefore cannot be
+accessed by IVALOF.  They are protected and should not be assigned to.
+Normally you cannot access them by sending a message to an instance but
+there is an autoloadable library which defines a method for "myflavour"
+which returns or changes the flavour of an instance.  See LIB * MYFLAVOUR.
+
+The library implementing this message will load automatically so you can
+do:
+
+    adam <- myflavour =>
+    ** <flavour person>
+
+    adam <- myflavour <- myflavour =>
+    ** <metaflavour flavour>
+
+See HELP * FLAVOUR_LIBRARY/myflavour for details of the updater.
+
+-- Sending a message to SELF -------------------------------------------
+
+Often a method will want to call another method.  The way to do this is to
+send a message to self (self <- somemessage).  As was mentioned above in
+the section on active variables, in order to ensure that a method which
+refers to an active variable fires the daemons it is necessary to send the
+appropriate message to self.  The expression "self <-" is so useful that
+a special syntax is provided for it - "^".  Thus:
+
+    ^selectself(a1);
+
+is equivalent to
+
+    self <- selectself(a1);
+
+(NOTE: While it is always functionally equivalent to use the ^ (send self)
+syntax in place of "self <-" it will often be more efficient to use the ^
+syntax and for this reason its use is encouraged.  This can be used in
+procedures which are not methods but which will be called by methods.)
+
+Here is an example of its use.
+
+    flavour window;
+    ivars mynumber;
+        defmethod selectself;
+            unless isselected(mynumber) do
+                select(mynumber);
+            endunless;
+        enddefmethod;
+        defmethod moveself;
+            ^selectself;
+            moveselectedwindow();
+        enddefmethod;
+    endflavour;
+
+-- More Jargon ---------------------------------------------------------
+
+Here is a summary of some of the terms introduced in this teach file.
+
+ACTIVE VARIABLE
+    An instance variable which is capable of performing some action when
+    inspected or changed.  Achieved in this package using daemons.
+
+DAEMON
+    A special method which is run before or after a primary method for a
+    message is run.  A daemon cannot be shadowed since all daemons are
+    executed.
+
+COMPONENT or SUPERCLASS
+    A flavour that is higher in the inheritance lattice than a given
+    flavour.
+
+COMPOSITE OBJECT
+    An object used to represent a group of objects which the external
+    world wants to treat as one entity.  A composite object is usually
+    responsible for creating its sub-objects and passing messages on to
+    them.
+
+INHERITANCE
+    When a flavour is placed in the flavour lattice it inherits variables
+    and methods from its components (or superclasses).  Any variable
+    defined higher in the flavour lattice will also appear in instances of
+    this flavour.  If a method is defined in more than one place, the
+    overriding value is determined by the inheritance order.  The default
+    inheritance order is depth-first up to joins, and left-to-right in the
+    list of components.
+
+METACLASS
+    An instance used to represent a flavour.  The flavour of an instances
+    flavour.
+
+MIXIN
+    A flavour designed to augment the description of its subclasses in a
+    multiple inheritance lattice.  A flavour which cannot be instantiated.
+
+SHADOWING
+    When a primary method defined lower in the flavour lattice will be
+    executed instead of one higher in the lattice it can be said to shadow
+    the one defined higher.
+
+SPECIALISATION
+    The process of modifying a generic thing for a specific use by
+    defining a more specific subclass flavour.
+
+SUBCLASS
+    A flavour that is lower in the inheritance lattice that a given
+    flavour.
+
+-- Bugs and Omissions --------------------------------------------------
+
+There are no class variables.  These are like instance variables only
+there is only one slot for all instances of a flavour.  Changes to the
+variable made by one instance will be read by all other instances of the
+same flavour.
+
+It is not possible to change the precedence_list of metaflavours.
+
+It is not possible to change the way in which messages are received.
+
+There should be a procedure and syntax for "sendifhandled".  Currently you
+can do:
+
+    if x<-myflavour<-willrespondto("mess") then
+        x <- mess(x, y)
+    endif;
+
+But this is clumsy.   It would be if, for example "<-:-" was the syntax
+for sendifhandled then:
+
+    x <-:- mess(x, y);
+
+would only send the message "mess" if x had a specific method (or
+instance-variable) to respond to the message.  If there was no such method
+then x and y would be *ERASE d from the stack.  This should not be too
+hard to do and might prove an interesting exercise for a hacker.
+
+-- See Also ------------------------------------------------------------
+
+HELP * NEWOBJ
+
+Other HELP and REF files that might be or use are:
+
+HELP * METAFLAVOURS describes the instances that represent flavours.
+
+REF * FLAVOURS is a reference file for the flavours system.
+REF * FLAVOUR_LIBRARY will list the flavours and messages provided in
+    the autoloadable library.
+REF * FLAVOUR_SYNTAX gives detailed information on the syntax of the
+    flavours package.
+REF * METAFLAVOUR_FLAVOU describes messages that metaflavours respond
+    to.
+
+
+
+HELP * IVALOF describes the procedure for accessing/updating ivars.
+HELP * BROWSESELF_MESSAGE describes use of the browser
+LIB * ADVENT_FLAVOURS is a sample flavours program of an adventure game.
+HELP * FLAVOUR_NEWS describes changes to the flavours system.
+HELP * SYSSENDMESSAGE describes the procedure used for sending messages.
+HELP * SYSFLAVOUR describes the procedure used for defining flavours.
+
+-- Bibliography --------------------------------------------------------
+
+Mark Stefik & Daniel Bobrow, 1986
+    "Object-Oriented Programming: Themes and Variations"
+    The AI Magazine, Vol 6 No 4.  Winter 1986
+
+--- C.all/teach/flavours -----------------------------------------------
+--- Copyright University of Sussex 1988. All rights reserved. ----------

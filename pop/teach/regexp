@@ -1,0 +1,404 @@
+TEACH REGEXP                                    Jonathan Meyer Sept 1992
+
+This file provides a high  level overview of Poplog regular  expressions
+(string search patterns). See 'Constructing Regular Expressions' in
+REF *REGEXP for  a full  account  of the  rules  used to  construct
+regular expressions in Poplog.
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Introduction
+ -- Simple regular expressions
+ -- Single-character wildcard
+ -- Multi-character wildcard
+ -- Character classes
+ -- Start of line and end of line constraints
+ -- Word constraints
+ -- Range constraints
+ -- Sub-expressions
+ -- `Case' mode
+ -- See also
+
+-- Introduction -------------------------------------------------------
+
+Regular expressions  are expressions built up from characters, wildcards
+and operators. They are used to perform pattern matching in strings by
+many editors and applications, especially by UNIX facilities such as
+GREP, AWK, ED, etc.
+
+This tutorial shows you how to construct regular expressions for use
+with the Poplog regular expression matcher.
+
+-- Simple regular expressions -----------------------------------------
+
+If you want to look  for  the single  character  'd' in  a  string, use
+the pattern:
+
+    'd'
+
+This will match the d in 'and', 'define', 'amplitude', etc. We can try
+this as follows:
+
+    ;;; compile the regular expression 'd' into a search procedure:
+    vars search_p;
+
+    regexp_compile('d') -> (, search_p);
+
+    ;;; run the search procedure on a string:
+    search_p(1, 'define', false, false) =>
+    ** 1 1 ;;; ie. the first character, which is 'd'
+
+    search_p(1, 'amplitude', false, false) =>
+    ** 8 1 ;;; the eighth character, which is 'd'
+
+For full details of the arguments passed to regexp_compile and
+search_p, see REF *REGEXP.
+
+Similarly, to  match  the two  characters  'de'  in a  string,  use  the
+pattern:
+
+    'de'
+
+This will match the 'de' in 'define' and 'amplitude', but will not match
+against the string 'and':
+
+    regexp_compile('de') -> (, search_p);
+
+    search_p(1, 'define', false, false) =>
+    ** 1 2 ;;; two characters starting from position one, or 'de'
+
+    search_p(1, 'amplitude', false, false) =>
+    ** 8 2 ;;; two characters from position eight - 'de' again
+
+    search_p(1, 'and', false, false) =>
+    ** <false> <false> ;;; no match
+
+In general, to search for any sequence of characters you can just  use a
+pattern that consists of those  characters. Thus, to look for  'define',
+use:
+
+    'define'
+
+There are several wildcard expressions that you can use to specify
+search patterns. Each wildcard matches in a special set of
+circumstances. The wildcard expressions are:
+
+    Pattern     Meaning
+    --------------------------------------------------------------------
+    @.          matches any one character
+
+    @*          matches zero or more occurrences of the last character
+
+    @[ and @]   matches first occurrence of a character in the brackets
+
+    @^ and @$   constrains a match to the start or end of the line
+
+    @< and @>   constrains a match to the start or end of a word
+
+    @{ and @}   constrains a match to a certain number of occurrences
+
+    @( and @)   denotes a sub-expression
+
+    @n          where n is a number 1-9 refers back to a previously
+                denoted sub-expression.
+
+
+Lets look at each of the wildcard characters in turn:
+
+-- Single-character wildcard ------------------------------------------
+
+The `@.' can be used as a wildcard that matches any one character. Thus
+the expression:
+
+    'h@.t'
+
+will match 'hit' ,'hot', 'hat', etc. :
+
+    ;;; compile the expression '@.at' into a search procedure:
+    regexp_compile('h@.t') -> (, search_p);
+
+    ;;; apply the search procedure:
+
+    search_p(1, 'hat', false, false) =>
+    ** 1 3 ;;; the whole string
+
+    search_p(1, 'the hat', false, false) =>
+    ** 5 3 ;;; three characters starting at position 5, ie. 'hat'
+
+    search_p(1, 'cat', false, false) =>
+    ** <false> <false> ;;; no match
+
+-- Multi-character wildcard -------------------------------------------
+
+On the other hand, the `@*' can be used to match zero or more
+occurrences of a character. For example:
+
+    'ap@*'
+
+will match 'ap',  'app', 'appp',  etc. Note  however that  it will  also
+match any occurrence  of the single  character 'a':
+
+    regexp_compile('ap@*') -> (, search_p);
+
+    search_p(1, 'dog and cat', false, false) =>
+    ** 5 1 ;;; ie. the 'a' in and
+
+    search_p(1, 'apply', false, false) =>
+    ** 1 3 ;;; ie. 'app'
+
+    search_p(1, 'appproperty', false, false) =>
+    ** 1 4 ;;; ie. 'appp'
+
+This is because `@*' matches zero more occurrences of the last
+character.
+
+You can combine the `@.' and the `@*' to match zero or more occurrences
+of any character. Thus the pattern:
+
+    'jack @.@*'
+
+will match 'jack and jill', 'jack  sprat', 'jack of all trades', or  any
+other string containing  'jack', followed  by a space,  followed by  any
+number of characters.
+
+The @.@* can also represent all characters between two patterns:
+
+    'define @.@* foo'
+
+will match  the strings  'define lconstant  foo', 'define  global  foo',
+'define updaterof foo', 'define global constant procedure foo', etc.
+
+-- Character classes --------------------------------------------------
+
+Character classes allow you to specify a set of characters, any one of
+which can match. For example, the pattern:
+
+    '@[chms@]at'
+
+will match the strings 'cat', 'hat', 'mat' or 'sat':
+
+    regexp_compile('@[chms@]at') -> (, search_p);
+
+    search_p(1, 'the hat on the rack', false, false) =>
+    ** 5 3 ;;; three characters starting at the 5th position ie. 'hat'
+
+Note that the character classes are case speficic:
+
+    search_p(1, 'Hat', false, 0) =>
+    ** <false> <false> ;;; ie. no match
+
+You can specify a range of characters using the `-' sign. For example:
+
+    '@[A-Z@]at'
+
+will match any string which contains a capital letter and followed by
+'at'. Similarly, you can use:
+
+    'the @[1-9@] million dollar man'
+
+which will match 'the 1 million dollar man', 'the 2 million dollar man',
+etc.
+
+If the first character inside the square brackets is a circumflex,  then
+the pattern  will match  any character  except the  ones listed  in  the
+square brackets. Thus:
+
+    '@[^c@]at'
+
+will still match 'hat', 'mat' and 'sat', but will not match 'cat':
+
+    regexp_compile('@[^c@]at') -> (, search_p);
+
+    search_p(1, 'my cat', false, false) =>
+    ** <false> <false>
+
+    search_p(1, 'a bowler hat', false, false) =>
+    ** 10 3 ;;; ie. 'hat'
+
+-- Start of line and end of line constraints --------------------------
+
+You use the @^ and @$ expressions to constrain a search to the start or
+end of a string. Thus the pattern:
+
+    '@^mary'
+
+will only match strings that start with 'mary'. Similarly:
+
+    'mary@$'
+
+will ony match against occurrences of mary at the end of a string.
+
+You can  use both @^ and @$ in  a regular  expression to constrain a
+match to the whole string. Thus the pattern:
+
+    '@^mary@$'
+
+will only match with  the string 'mary', and  not with the string  'mary
+had a little lamb':
+
+    regexp_compile('@^mary@$') -> (, search_p);
+
+    search_p(1, 'mary', false, false) =>
+    ** 1 4
+
+    search_p(1,'mary liked jon', false, false) =>
+    ** <false> <false>
+
+    search_p(1,'jon and mary went to town', false, false) =>
+    ** <false> <false>
+
+
+-- Word constraints ---------------------------------------------------
+
+The @< and  @> are used  to indicate the  starts and end  of words  in a
+pattern. For example the pattern:
+
+    '@<th'
+
+will match words that start with 'th', like 'the' or 'theatre' but not
+'although' or 'athena':
+
+    regexp_compile('@<th') -> (, search_p);
+
+    search_p(1, 'although they were hungry', false, false) =>
+    ** 10 2 ;;; ie. the 'th' of 'they'
+
+Likewise,  the pattern:
+
+    'at@>'
+
+will match words that end in 'at', like 'splat', but will not match with
+'splatter'.
+
+You can use @< and  @> in the same pattern  to specify a complete  word.
+Note however that the pattern:
+
+    '@<t@.@*@>'
+
+might be expected to match any word that starts with t. However, if you
+try it, you will find that in fact it matches from a word starting with
+t to the end of the string:
+
+    regexp_compile('@<t@.@*@>') -> (, search_p);
+
+    search_p(1, 'does this match?', false, false) =>
+    ** 6 11 ;;; ie. the text 'this match?'
+
+This is because a `@.@*' matches any character, including a space. If
+you wish to constrain a search to an item, you could instead use:
+
+    '@<t@[^\s\t@]@*'
+
+or, in English, 'a word starting with t, containing any number of
+characters which aren't spaces or tabs'.
+
+    regexp_compile('@<t@[^\s\t@]@*') -> (, search_p);
+
+    search_p(1, 'does this match?', false, false) =>
+    ** 6 4 ;;; ie. 'this'
+
+-- Range constraints --------------------------------------------------
+
+The operators @{ and @} are used to constrain the number of times that a
+pattern appears in a string. Thus the pattern:
+
+    'p@{3@}'
+
+specifies that 'p' must  appear in the string  three times:
+
+    regexp_compile('p@{3@}') -> (, search_p);
+
+    search_p(1, 'appproperty', false, false) =>
+    ** 2 3 ;;; ie. 'ppp'
+
+This is  the same as the expression:
+
+    'ppp'
+
+You can  specify a  range of  occurrences by  using two  comma
+separated numbers. So:
+
+    'p@{1,3@}'
+
+will match 'p', 'pp' or 'ppp'.
+
+If you use a comma, but don't provide a second number, the second number
+is assumed to be 'as many as possible'. Thus:
+
+    'd@{2,@}'
+
+will match two or more successive 'd' characters:
+
+    regexp_compile('d@{2,@}') -> (, search_p);
+
+    search_p(1, 'one d', false, false) =>
+    ** <false> <false> ;;; no match
+
+    search_p(1, 'two dds', false, false) =>
+    ** 5 2 ;;; 'dd'
+
+    search_p(1, 'a dozen dddddddddddds', false, false) =>
+    ** 9 12 ie. 'dddddddddddd'
+
+-- Sub-expressions ----------------------------------------------------
+
+The @( and @) operators let you denote a portion of a pattern  (called a
+sub-expression) that  you  can  then  refer back  to  later  on  in  the
+expression using  the  @_n  operator  (where  _n  is  the  number  of  the
+sub-expression). You can use this to save typing, For example:
+
+    '@(a very long string @)@1'
+
+is the same pattern as:
+
+    'a very long string a very long string'
+
+[You can also refer back to the bracketed sub-expressions of a search
+pattern in the replacement string when performing search-and-replace in
+an editor].
+
+An @_n can be followed by an @* to indicate that the string should be
+repeated zero or more times. It can also be followed by a @{ @} to
+specify how many times the string should be repeated:
+
+    '@(d@.@)@1@{3,@}'
+
+will match in strings which contain the sequence d<something> repeated
+four or more times:
+
+    regexp_compile('@(d@.@)@1@{3,@}') -> (, search_p);
+
+    search_p(1, 'dodo', false, false) =>
+    ** <false> <false>
+
+    search_p(1, 'dodododo', false, false) =>
+    ** 1 8
+
+-- `Case' mode --------------------------------------------------------
+
+You  can  make  all or part of  an  expression  case  sensitive or
+case-insensitive using the @c and @i switches. @c makes the following
+characters case sensitive, up to the end of the string or the next @i.
+@i makes the matcher ignore the case of the following characters, up to
+the end of the string or the next @c. For example:
+
+    'The @icase@c'
+
+will match 'The Case', 'The CASE', 'The CaSe', etc.
+
+-- See also -----------------------------------------------------------
+
+    HELP * ASCII        - Character codes
+    HELP * VED_GREP     - Running grep from within VED
+    HELP * MATCHES      - Pattern matching in lists
+    REF  * REGEXP       - The Poplog regular expression matcher
+    REF  * VEDSEARCH    - VED search facilities
+    REF  * ITEMISE      - The Pop-11 itemiser
+    REF  * STRINGS      - Pop-11 strings
+    REF  * WORDS        - Pop-11 words
+    MAN  * REGEXP       - `C' regular expression compiler
+    MAN  * GREP         - Regular expression matching in files
+
+
+--- C.all/teach/regexp -------------------------------------------------
+--- Copyright University of Sussex 1993. All rights reserved. ----------

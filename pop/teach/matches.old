@@ -1,0 +1,659 @@
+TEACH MATCHES                                 Revised A.Sloman Oct 1996
+
+<list> matches <pattern> -> <boolean>
+
+This file introduces the use of the Pop-11 pattern matcher. In Sept 1996
+it was extended to include the use of the pattern prefix "!" which
+allows matcher variables to be lvars. Readers who are familiar with
+pattern matching will find a more complete and concise summary in
+HELP * MATCHES, but not including the use of "!" described below.
+
+
+                        PATTERN MATCHING IN POP11
+                        =========================
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Introduction
+ -- What is a list?
+ -- Patterns are lists used as templates for matching
+ -- Some examples
+ -- How MATCHES works: a first approximation
+ -- Matching arbitrary elements
+ -- Digging out elements of a list using ??
+ -- Getting practice with pattern variables
+ -- Repeated pattern variables
+ -- Constraining a variable to match only one item, using "?"
+ -- Revision questions
+ -- Note on "!" with patterns
+ -- Further reading
+
+-- Introduction -------------------------------------------------------
+
+POP11 has a built in 'pattern matcher' which can be used for checking
+the correspondence of a list with a pattern. The pattern matcher
+provides a powerful tool for operating on lists, and makes it much
+easier to write list-processing programs than if you use the "lower
+level" facilities such as "hd" and "tl", sometimes referred to as
+"first" and "rest", or "car" and "cdr".
+
+This TEACH file introduces the use of the matcher, but without
+mentioning all of its capabilities, since that would be too confusing.
+At the end of this file there are pointers to additional things to read,
+giving information about the more sophisticated facilities. If you look
+at TEACH RESPOND after this you will see how to use the MATCHER to write
+an Eliza-like program.
+
+In AI programs it is very common to use lists to represent information.
+The pattern matcher, and other procedures defined in terms of it, can be
+used for checking whether some information is present in a list or list
+of lists, and for extracting components from memory stores. It can also
+be used for comparing a sentence typed in by the user with various
+templates and choosing an action depending on which template the input
+matches.
+
+-- What is a list? ----------------------------------------------------
+
+In POP-11 lists are created using square brackets. Thus the following is
+a list of words:
+    [the cat sat on the mat]
+
+this is a list of numbers:
+
+    [1 2 3 99 98 97]
+
+and this is a list containing three strings:
+
+    ['the cat' 'my dog' 'your boat']
+
+To be more precise, those are list expressions, which instruct Pop-11 to
+create the appropriate lists, which are special structures that can be
+stored in the computer's memory, then combined, searched, changed, etc.
+
+Pop-11 allows lists that contain a mixture of items of different sorts.
+The following list contains words, numbers, lists of words and a list of
+lists of numbers.
+
+    [1 cat 2 dog [a b c] [d e f] [[66 67 68] [200 205 210 215]] 99]
+
+In other words, Pop-11 allows lists to contain any mixture of objects of
+arbitrary types, unlike some languages that require all elements of a
+list to be of the same type.
+
+A list expression can extend over several lines: spaces and newlines are
+treated as equivalent. E.g. this is one list:
+
+    [a list
+        expression containing
+        several words]
+
+-- Patterns are lists used as templates for matching ------------------
+
+A pattern is itself a list, which may contain 'pattern elements'. An
+example of a pattern is:
+
+    [== is a ==]
+
+This can be used as a template which would match the lists:
+
+    [fred is a student]
+    [the oldest person in the romm is a very happy woman]
+    [[joe bloggs] is a [champion golfer]
+
+or even:
+
+    [ sad asdf gobbledigook is a junkrubbish asdfasd sadf]
+
+The pattern element "==" will "match" any sequence of words in a list, a
+bit like a joker, or "wild card" in a card game, which can be used to
+stand for any card. The difference is that "==" can stand for any
+subsequence of list elements, even an empty subsequence, so that these
+lists will also match the above pattern:
+    [fred bloggs is a]
+    [is a merry old soul]
+    [is a]
+
+The normal format for using the matcher is:
+
+    <list> matches <pattern>
+
+That is a POP-11 instruction that produces a result that is either TRUE
+or FALSE, and may have additional useful side effects, as will be shown
+below.
+
+
+-- Some examples ------------------------------------------------------
+
+To get a feel for how you use the matcher, try out the commands below,
+using the Load This Line or Mark and load commands. The result will be
+printed in your 'output.p' file. Before loading each line see if you can
+tell whether the result will be TRUE or FALSE.
+
+    [ 1 2 3] matches [1 2 3] =>
+    [1 2 3] matches [3 2 1] =>
+    [steve is a teacher ] matches [ ==  is a == ] =>
+    [fred is not a computer] matches [ == is a == ] =>
+
+Experiment with different lists and different patterns to see which ones
+produce TRUE and which FALSE. Insert and delete words and pattern
+elements in the above lists and patterns.
+
+Compare the last one with
+
+    [fred is not a computer] matches [ == is == a == ] =>
+
+
+-- How MATCHES works: a first approximation ---------------------------
+
+The operation called "matches" takes as its inputs two lists, one
+written on each side. The first is sometimes called a "datum", the
+second a "pattern".
+
+It decides whether the list on the left (the datum) matches the pattern
+on the right, by comparing the two element by element. If it does match
+the operation produces the result TRUE, otherwise the result FALSE. It
+always produces a "BOOLEAN" result, so it can be used in conditional
+expressions in the form
+
+    if <datum> matches <pattern> then ....
+
+If it finds an embedded list on one side there must be an embedded list
+in the corresponding place on the other side, and it will compare them,
+as in this example:
+
+    [[the old mayor] of [new york]] matches [[the ==] of [== york]] =>
+
+If the pattern element "==" is found on the right hand side, the matcher
+will try matching different numbers of items from the list on the left
+hand side with it, to see if it can find a way to make everything else
+match. There are other sorts of pattern elements, which are interpreted
+differently, described below.
+
+This sort of ability can be used in programs like Eliza to sort
+sentences typed by the user into different categories, to be treated
+differently, as explained in TEACH RESPOND. For example you can write
+programs of the form:
+
+    if      <input> matches <pattern1> then <output1>
+    elseif  <input> matches <pattern2> then <output2>
+    elseif  <input> matches <pattern3> then <output3>
+    elseif  <input> matches <pattern4> then <output4>
+    .... etc ...
+
+
+-- Matching arbitrary elements ----------------------------------------
+
+You can use '==' to represent any number of 'don't care' elements,
+including NO elements. Try the following and see which are true, which
+false (in each case, try to work out the result for yourself before you
+get POP-11 to obey the command, using the Load This Line command.
+
+    [1 2 3 4] matches [1 == 4] =>
+    [1 2 3 4] matches [1 == ] =>
+    [1 2 3 4] matches [2 == 4] =>
+    [1 2 3 4] matches [== 4] =>
+    [1 2 3 4] matches [1 == 2 3 4] =>
+    [1 and also 2 3 4] matches [1 == 2 3 4] =>
+    [1 2 3] matches [== 2 ==] =>
+
+In each case where the result is FALSE try changing either the list on
+the left or the pattern to make it TRUE, and vice versa.
+
+Notice the different ways in which == will match an empty sublist
+    [ 1 2 3] matches [== 1 2 3] =>
+    [ 1 2]  matches [ 1 == 2] =>
+    [ 1 2 3] matches [== 3 ==] =>
+
+Will these come out true or false?
+
+    [1 2 3] matches [== 1 == 2 == 3 == ] =>
+    [1 2 3 4] matches [ == ] =>
+
+Work out your answer then try them. Try constructing a list containing
+the numbers 1 to 6 that will match this pattern:
+
+    [== 3 == 2 == 1 == ]
+
+Then create a list that will not match the pattern. Test your answers.
+
+"==" is called a "segment" pattern element because it will match a
+segment (i.e. a sublist) of arbitrary length in the datum. It is an
+anonymous segment pattern element because it has no name, and you
+therefore cannot refer to the segment of the list that was matched.
+Later we'll see how to use ?? with a name, to achieve that.
+
+"=" is another type of anonymous pattern element, which will match only
+ONE item at a time in the datum. See which of these is true, and which
+false:
+
+    [1 2 3 4 5] matches [ 1 = 3 = 5] =>
+
+    [1 2 3 4 5 6] matches [ = 2 = = 5 =] =>
+
+    [1 2 3 4 5 6] matches [ = 2 = 5 =] =>
+
+    [the cat is on the mat] matches [= is on =] =>
+
+    [[the cat] is on [the mat]] matches [= is on =] =>
+
+To understand the last example you have to realise that an embedded
+list, like [the cat], is treated as ONE element of the list on the list,
+so it can match an occurrence of "=".
+
+-- Digging out elements of a list using ?? ----------------------------
+
+Often you don't merely want to see if something is recognised as fitting
+a pattern. You also want to get at the components of the list, and use
+them in a subsequent command.
+
+For instance, consider a conversational program with the following
+strategy:
+
+        user types                      program responds
+    FRED IS VERY HAPPY          SUPPOSE FRED WERE NOT VERY HAPPY
+    SMOKING IS BAD FOR YOU      SUPPOSE SMOKING WERE NOT BAD FOR YOU
+    EVERY COMPUTER IS STUPID    SUPPOSE EVERY COMPUTER WERE NOT STUPID.
+
+The rule can be expressed in English something like this.
+
+Rule1 (English):
+
+    If the input contains some words followed by "is" followed by some
+    more words, then the output must contain the word "suppose" followed
+    by the first set of words, then "were not" followed by the second
+    set of words.
+
+In order to express that in Pop-11 we shall need to use a conditional
+instruction of the form:
+
+    IF <expression1> THEN <expression2> ELSE <expression3> ENDIF
+
+This says test the result of <expression1>. If it is true, then
+perform the actions in <expression2> otherwise perform the actions in
+<expression3>
+
+We can use that in the following translation (notice that we are using
+four variables "input", "first", "second" and "output", which have
+not yet been declared):
+
+Rule1 (Pop-11):
+
+    if  input matches [??first is ??second] then
+        [suppose ^^first were not ^^second] -> output;
+    else
+        [Sorry I do not understand] -> output;
+    endif;
+
+(Don't try typing that in yet. We have not defined INPUT so it will not
+work.)
+
+Here "??" is used to define a PATTERN ELEMENT used in matching and
+remembering what is matched, while "^^" is used as a LIST CONSTRUCTOR
+ELEMENT to produce a new list starting with the word "suppose", that is
+assigned to the variable "output".
+
+The above rule would sometimes behave rather stupidly, for instance
+responding to:
+
+    I DONT THINK THAT IS VERY SENSIBLE
+with
+    SUPPOSE I DONT THINK THAT WERE NOT VERY SENSIBLE
+
+Never mind the stupidity for now. Let's look at the important
+programming concepts.
+
+Let's look more closely at the new pattern elements used in the first
+line
+
+    if  input matches [??first is ??second] then
+
+Instead of the anonymous pattern element "==" we now have two new
+pattern elements ??first and ??second. These ensure that if "matches"
+returns the result TRUE, i.e. the match succeeds, then the variables
+first and second will remember which segments of the input list were
+matched against the two pattern elements before and after "is". The
+variable first will then contain a list of items from the input which
+were before "is", and the variable second will contain a list of the
+items that came after "is". (Either or both could be empty lists).
+
+If the value of input were the list [fred is very happy], matches would
+do the following assignments:
+
+    [fred] -> first;
+    [very happy] -> second;
+
+Test that as follows
+
+    vars first, second;
+    [fred is very happy] matches [ ??first is ??second ] =>
+
+Then find out the values of first and second thus:
+
+    first =>
+    second =>
+
+The new values of the variables FIRST and SECOND can then be used in
+conjunction with the double-up-arrow symbol '^^' to build up
+the response
+
+    [suppose ^^first were not ^^second]
+
+which in this case would evaluate to
+
+    [suppose fred were not very happy]
+
+Try it:
+    [suppose ^^first were not ^^second] =>
+
+You can think of "^^" as meaning, roughly, 'use the value of the
+following variable to insert elements into the list'. If the value of
+the variable following "^^" is not a list, a mishap will occur.
+
+For now, we shall not pursue the use of "^^". (For more on "^^" see
+TEACH ARROW, and TEACH RESPOND).
+
+To see how the matcher assigns lists to pattern variables in the above
+examples, try getting POP-11 to obey the following. Note that we start
+by telling POP11 that we are going to use FIRST and SECOND as variables:
+
+    vars first, second;
+    [fred is sad] matches [ ??first is ??second] =>
+    first =>
+    second =>
+
+Then try:
+    [father christmas is a very old man] matches [ ??first is ??second] =>
+    first =>
+    second =>
+
+Try further variations of your own. You can use more than two "pattern
+variables", e.g.
+
+    vars a, b, c;
+    [alice andrews stood between bertha butlin and cathy carter]
+        matches
+    [??a stood between ??b and ??c ] =>
+
+    a=>
+    b=>
+    c=>
+
+Notice that an instruction using matches can extend over more than one
+line, as can other Pop-11 expressions such as an addition:
+
+    3
+    +
+    4 =>
+
+-- Getting practice with pattern variables ----------------------------
+
+What will be the values of X and Y after the following matches tests?
+First try to work out the answers, then get POP-11 to tell you.
+
+    vars x, y;
+    [a b c] matches [a ??x] =>
+    x =>
+
+    [a b c] matches [??x c] =>
+    x =>
+
+    [a b c] matches [??x ??y] =>
+    x =>
+    y =>
+
+    [1 2 3 4] matches [??y] =>
+    y =>
+
+Use the Load This Line command to find out the answers.
+
+Notice that the items not preceded by '??' are 'constants', i.e. they
+only match themselves.
+
+A pattern variable may get the empty list as its value if there are no
+corresponding elements in the other list. Try:
+
+    [a b] matches [a ??x b] =>
+    x =>
+
+    [1 2 3] matches [??x 1 2 3 ??y] =>
+    x =>
+    y =>
+
+When a match fails, the new values of the variables are unpredictable. Try
+
+    undef -> x; undef -> y;
+    [1 2 3 4] matches [??x 3 5 ??y] =>
+    x =>
+    y =>
+
+-- Repeated pattern variables -----------------------------------------
+
+If you use the same variable twice over in a pattern, the match will be
+TRUE ONLY if there is a corresponding repetition in the list on the
+left. Try the following:
+
+    vars x, y;
+    [war is war] matches [??x is ??x] =>
+    x=>
+
+    [war is very nasty] matches [??x is ??x] =>
+
+    [war is very nasty] matches [??x is ??y] =>
+    x =>
+    y =>
+
+
+In some cases you may find it a little unobvious how the use of repeated
+variables affects the matcher. Try the following, and see if you can
+anticipate how the match will work.
+
+    [1 2 3 1 2 3] matches [??x ??x] =>
+    x=>
+
+    [1 2 3 4 5 6] matches [??x ??x] =>
+contrast:
+    [1 2 3 4 5 6] matches [== ==] =>
+
+Thus, repeating a variable makes the pattern more restrictive than
+repeating the "joker" (or "wild card") symbol '=='.
+
+Repeated matching of the empty list is allowed. Try:
+
+    [1 2 3 4 5 6] matches [??x ??y ??x] =>
+    x=>
+    y =>
+
+-- Constraining a variable to match only one item, using "?" ----------
+
+So far we have prefixed variables with the double query symbol '??',
+which tells POP-11 to match the variable with any number of elements in
+the left hand list. We sometimes want to make sure we get only one item
+from the list on the left, and assign that item to a variable. Try:
+
+    vars first rest;
+    [a b c d] matches [?first ??rest] =>
+    first=>
+    rest =>
+
+Notice how the use of '?' restricts ?FIRST to match ONE item which is
+assigned to it (the head of the list), whereas '??' allows ??REST to
+match any number of items (the tail of the list). The items matching
+REST are put together into a new list and assigned to the variable REST.
+
+Compare the following:
+    [a b c d ] matches [?first ?rest] =>
+    [a b c d] matches [??first ?rest] =>
+    first =>
+    rest =>
+
+In the second case it might have been better to use "last" rather than
+"rest".
+
+Try writing a matches command that will assign the second element of a
+list to the variable second, e.g. complete the following instruction in
+such a way as to assign "b" to "second"
+
+    [a b c d e]  matches ........  =>
+
+Try making it assign the second last element to "x".
+
+I.e. You can use the single query "?" to ensure that the matcher digs
+out just the first or second or or the third or .... the last element of
+the list.
+
+As explained above you can use "=" as an "anonymous" pattern element to
+match exactly one item, to contrast with "==" which will match any
+number. Thus if we are interested only in the second, or second last
+element of a list, we can use a combination of "=", "==" and "?" to
+extract it, thus
+
+    vars x;
+    [a b c d e] matches [ = ?x ==] =>
+    x =>
+
+    [a b c d e] matches [ == ?x =] =>
+    x =>
+
+Try those out with different lists on the left hand side.
+
+How would you use the matcher to dig out the third last element of a
+list? Try it out and make sure it works.
+
+You can mix 'queried' variables, with the 'anonymous' pattern elements
+'=' and '=='. So the following will make x stand for the object
+occurring immediately after c :
+    [a b c d e] matches [== c ?x ==] =>
+    x =>
+
+    [a 1 b 2 c 3 d 4] matches [ == c ?x ==] =>
+    x =>
+
+Having done that, try a version which will set x to be whatever comes
+just before the number 3, in various lists. E.g. complete the following
+so as to make x get the value 2.
+
+    [a 1 b 2 c 3 d 4 ] matches .......
+
+-- Revision questions -------------------------------------------------
+
+    1. What does MATCHES do? What inputs does it take, and what sort of
+        result does it produce?
+
+    2. Explain how '==' works with MATCHES.
+
+    3. Explain how '??' works with MATCHES.
+
+    4. What is the difference between '??' and '?'.
+
+    5. What is the difference between '==' and '='.
+
+    6. What are anonymous pattern elements?
+
+    7. What are segment pattern elements?
+
+
+-- Note on "!" with patterns ------------------------------------------
+
+There is an extension to Pop-11 available at Birmingham which allows
+patterns to be preceded by "!" which has the effect that if the pattern
+is used inside a procedure, then the pattern variables preceded by "?"
+or "??" can be made "lvars", so that they do not need to be declared as
+"vars".
+
+This reduces bugs in programs due to unintended interactions between
+global variables, and also allows variables declared as "lvars" to be
+used in patterns. Example:
+
+define next_after(item, list) -> next;
+    ;;; given item and list, return the first thing after item in list
+    ;;; or false if there isn't one.
+    ;;; Note: input and output variables (item, list and next) are
+    ;;;  automatically declared as lvars.
+
+    lvars found;    ;;; the pattern variable
+    if list matches ! [ == ^item ?found == ] then
+        found -> next
+    else
+        false -> next
+    endif
+enddefine;
+
+/*
+;;; Test that:
+
+next_after(3, [1 2 3 4 5]) =>
+** 4
+
+next_after(6, [1 2 3 4 5]) =>
+** <false>
+
+next_after("cat", [the cat [did sit] on mat] ) =>
+** [did sit]
+
+*/
+
+That procedure would not work without the "!" list prefix. The space
+between "!" and "[" is not required. It was inserted for clarity.
+
+Strictly speaking, preceding a pattern with "!" inside a procedure does
+TWO things. First it treats all the pattern variables in the list,
+i.e. all those following "?" or "??", as lvars local to the current
+procedure. If you have not declared those variables as lvars you will
+get a warning message. Try removing the lvars declaration from the above
+procedure and recompiling it.
+
+Secondly it changes the pattern so that instead of words following "?"
+or "??" it contains identifier records, which the pattern matcher can
+use to "communicate with" the local lvars in the procedure. This is
+possible only since Poplog Version 15.0
+
+The change to the pattern contents may show up if you use the Pop-11
+tracer. This is how patterns print out without and with "!".
+
+    [ == cat ?next == ] =>
+    ** [== cat ? next ==]
+
+    ! [ == cat ?next == ] =>
+    ** [== cat ? <ID next <undef next>> ==]
+
+The <ID ...> tells you that a word has been replaced with an identifier,
+and the <undef next> tells you that this is an undefined global
+variable.
+
+If you give the identifier a value, its value shows when the pattern is
+printed out:
+    "dog" -> next;
+    ! [ == cat ?next == ] =>
+    ** [== cat ? <ID next dog> ==]
+
+Inside a procedure, the default undefined value is likely to be 0,
+though that depends on the implementation.
+
+-- Further reading ----------------------------------------------------
+
+TEACH * RESPOND shows how to make use of the matcher in designing an
+Eliza-like program.
+
+TEACH * ARROW gives more instruction in using '^^' and other constructs
+to build lists in POP-11.
+
+If you'd like some additional exercises giving more features of the
+matcher try TEACH * MATCHES2
+
+The Pop-11 PRIMER gives more information about the matcher, with
+examples.
+
+TEACH * LISTS introduces some of the other procedures provided in POP-11
+for operating on lists.
+
+For more experienced users, HELP * MATCHES gives a summary of the
+facilities of the matcher, including several more sophisticated than
+those shown here.
+
+This is a modified version of the Poplog TEACH file.
+
+--- C.all/teach/matches ---------------------------------------------------
+--- Copyright University of Sussex 1987. All rights reserved. ----------
+
+--- $poplocal/local/teach/matches
+--- Copyright University of Birmingham 1996. All rights reserved. ------

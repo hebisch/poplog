@@ -1,0 +1,245 @@
+TEACH DATASUMM (Extracts from POPSUMMARY) by Aaron Sloman and Max Clowes
+                                             Prepared by SDI, April,1982
+
+DATABASE is a collective name for a set of ideas about how to use  lists
+to  store  'propositions',  or  'facts'.  This  is  often  a  convenient
+technique to use in programs which build descriptions of 'micro worlds'.
+
+This handout introduces the following procedures:
+
+        ADD and ALLADD, which add 'facts' to the database
+        REMOVE, ALLREMOVE and FLUSH which remove facts
+        PRESENT which checks if a fact is in the database
+        LOOKUP which also accesses the database
+
+and the looping construct:
+
+        FOREACH which performs an action for each fact of a given kind.
+
+To use the database procedures  you have to know  a bit about the  POP11
+MATCH facility (see, e.g. TEACH MATCHES).
+
+
+--- Adding and Removing DATABASE items ---------------------------------
+
+We can build up a DATABASE using ADD:
+
+    vars database;
+    [] -> database;
+    add ([a]);
+    add ([b]);
+
+or more concisely using ALLADD:
+
+    alladd([[c][d]]);
+
+The items will be ordered in the DATABASE consistently with the order in
+which they were added.
+
+    database =>
+    ** [[d][c][b][a]]
+
+That is the  last shall  be first!  This is not  a property  of ADD  and
+ALLADD that applications of the DATABASE would normally exploit.
+
+Complementing ADD and ALLADD we have REMOVE and ALLREMOVE.
+
+    remove([c]); database =>
+    ** [[d][b][a]]
+
+The order of items in a call of ALLREMOVE is not important i.e. it  does
+not need to reflect the ordering of the DATABASE
+
+    allremove([[a][b][d]]); database =>
+    ** []
+
+The procedure REMOVE  will remove at  most one item  from the  database,
+even if it is given a pattern which matches several. Thus  REMOVE([==]);
+instead of removing everything, removes just one item. Moreover,  REMOVE
+will generate a MISHAP if it doesn't find one item to remove. Similarly,
+ALLREMOVE will generate a mishap if it can't remove something for  every
+element of the list of patterns given to it as argument.
+
+The procedure  FLUSH  is  provided  without  these  restrictions.  FLUSH
+deletes everything in  the database  that matches its  argument, but  if
+there is nothing that matches, then FLUSH does nothing.
+
+The argument given to  FLUSH is a pattern  specification, that is  FLUSH
+carries out a MATCH to determine the list items that it will DELETE.  It
+is however very powerful in its  action ... it removes ALL the  matching
+DATABASE entries. Thus with the DATABASE [[D]][C][B][A]] the action
+
+    flush([=]);
+
+clears the DATABASE.
+
+    database =>
+    ** []
+
+Thus FLUSH([=]); is equivalent in this situation to
+
+    allremove([[a][b][c][d]]);
+
+Whenever the database contains only one-element lists
+
+    flush([=]);
+
+will remove them all.  Similarly
+
+    flush([==]);
+
+will empty  the database  no matter  what  is in  it, and  is  therefore
+equivalent to
+
+    [] -> database;
+
+What was removed?
+----------------
+
+After using FLUSH  or REMOVE  the variable IT  will hold  the item  last
+removed. E.g.,
+
+    add([dogs like meat]);
+    remove([dogs like == ]);
+    it =>
+    ** [dogs like meat]
+
+The procedure ALLREMOVE, uses the variable THEM instead. This will  be a
+list of all  the items removed.  Similarly, ADD updates  IT, and  ALLADD
+records things in THEM.
+
+Finding items in the DATABASE
+-----------------------------
+
+Perhaps the  most  commonly  used procedure  is  PRESENT  which  takes a
+pattern and starts MATCHing it against every database item. If the match
+is ever successful then  the item is returned  as the result of  PRESENT
+otherwise the result is false.
+
+    alladd([ [a b c d] [d c b a] [a b d c] ]);
+    present([== b ==]) =>
+    ** [a b d c]
+    present ([== b c]) =>
+    ** <false>
+
+Notice that PRESENT finds the 'first' matching item.
+
+PRESENT is frequently employed in a conditional e.g.
+
+    if present(<pattern specification>) then
+        <action>
+
+The 'IF... THEN' construction 'uses up' the value
+returned before THEN ie. try
+
+    if present([== b ==]) then
+        =>
+    endif;
+
+This arises because POP11 treats  the value returned by PRESENT  between
+"IF" and "THEN" as <TRUE> or <FALSE>. For many purposes however we  will
+need to know what the matched item is; for example to use it in the THEN
+branch of the conditional. For this purpose the DATABASE variable IT  is
+set to  have  the  value  of  the  matching  item,  when  PRESENT  finds
+something.
+
+    if present([== b ==]) then
+        it =>
+        remove(it);
+    endif;
+    ** [a b c d]
+
+Which is  of course  the MATCHed  item that  PRESENT found.  REMOVE  has
+however REMOVEd it -
+
+    database =>
+    ** [[d c b a][a b c d]]
+
+Note that it found only one item, matching the pattern, and removed  it.
+FOREACH, explained  below,  shows  how  you can  search  for  all  items
+matching some pattern.
+
+
+--- Retrieving Values from within an ITEM ------------------------------
+
+Since all of the apparatus of MATCH is utilised in DATABASE  procedures,
+PRESENT can be used to set values of appropriately queried variables  in
+the pattern specification.
+
+    vars x;
+    present([?x b ==]) =>
+    ** [a b c d]
+    x =>
+    ** a
+
+Notice that if "?" or "??" is used before a word in a pattern, then that
+word should be declared as a  variable name. Hence the "VARS X;"  above.
+If the  variables in  patterns are  not  declared to  be local,  to  the
+procedures which use them, then different procedures can mess each other
+up. This applies to  procedures which use MATCH  or any of the  database
+operations PRESENT, FLUSH, LOOKUP, REMOVE, etc.
+
+We do not always want the matching item. Sometimes we will know that the
+item is present in the DATABASE and want only the value of some fragment
+of it. For this  purpose the procedure LOOKUP  is provided. It does  not
+return <TRUE> or <FALSE>  but merely sets the  value of queried  pattern
+variables when a match is found.
+
+    lookup([?x b ==]);
+    x =>
+    ** a
+
+In the event of no match being found an error will result
+
+    lookup([?x == c]);
+    ;;; MISHAP; LOOKUP FAILURE
+    ;;; INVOLVING : [?X == C]
+    ;;; DOING: LOOKUP
+
+
+--- Retrieving all the items PRESENT which match a pattern -------------
+
+There will often be  a need to  find not just one  matching item in  the
+DATABASE, (or to set the value of queried pattern variable for just  one
+matching item) but  to find all  of them. For  this purpose the  looping
+construct FOREACH is provided:
+
+    foreach [== b ==] do
+        it =>
+    endforeach;
+    ** [d c b a]
+    ** [a b c d]
+
+Note that  FOREACH  is a  'syntax'  word  (like IF  and  DEFINE),  not a
+procedure name, and  hence the pattern  specification that follows  need
+not be enclosed in round brackets '(' ')'.
+
+
+--- Checking a set of patterns against the database --------------------
+
+Just as ALLADD and ALLREMOVE can be  given a list of patterns to add  or
+remove, similarly, ALLPRESENT can  be given a list  of patterns to  look
+for in the database. If it finds items for all of them it returns a list
+of the found items (and also assigns it to the variable THEM). Otherwise
+its result is false. E.g. to find a grandson of TOM:
+
+    alladd([[dick father harry][tom father jack]
+        [bill father tom][jack father dick]]);
+    vars x y;
+    if allpresent([[tom father ?x][?x father ?y]]) THEN
+        y =>
+    endif;
+    ** dick
+    them =>
+    ** [[tom father jack][jack father dick]]
+
+For more information on the database procedures type:
+
+    HELP * ADD
+    HELP * PRESENT
+    HELP * REMOVE
+    HELP * FLUSH
+    HELP * LOOKUP
+
+--- C.all/teach/datasumm -----------------------------------------------
+--- Copyright University of Sussex 1988. All rights reserved. ----------

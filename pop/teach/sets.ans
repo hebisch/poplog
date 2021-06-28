@@ -1,0 +1,485 @@
+TEACH SETS.ANS                                       A.Sloman Feb 1984
+                                               Revised A.Sloman Oct 1995
+
+This file has been re-written to conform to the current good practice
+regarding programming in Pop-11. In particular, "vars" has been replaced
+by "lvars" in many places.
+
+For quick reminders of the syntax of Pop-11 see TEACH POPCORE
+A lot more information is given in TEACH PRIMER, also available in
+printed form.
+
+
+                   ILLUSTRATIVE ANSWERS TO TEACH SETS
+                    =================================
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- ISELEMENT
+ -- -- Recursive version of iselement
+ -- HAPPYMAN
+ -- FINDONE
+ -- -- A note on testing for equality using "==" or "="
+ -- -- Tests for findone
+ -- -- Defining findone
+ -- FINDALL
+ -- -- Tests for findall
+ -- FINDSET
+ -- -- Tests for findset
+
+There are many possible ways to define procedures of the sorts specified
+in TEACH SETS and TEACH SETS2. So if your answers are different from
+those given below, that doesn't mean yours is wrong.
+
+-- ISELEMENT ----------------------------------------------------------
+
+Look back at TEACH SETS for the specification of ISELEMENT
+
+define iselement(item, list) -> result;
+    ;;; an 'iterative' version, using a loop
+    lvars item, list, result;
+    ;;; search down the list looking for a thing = item.
+    ;;; if found return true.
+    lvars thing;
+    for thing in list do
+        if item = thing then
+            true -> result; return()
+        endif;
+    endfor;
+    ;;; not found, so
+    false -> result;
+enddefine;
+
+NOTE: we need the call of return() to make sure that when the item is
+found the loop stops, i.e. the procedure does not go on searching through
+the list. We could not just use quitloop() because then it would do the
+instruction after 'endfor', and that would produce a false result.
+return() is roughly equivalent to 'goto enddefine', though the latter is
+not legal Pop-11.
+
+We need to have 'false -> result' after 'endfor' since if the procedure
+gets to the end of the list without finding the item, then that means
+the result should be false.
+
+define iselement(item, list)->result;
+    lvars item, list, result;
+    ;;; Another 'iterative' version, using an "until" loop
+    ;;; instead of a "for" loop
+    ;;; Is it less clear?
+    until list = [] do
+        if item = hd(list) then     ;;; or list matches [^item == ]
+            true -> result; return()
+        else tl(list) -> list
+        endif;
+    enduntil;
+    false -> result;
+enddefine;
+
+-- -- Recursive version of iselement
+
+define iselement(item, list) -> result;
+    lvars item, list, result;
+    ;;; a recursive version
+    if list = [] then
+        false
+    elseif item = hd(list) then     ;;; or list matches [^item == ]
+        true
+    else iselement(item,tl(list))   ;;; use recursion to search the tail
+    endif -> result;
+enddefine;
+
+Notice that in this last version we do a single assignment to RESULT
+after the conditional expression (if .... endif). We could have done the
+assignment in each branch. We are using the fact that the recursive call
+will return a true or false result, which will also be the result of the
+caller. See TEACH SETS1 for a slightly different format.
+
+Here is a version using MATCHES
+
+define islement(item, list);
+    lvars item, list;
+    list matches [== ^item ==]
+enddefine;
+
+Note that MATCHES will leave a true or false result on the stack.
+
+This version is equivalent, but makes it clearer that a result is
+produced:
+
+define islement(item, list) -> result;
+    lvars item, list, result;
+    list matches [== ^item ==] -> result;
+enddefine;
+
+
+-- HAPPYMAN -----------------------------------------------------------
+
+Test inputs for happyman
+
+vars
+    john = [male happy single clerk tall],
+    freda = [female happy married surgeon tall],
+    tim  = [male sad single butcher short]
+;
+
+;;; Use the procedure iselement defined above, or the system procedure
+;;; member.
+
+define happyman(list) -> result;
+    ;;; list is a description of an object. Check that it contains
+    ;;; both the word "happy" and the word "male"
+    lvars list, result;
+    if iselement("happy", list) then
+        if iselement("male", list) then
+            true -> result
+        else
+            false -> result
+        endif
+    else
+        false -> result
+    endif;
+enddefine;
+
+;;; test it
+
+happyman(john) =>
+happyman(freda) =>
+happyman(tim) =>
+happyman([cow sad milky]) =>
+
+;;; The above definition can be abbreviated
+
+define happyman(list) -> result;
+    lvars list, result;
+    if iselement("happy", list) and iselement("male", list) then
+        true -> result
+    else
+        false -> result
+    endif;
+enddefine;
+
+;;; or
+
+define happyman(list) -> result;
+    lvars list, result;
+    if iselement("happy", list) and iselement("male", list) then
+        true
+    else
+        false
+    endif -> result;
+enddefine;
+
+;;; or
+
+define happyman(list) -> result;
+    lvars list, result;
+    iselement("happy",list) and iselement("male", list) -> result
+enddefine;
+
+You should make sure that you can see why each of the above has the same
+effect. For this you need to understand how conditionals work, how
+output locals work, and how the stack works.
+
+See TEACH DEFINE, TEACH STACK.
+
+-- FINDONE -----------------------------------------------------------
+
+
+-- -- A note on testing for equality using "==" or "="
+
+In the examples that follow, in the definition of findone, I have used
+the test
+
+    if list == [] then
+
+instead of
+
+    if list = [] then
+
+because the empty list [] is a unique object, like an integer 66 or a
+word "cat" so we do not need the sophistication of the "=" test. The
+latter first checks if two things are identical (the very same unique
+object, or the very same integer bit pattern), if not, "=" checks to see
+if they are of the same type with the same components. So "=" allows two
+different strings with the same characters to be the same, whereas "=="
+does not:
+
+'the cat' = 'the cat' =>
+** <true>
+
+'the cat' == 'the cat' =>
+** <false>
+
+With the empty list, an integer or a word only "==" makes sense, and "="
+wastes time when the objects are not ==.
+
+If you want to know more about this see HELP * EQUAL
+
+
+-- -- Tests for findone
+
+;;; test data for findone
+
+vars
+    people = [john ethel mary fred],
+
+    john = [male happy single clerk tall],
+
+    ethel = [female unhappy single prime_minister ],
+
+    mary = [female happy married teacher thin tall],
+
+    fred = [male small typist old];
+
+Try the following test examples on the different versions of findone
+defined below.
+
+findone("male", people) =>
+findone("old", people) =>
+findone("male", rev(people)) =>         ;;; searches in reverse order
+findone("female", [john fred]) =>
+findone("female", [john mary fred]) =>
+
+
+-- -- Defining findone
+
+;;; These examples use the system procedure member, rather than the
+;;; procedure iselement, defined above
+
+define findone(prop, list) -> result;
+    ;;; a recursive version
+    lvars prop, list, result;
+    if list == [] then
+        false -> result;
+    elseif member(prop, valof(hd(list))) then
+        hd(list) -> result
+    else
+        findone(prop,tl(list)) -> result
+    endif
+enddefine;
+
+
+Explanation:
+The following line may not be very clear.
+    elseif member(prop, valof(hd(list))) then
+
+The crucial thing is to understand the expression:
+    member(prop, valof(hd(list)))
+
+which needs to produce a true or false result. In order to do this it
+first has to get the arguments for member. The first is the value of
+"prop", so that is just left on the stack. Secondly it has to get the
+head of list, which may, for instance be the word "john". Then to get
+the list associated with the word it does
+
+    valof(hd(list)) ;;; which might be valof("john")
+
+The following might be an easier version to understand, though it is
+somewhat longer to write:
+
+define findone(prop,list) -> result;
+    lvars
+        prop, list, result,
+        name, properties;
+
+    if list == [] then
+        false -> result;
+    else
+        hd(list) -> name;
+        valof(name) -> properties;
+        if member(prop, properties) then
+            name -> result
+        else
+            findone(prop,tl(list)) -> result
+        endif
+    endif
+enddefine;
+
+Probably this iterative version is clearer:
+
+define findone(prop, list) -> result;
+    lvars
+        prop, list, result,
+        name;
+    for name in list do
+        if member(prop, valof(name)) then
+            name -> result;  return()
+        endif
+    endfor;
+    false -> result;
+enddefine;
+
+Here is a version using matches (it will be less efficient - why?)
+
+define findone(prop, list) -> result;
+    lvars
+        prop, list, result,
+        name;
+    for name in list do
+        if valof(name) matches [ == ^prop ==] then
+            name -> result;  return()
+        endif
+    endfor;
+    false -> result;
+enddefine;
+
+
+-- FINDALL ------------------------------------------------------------
+
+-- -- Tests for findall
+
+Use the same test data as for findone, above, in these test commands.
+
+findall("male", people) =>
+findall("female", people) =>
+findall("hungry", people) =>
+
+define findall(prop, list) -> result;
+    ;;; prop is any item, though usually a word, as in the above
+    ;;;   examples
+    ;;; list is a list of variables whose values are lists.
+    ;;; search for all the wors whose values contain prop.
+    lvars prop, list, result;
+    ;;; This is how teach sets suggests you do it recursively
+    if list == [] then
+        []                              ;;; nothing to go in the result list
+    elseif member(prop, valof(hd(list))) then
+        ;;; search the rest of the list and combine the result with
+        ;;; the first element
+        [^(hd(list)) ^^( findall(prop,tl(list)) )]
+    else
+        ;;; ignore the first element and search the rest of the list
+        findall(prop, tl(list))
+    endif -> result
+enddefine;
+
+Notice that by now the pattern
+    member(...., valof( .... ))
+
+has begun to recur. It can therefore be replaced by a procedure.
+
+define hasprop(prop, name);
+    lvars prop, name;
+    member(prop, valof(name))
+enddefine;
+
+So we can re-write the last procedure:
+
+define findall(prop, list) -> result;
+    lvars prop, list, result;
+    if list = [] then
+        []                              ;;; nothing to go in the result list
+    elseif hasprop(prop, hd(list)) then
+        [^(hd(list)) ^^( findall(prop,tl(list)) )]
+    else
+        findall(prop, tl(list))
+    endif -> result
+enddefine;
+
+Make sure you are convinced that this works, by testing it, and tracing
+findall, member and hasprop, to see what is going on.
+
+Here is an iterative version
+
+define findall(prop, list) -> result;
+    lvars
+        prop, list, result,
+        item;
+    ;;; put all the items satisfying the test on the stack, and then
+    ;;; collect them into a list
+    [%
+      for item in list do
+        if hasprop(prop, item) then item endif
+      endfor
+    %] -> result
+enddefine;
+
+-- FINDSET ------------------------------------------------------------
+
+-- -- Tests for findset
+;;; use the lists defined above
+
+findset([happy male], people) =>
+findset([happy female], people) =>
+findset([tall male], people) =>
+findset([tall happy ], people) =>
+findset([tall happy female], people) =>
+findset([tall happy female single], people) =>
+
+We first need a procedure HASALL which will check that something has all
+the properties in a given list. This can use the procedure ISSUBSET,
+to be defined below:
+
+vars procedure issubset;    ;;; definition coming
+
+define hasall(proplist, name) -> result;
+    lvars
+        proplist, name, result,
+        list;
+    valof(name) -> list;    ;;; the actual list of the person's properties
+    issubset(proplist, list) -> result;
+enddefine;
+
+Now we can define issubset. We take two lists. For each item in the
+first list check that it is in the second. If it isn't, then we can
+stop: issubset must produce a false result. If we get to the end without
+finding such an item in list1, then every item in list1 is in list2. So
+the result for issubset must be true. This version uses member instead
+of iselement. Thus:
+
+
+define issubset(list1, list2) -> result;
+    lvars
+        list1, list2, result,
+        item;
+    for item in list1 do
+        if not(member(item, list2)) then
+            false -> result; return();
+        endif
+    endfor;
+    true -> result;
+enddefine;
+
+Note the RETURN() which ensures that issubset stops with a false result
+should an item from list1 be found which isn't in list2.
+
+Now we can make a procedure which collects all the things which
+have all the properties in a given list of properties:
+
+Take each thing in turn: if it has all the properties, then add
+it to the list being produced as the result:
+
+define findset(proplist, thinglist) -> result;
+    ;;; a recursive version
+    lvars proplist, thinglist, result;
+    if thinglist = [] then
+        []
+    elseif hasall(proplist, hd(thinglist)) then
+        [^(hd(thinglist)) ^^(findset(proplist, tl(thinglist)) )]
+    else
+        findset(proplist, tl(thinglist))
+    endif -> result
+enddefine;
+
+An iterative version which makes a list by putting relevant names on the
+stack, using the list brackets  with '%' symbols (see TEACH PERCENT):
+
+define findset(proplist, thinglist) -> result;
+    lvars
+        proplist, thinglist, result,
+        name;
+    [%
+        for name in thinglist do
+            if hasall(proplist, name) then
+                name        ;;; just leave the name on the stack
+            endif
+        endfor
+    %]-> result
+enddefine;
+
+
+
+--- Originally produced at the University of Sussex
+
+--- $poplocal/local/teach/sets.ans
+--- The University of Birmingham 1995.  --------------------------------

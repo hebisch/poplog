@@ -1,0 +1,1254 @@
+TEACH SETS2.ANS                                    Aaron Sloman Feb 1984
+                           Tidied up, and brought up to date, 7 Dec 1996
+
+Changes in Dec 1996 include:
+    (a) removing spurious lvars declarations for input and output
+        locals
+
+    (b) using "!" in the examples based on the matcher, but
+        reducing the use of the matcher
+
+    (c) some comments on the functional style
+
+    (d) a few other changes
+
+    (e) revised solutions to the subculture problem.
+
+
+                   Sample answers to TEACH * SETS2
+                   ===============================
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- A COLLECTION OF PREDICATES
+ -- . Using partial application to define positive and negative
+ -- MUCHLESS
+ -- ISSUBSET
+ -- REDUNDANT
+ -- EXISTS
+ -- FINDONE
+ -- ALL
+ -- HASODD HASEVEN ALLODD ALLEVEN
+ -- FINDALL
+ -- PRUNE
+ -- UNION
+ -- INTERSECTION
+ -- LARGER
+ -- HOWMANY
+ -- MORE
+ -- MOST
+ -- REMOVEALL
+ -- SUBTRACT
+ -- OVERLAPS EXCLUDES
+ -- SUBCULTURE
+ -- . subculture version 1
+ -- . Test cases for subculture
+ -- . subculture version 2
+ -- . subculture version 4
+ -- . subculture version 5
+ -- QUESTION 24
+
+-- A COLLECTION OF PREDICATES -----------------------------------------
+
+The procedure positive takes a number and returns true if the number
+is positive, i.e. greater than 0. This can be defined in a number
+of different styles, some more verbose than others, and with or without
+an output variable. Using an output variable is more verbose but makes
+it clearer what the procedure does, when someone reads the program.
+
+define positive(item) -> boolean;
+    ;;; verbose version, with header clearly showing what the procedure
+    ;;; is about
+    if item > 0 then
+        true -> boolean
+    else
+        false -> boolean
+    endif;
+enddefine;
+
+define positive(item) -> boolean;
+    ;;; Slightly more compact version. Evaluate conditional, then
+    ;;; assign the result to the output local
+    if item > 0 then
+        true
+    else
+        false
+    endif -> boolean;
+enddefine;
+
+define positive(item) -> boolean;
+    ;;; Even more compact version - assign the result of ">" to
+    ;;; the output local
+
+    item > 0 -> boolean
+enddefine;
+
+
+define positive(item);
+    ;;; Functional style of programming.
+    ;;; Just leave the result of ">" as the result of this procedure.
+    item > 0
+enddefine;
+
+
+;;; Each of the following could also be done in all the above styles.
+
+define negative(item) -> boolean;
+    item < 0 -> boolean
+enddefine;
+
+define even(item) -> boolean;
+    (item mod 2) == 0 -> boolean;
+enddefine;
+
+
+Note: for comparing words or integers or constant items like [], it is
+slightly to use "==" than "=".
+
+This has nothing to do with the use of "=" and "==" in lists patterns.
+See HELP * EQUAL for more on this.
+
+NEVER use "==" to compare decimal numbers. (Floats).
+
+define odd(item) -> boolean;
+    (item mod 2) /== 0 -> boolean
+enddefine;
+
+-- . Using partial application to define positive and negative
+
+Skip to next subheading if you don't know about 'partial application'.
+
+If you have learnt about 'partial application' (see HELP * CLOSURES or
+the second half of TEACH PERCENT, or HELP PARTAPPLY),
+then you could have defined positive and negative by partially applying
+the operators > and < to 0.
+
+There are two points to note. One is that partial application uses
+(% .. %) for the arguments to the procedure to say, do not run this
+procedure now but create a new version which can be run later and will
+already have these arguments. The other point is that because ">" and
+"<" are names of infix operators, you have to use "nonop" in front of
+them to prevent pop-11 immediately trying to run the corresponding
+procedures.
+
+vars positive;
+
+nonop >(%0%)    -> positive;        ;;; partially apply ">" to 0
+
+vars, negative;
+
+nonop <(%0%)    -> negative;        ;;; partially apply "<" to 0
+
+The nonop part is there to stop the procedure > (or <) actually attempting
+to run, which it would normally do since it is an 'infix' operator.
+
+Those declarations and assignments can be combined, thus:
+
+vars
+    positive = nonop >(%0%),
+
+    negative = nonop <(%0%);
+
+Alternatively you can use this format
+
+define positive = nonop >(%0%)
+enddefine;
+
+define negative = nonop <(%0%)
+enddefine;
+
+/*
+;;; tests
+
+positive(6) =>
+positive(-6) =>
+positive(0) =>
+positive(4.5) =>
+
+negative(6) =>
+negative(-6) =>
+negative(0) =>
+negative(4.5) =>
+
+*/
+
+Note that according to those definitions 0 is neither positive nor
+negative.
+
+-- MUCHLESS -----------------------------------------------------------
+
+define muchless(num1, num2) -> boole;
+    num2 - num1 > 100 -> boole;
+enddefine;
+
+-- ISSUBSET -----------------------------------------------------------
+
+define issubset(list1, list2) -> boolean;
+
+    lvars item;
+    for item in list1 do
+        unless member(item, list2) then
+            ;;; Item from list1 not in list2, so
+            false -> boolean; return()
+        endunless
+    endfor;
+    ;;; Everything in list1 was found to be in list2, so
+    true -> boolean;
+enddefine;
+
+
+;;; Here is a version using "returnunless" in this format
+;;; returnunless( <condition> )( <action> )
+;;;; Meaning unless <condition> then <action>; return() endunless;
+
+define issubset(list1, list2) -> boolean;
+    lvars item;
+    for item in list1 do
+        returnunless( member(item, list2) )(false -> boolean)
+    endfor;
+    true -> boolean;
+enddefine;
+
+
+The next version uses recursion, in the functional style. People who
+like this style do not use output local variables. The result of the
+procedure is simply whatever is left on the stack, in this case true
+or false.
+
+define issubset(list1, list2);
+
+    ;;; The empty list is a subset of every list.
+    if list1 == [] then true
+
+    ;;; otherwise if list2 is empty, then list1 cannot be a subset
+    elseif list2 == [] then false
+
+    ;;; see if tail of list1 is a subset of list2. If so, see if the
+    ;;; head is a member. It could be done the other way round.
+    elseif issubset(tl(list1), list2) and member(hd(list1), list2) then
+        true
+    else
+        ;;; all conditions for being a subset failed, so
+        false
+    endif
+enddefine;
+
+
+Here is the same thing with an output local variable, so that someone
+looking at the header can see what sort of result the procedure produces
+
+define issubset(list1, list2) -> boolean;
+
+    if list1 == [] then true
+
+    elseif list2 == [] then false
+
+    elseif issubset(tl(list1), list2) and member(hd(list1), list2) then
+        true
+    else
+        false
+    endif -> boolean
+
+enddefine;
+
+
+Write some test cases and check that the procedure works.
+
+
+-- REDUNDANT ----------------------------------------------------------
+
+;;; This procedure takes a list of items and returns a boolean result
+
+define redundant(list) -> boolean;
+    ;;; return true if the list is redundant, otherwise false
+
+    lvars list, item;    ;;; pattern variables
+
+    while list matches ! [?item ??list] do
+        if member(item, list) then true -> boolean; return(); endif;
+    endwhile;
+
+    false -> boolean;
+enddefine;
+
+The line containing member could be changed to
+
+        returnif( member(item, list) )(true -> boolean)
+
+Using the matcher is not the most efficient way. Here is an answer that
+does not use the matcher and is better programming style because it
+is more efficient, and probably clearer.
+
+define redundant(list) -> boolean;
+
+    lvars sub;
+
+    ;;; Use "for ... on ...do" to get successive tails.
+    ;;; See HELP * FOR
+
+    for sub on list do
+        if member(hd(sub), tl(sub)) then
+            true -> boolean;
+            return()
+        endif
+    endfor;
+
+    false -> boolean;
+enddefine;
+
+;;; Here is a recursive, functional style version,without output local
+
+define redundant(list);
+    ;;; an empty list is not redundant
+    if list == [] then
+        false
+
+    ;;; if the first element is in the tail then it is
+    elseif member(hd(list), tl(list)) then
+        true
+
+    ;;; or if the tail is redundant then it is
+    elseif redundant(tl(list)) then
+        true
+
+    else
+        ;;; all forms of redundancy ruled out
+        false
+
+    endif
+enddefine;
+
+-- EXISTS -------------------------------------------------------------
+
+This procedure, defined in TEACH SETS2 takes a list and a predicate, and
+returns true if at least one thing in the list satisfies the predicate,
+otherwise it returns false.
+
+It could also have been defined thus
+
+define exists(list, pred) -> found;
+
+    ;;; because pred is a local lvar, we have to insert the
+    ;;; procedure itself, not the word "pred" as the restriction
+    if list matches ! [== ?found: ^pred ==] then
+        true -> found
+    else
+        false -> found
+    endif
+enddefine;
+
+
+The next version avoids the need for "^" before pred, but is
+not a good way to program, as the variable pred is not lexically
+scoped, and could interact with something else.
+
+define exists(list, pred) -> found;
+
+    vars pred;  ;;; make pred dynamically scoped
+
+    if list matches ! [== ?found: pred ==] then
+        true -> found
+    else
+        false -> found
+    endif
+enddefine;
+
+
+
+The next version uses a loop instead of the matcher, which is more
+efficient. We also declare the input variable "pred" to be of
+type procedure. That means that
+
+(a) if you give exists a second argument that is not a procedure you
+will get an error message, which is useful for finding bugs in your
+programs, and
+
+(b) exists will test when it starts that pred is a procedure, so that
+the calls in the loop do not all need to involve the test. This makes
+the program somewhat more efficient. If a variable is not declared to be
+of type procedure, then whenever it is used in a procedure call pop-11
+does a check at run time that it has a procedure value.
+(See HELP EFFICIENCY if you want to know more.)
+
+define exists(list, procedure pred) -> found;
+
+    lvars item;
+
+    for item in list do
+        if pred(item) then true -> found; return() endif;
+    endfor;
+
+    false -> found;
+enddefine;
+
+
+;;; The next version uses "returnif" in this format
+;;; returnif( <condition> )( <action> )
+;;; Meaning if <condition> then <action>; return(); endif;
+
+define exists(list, procedure pred) -> found;
+    lvars item;
+
+    for item in list do
+        returnif(pred(item))(true -> found)
+    endfor;
+
+    false -> found;
+enddefine;
+
+Here is a version that returns the item found, or false. Usually
+returning the item found is more useful than returning true.
+See findone below.
+
+define exists(list, procedure pred) -> found;
+    lvars item;
+
+    for item in list do
+        returnif( pred(item) )( item -> found )
+    endfor;
+
+    false -> found;
+enddefine;
+
+
+This one uses "item" as the output local, saving a local variable.
+In that case the return instruction can be simplified.
+
+define exists(list, procedure pred) -> item;
+
+    for item in list do
+        returnif( pred(item) )
+    endfor;
+
+    false -> item;
+enddefine;
+
+
+Here is a recursive version, in the functional style
+
+define exists(list, procedure pred);
+    if list == [] then
+        false
+    elseif pred(hd(list)) then
+        true
+    else
+        exists(tl(list), pred)
+    endif
+enddefine;
+
+-- FINDONE ------------------------------------------------------------
+
+This is essentially the same as exists, except for the result returned.
+
+define findone(list, procedure pred) -> item;
+
+    for item in list do
+        ;;; the result returned will be item if pred(item) is true
+        returnif( pred(item) )
+    endfor;
+
+    false -> item;
+
+enddefine;
+
+NOTE
+    returnif( < expression > )
+
+is equivalent to
+
+    if < expression > then return() endif
+
+See REF * SYNTAX/returnif  REF * SYNTAX/returnunless
+
+
+Here is a recursive version in the functional style
+
+define findone(list, procedure pred);
+    if list == [] then false
+
+    elseif pred(hd(list)) then hd(list)
+
+    else findone(tl(list), pred)
+
+    endif
+enddefine;
+
+
+
+-- ALL ----------------------------------------------------------------
+
+define all(list, procedure pred) -> boolean;
+    ;;; return true if all items in the list satisfy pred, otherwise
+    ;;; false
+    lvars item;
+    for item in list do
+        unless pred(item) then false -> boolean; return() endunless;
+    endfor;
+    true -> boolean;
+enddefine;
+
+Alternatively:
+
+define all(list, pred) -> boolean;
+    lvars item;
+    for item in list do
+        returnunless ( pred(item) )( false -> boolean)
+    endfor;
+    true -> boolean;
+enddefine;
+
+
+Another way to define this would use <> to join the procedure
+pred to the procedure not, producing a new procedure which always
+produces the opposite truth value to that produced by pred.
+
+define all(list, pred) -> boolean;
+    not( exists( list, pred <> not) )
+enddefine;
+
+That has the disadvantage that every time you run it it has to create
+the procedure pred <> not, which will be used temporarily then
+discarded, increasing the time spent doing garbage collection.
+But it is a nice elegant solution.
+
+
+-- HASODD HASEVEN ALLODD ALLEVEN --------------------------------------
+
+This is defined here in the functional style. It might be better
+to use output locals, e.g. "-> boolean"
+
+define hasodd(list);
+    exists(list, odd)
+enddefine;
+
+HASEVEN can be defined similarly.
+
+
+Or, using partial application:
+
+vars procedure(hasodd, haseven);
+    exists(%odd%) -> hasodd;
+    exists(%even%) -> haseven;
+
+or, equivalently:
+
+vars procedure(
+    hasodd = exists(%odd%),
+    haseven = exists(%even%)
+);
+
+or
+
+define hasodd = exists(%odd%)
+enddefine;
+
+define haseven = exists(%even%)
+enddefine;
+
+hasodd([ 3 5 7 2 4 5 6 8]) =>
+haseven([ 3 5 7 2 4 5 6 8]) =>
+hasodd([ 2 4 6 8]) =>
+haseven([ 3 5 7 5 ]) =>
+
+
+Compare the result if exists is defined so as to return the object
+found, instead of true, or if you use findone instead of exists.
+
+Similarly, allodd and alleven can be defined using partial application;
+
+vars procedure(
+    allodd = all(%odd%),
+    alleven = all(%even%)
+);
+
+or
+
+define allodd = all(%odd%)
+enddefine;
+
+define alleven = all(%even%)
+enddefine;
+
+
+-- FINDALL ------------------------------------------------------------
+
+A recursive version
+
+define findall(list, procedure pred) -> newlist;
+    ;;; return a list of all items in list that satisfy pred
+    if  list == [] then
+        [] -> newlist
+    elseif  pred(hd(list)) then
+        [^(hd(list)) ^^( findall(tl(list), pred) )] -> newlist
+    else
+        findall( tl(list), pred ) -> newlist
+    endif
+enddefine;
+
+An iterative version using the matcher. Note that each time round the
+loop the variable list has as its value a smaller sublist.
+
+define findall(list, procedure pred) -> newlist;
+    lvars item;
+    [% while list matches ! [ == ?item: ^pred ??list] do item endwhile %]
+        -> newlist;
+enddefine;
+
+
+A more efficient iterative version, possibly clearer too:
+
+define findall(list, procedure pred) -> newlist;
+
+    lvars item;
+
+    [% for item in list do if pred(item) then item endif endfor%]
+        -> newlist;
+enddefine;
+
+
+A recursive version in the functional style
+
+define findall(list, pred) -> newlist;
+    if list == [] then
+        []
+    elseif pred(hd(list)) then
+        hd(list) :: findall(tl(list), pred)
+
+    else
+        findall(tl(list), pred)
+    endif
+        -> newlist;
+enddefine;
+
+/*
+;;; some tests
+    findall([], isword) =>
+    ** []
+    findall([a 1 b 2 c 3], isinteger) =>
+    ** [1 2 3]
+    findall([a 1 b 2 c 3], isword) =>
+    ** [a b c]
+
+*/
+
+
+-- PRUNE --------------------------------------------------------------
+
+
+define prune(list) -> result;
+    ;;; Make a copy of the list which does not contain repeated items.
+
+    lvars sub, item;
+
+    [%
+        ;;; use "on" so sub has successive tails as values
+        for sub on list do
+            hd(sub) -> item;
+            unless member(item, tl(sub)) then item endunless
+        endfor
+    %] -> result;
+
+enddefine;
+
+A still more efficient version using the procedure dest, which, when
+applied to a list returns both its head and its tail. See * dest
+
+define prune(list) -> result;
+    lvars item;
+
+    [%
+        until list == [] do
+            dest(list) -> (item, list);
+            unless member(item, list) then item endunless
+        enduntil
+    %] -> result;
+
+enddefine;
+
+Here is a recursive version in the functional style
+
+define prune(list) -> result;
+    if list == [] then
+        []
+    elseif member(hd(list), tl(list)) then
+        prune(tl(list))
+    else
+        hd(list) :: prune(tl(list))
+    endif -> result
+enddefine;
+
+/*
+;;; test examples
+prune([A B 1 2 C 2 1 B A])=>
+** [C 2 1 B A]
+rev(prune(rev([A B 1 2 C 2 1 B A]))) =>
+** [A B 1 2 C]
+
+*/
+
+
+The above definitions of prune do not return items in the order
+specified in the question, in which the first occurrence is kept
+and subsequent ones removed.
+For that you have to reverse the list before giving it to prune,
+and then reverse the result. Why?
+
+Here is a recursive version that produces the result specified in the
+question, i.e. it does it in the right order. But it requires deleting
+items from the tail of the list before running the recursive call.
+
+
+define prune(list) -> result;
+    if list == [] then
+        []
+    elseif member(hd(list), tl(list)) then
+        hd(list) :: prune( delete(hd(list), tl(list)) )
+    else
+        hd(list) :: prune( tl(list) )
+    endif -> result;
+enddefine;
+
+/*
+;;; try these tests, tracing prune
+prune([A B 1 2 C 2 1 B A])=>
+rev(prune(rev([A B 1 2 C 2 1 B A]))) =>
+*/
+
+A disadvantage of this version is that the use of delete before the
+recursive call of prune means that the rest of the list is traversed
+TWICE, once to delete items equal to the head of the list, and then once
+to prune the tail. And that is AFTER member has already traversed the
+tail.
+
+So if you care about efficiency it is better not to worry about creating
+the pruned list in the right order. However, sometimes you need to
+preserve the order of a list, e.g. when all items are stored in
+alphabetical order in lists.
+
+-- UNION --------------------------------------------------------------
+
+This version is wasteful. Why?
+
+define union(list1, list2) -> result;
+    ;;; return a list containing all elements of list1 and list2 without
+    ;;; any repeats
+    prune( [^^list1 ^^list2] ) -> result;
+enddefine;
+
+Slightly more efficient perhaps:
+
+define union (list1, list2) -> newlist;
+    lvars item;
+    [
+        %
+        for item in list1 do
+            unless member(item, list2) then item endunless
+        endfor
+        %
+        ^^list2
+    ] -> newlist;
+
+    ;;; optional extra
+    ;;; sort(newlist) -> newlist;
+enddefine;
+
+If the union is to be alphabetically ordered, or numerically ordered,
+end with
+
+    sort(newlist) -> newlist
+
+in the procedure. This will work only if the original list contains only
+words and strings, or only numbers.
+
+
+-- INTERSECTION -------------------------------------------------------
+
+define intersection(list1, list2) -> newlist;
+    ;;; return a list containing all items that occur in both lists.
+    lvars item;
+
+    [% for item in list1 do
+        if member(item, list2) then item endif
+    endfor %] -> newlist;
+
+enddefine;
+
+Note that in this version of intersection, items are put in newlist
+in the order in which they were in list1. This may make sorting
+unnecessary.
+
+-- LARGER -------------------------------------------------------------
+
+define setsize(list);
+    ;;; If list may contain repreated elements use "setsize" to
+    ;;; find the number of distinct items in it.
+    ;;; This is wasteful because it first creates the pruned list.
+    length(prune(list))
+enddefine;
+
+Here is a less wasteful version
+
+define setsize(list) -> num;
+    if list == [] then
+        0
+    elseif member(hd(list), tl(list)) then
+        setsize(tl(list))
+    else
+        1 + setsize(tl(list))
+    endif -> num
+enddefine;
+
+/*
+;;; test it
+
+    setsize([1 2 3 4 5]) =>
+    ** 5
+    setsize([5 1 4 2 3 4 5]) =>
+    ** 5
+    setsize([1 2 3 4 5 5 4 3 2 1]) =>
+    ** 5
+
+*/
+
+
+
+
+define larger(list1, list2) -> boolean;
+    if setsize(list1) > setsize(list2) then
+        true
+    else
+        false
+    endif -> boolean
+enddefine;
+
+or
+
+define larger(list1, list2) -> boolean;
+    setsize(list1) > setsize(list2) -> boolean
+enddefine;
+
+
+-- HOWMANY ------------------------------------------------------------
+
+define howmany(list, procedure pred) -> total;
+    ;;; return the number of items in list that satisfy pred
+
+    lvars item;
+
+    0 -> total;
+
+    for item in list do
+        if pred(item) then total + 1 -> total endif
+    endfor
+
+enddefine;
+
+/*
+
+howmany([1 a b 2 3 c 4], isword) =>
+howmany([1 a 1.5 b 2 3 c 4], isnumber) =>
+
+*/
+
+
+-- MORE ---------------------------------------------------------------
+
+define more(list1, pred1, list2, pred2);
+    ;;; are there more elements in list1 satisfying pred1 than
+    ;;; elements in list2 satisfying pred2?
+
+    howmany(list1, pred1) > howmany(list2, pred2)
+
+enddefine;
+
+-- MOST ---------------------------------------------------------------
+
+We can use <> to join two procedures to produce a new procedure. So if
+pred is a predicate which returns true or false as its result, then
+using 'pred <> not' we define a new procedure which returns true when
+the old one was false and vice versa.
+
+define most(list,pred);
+    more(list, pred, list, pred <> not)
+enddefine;
+
+;;; This version is more efficient. Why?
+
+define most(list,pred);
+    ;;; more than half the elements of the list satisfy pred
+    2 * howmany(list, pred) > length(list)
+enddefine;
+
+
+/*
+
+most([1 a b 2 3 c 4], isword) =>
+most([1 a b 2 3 c 4], isinteger) =>
+most([1 a 1.5 b 2 3 c 4], isword) =>
+most([1 a 1.5 b 2 3 c 4], isnumber) =>
+
+*/
+
+-- REMOVEALL ----------------------------------------------------------
+
+define removeall(list, pred);
+    ;;; return a list of items in list that do not satisfy pred
+    findall(list, pred <> not)
+enddefine;
+
+or
+
+define removeall(list, procedure pred) -> newlist;
+    lvars item;
+    [%for item in list do unless pred(item) then item endunless endfor%]
+        -> newlist;
+enddefine;
+
+/*
+removeall([1 a b 2 3 c 4], isword) =>
+** [1 2 3 4]
+removeall([1 a b 2 3 c 4], isinteger) =>
+** [a b c]
+removeall([1 a 1.5 b 2 3 c 4], isword) =>
+** [1 1.5 2 3 4]
+removeall([1 a 1.5 b 2 3 c 4], isnumber) =>
+** [a b c]
+*/
+
+-- SUBTRACT -----------------------------------------------------------
+
+First version uses partial application, i.e. it partially applies
+member to listb, to get the second argument for removall.
+
+define subtract(lista, listb) -> newlist;
+    ;;; return a list of elements of lista that are not in listb
+    ;;; Use partial application for the second argument of removeall
+    removeall(lista, member(%listb%) ) -> newlist
+enddefine;
+
+
+The next version is more efficient. Why?
+
+define subtract(lista, listb) -> newlist;
+    ;;; return a list of elements of lista that are not in listb
+
+    lvars item;
+
+    [% for item in lista do
+        unless member(item, listb) then item endunless
+       endfor %] -> newlist;
+enddefine;
+
+/*
+
+subtract([1 2 3 4 5 6], [2 4 6]) =>
+** [1 3 5]
+
+subtract([1 2 3 4 5 6], [1 3 5]) =>
+** [2 4 6]
+
+
+*/
+
+-- OVERLAPS EXCLUDES --------------------------------------------------
+
+define overlaps(list1, list2) -> result;
+    lvars item;
+    for item in list1 do
+        if member(item, list2) then true -> result; return() endif
+    endfor;
+    false -> result
+enddefine;
+
+define excludes(list1, list2);
+    not(overlaps(list1,list2))
+enddefine;
+
+-- SUBCULTURE ---------------------------------------------------------------
+
+There are VERY MANY ways of doing this. Several different solutions
+are provided below.
+
+subculture is given a list of lists and returns a new list of lists
+containing the maximal connected subsets from the original list.
+I.e. if two lists have any overlapping elements it replaces them
+with their union, so the final list of lists contains no lists that
+overlap each other.
+
+In general the easiest way to define such a procedure is to deal with
+the case where the intput list is empty, and use recursion to deal with
+other cases. I.e. if you want to find all the maximal subcultures
+in LIST first get the result of finding them for the tail of LIST,
+then do what you need to do with the head of LIST.
+
+In this case see if the head of the list overlaps with any lists in the
+subculture, and if so extract them and merge them with each other and
+the head. The problem as stated in the teach file assumes that the input
+list contains only two element lists. So we initially produce a solution
+based on that assumption, then see how to generalise it to merge lists
+with any number of elements.
+
+
+-- . subculture version 1
+
+Assume there is a procedure that takes the result of the
+recursive call of subculture, and then adds one more two element list.
+
+Call it add_first(first, lists), defined below. We can then use it to
+define a recursive version of subculture, thus:
+
+vars procedure add_first; ;;; defined below.
+
+define subculture(lists) -> result;
+    ;;; lists is a list of two element lists. The result must satisfy
+    ;;; the requirements of subculture.
+
+    ;;; First deal with the trivial case where there are no lists
+    if lists == [] then
+        ;;; no subcultures in an empty list
+        [] -> result;
+    else
+        ;;; There are one or more pairs in lists.
+        ;;; Find all the subcultures in the tail of lists, then
+        ;;; add in the head. That's all!
+        add_first( hd(lists), subculture(tl(lists)) ) -> result
+    endif;
+enddefine;
+
+
+;;;  Now define add_first. It uses union, defined above.
+
+define add_first(first, lists) -> newlists;
+    ;;; first is a two element list that came from the head of the
+    ;;; list given to subculture. lists is the result of applying
+    ;;; subculture to the tail. So lists already has been arranged
+    ;;; into a list of lists that are "maximal" groups, i.e. they
+    ;;; do not overlap.
+
+    ;;; If any subculture in lists overlaps with first, merge them.
+    ;;; Since first contains only two elements, and no elements of lists
+    ;;; overlap (by assumption), there cannot be more than two
+    ;;; things to merge.
+
+    ;;; We grow a new subculture, starting from first, and merge it
+    ;;; with anything in lists that contains an element of first.
+    lvars newculture;
+
+    first -> newculture;
+
+    ;;; Make a list of all the things in lists that don't contain
+    ;;; either item in the first, and add those that do to newculture
+
+    lvars subcult, item1 = first(1), item2 =first(2);
+
+    [%  for subcult in lists do
+            if member(item1, subcult) or member(item2, subcult) then
+                ;;; the first and subcult overlap, so
+                ;;; merge the subcult with the newculture
+                 union(newculture, subcult) -> newculture
+            else
+                ;;; keep the non-overlapping subculture as it is
+                subcult
+            endif
+        endfor
+    %] -> newlists;
+
+    ;;; now put the newculture at the front of newlists.
+
+    [^ newculture ^^newlists] -> newlists;
+
+enddefine;
+
+-- . Test cases for subculture
+
+/*
+;;; test it, with and without tracing subculture.
+
+subculture([]) =>
+** []
+
+subculture([[a b] [b c] [d e] [e f]]) =>
+** [[a b c] [d e f]]
+
+subculture([[a e] [b f] [c g] [d g]]) =>
+** [[a e] [b f] [c d g]]
+
+subculture([[a f] [g i] [h b] [f e] [c h] [j d] [g j] [b h] [d i]]) ==>
+** [[a f e] [g j d i] [c b h]]
+
+subculture([[ a b] [a d ] [e f] [d g] [ p q f]]) =>
+** [[b a d g] [e p q f]]
+
+;;; Notice that this version does not work when the input includes sets
+;;; with more than two elements. Why?
+
+subculture([[a b f ] [c d e] [e b ] [f g] [ a h]])=>
+** [[f e b a h] [c d e] [f g]]
+
+;;; It did not notice that e and f each occurred in two of the output
+;;;     lists. The result should have contained a single big list.
+
+;;; What change is needed to make it notice this? (A very simple
+;;; change will fix it. Look at where the program assumed implicitly
+;;; that only pairs were involved.)
+*/
+
+-- . subculture version 2
+
+The previous version of add_first assumed that first had only two
+elements. Thus to check whether an existing subgroup produced by the
+recursive call had to be merged with the new one or not it sufficed to
+use this test:
+            if member(item1, subcult) or member(item2, subcult) then
+
+However if first has more than two elements, then instead of
+listing them and testing them separately we can use the procedure
+overlaps defined above and say
+            if overlaps(first, subcult) then
+
+overlaps could be defined thus:
+
+define overlaps(list1, list2) -> boolean;
+    lvars item;
+    for item in list1 do
+        returnif( member(item, list2) )( true -> boolean )
+    endfor;
+    false -> boolean
+enddefine;
+
+
+;;; Now modified version of add_first
+define add_first(first, lists) -> newlists;
+
+    ;;; We grow a new subculture, starting from first, and merge it
+    ;;; with anything in lists that overlaps with first. Others
+    ;;; are kept as they are
+
+    ;;; Make a list of all the things in lists that don't contain
+    ;;; either item in the first, and add those that do to first
+
+    lvars subcult, item1 = first(1), item2 =first(2);
+
+    [%  for subcult in lists do
+            if overlaps(first, subcult) then
+                 union(first, subcult) -> first
+            else
+                subcult
+            endif
+        endfor
+    %] -> newlists;
+
+    ;;; now put the first at the front of newlists.
+
+    [^ first ^^newlists] -> newlists;
+
+enddefine;
+
+/*
+;;; test that subculture now works with three element lists.
+
+subculture([[a b f ] [c d e] [e b ] [f g] [ a h]])=>
+** [[g f d c e b a h]]
+
+*/
+
+-- . subculture version 4
+
+This version is nearly like the above but does not use a separate
+add_first procedure. Instead the code is in a loop in subculture.
+
+It also makes use of the procedure "overlaps" defined above
+
+define subculture(lists) -> result;
+    lvars first, sub, temp;
+    if lists == [] then
+        [] -> result;
+    else
+        ;;; Do the recursive call
+        subculture(tl(lists)) -> temp;
+
+        ;;; form a first subculture using the head
+        hd(lists) -> first;
+        ;;; See if any of the subcultures in temp need to be
+        ;;; merged with the items in first.
+        [% for sub in temp do
+            if overlaps(first, sub) then
+                ;;; subculture from tail of list must be merged with first one
+                union(first, sub) -> first;
+            else
+                ;;; use the original subculture from tail of list
+                sub
+            endif
+          endfor
+        %] -> result;
+        ;;; Now add the subculture to the result.
+        [^first ^^result] -> result;
+    endif;
+enddefine;
+/*
+;;; test it on the problem that defeated the previous version
+subculture([[a b f ] [c d e] [e b ] [f g] [ a h]])=>
+** [[g f d c e b a h]]
+
+;;; It works.
+;;; You should also test it on the other cases
+
+*/
+
+-- . subculture version 5
+
+;;; Another tempting possible definition of subculture
+;;; Start by trying to merge the first item with everything that
+;;; can be merged. Then use everything left over to form new
+;;; subcultures, recursively. This has a bug. Why?
+
+define subculture(lists) -> result;
+    lvars  item, sub, rest;
+    if lists == [] then
+        [] -> result
+    else
+        ;;; get the first element and see which others can be merged with it
+        ;;; to form a subculture
+        hd(lists) -> sub;
+        [] -> rest;
+        [% for item in tl(lists) do
+              if overlaps(sub, item) then
+                  union(sub, item) -> sub;    ;;; enlarge the subculture
+              else
+                  item                ;;; build a list of elements which
+                  ;;; can't be merged with sub
+              endif;
+           endfor %] -> rest;
+
+        ;;; now run subculture on the list of groups that could not
+        ;;; be linked to the first element, and return that with the
+        ;;; enlarged first group
+        [^sub ^^(subculture(rest))] -> result;
+    endif;
+enddefine;
+
+/*
+;;; test it
+subculture([[ a b] [a d ] [e f] [d g] [ p q f]]) =>
+** [[a b d g] [e p q f]]
+
+;;; That's OK, but here's an example of the bug.
+subculture([[a b ] [c d] [e d] [f g] [f a ]])=>
+** [[b f a] [c e d] [f g]]
+
+;;; Why has it not merged the first two lists?
+*/
+
+
+-- QUESTION 24 --------------------------------------------------------
+
+This is potentially quite a large mini project, though it is not fully
+specified by the question.
+
+An example approach to this can be found in TEACH INDUCE_RULES.P
+
+But it does not solve all the problems.
+
+
+--- $poplocal/local/teach/sets2.ans
+--- Copyright University of Birmingham 1996. All rights reserved. ------

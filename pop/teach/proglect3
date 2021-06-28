@@ -1,0 +1,509 @@
+TEACH PROGLECT3                                    Aaron Sloman Oct 1996
+                                                        Updated Oct 2000
+
+See TEACH PROGLECT1, PROGLECT2 for introductory material
+
+This file is mainly about lists and their use in representing knowledge.
+
+CONTENTS
+
+ -- Why lists are important
+ -- -- Storing factual information
+ -- -- Plans
+ -- -- Patterns
+ -- -- Storing information extracted from images
+ -- -- Storing general information
+ -- -- Building meta-level descriptions, e.g. grammars
+ -- General descriptions can be used to generate instances
+ -- General descriptions can be used to analyse instances
+ -- A programmer's view of lists
+ -- -- There are many procedures for operating on lists
+ -- -- Also looping constructs for "iterating over" lists
+ -- How are lists actually represented in the computer?
+
+-- Why lists are important --------------------------------------------
+
+Lists
+    Lists are a derived data-structure, based on pairs, which are
+    primitive data-structures in pop-11. They are explained in more
+    detail in Chapter 6 of the Pop-11 primer, also in
+        TEACH LISTS
+        TEACH BOXES
+    and other teach files.
+
+    Lists provide a very flexible and general type of data-structure,
+    with a large collection of system and library facilities for
+    manipulating them, including many that are useful for AI purposes.
+
+They can use used for at least the following sorts of purposes:
+
+
+-- -- Storing factual information
+
+They can be used for storing factual information (as in TEACH RIVER2)
+
+        [at boat left]
+        [at man left]
+        [at fox left]
+        [size b3 big]
+        [colour b3 blue]
+
+
+-- -- Plans
+They can be used for storing plans
+
+    [plan [putin chicken] [getin] [crossriver] [getout] ... ]
+
+-- -- Patterns
+
+A list can contain "pattern elements" which enable the list to be used
+with the Pop-11 pattern matching facilities to test things and to
+extract information stored in a database based on lists.
+
+E.g. in Eliza
+
+    if input matches [ ??thing can ??action ] then
+
+        [ suppose ^^thing could not ^^action ] -> result
+
+    elseif...
+
+
+And also in connection with many Pop-11 database facilities illustrated
+in TEACH RIVER2.
+
+E.g. to check that there is at least one item in the database matching
+a pattern:
+
+    if present( ! [at ?thing ?place ] ) then
+        [^thing is at ^place] =>
+    endif;
+
+
+To do something relating to EACH database item that matches a pattern:
+
+    foreach ![at ?thing ?place] do
+
+        [^thing is at ^place] =>
+
+    endforeach
+
+To remove everything matching a pattern from the database:
+
+    flush( ! [at ?thing ?place] );
+
+
+Notice the difference between "?" or "??" and "^" and "^^".
+
+The first two can be read as "Set the value of ...."
+
+The last two can be read as "Use the value of ...."
+
+However "?" and "??" work only in conjunction with the pattern
+matcher. If you just create a list with them, they are simply components
+of the list:
+
+    [ ?person uttered ??sentence ] =>
+
+Contrast this:
+
+    vars person, sentence;
+
+    "fred" -> person;
+    [How are you today] -> sentence;
+
+    [ ^person uttered: ^^sentence ] =>
+
+or
+    [ ^person uttered: ^sentence ] =>
+
+So "^" and "^^" are used by the compiler as instructions when the list
+is being built. "?" and "??" are used after the list is built, when
+the pattern matching procedures run.
+
+
+-- -- Storing information extracted from images
+
+    showlib edgepic
+
+    uses vturtle
+
+    lib edgepic
+
+    findlines();
+
+    database ==>
+
+
+-- -- Storing general information
+
+By including "variables" in the lists, we can use them for storing
+constraints and other general information, as in TEACH PRBRIVER
+
+    [constraint Eat
+
+        [   [?thing1 isat ?side]
+            [NOT man isat ?side]
+            [?thing1 can eat ?thing2]
+            [?thing2 isat ?side]
+        ]
+
+        [?thing1 will eat ?thing2 GO BACK]
+    ]
+
+Prolog makes a great deal of use of this sort of mechanism, though with
+a very different syntax.
+
+-- -- Building meta-level descriptions, e.g. grammars
+
+Lists are often used for building descriptions of descriptions, e.g.
+descriptions of sentences. See TEACH * GRAMMAR
+
+    uses grammar;
+
+E.g. here is a simple lexicon (a list of allowable words)
+
+    vars mylex =
+      [
+        ;;; start a list of lexical categories
+        [noun  man girl number computer cup battle room car garage]
+        [verb  hated stroked kissed teased married taught added]
+        [prep  in into on above under beside]
+        [det   the a every each one some]
+     ];
+
+
+And here is a simple grammar, using lists to express rules for
+    s   - a sentence
+    np  - a noun phrase
+    snp - a simple noun phrase
+    pp  - a preposition phrase
+    vp  - a verb phrase
+
+Notice that some of the rules use structures defined in other rules.
+
+    vars mygram =
+    [
+        ;;; start a list of rules
+        ;;; a sentence is a NP followed by a VP
+        [s [np vp]]
+
+        [np [snp] [snp pp]]     ;;; a NP is either a simple NP
+                                ;;; or a simple NP followed by
+                                ;;; a prepositional phrase PP
+        [snp [det noun]]        ;;; a simple NP is a determiner followed by
+                                ;;; a noun
+        [pp [prep snp]]         ;;; a PP is a preposition
+                                ;;; followed by a simple NP.
+        [vp [verb np]]          ;;; verbphrase = verb followed by NP
+    ] ;
+
+-- General descriptions can be used to generate instances -------------
+
+TEACH GRAMMAR shows how you can use a grammar and a lexicon to generate
+sentences corresponding to the grammar and lexicon.
+
+    generate(mygram, mylex) ==>
+
+    repeat 20 times generate(mygram, mylex) ==> endrepeat;
+
+
+-- General descriptions can be used to analyse instances --------------
+
+Parsing a sentence is working out what its structure is in accordance
+with a grammar, i.e. which complex grammatical components it contains,
+and what their grammatical subcomponents are, etc.
+
+LIB GRAMMAR allows us to create a parser for our grammar and lexicon
+using setup.
+
+This takes the rules and creates "parsing" procedures corresonding to
+the grammatical categories, s, np, vp, etc.
+
+Reminder:
+    mygram ==>  ;;; defined above
+    mylex ==>
+
+    ;;; Create the parser. ASsumes "s" is top level category
+
+    setup(mygram, mylex);
+
+    s =>
+    np =>
+
+    np( [one garage] ) ==>
+
+    np( [the man in the garage] ) ==>
+
+    s( [some man kissed one garage] ) ==>
+
+We can show the parse tree using VED's character graphics.
+
+    uses showtree;
+
+    showtree( s( [some man kissed one garage] ) );
+
+By tracing the procedures and repeating the parse we can see how
+searching is involved in analysing the sentence.
+
+    trace s np vp snp pp verb noun;
+
+    s( [some man kissed one garage] ) ==>
+
+    s( [the computer in some car teased some battle] ) ==>
+
+    untrace s np vp snp pp verb noun;
+
+    s( [a battle under each computer teased one room] ) ==>
+
+    showtree( s( [the computer in some car teased some battle] ) );
+
+
+-- A programmer's view of lists ---------------------------------------
+
+One use of lists is to store variable length data structures.
+
+
+    vars count, numbers;
+
+    [% for count from 1 to 8 do count endfor %] -> numbers;
+
+    numbers =>
+
+    vars count, list;
+
+    [% for count from 1 to 8 do gensym("thing_") endfor %] -> list;
+
+    list =>
+
+    [hello ] <> tl(list) =>
+
+    list =>
+
+    [hello ] <> tl(list) -> tl(list);
+
+    list =>
+
+    tl(list) =>
+
+    tl(tl(tl(list))) -> tl(list);
+
+    list =>
+
+And many more.
+
+    lists of lists of lists of .....
+
+As in the grammar example.
+
+This requires understanding how to manipulate lists.
+
+
+-- -- There are many procedures for operating on lists
+
+Creating lists
+
+    999 :: numbers =>
+
+    ;;; that does not change numbers.
+
+    numbers =>
+
+    ;;; neither does this:
+
+    numbers <> list =>
+
+    numbers =>
+
+
+
+You will also learn to create lists using these formats:
+
+    [ ^...  ^^...   %...% ]
+
+    [^numbers ^^numbers] =>
+
+Accessing parts of lists (or updating them)
+    hd, tl,
+
+    The pattern matcher is a particularly powerful mechanism for
+    accessing components of lists. TEACH * MATCHES
+
+e.g.
+    vars list = [the cat sat on the very old mat];
+
+    vars between;
+
+    list matches [== cat ??between old ==] =>
+
+    between =>
+
+    list matches [== the ??between old ==] =>
+
+    between =>
+
+    list matches [== = the ??between old ==] =>
+
+    between =>
+
+
+There are many more procedures for operating on lists. Here is a subset
+that's widely used. (Some of them will give an error if applied to an
+empty list.
+
+    ITEM :: LIST -> LIST
+
+    LIST <> LIST -> LIST
+
+    hd(LIST) -> ITEM
+    ITEM -> hd(LIST)
+
+    tl(LIST) -> LIST
+    LIST -> tl(LIST)
+
+    dest(LIST) -> (ITEM, LIST)
+        returns the head and the tail of the LIST
+
+    last(LIST) -> ITEM
+    ITEM -> last(LIST)
+
+    explode(LIST)
+        Puts all elements of the LIST on the stack
+
+    allbutfirst(N, LIST) -> SUB_LIST
+    allbutlast(N, LIST) -> SUB_LIST
+        Here N is an integer
+
+        list =>
+        allbutfirst(3, list) =>
+        allbutlast(3, list) =>
+
+    rev(LIST) -> LIST
+        ;;; create a new list with numbers in reverse order
+
+        rev(numbers) =>
+
+    member(ITEM, LIST) -> boolean
+
+        member(3, numbers) =>
+        member(33, numbers) =>
+
+    lmember(ITEM, LIST) -> false_or_sublist
+
+    delete(ITEM, LIST)          -> LIST
+        Return a list which does not contain ITEM
+
+    delete(ITEM, LIST, N)       -> LIST
+        Remove only the first N instances of ITEM
+
+    length(LIST) -> N
+
+    sort(LIST) -> LIST
+        Sorts a list of words, or strings, or numbers in the expected
+        way
+
+        sort([11 5 10 3 4 2 6 8]) =>
+        sort([the cat sat on the back of the hairy dog]) =>
+
+    syssort(LIST, PREDICATE) -> LIST
+        More general sorting procedure
+
+    applist(LIST, PROCEDURE)
+        Applies the procedure to every item in the list.
+        May or may not produce results on stack
+
+    maplist(LIST, PROCEDURE) -> LIST
+
+    oneof(LIST) -> ITEM
+        Selects an element at random
+
+    shuffle(LIST) -> LIST
+        Rearranges the list elements at random
+
+        shuffle([the cat sat on the back of the hairy dog]) =>
+
+    flatten(LIST) -> LIST
+        Recursively replaces every sublist with its elements
+        ("removes list brackets").
+
+        vars list_of_lists
+            = [[the cat] [sat [on the [back]] of] the dog];
+
+        flatten(list_of_lists)=>
+
+            flatten is a sort of reverse of parsing.
+
+    copylist(LIST) -> LIST
+    copytree(LIST) -> LIST
+
+These are all explained in TEACH PRIMER, and a more complete overview
+is given in REF LISTS.
+
+
+-- -- Also looping constructs for "iterating over" lists
+
+Often it is useful to do something to each element of a list. The
+procedure applist can do that, e.g.
+
+    define double(x);
+        x * 2
+    enddefine;
+
+    applist([ 1 2 3 4 5], double) =>
+    ** 2 4 6 8 10
+
+However the for ... endfor construct is often more useful if you don't
+want to create a special procedure to give to applist, e.g.
+
+    vars item;
+
+    for item in [1 2 3 4 5] do item*2 endfor =>
+    ** 2 4 6 8 10
+
+More generally, the form is
+
+    for item in list do action endfor
+        (Like applist and maplist)
+
+It is also sometimes useful to do something first to the head of the
+list, then to its tail, then to the tail of the tail, etc. For this use
+a for loop with "on" instead of "in"
+
+    for item on list do action endfor
+
+e.g.
+
+    vars sublist;
+    for sublist on [1 2 3 4 5] do sublist => endfor;
+    ** [1 2 3 4 5]
+    ** [2 3 4 5]
+    ** [3 4 5]
+    ** [4 5]
+    ** [5]
+
+See
+
+    HELP FOR
+    HELP LOOPS
+    HELP CONTROL
+
+
+-- How are lists actually represented in the computer? ----------------
+
+See TEACH * BOXES
+
+For lower level gory details: TEACH * WAL
+ (What Are Lists)
+
+See also the Pop11 PRIMER, Chapter 6, on lists.
+
+For some general revision of Pop-11 and VED see the test questions in:
+
+    TEACH * REVISE
+
+
+There is more on the pattern matcher in proglect4
+
+
+--- $poplocal/local/teach/proglect3
+--- Copyright University of Birmingham 2000. All rights reserved. ------

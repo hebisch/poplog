@@ -1,0 +1,525 @@
+TEACH GC                                           Allan Ramsay Jan 1984
+                                         Revised: Adrian Howard Jun 1992
+
+                  Storage Management In LISP and POP-11
+                  =====================================
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Introduction
+ -- Reference Counters
+ -- Garbage Collection
+ -- Relocation
+ -- Related Documentation
+
+
+
+-- Introduction -------------------------------------------------------
+
+Data structures in LISP and POP-11 are generally implemented with each
+structure represented by a block of memory. These blocks are divided up
+into words, each of which contains a binary number (i.e. a sequence of
+0's and 1's). As far as LISP and POP-11 are concerned, such a binary
+number may represent an integer, a real number, or the address of some
+other cell, and there has to be some way of distinguishing which is
+meant in any given case. The standard technique for doing this is to
+split the word into one component which contains the actual data (i.e.
+the value of the integer, the address the word points to, or whatever),
+and another which denotes what sort of data it is. This is often done by
+reserving several of the bits in the word, and giving them each a
+meaning - thus on the VAX a word is taken to hold a pointer if the
+bottom two bits are clear, a real if the bottom bit is set but not the
+next one, and an integer if both the bottom two bits are set; other
+implementations of POP-11 use other bits for the same purpose.
+
+Every cell contains a pointer to a distinguished cell called the "___key"
+of the class to which the cell belongs (see REF *KEYS). This pointer is
+held in the same position for every cell. In this file I shall always
+refer to it as being in the first word --- bear in mind that this is not
+universally the case for all systems.
+
+This key cell contains general information about cells of the same type
+as the given one, e.g. the dataword of the cell, its printing routine,
+the set of procedures which can be used for accessing/updating its
+components. Note that the key cell for a class is itself a data
+structure, and hence has a key. The key for the class of all keys is the
+key key!
+
+Thus, if we use the convention that the bottom three bits being clear
+denotes that a word contains a pointer, and that all the bottom three
+bits being set denotes that the word contains a positive integer, then
+in terms of the contents of words the list [1 2 3] would be represented
+in memory as something like
+
+    113: 2340    ; address of key for pair cells
+           15    ; 1 - bottom 3 bits denote integer,
+                 ; next denotes 1 (15 = 8:17)
+         1190    ; address of back of pair cell
+    ...
+
+    119: 2340    ; address of key for pair cells
+           23    ; 2 - bottom 3 bits denote integer,
+                 ; remainder denotes 2
+         1710    ; address of back of pair cell
+    ...
+
+    171: 2340    ; address of key for pair cells
+           31    ; 3 - bottom 3 bits denote integer,
+                 ; remainder denotes 3
+         2570    ; address of nil (end of list)
+    ...
+
+    234: 2390    ; address of key for key cells
+         ...     ; data associated with pair cells
+    ...
+
+    239: 2390    ; address of key for key cells (pointer to self!)
+         ...     ; data associated with key cells
+    ...
+
+    245: 2390    ; address of key for key cells
+         ...     ; data associated with nil
+    ...
+
+    257: 2450    ; address of key for nil
+         ...     ; other data associated with nil
+
+Perhaps more readably we can show this set of cells as:
+
+             -----    -----    ----- (pointers between pairs)
+             |   |    |   |    |   |
+       ------+- ------+- ------+- -------
+       |- 1  -| |- 2  -| |- 3  -| |- NIL|
+       -+------ -+------ -+------ -+-----
+        |        |        |        |
+        -------------------        |(pointer to keys of the list items)
+              |                    |
+             ------------         -----------
+             |- PAIR KEY|         |- NIL KEY|
+             -+----------         -+---------
+              ---------------------- (pointers to the key of the keys)
+                     |
+              -------|
+              |     -----------
+              |     |- KEY KEY|
+              |     -+---------
+              --------
+  (the key of the "key" key is itself)
+
+Systems that use data structures of this sort have to have some means of
+allocating sequences of words to be used as cells whenever a new
+structure is required. In LISP, where all structures are constructed
+from chains of pair cells, this can be done fairly easily by initially
+dividing the whole of memory into contiguous pair cells, and linking
+these cells together in a list, called the "________freelist". Then whenever a
+new pair cell is required, the system simply returns the CAR (head) of
+the freelist as the new cell, and sets the CDR (tail) of the freelist to
+be its new value - a very simple mechanism, which is fine until CDR of
+the freelist is NIL, at which point no more new structures can be
+created. The situation is a little more complex in POP-11, since we
+cannot know in advance what size cells will be required. To cope with
+this, the freelist in POP-11 is initialised to contain a single cell,
+whose data area (i.e. the words after the pointer to the key cell)
+covers the whole of memory. When the system needs to make up a new data
+structure, it walks along the freelist until it finds a cell which is
+big enough for the structure it wants to make. If it finds such a cell,
+it splits it into two components - one to be used for the new structure,
+the other to be chained back into the freelist. Thus if the initial cell
+in the freelist was of size 100, and we wanted to make one cell of size
+30 and one of size 20, the organisation of store would undergo the
+following transformations
+
+     INITIAL          AFTER MAKING 1st CELL   AFTER MAKING 2nd CELL
+
+     --------               --------                -------
+     | free |               | free |                | free|
+     |      |               |      |                |     |
+     |      |               |      |                |     |
+     |      |               |      |                |     |
+     |      |               |      |                |-----|
+     |      |               |      |                | 20  |
+     |      |               |      |                |     |
+     |      |               |------|                |-----|
+     |      |               |      |                |     |
+     |      |               |  30  |                | 30  |
+     |      |               |      |                |     |
+     --------               --------                -------
+
+It was noted above that when the freelist becomes empty (or, for POP-11,
+when the largest cell remaining in it is too small) then no more data
+structures can be created. Since most LISP and POP-11 programs create
+new data structures all the time as they are running, this effectively
+means that shortly after the freelist becomes empty processing will have
+to halt. However it frequently happens that many of the cells which have
+been removed from the freelist have subsequently become inaccessible to
+the running program, so that they could safely be returned to the
+freelist and re-used. In POP-11, for instance, writing
+
+    [1 2 3 4] -> x;
+
+would create a list which was accessible from x. If you immediately type
+
+    [5 6 7 8] -> x;
+
+x will no longer point to the first list. ___Nor ____will ________anything ____else, since
+we never assigned it anywhere else. Hence it would be nice if the cells
+that were used to make up this first list could be returned to the
+freelist. We could, perhaps, allow the user to return cells to the
+freelist when she thought she had finished with them (which is how
+PASCAL deals with this problem). This is fairly tedious, since it means
+that all your programs must keep track of the pointers between
+structures, so that they can dispose of any that are no longer relevant.
+It is also fairly dangerous to expect the user to keep track of this in
+her own program, since the links between data structures can become
+exceedingly entwined and it is very easy to believe that some action
+overwrites the last pointer to a cell when in fact there are still some
+left (if you return a cell to the freelist when you still have pointers
+to it, the remaining pointers will most likely point to nonsense when
+the cell is taken from the freelist again and re-used). To see how
+easily this can happen, suppose we had decided that assigning to a
+variable overwrote the last pointer to the current value of the
+variable, so that this could be returned to the freelist. We might be
+tempted to redefine -> so that it automatically disposed of the current
+value of the variable. Which would be OK in the example shown above,
+disastrous if we had typed instead
+
+    [1 2 3 4] -> x;
+    x -> y;
+    [5 6 7 8] -> x;
+
+What would be convenient would be some way for the system to detect,
+automatically and reliably, which cells had viable pointers to them and
+which didn't. We could then make the system itself look after the
+freelist.
+
+
+
+-- Reference Counters -------------------------------------------------
+
+One possible solution is to include in each cell some extra space to
+keep a count of how many pointers there are to it. When a cell is
+removed from the freelist to make up a data structure, its counter would
+be set to 0. Any procedure which affected how many pointers there were
+to a cell would be redefined so that it incremented the counter (if it
+set a new pointer to its argument) or decremented it (if it overwrote an
+existing pointer), and if decrementing the counter meant that it
+returned to 0, this would mean that there were no longer any pointers to
+the cell, so it could safely be released for re-use. Thus, in POP-11, X
+-> Y would decrement the counter for the cell which was the current
+value of Y and increment the one for the current value of X, X :: Y
+would increment the counter for the current values of X and Y (since it
+would create a new pair cell with a pointer to each of them), etc.
+
+This is a simple, fairly rapid mechanism. It has two major faults:
+
+    (i) it requires that every cell should have room to keep a
+    counter. Since the whole point of the exercise is to ensure that
+    store is used effectively, it seems a little counter-productive
+    to demand that all data structures should take up more room.
+
+    (ii) If you create a circular data structure, each element will
+    always be pointed to by the one that precedes it in the circle.
+    Thus even if there are no pointers to this structure from
+    anywhere else in the program, none of the counters of its
+    component cells will ever become 0, so neither it, nor anything
+    which it points to, will ever be released. This may appear to be
+    a minor issue, only affecting people who choose to use bizarre
+    circular structures who probably deserve to be punished anyway.
+    It is in fact surprising how many apparently straightforward
+    procedures lead to circular structures being created (e.g. (SETQ
+    A '(A B C)) in LISP will create a circular structure, as will
+    calling (FOO 'A) if A is local variable of FOO).
+
+
+
+-- Garbage Collection -------------------------------------------------
+
+Because of these problems, it is more usual to make use of the technique
+known as garbage collection. The principle underlying this technique is
+that any data structure that is accessible must be accessible via some
+chain of pointers starting from one of a number of basic cells. These
+basic cells are things like the system's dictionary, which contains a
+list of all the variable identifiers known to the program, the user
+stack (for POP-11), and the auxiliary stack. Since we can find out which
+are the __________accessible cells, we can find out (by elimination) which are the
+____________inaccessible ones, and we can return them to the freelist.
+
+The simplest implementation of this mechanism involves two phases. In
+the first '____mark' phase, the following recursive algorithm (written out
+in POP-11 for clarity) is used to find out and note which cells are
+accessible :-
+
+    define gc_mark(cell);
+        if      marked(cell)
+        then    return
+        else    mark(cell); appdata(cell, gc_mark)
+        endif;
+    enddefine;
+
+In this algorithm, '_______marking' and checking whether a cell is '______marked' is
+usually done by setting some bit in its initial word (its '______header' word)
+which is not used for anything else. If you think about it, you will see
+that if we apply this procedure to each of the '_____basic' cells, we will
+eventually mark every accessible cell (and we will not waste any time
+looking at the components of any cell we have already dealt with).
+
+When all the accessible cells have been marked, the garbage collector
+'______sweeps' up all the inaccessible ones and returns them to the freelist.
+This is simply a matter of walking through all the cells in sequence and
+looking to see if they have been marked. If they have, then they are in
+use; in this case, the mark should be removed (so that the next time a
+garbage collection is performed everything works as it should). If a
+cell is not marked, it is  not in use, so it is simply added on to the
+front of the freelist for re-use. Thus in outline the sweep phase of a
+garbage collection is performed by the following algorithm
+
+    define sweep ();
+        vars current_cell ;
+        initial_cell -> current_cell;
+        until   current_cell == last_cell
+        do      if      marked(current_cell)
+                then    unmark(current_cell)
+                else    current_cell :: freelist -> freelist
+                endif;
+                next_cell(current_cell) -> current_cell;
+        enduntil;
+    enddefine;
+
+There are two major problems with this scheme for looking after storage
+allocation and the re-use of abandoned cells. The first, which is
+insoluble, is that it takes a perceptible amount of time. It doesn't
+take as long as you might think, given that it effectively requires the
+system to scan the whole of core twice, but if you're running a large
+program when the computer you're using is busy doing work for other
+people as well, your program can be suspended for 10 or 20 seconds while
+storage gets reorganised. The other problem is that the mark phase of
+the process involves a recursive algorithm. This means that you will
+need a stack to store all the saved arguments of the recursive calls of
+mark, i.e. all the cells which have been marked themselves and are now
+having their components marked. Since garbage collection is normally
+performed when you have either run out of space or have nearly done so,
+it is quite likely that you will not have room to grow this stack (which
+in the worst possible case will contain an entry for every cell in
+store).
+
+A number of approaches have been taken to this problem, of which a few
+are outlined below :-
+
+    (i) Hope it never happens. This is in fact what happens in the
+    POP-11 system that underlies POPLOG. This system usually runs on
+    computers where the user is initially allocated only a small
+    fraction of the possible memory for her program to work in.
+    Garbage collection takes place when this fraction is filled up,
+    but the extra space that may be needed to actually perform a
+    garbage collection can be temporarily borrowed from the memory
+    that she is not normally allowed to use.
+
+    (ii) When you run out of space to grow your recursion stack,
+    copy part of it out to secondary storage (i.e. disc) so that you
+    can re-use the space that it was occupying. This is a feasible,
+    if inelegant, solution if you keep sufficient memory reserved to
+    grow the stack in most circumstances, so that you only make use
+    of secondary storage as an occasional desperate measure. This
+    approach has been used in implementations of POP-11 on PDP-10s.
+
+    (iii) Add a new basic cell, which we'll call ________deferred, to the
+    set of basic cells which are the initial arguments of calls of
+    mark. When a garbage collection is started, this cell is set to
+    point to the location after the last cell in store. If the
+    system runs out of space for the recursion stack when it is
+    marking accessible cells, it compares the address of the cell it
+    is currently marking with the address in ________deferred, and if the
+    current address is less than the one in ________deferred, it is set to
+    be its new value. When you've finished marking all the original
+    basic cells and their descendants, do it to the cell pointed to
+    by ________deferred. When you've done that, walk sequentially through
+    all cells with higher addresses. Any of these may be cells that
+    you managed to mark, but whose descendants you were unable to
+    deal with because you ran out of space, so you will have to
+    inspect every marked cell to see if its descendants are marked,
+    and if they are not you will have to call mark to deal with
+    them. Any of these extra calls of mark caused by the fact that
+    you have had to defer marking some cell may themselves reset
+    ________deferred to a new lower location, in which case you will have to
+    go through the whole of the second part of this procedure again.
+
+    It should be fairly obvious that this technique, which was used
+    for the garbage collector in the PDP-11 implementation of
+    POP-11, deals with the problem of running out of space (since it
+    gives up and starts again whenever that happens). If you don't
+    believe that it will actually mark all the accessible cells,
+    find someone who is and see if they can convince you.
+
+    (iv) The recursion stack normally holds the return address,
+    where computation should resume after a procedure call
+    terminates, and the values of the local variables of procedures.
+    Within mark there is no need to keep track of the return
+    address, since the only procedure that will get called is mark
+    itself, and we know where to return to within mark. Hence all we
+    need to keep track of are the values of the local variable of
+    mark, i.e. the cells which we have marked and whose components
+    we are now dealing with. It is possible, if we make use of some
+    fairly tricky manipulations of pointers, to keep a pointer to
+    the last cell we looked at ______inside the cell we are currently
+    marking, and to unwind these 'reversed pointers' when we have
+    finished with a given cell. This is a particularly elegant
+    solution to the problem of where to keep the recursion stack for
+    the mark phase of a garbage collection. Since the required
+    manipulation of pointers is fairly intricate (though it can be
+    done virtually as quickly as can adding them to the recursion
+    stack), and since I am not aware of any implementations of any
+    languages that use this algorithm, I shall not go into any more
+    detail about it.
+
+
+
+-- Relocation ---------------------------------------------------------
+
+The garbage collection algorithms described above will ensure that any
+memory not currently in use is returned to the freelist so that it can
+be re-used. However, since POP-11 cells are of different sizes, it is
+quite easy for the freelist to end up looking something like
+
+               -----------
+               | in use  |
+               |---------|
+               |  free   +-----
+               |         |    |
+               |---------|    |
+               | in use  |    |
+               |         |    |
+               |         |    |
+               |---------|    |
+        -------|  free   |<----
+        |      |         |
+        |      |---------|
+        |      | in use  |
+        |      |         |
+        |      |         |
+        |      |---------|
+        ------>|  free   |
+               |         |
+               |         |
+               -----------
+
+We have here a chain of three free cells, of which two occupy 2
+locations and the third one occupies 3 locations. We thus have 7 free
+locations available for re-use; but we would not be able to create a new
+cell occupying 7 locations (this sort of situation is often described by
+saying that free store has become '__________fragmented'). What we need to do is
+to '________relocate' the used cells as near the bottom of store as we can,
+leaving the whole area above them as a single free cell like the one we
+had when the system was initialised, i.e.
+
+               -----------             ------------
+               | in use 1|             |  free    |
+               |---------|             |          |
+               |  free   +-----        |          |
+               |         |    |        |          |
+               |---------|    |        |          |
+               | in use 2|    |        |          |
+               |         |    |        |          |
+               |         |    |        |          |
+               |---------|    |  =>    |          |
+        -------|  free   |<----        |----------|
+        |      |         |             | in use 1 |
+        |      |---------|             |----------|
+        |      | in use 3|             | in use 2 |
+        |      |         |             |          |
+        |      |         |             |          |
+        |      |---------|             |----------|
+        ------>|  free   |             | in use 3 |
+               |         |             |          |
+               |         |             |          |
+               -----------             ------------
+
+It is easy enough to find out how far to move the occupied cells, since
+we can keep track of the amount of free space below each accessible cell
+as we sweep through store during the second phase of garbage collection.
+Furthermore, it is generally fairly easy to actually move cells around
+in this way - most computers provide a single machine instruction which
+will do it for you. The difficult part is to make sure that pointers
+between cells are kept up-to-date. For instance, the cell referred to as
+'in use 1' in the picture above might easily contain a pointer to 'in
+use 2', i.e. one of its component words would contain the address of 'in
+use 2'. But 'in use 2' is going to be moved, so this address is going to
+be wrong! This means that relocation requires yet another complete scan
+of memory. During the sweep phase of garbage collection, we are now
+calculating where each accessible cell is going to be moved to, and
+storing its new address somewhere in the cell (probably in its header
+word). Before we actually move the cells to their new positions, we will
+have to look at all the addresses they currently contain, find the new
+addresses that are temporarily stored at those addresses, and overwrite
+the existing values with the new ones.
+
+To recap, the major components of the storage management system outlined
+above are as follows :-
+
+    (i)     mark all accessible cells (recursive scan through most of
+            memory)
+    (ii)    link all inaccessible cells, possibly calculating new
+            addresses for accessible ones as you go if the freelist has
+            become so fragmented that relocation is necessary (iterative
+            scan through all of memory)
+    (iii)   if relocating, update all inter-cell pointers to new values
+            (iterative scan through all of memory)
+    (iv)    if relocating, move accessible cells to new locations
+            (iterative scan through most of memory)
+
+Some of this work can be avoided if, as is the case for POPLOG, there is
+plenty of space theoretically available on the computer. When a garbage
+collection is performed in POPLOG, an area of store the same size as
+your current working area is temporarily reserved for your program. The
+mark phase of the garbage collection doesn't just mark each cell as it
+inspects it, it also copies it immediately to the next vacant space in
+the newly acquired area of store and puts the address to which it has
+been copied in the header of the old cell. Since the garbage collector
+knows the new address at which the cell will reside, the pointer which
+led to the cell being marked can be given its new value immediately. For
+pointers to cells which have already been marked and copied, the new
+address can be obtained from the header of the old cell.
+
+When the marking and copying is complete, the new area will contain
+copies of all your data structures, all nicely squashed together at the
+bottom of the area with a single large free cell at the top, and with
+all the pointers between cells correct. At this point you can either
+give the OLD area of store back to the operating system, and the program
+can continue with just the new one, or you copy the ___new area back into
+the old one and give the new one back. The choice of which technique to
+use depends on the facilities offered by your particular computer - the
+VAX implementation of POPLOG works by copying the new area onto the old
+one and then disposing of the new one, but on other computers the other
+choice may make more sense. With this technique the four stages of the
+summary given above are merged together, thus minimising the time taken
+when you run out of store and have to reorganise.
+
+Nonetheless, however you do it, garbage collection clearly requires a
+lot of work. Hence when you are designing a program it is worth paying
+some attention to the number of temporary data structures it will use,
+since creation of lots of temporary structures will mean that the
+program has to do lots of garbage collection, which may take lots of
+time.
+
+
+
+-- Related Documentation ----------------------------------------------
+
+Also see:
+
+TEACH *POPSYS   --- How the POP-11 system works
+TEACH *VM       --- The POP-11 Virtual Machine
+
+*SYSGARBAGE     --- Procedure to invoke a garbage collection
+*SYS_LOCK_HEAP  --- Make POP-11 treat all objects currently in the heap
+                    as non-garbage.
+*SYS_DESTROY_ACTION *SYS_PROCESS_DESTROY_ACTION
+                --- Mechanisms for specifying action to be taken when a
+                    particular object is about to be garbage collected.
+
+REF *SYSTEM/Store --- Facilities concerned with store management.
+
+
+
+--- C.all/teach/gc
+--- Copyright University of Sussex 1990. All rights reserved. ----------

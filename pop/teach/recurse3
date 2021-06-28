@@ -1,0 +1,415 @@
+TEACH RECURSE3                          Aaron Sloman November 1989
+
+
+               RECURSION AND THE TERMINATING VALUE
+
+People learning about recursion often have considerable difficulty over
+what to do with the terminating condition, especially when recursing
+down a list. What result should be returned when the empty list [] is
+found?
+
+In particular, difficulties often arise if it is decided to make
+ -false- the result when the list is empty, and otherwise to return a
+list of items.
+
+This teach file explores some of the design issues that need to be
+understood in dealing with such cases.
+
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- The problem
+ -- How can we think about taking this decision? Two issues
+ -- Addressing the first issue: Q1
+ -- SUMMARY of answer to Q1:
+ -- How to answer Q2
+ -- What if the answers to Q1 and Q2 are different ?
+ -- The complicated solution
+ -- The simpler (divide and conquer) solution
+ -- POP-11 allows nested procedure definitions
+ -- Final silly exercise
+ -- Further Reading
+
+-- The problem --------------------------------------------------------
+
+We are talking about a schema of the SECOND of the following two forms,
+representing a procedure P that takes a list, and possibly other
+arguments (e.g. a predicate), and recurses down the list, looking at
+every element for some purpose, and returns some result.
+
+Schema (A)
+  The procedure produces no result (e.g. because it is doing something
+with some or all elements of the list such as printing them on the
+terminal, or putting them into the database or writing them to a file).
+
+    define P(list, .....);
+
+        .....
+
+    enddefine;
+
+Ignore Schema (A) for now. It is mentioned simply to point out that the
+following discussion does not apply to it, as we are considering only
+recursive procedures that produce a result (on the stack).
+
+Schema (B)
+ A result is produced.
+
+    define P(list, ....) -> result;
+
+        ......
+
+    enddefine;
+
+
+
+The problem is: what should the result for the stopping condition
+be?
+    define P(list, ....) -> result;
+
+        if list == [] then
+            ???? -> result
+        else(if)
+            ......
+            ......
+
+        endif
+
+    enddefine;
+
+-- How can we think about taking this decision? Two issues ------------
+
+
+In order to answer this question you have to separate two different
+questions and think VERY clearly about them.
+
+Q1. What should the procedure P return when given an empty list?
+
+Q2. What does the result of P have to be for the recursive terminating
+    case in order that the result can be used sensibly for
+    the other (non-terminating) cases?
+
+
+Let's ignore Q2 for now, and concentrate on Q1.
+
+
+-- Addressing the first issue: Q1 -------------------------------------
+
+Q1 Has to be answered on the basis of how the problem is defined
+originally, and THAT may depend on what you want to use the procedure P
+for, e.g. which other procedures will call it.
+
+
+CASE 1 The procedure is to be used in CONDITIONs like these:
+
+    if P(.........) then .....
+    until P(.........) do .....
+    while P(.........) do .....
+
+then the answer to Q1 should be that the procedure produces a result
+that is essentially BOOLEAN, i.e. sometimes false, sometimes not.
+(Remember in Pop-11 anything other than false counts as true, in a
+condition.) If P never returns false, in these contexts, then the
+condition will always be true, and there is no point using a
+condition.
+
+
+CASE 2 The result of the procedure is to be used as one argument for
+an operation or procedure that REQUIRES a list as input, as in:
+
+    ....  ::  P(.....)              (Second arg of "::" MUST be a list)
+
+    P(.....) <> .......             (Both args of "<>" MUST be lists)
+
+    [^^(P(......)  ....]            ("^^" in a list REQUIRES a list)
+
+    rev(P(.....))                   (Arg of "rev" MUST be a list)
+
+
+Then for these uses P MUST always return a list (which could be [], as
+that is a list).
+
+
+CASE 3 The result of P is used as one argument for an arithmetic
+operation, e.g. "+" or "*", as in
+
+    x + P(x - 1)                    (Arguments for "+" MUST be numbers)
+
+
+Then the result of P MUST be a number (e.g. it could be 0).
+
+
+CASE 4 The result of P is used as input to some other procedure
+that requires  a particular type of result (e.g. a string, or a
+vector, etc), e.g.
+
+    subscrs(num, P(.....))
+    subscrv(num, P(.....))
+
+then the result of P MUST be an object of the required type.
+
+
+CASE 5 the result of P is used only as input for procedures that will
+operate on ANY kind of object, e.g. the first argument of -member- can
+be any kind of object.
+
+In that case you don't get any programming constraints on the result of
+P, though there may be other constraints, that depend on what the
+procedure is supposed to be doing.
+
+
+-- SUMMARY of answer to Q1: -------------------------------------------
+
+The result produced by P depends on the kind of use to which the result
+is to be put. So for some procedures the result should be boolean, for
+others a (possibly empty) list, for others a (possibly zero) number,
+etc.
+
+
+-- How to answer Q2 ---------------------------------------------------
+
+As you may already have noticed, in a recursive procedure P, the result
+of a recursive call will itself be used in some way, and THAT use can
+determine what sort of result the recursive call should produce,
+including the terminating case.
+
+E.g. if P is making a list of objects, and the result of the recursive
+call is used in creating that list, i.e. the recursive call is used
+something like this:
+
+    hd(list)  ::  P(tl(list), ....) -> result
+
+    P(tl(list), ....) <> .......    -> result
+
+    [^^(P(tl(list), ....) ....]     -> result
+
+then the recursive call (on tl(list)) MUST always return a list,
+possibly []. It must NOT return FALSE, or the program will produce
+
+
+    ;;; MISHAP - LIST NEEDED
+    ;;; INVOLVING:  <false>
+    ;;; DOING    :  :: P(*3)  .....
+
+
+where P(*3) means it was three levels deep in recursion in P when the
+error occurred, and "::" in the DOING list tells you that it is
+complaining about <false>  being given as argument to "::"
+
+If P is traced the last bit of tracing before the error would be
+something like this
+        !!!> P []
+        !!!< P <false>
+
+i.e. it recursed on [], returned false, and then the PREVIOUS call of P
+waiting for the result of P([]) complained.
+
+
+So if the result of the recursive call is used as input to a
+list-processing procedure, then the result for the terminating condition
+MUST be a list. This will usually be [], but it may be some other list
+in more complex cases.
+
+
+Similarly, if the result of the recursive call is used as input for
+an arithmetic operation, then the result of the terminating condition
+MUST be a number, e.g. 0 or 1, as in
+
+    define P(list) -> result
+        if list == [] then
+            0 -> result
+        else
+            hd(list) + P(tl(list)) -> result
+
+        endif
+    enddefine;
+
+
+
+-- What if the answers to Q1 and Q2 are different ? -------------------
+
+Then you have a problem. There are two different solutions. The
+complicated one is to try to make one procedure definition for P handle
+the situation. The simpler solution is to use two procedures, one that
+does the work, and one that calls it and decides whether to return
+false.
+
+-- The complicated solution -------------------------------------------
+
+Here for example is a version of findall that takes a
+list and a predicate and returns false if NO items in the list satisfy
+the predicate, otherwise a list of all the items that do.
+
+define findall(list, pred) -> out;
+
+    if list == [] then
+        false -> out
+    else
+        ;;; first get the result for the tail, and then decide what
+        ;;; to do about the head
+        findall(tl(list), pred) -> out;
+
+        if out then
+            ;;; out is not false, so it must be a list. Use it
+            if pred(hd(list)) then
+                [^(hd(list)) ^^out] -> out
+            else
+                ;;; do nothing - return previous value of out
+            endif
+        else
+            ;;; decide what to by testing hd(list)
+            if pred(hd(list)) then
+                ;;; ignore previous value of out, because it is false
+                [^(hd(list))] -> out
+            else
+                ;;; do nothing - return previous (false) value of out
+            endif
+        endif
+    endif
+enddefine;
+
+NOTE: you can remove the empty "else" clauses.
+
+We can test this to make sure it works.
+
+findall([], isword) =>
+** <false>
+findall([cat],isword) =>
+** [cat]
+findall([1 cat on 2 mats],isword) =>
+** [cat on mats]
+
+
+-- The simpler (divide and conquer) solution --------------------------
+
+The above definition is fairly complex, even if you ignore the empty
+"else" clauses. But you can do it more simply by defining a recursive
+sub-procedure called sub_find, that returns a LIST under all conditions,
+and then define findall to see if the list is empty.
+
+define findall(list, pred) -> out;
+
+    sub_find(list, pred) -> out;
+    ;;; decide whether to replace the value of out with false
+    if out == [] then
+        false -> out
+    endif;
+
+enddefine;
+
+define sub_find(list, pred) -> out;
+
+    if list == [] then
+        [] -> out
+    elseif pred(hd(list)) then
+        [^(hd(list)) ^^(sub_find(tl(list), pred))] -> out
+    else
+        sub_find(tl(list), pred) -> out
+    endif
+enddefine;
+
+findall([], isword) =>
+** <false>
+
+findall([cat],isword) =>
+** [cat]
+
+findall([1 cat on 2 mats],isword) =>
+** [cat on mats]
+
+
+NOTE
+You might have been tempted to write
+
+        [^^(sub_find(tl(list), pred))] -> out
+
+Can you see why that is unnecessary complexity? (The square brackets say
+make a list. "^^(...)" says put in all the elements of the list you
+started with!).
+
+
+-- POP-11 allows nested procedure definitions -------------------------
+
+If the procedure -sub_find- is used nowhere but in findall, then we can
+hide it from everything else, by actually putting its definition INSIDE
+that of findall. If you do that, make sure that you give the nested
+definition extra indentation to show very clearly that it is nested.
+
+<ENTER> tidy (or <ENTER> jcp if the cursor is at the beginning of the
+outer definition) will do this automatically. (See HELP * MARK )
+
+This is how the nested procedures look:
+
+define findall(list, pred) -> out;
+
+    define sub_find(list, pred) -> out;
+
+        if list == [] then
+            [] -> out
+        elseif pred(hd(list)) then
+            [^(hd(list)) ^^(sub_find(tl(list), pred))] -> out
+        else
+            sub_find(tl(list), pred) -> out
+        endif
+    enddefine;
+
+    sub_find(list, pred) -> out;
+
+    ;;; decide whether to replace the value of out with false
+    if out == [] then
+        false -> out
+    endif;
+
+enddefine;
+
+You can make your nested procedure slightly more efficient if you
+replace the nested "define" with "define lconstant", as in:
+
+define findall(list, pred) -> out;
+
+    define lconstant sub_find(list, pred) -> out;
+
+        if list == [] then
+            [] -> out
+        elseif pred(hd(list)) then
+            [^(hd(list)) ^^(sub_find(tl(list), pred))] -> out
+        else
+            sub_find(tl(list), pred) -> out
+        endif
+    enddefine;
+
+    sub_find(list, pred) -> out;
+
+    ;;; decide whether to replace the value of out with false
+    if out == [] then
+        false -> out
+    endif;
+
+enddefine;
+
+
+-- Final silly exercise -----------------------------------------------
+
+As a test for whether you have understood all that, try to define
+a recursive procedure called silly that takes a list of numbers and
+returns the sum of all the numbers if the list is non-empty, otherwise,
+for the empty list, returns the result FALSE, not 0!
+
+    silly([]) =>
+    ** false
+
+    silly([3 4 5]) =>
+    ** 12
+
+-- Further Reading ----------------------------------------------------
+
+TEACH * RECURSE1
+
+TEACH * RECURSE2
+
+TEACH * SETS
+
+TEACH * SETS2
+
+--- C.all/teach/recurse3
+--- Copyright University of Sussex 1990. All rights reserved. ----------

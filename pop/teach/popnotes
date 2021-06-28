@@ -1,0 +1,1139 @@
+TEACH POPNOTES                          Aaron Sloman Max Clowes, May 1981
+
+=== SOME NOTES ON FEATURES OF POP11 ==================================
+
+ITERATION - LISTS - MATCH - DATABASE
+
+         CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- ITERATION
+ -- REPEAT number TIMES action ENDREPEAT
+ -- UNTIL condition DO action ENDUNTIL
+ -- WHILE condition DO action ENDWHILE
+ -- FOR init STEP step TILL condition DO action ENDFOR
+ -- ITERATING ON LISTS
+ -- MORE LIST PROCESSING
+ -- REPRESENTATIONS
+ -- BASIC OPERATIONS ON LISTS
+ -- PROCEDURES AND LISTS
+ -- LIST PATTERN MATCHING
+ -- THE MATCHER
+ -- DESCRIBING THE SHAPE OF A LIST PATTERN
+ -- USING VARIABLES IN A PATTERN SPECIFICATION
+ -- RETRIEVING DETAILS OF THE TARGET LIST
+ -- SUMMARY OF MATCH NOTATIONS
+ -- MATCHing on a corpus of lists - the DATABASE concept
+ -- ADDING AND REMOVING DATABASE ITEMS
+ -- WHAT WAS REMOVED?
+ -- FINDING ITEMS IN THE DATABASE
+ -- RETRIEVING VALUES FROM WITHIN AN ITEM
+ -- Retrieving all the items PRESENT which match a pattern
+ -- CHECKING A SET OF PATTERNS AGAINST THE DATABASE
+
+-- ITERATION -----------------------------------------------------------
+
+There are many occasions upon which we will need to repeat some action or
+actions many times over. For example in scanning a list or changing something
+in small steps. There are a number of constructions designed to allow an
+economical expression of these sorts of operations. They are usually called
+'Loop Statements'.
+
+-- REPEAT number TIMES action ENDREPEAT --------------------------------
+
+The REPEAT statement is appropriate where you can express the extent of the
+repetition in terms of the number of times it will need to be done. Thus
+
+    : repeat 6 times
+    :   99 * 9 =>
+    : endrepeat;
+
+does a bit of arithmetic six times. The 'action' can include as many
+operations as you like between the TIMES and ENDREPEAT. Further the <number>
+can be a variable or a more complex expression. e.g.
+
+    : repeat random(20) times
+    :   [another random number] =>
+    :   random(100) =>
+    : endrepeat
+
+-- UNTIL condition DO action ENDUNTIL ----------------------------------
+
+A more common requirement is repetition of some <action> until some
+<condition> is satisfied, for instance, increasing X until it is bigger than
+Y:
+
+    : vars x, y, z;
+    : 3 -> x; 99 -> y; 4 -> z;
+    : until x > y do
+    :   z + y -> x;
+    :   x =>
+    : enduntil;
+
+REPEAT and UNTIL are both 'looping constructions' and as such involve an
+underlying conditional statement. The action in the UNTIL loop,
+
+    : x + y -> x
+
+will be performed if the <condition> is FALSE. After performing it POP11
+treats the following ENDUNTIL or ENDREPEAT as an instruction to 'loop back'
+to the head of the statement - the UNTIL part - and test that <condition>
+again. When the <condition> is TRUE, POP11 skips over both the <action> and
+the closing bracket to perform the next specified command. Any number of
+<action>s can be inserted in the DO... segment of all loop statements. We can
+translate our first REPEAT into an UNTIL, thus:
+
+    : vars num; 1 -> num;
+    : until num > 6
+    : do    99 * 9 =>
+    :   num+1 -> num
+    : enduntil;
+
+-- WHILE condition DO action ENDWHILE ----------------------------------
+
+This is similar to UNTIL except that the <action> will continue to be
+performed while the <condition> remains <TRUE>
+
+    : while picture(xposition, yposition) = space do
+    :   jump(1)
+    : endwhile;
+
+Thus 'UNTIL condition DO' is equivalent to 'WHILE NOT(condition) DO'; use
+whichever feels more natural.
+
+-- FOR init STEP step TILL condition DO action ENDFOR ------------------
+
+This construction is a variant on UNTIL where you want to separate out the
+step-by-step incrementing that is being performed in the <action>. Thus to
+count backwards from 10 we might use the construction:
+
+    : for   10 -> num
+    : step  num - 1 -> num
+    : till  num = 0
+    : do    num =>
+    : endfor;
+    ** 10
+    ** 9
+    ** 8
+    ...
+    ** 1
+
+which could be written in UNTIL form as:
+
+    : 10 -> num;
+    : until num = 0 do
+    :   num =>
+    :   num - 1 -> num
+    : enduntil;
+
+Notice that neither version will print 0. As soon as the condition is true
+the action is terminated.
+
+-- ITERATING ON LISTS --------------------------------------------------
+
+Another common need for iteration is in list processing, specifically in the
+serial 'scanning' of the elements of a list. The following
+is a typical loop construction to print out the elements of a list:
+
+    : [a b c d] -> list;
+    : until list = [] do
+    :   hd(list) =>
+    :   tl(list) -> list
+    : enduntil;
+    ** a
+    ** b
+    ** c
+    ** d
+
+You would be well advised to try this piece of POP11 on the computer.
+
+Try also the central action of that fragment:
+
+    : tl(list) -> list;
+    : list =>
+
+but make sure that LIST contains something before you do. The action
+
+    : tl(list)->list
+
+causes LIST to be given the value TL(LIST). TL is given the old value as
+LIST. From that it produces as result a list containing all but the initial
+element. The new list (the TAIL) is assigned to LIST.
+
+For more on this, try TEACH LISTS;
+
+Another typical use of iteration is to accumulate some total:
+
+    : vars list, total;
+    : 0 -> total;
+    : [3 5 7] -> list;
+    : until list = [] do
+    :   total + hd(list) -> total;
+    :   tl(list) -> list
+    : enduntil;
+    : total =>
+    ** 15
+
+An alternative and more widely used method is to recursively TL the list. The
+recursive technique has the great advantage that any iteration written as a
+recursive procedure can be TRACEd. Constructions utilising loops (REPEAT,
+WHILE, UNTIL, FOR) do not admit of easy monitoring through TRACE.
+
+-- MORE LIST PROCESSING ------------------------------------------------
+
+-- REPRESENTATIONS -----------------------------------------------------
+
+The basic thesis of AI's approach to the study of human intelligence is that
+computation provides a good - perhaps the best - way to REPRESENT the
+processes we call thinking, seeing, reasoning, speaking, learning. And a
+crucial ingredient of the computational forms used in much AI research to
+represent mentation is the LIST. For instance, the POP11 database (see below)
+is defined as a list of lists.
+
+There are many tasks where we will need to choose an element from a pool of
+items e.g. from a deck of 'Court' cards like King of Hearts, Jack of Diamonds
+etc.
+
+    : oneof([kh jd qc qh as]) =>
+    ** qc
+
+ONEOF actually chooses at random, and typing the same thing again will not
+necessarily produce the same result.
+    : repeat 5 times
+    :   oneof([kh jd qc qh as]) =>
+    : endrepeat;
+
+The nice thing here is that lists are 'elastic', they aren't designed to hold
+an item of a fixed size or type.
+
+More important still is the way that lists can be used to represent mental
+STRUCTURES, for example the structure of a sentence.
+
+    [[THE BOY] KICKED [THE BALL]]
+    [[THE DISH] [RAN AWAY] [WITH [THE SPOON] ]]
+
+This idea of a list structure flows from the fact that an element of a list
+can itself be a list. These brief remarks do not do justice to the topic,
+they are intended only as motivation for what is inevitably rather a formal
+presentation. You may like to read Raphael, THE THINKING COMPUTER, Ch2
+
+
+-- BASIC OPERATIONS ON LISTS -------------------------------------------
+
+(a) Specifying the contents of a list - [] and ^
+
+    : vars box;
+    : [shoes tins brushes] -> box;
+
+declares a variable BOX and gives it a value which is a list containing three
+items.
+
+    : vars cupboard;
+    : [box blanket pillow] -> cupboard;
+
+Will similarly construct a list of three items.
+
+    : cupboard =>
+    ** [box blanket pillow]
+
+How does POP11 know that the 'BOX' referred to here is not the variable we
+declared earlier but the literal word "BOX"? The answer is - 'By convention'.
+
+The square brackets are used where the items listed are to be understood
+literally and not read as names of other things (e.g. other lists) or as
+procedures that will yield something we want put into the list. I.e.
+inside the square brackets words are QUOTED. If we wanted that mention
+of 'BOX' to denote the list that BOX contains then we must indicate that
+it is the value of BOX rather than its literal form that  is to be used.
+
+    : [^box blanket pillow] -> cupboard;
+    : cupboard =>
+    ** [[shoes tins brushes] blanket pillow]
+
+The use of "^" signals 'value of' to POP11. Of course we could construct
+this list without the "^":
+
+    : [[shoes tins brushes] blanket pillow]-> cupboard;
+
+And evaluation really does mean 'evaluating'!
+
+    : vars x y; 3 -> x; 4 -> y;
+    : [the sum of x and y is x+y] =>
+    ** [the sum of x and y is x+y]
+
+Here POP11 has not evaluated X,Y but simply quoted them. But if we use
+"^" appropriately:
+
+    : [the sum of ^x and ^y is ^(x+y)]=>
+    ** [the sum of 3 and 4 is 7]
+
+POP11 has evaluated X, Y and the arithmetic expression X+Y, and it is the
+results of the evaluations that appear in the list.
+
+(See also TEACH * ARROW and TEACH * PERCENT)
+
+On some terminals the up-arrow looks like a little upside-down 'V'. On others
+the keyboard uses an arrow pointing up. Notice that if the uparrow is to
+precede a complex expression, the expression must be surrounded by
+parentheses.
+
+(b) Joining lists together - <>
+
+Lists-within-lists is an important feature but we'll also need to join lists
+end-to-end. The concatenation symbol <> is constructed from two keyboard
+characters, the "greater-than" and "less-than" signs. It is placed between
+the lists that we want joined in a similar fashion to the use of + between
+numbers we want added
+
+    : [box] <> [cupboard] =>
+    ** [box cupboard]
+    : [a b] <> [c d e] <> [f] =>
+    ** [a b c d e f]
+
+If we want the two lists that are in BOX and CUPBOARD joined together then we
+need to use the variable names 'unprotected' as it were by the '[' and ']'
+brackets that turn those names into quoted words:
+
+    : box <> cupboard =>
+    ** [shoes tins brushes [shoes tins brushes] blanket pillow]
+
+Note that the original lists are unchanged by this:
+
+    : box =>
+    ** [shoes tins brushes]
+    : cupboard =>
+    ** [[shoes tins brushes] blanket pillow]
+
+The operator <> creates a new list, by copying. Strictly, it is redundant,
+since you can always get the same effect by using list brackets and the "^^"
+prefix. E.g.
+
+    box <> cupboard             IS THE SAME AS  [^^box ^^cupboard]
+    [^^box ^^(tl(cupboard))]    IS THE SAME AS  box <> tl(cupboard)
+
+
+(c) Accessing list elements - HD, TL
+
+The items in a list can be accessed one at a time, using the procedure 'HD'
+(pronounced 'Head'). The HD of a list is its first element, thus
+
+    : hd(box) =>
+    ** shoes
+
+Note that SHOES is not itself a list. It is a word. We can also store numbers
+in lists
+
+    : hd([351 two 79 rubbish]) =>
+    ** 351
+
+The first element may be a LIST as for example
+
+    : hd(cupboard)=>
+    ** [shoes tins brushes]
+
+And the HD of that list is "SHOES".
+
+Getting access to anything other than this first element requires us to
+combine together successive applications of HD or of HD and the other basic
+procedure TL (Pronounced 'Tail'). Thus:
+
+    : hd(hd(cupboard)) =>
+    ** shoes
+
+POP11 tackles this in several stages working from THE INSIDE OUT.
+
+    1) ...(...(CUPBOARD))
+        gets the value of CUPBOARD, which is the list:
+            [[SHOES TINS BRUSHES]] BLANKET PILLOW]
+
+    2) ...(HD(...))
+        Then do the first (innermost) HD to it.
+        The first element of the list above is:
+            [SHOES TINS BRUSHES]
+        which is now available for:
+
+    3) HD(...(...))
+        Then do the final (outer) HD operation to select its first element
+        which is the the word:
+            SHOES
+
+An alternative to using HD is to pretend that the list variable e.g. CUPBOARD
+is a PROCEDURE and apply it to the number 1 to get the first element. E.g.
+
+    : cupboard(1) =>
+    ** [shoes tins brushes]
+
+Similarly to get the second and subsequent elements
+
+    : cupboard(2) =>
+    ** blanket
+    : cupboard(3) =>
+    ** pillow
+
+But CUPBOARD(4) will produce a mishap message.
+
+To get the second element of the first element of CUPBOARD do:
+
+    : cupboard(1)(2) =>
+    ** tins
+
+The procedure TL (TaiL) is the list minus its first element (i.e. NOT just the
+second element.):
+
+    : tl(cupboard)=>
+    ** [blanket pillow]
+    : hd(tl(cupboard)) =>
+    ** blanket
+    : hd(tl(tl(cupboard)))=>
+    ** pillow
+
+Notice that TL always returns a LIST (unless you apply it to an empty list).
+Thus
+
+    : tl(box)=>
+    ** [tins brushes]
+    : tl([onething])=>
+    ** []
+
+What do you think the following will do? ([] is an empty list.)
+
+    : tl([]) =>
+
+Notice the lack of symmetry between HD and TL. HD(BOX) is the same as BOX(1).
+But TL(BOX) is not the same as BOX(2): it is a list of remaining elements, or
+[] if there aren't any more.
+
+Moving around lists using HD and TL appears clumsy and laborious viewed in
+terms of these nested procedure calls. But when used within procedures that
+are designed to manipulate list formats that we as programmers have designed,
+the consistency and simplicity of these two primitive operations becomes more
+attractive, although as we shall see we have much more global ways of
+accessing list contents - the MATCH procedure. Underneath these more powerful
+modes of list processing there is however the basic operations of HD and TL.
+
+The library procedure LAST (actually defined in terms of HD and TL) takes a
+list and produces its last element:
+
+    : last(cupboard) =>
+    ** pillow
+
+For more detail, see:
+
+    R.Barrett A.Ramsay, A.Sloman
+    Pop-11: A practical language for Artificial Intelligence
+    Ellis Horwood and John Wiley, 1985.
+
+-- PROCEDURES AND LISTS ------------------------------------------------
+
+Getting to the bottom of a list by nested calls of TL as in
+HD(TL(TL(CUPBOARD))) looks very clumsy. What would a procedure look like
+which traverses a list printing out each element as it progresses?
+
+    : define traverse(list);
+    :   if  list = [] then
+    :       'finished' =>
+    :   else
+    :       hd(list) =>
+    :       traverse(tl(list))
+    :   endif;
+    : enddefine;
+
+    : traverse(box);
+    ** shoes
+    ** tins
+    ** brushes
+    ** 'finished'
+
+You may find it a little easier to understand the following version, which is
+strictly equivalent. ("/=" means "is not equal to")
+
+    : define traverse(list);
+    :   if  list /= [] then
+    :       hd(list) =>
+    :       traverse(tl(list))
+    :   else
+    :       'finished' =>
+    :   endif;
+    : enddefine;
+
+To see the mechanics of TRAVERSE and in particular how that call of TL(LIST)
+in the ELSE branch works lets use TRACE -
+
+    : trace traverse;
+    : traverse(box);
+    >traverse [shoes tins brushes]
+    ** shoes
+    !>traverse [tins brushes]
+    ** tins
+    !!>traverse [brushes]
+    ** brushes
+    !!!>traverse []
+    ** 'finished'
+    !!!<traverse
+    !!<traverse
+    !<traverse
+    <traverse
+
+TRAVERSE is being called recursively. That is each time the condition for
+completion 'LIST = []' is FALSE, TRAVERSE prints something and then requests
+an execution of TRAVERSE with a shortened (TaiLed) list. Eventually these
+successive shortenings lead to an empty list [] whereupon no new call is
+made, and the whole process 'unwinds' as shown by the '<TRAVERSEs' printed
+out by TRACE.
+
+You can think of each occurrence of '>TRAVERSE' as meaning something like:
+
+    'start a new process executing the TRAVERSE instructions'
+
+It also indicates the input for the process. Meanwhile the PREVIOUS PROCESS
+waits until the new process has finished, as signalled by '<TRAVERSE' aligned
+below. The '!' marks are to help you see the alignment. When the new process
+finishes, the previous one continues from where it was in the 'script', or
+definition, for TRAVERSE.
+
+TRAVERSE is typical of the way that list structure can be combined with a
+recursively organised procedure.
+
+Try TRAVERSE on CUPBOARD. What should it do?
+
+Suppose you were to define TRAVERSE with the two instructions
+
+    : hd(list) =>
+    : traverse(tl(list));
+
+reversed. What would TRAVERSE(BOX) do then? Try this version of TRAVERSE, and
+TRACE it.
+
+A more discriminating version of TRAVERSE would be a procedure which is
+looking for the presence of a particular item on a list
+
+    : define spotit(item, list) -> result;
+    :   if  list = [] then
+    :       false -> result
+    :   elseif hd(list) = item then
+    :       true -> result
+    :   else
+    :       spotit(item, tl(list)) -> result
+    :   endif
+    : enddefine;
+    : spotit("tins", box) =>
+    ** <true>
+
+You should repeat this call of SPOTIT using TRACE. Notice that the value
+supplied for ITEM in this call of SPOTIT is the WORD
+
+    "TINS"
+
+Also, instead of doing its own printing, SPOTIT produces OUTPUT, i.e.
+whatever value is assigned to the variable RESULT.
+
+What would happen if we had written
+
+    : spotit(tins, box) =>
+
+and why?
+
+Sometimes a program needs to know if something is in a list.
+
+    : IF so and so is in such and such THEN ...
+
+This requires the use of a testing procedure which produces a <TRUE>/<FALSE>
+RESULT like SPOTIT, unlike our previous procedures which merely print
+something on the terminal. (Your programs cant see the terminal.) Actually,
+the POP11 system contains a library function MEMBER which behaves like
+SPOTIT, so you can type
+
+    : member ("shoes", box) =>
+
+SPOTIT unlike TRAVERSE 'returns a result' which it leaves on the stack via
+the 'output local' variable RESULT. Returning results in this way is a
+characteristic feature of sound programming style in any language. That is we
+are being quite explicit about the operations performed by a procedure - e.g
+by giving names to the results it produces and stating those names clearly as
+Output Locals. To see what is really going on you can do
+
+    : trace spotit;
+    : spotit("shoes", box) =>
+
+Often a LIST is returned as a result rather than TRUE or FALSE. Thus a
+procedure to produce from a given list a new one not containing a certain
+item, might take this form
+
+    : define delete(item, list) -> result;
+    :   if list =[] then
+    :       [] -> result
+    :   elseif hd(list) = item then
+    :       delete(item, tl(list)) -> result
+    :   else
+    :       [^(hd(list)) ^^(delete(item,tl(list)))] -> result
+    :   endif
+    : enddefine;
+
+Note the use of ^^(...)
+
+    : delete(3, [1 17 3 42 30 3 19])=>
+    ** [1 17 42 30 19]
+
+
+To understand how delete works it is essential to TRACE it:
+
+    : trace delete;
+    : delete(3,[1 17 3 42 30 3 19])=>
+    >delete 3 [1 17 3 42 30 3 19]
+    !>delete 3 [17 3 42 30 4 19]
+    !!>delete 3 [3 42 30 3 19]
+    !!!>delete 3 [42 40 3 19]
+    !!!!>delete 3 [30 3 19]
+    !!!!!>delete 3 [3 19]
+    !!!!!!>delete 3 [19]
+    !!!!!!!>delete 3 []
+    !!!!!!!delete []
+    !!!!!!<delete [19]
+    !!!!!<delete [19]
+    !!!!<delete [30 19]
+    !!!<delete [42 30 19]
+    !!<delete [42 30 19]
+    !<delete [17 42 30 19]
+    <delete [1 17 42 30 19]
+    ** [1 17 42 30 19]
+
+The essence of DELETEs solution of the task lies in the way that it
+constructs the resultant list starting from the [] list that it reaches with
+the last call of
+
+    !!!!!!!>delete 3 []
+
+Remember what we said before about TRACE printing.
+
+    >delete 3 [42 40 3 19]
+
+Means: 'starting a new process with inputs 3 and [41 40 3 19]'.
+
+The previous process is suspended till this one has produced its result,
+which is then used as input for '<>' in the suspended process. The suspended
+process has to remember where it was in the instructions for DELETE, and what
+values it had for any of its local variables, e.g. ITEM, LIST and RESULT.
+
+DELETE is of course deleting ALL occurrences of the ITEM in the LIST offered
+to it, it should perhaps have been called DELETE-ALL. What would a version
+that DELETEs just the first instance of ITEM it finds look like?
+
+Strictly, nothing is deleted from the original list. Rather a new COPY is
+produced, minus the specified item. The original list is unchanged. E.g.
+
+    : [1 2 3 2 1] -> list;
+    : delete(2, list) =>
+    ** [1 3 1]
+    : list =>
+    ** [1 2 3 2 1]
+
+TEACH LISTS; provides more information on LISTS. Examples of list processing
+can also be found in the demos LISTS1, LISTS2, NUMBERS and LISTSUMMARY.
+
+-- LIST PATTERN MATCHING -----------------------------------------------
+
+SPOTIT and DELETE use
+
+    : item = hd(list)
+
+to accomplish their aims. But list representations of more complex situations
+do not exhibit their significant features in terms of single items considered
+in isolation. Rather the norm is one of a context or co-occurence of
+elements. Thus we are much more likely to want to know whether a list
+contains two designated elements occurring in a particular order.
+
+Supposing we have this list
+
+    : [a b c d e] -> x;
+
+A relevant test might be to establish whether it contains B and D occurring
+in that order. Now
+
+    : member("b",x) =>
+    ** <true>
+    : member("d", x) =>
+    **<true>
+
+tell us that both are present i.e.
+
+    : member("b", x) and member("d",x) =>
+    ** <true>
+
+but we know nothing of their relative positions in L nor indeed of their
+intervening or surrounding context.
+
+We can capture this ordering of B and D for example:
+
+    : x(1) = "b" and x(2) = "d"
+
+which specifies that D should immediately follow B in the list. In fact the
+relationship that does obtain in X has the form
+
+    : x(2) = "b" and x(3) = "d"
+
+In this way we can specify any arbitrary patterning of elements in a list
+structure. It will however  be very tedious to try all possible combination
+of pairs of successive numbers. The situation gets even worse if you merely
+want to test whether "D" occurs SOMEWHERE to the right of "B", although you
+don't mind where exactly.
+
+-- THE MATCHER ---------------------------------------------------------
+
+To meet this need there is a procedure called MATCH that tests a given list
+for the presence of some specified pattern. We use it like this:
+
+    : list MATCHES pattern =>
+
+-- DESCRIBING THE SHAPE OF A LIST PATTERN ------------------------------
+
+The B, D example is of course but one of an infinite variety of patternings
+that we might want to look for. So our specification of a pattern has to be
+couched in a suitably descriptive language. The pattern for 'B immediately
+followed by D' would be:
+
+    : [== b d ==]
+
+But the 'B followed somewhere by D' pattern would be specified like this:
+
+    : [== b == d ==]
+
+Where '==' denotes any number of list elements (including no elements). Thus
+all of these lists should meet that specification:
+
+    : [a b c d e]
+    : [b d]
+    : [b a a c d f]
+
+To test a given list, say X, for presence of this specified pattern we'd call
+MATCHES like this
+
+    : x matches [== b == d ==] =>
+    ** <true>
+
+What result would you expect from the following:
+
+    : x matches [a == e] =>
+    : x matches [a == d == e] =>
+
+The pattern specification we've adopted clearly admits of a lot of variation
+X - its a rather sloppy fit: and often that is a useful way of representing
+generality. There are a number of ways in which we can tighten it up, when
+required. We might for example want just one intervening element between B
+and D:
+
+    : x matches [== b = d ==] =>
+    ** <true>
+
+These two symbols == and = are basic descriptors of pattern shape and we may
+think of them as 'Gobbling up' intervening list items. We can call '='
+Gobble-one and '==' Gobble-any.
+
+Gobble-one and Gobble-any help us characterise the linear shape of a pattern.
+We may also want to characterise its structural organisation. For example
+that the first element in the target list must itself be a list - as it is in
+CUPBOARD for example.
+
+    : cupboard matches [[==] blanket ==] =>
+    ** true
+
+And this device may of course be used to dig arbitrarily 'deep' into a list
+structure.
+
+The pattern is then a sort of picture with lots of missing details, of the
+kind of list we are looking for.
+
+-- USING VARIABLES IN A PATTERN SPECIFICATION --------------------------
+
+So far we've described our patterns in very literal terms. i.e. that there
+needs to be a "B" and a "D", or a list etc. In practice the items we want to
+include in our specification may have been constructed by other procedures
+(and as we shall see by procedures that use MATCH). Typically these items
+will be the value of variables. If we write
+
+    : cupboard matches [box blanket ==] =>
+    ** <false>
+
+because the first element of CUPBOARD is not "BOX" but a list which is the
+same as the value of the variable BOX. We need to enrich the pattern
+specification language so as to distinguish between words used literally and
+words used as variable names. We do this with the up-arrow ^ prefix. Thus
+
+    : cupboard matches [^box blanket ==] =>
+    ** <true>
+
+The use of ^ (up-arrow) in the pattern specification here is of course the
+same as that introduced earlier. Thus
+
+    : [box blanket ==] =>
+    ** [box blanket ==]
+
+But
+
+    : [^box blanket ==] =>
+    ** [[shoes tins brushes] blanket ==]
+
+And it is of course only this latter version that matches CUPBOARD. Had the
+value of CUPBOARD been
+
+    ** [shoes tins brushes blanket pillow]
+
+then that MATCH would have failed.
+
+We need to 'strip off' the list brackets of the value of BOX if we are to
+match this new kind of CUPBOARD, and we can do this by using a double
+up-arrow:
+
+    : [^^box blanket ==] =>
+    ** [shoes tins brushes blanket ==]
+
+To illustrate the power of MATCH and the pattern language, consider the
+following defin tion of the procedure MEMBER, and compare it with the
+definition of SPOTIT given earlier:
+
+    : define member(item, list);
+    :   list matches [== ^item ==]
+    : enddefine;
+
+-- RETRIEVING DETAILS OF THE TARGET LIST -------------------------------
+
+Thus far we have merely been concerned to establish whether a particular
+target list meets some pattern specification. And so far that specification
+only cited various list fragments embedded within a context whose precise
+composition was not germane to the recognition of this key configuration.
+
+We may however want to know what that context is, when a match is obtained.
+This is used in many places by the Eliza program which gives you back some of
+what you have typed in.
+
+Thus in recognising the ordered co-occurrence of "B" and "D" in the list
+
+    : [a b c d e] -> x;
+
+we might want to be 'told' what the value of the intervening list element(s)
+is (are).
+
+To set a variable say P to take on the value of  single list element prefix
+the variable name with '?' Thus
+
+    : vars p;
+    : x matches [== b ?p d ==] =>
+    ** <true>
+    : p=>
+    ** c
+
+Similarly to set the variable to be some sequence of list elements use ?? Thus
+
+    : vars q;
+    : x matches [a ??q d ==] =>
+    ** <true>
+    : q=>
+    ** [b c]
+
+Think of "?" as "get ONE element" and "??" as get ANY elements", by analogy
+with "=" and "==". Try the following, which gives LIST a new value, then uses
+it:
+
+    : [i like talking to you] matches [i ??list you] =>
+    ** <true>
+    : [you ^^list me?] =>
+    ** [you like talking to me?]
+
+This is typical of the sort of trick used by Eliza.
+
+Whenever the MATCH fails because the specified pattern, e.g. [A == D ==], is
+not that of X, the queried variables may have their values altered as part of
+the process of determining that the match fails.
+
+The basic concept of MATCHing is that of an identity between some element or
+elements of the target list and elements of the pattern specification. We can
+generalise this by requiring that a target element have some specified
+PROPERTY.
+
+For example in the ELIZA world, the occurrence of a word indicating reference
+to the family e.g. SON, FATHER, MOTHER, BROTHER etc in an input sentence is
+an important response-determining cue. To detect that set membership we can
+use a procedure as an affix to a queried variable in the pattern
+specification. Thus
+
+    : vars x;
+    : [my father loved me] matches [== ?x:family ==] =>
+    ** <true>
+
+where FAMILY is a (previously-defined) procedure that might take the form
+
+    : define family(word) -> result;
+    :   member(word, [son father mother brother]) -> result
+    : enddefine;
+
+You can gain experience with MATCH ?, ??, ^, ^^, and variables by extending
+the Eliza program, as explained in the ELIZARULES demo.
+
+-- SUMMARY OF MATCH NOTATIONS ------------------------------------------
+
+Basic format:
+
+    list MATCHES pattern
+
+Pattern specification can contain:
+
+    1) [A B]
+        literal words to be checked in the target list
+
+    2) =
+        The 'Gobble-one' spacer
+
+    3) ==
+        The 'Gobble-any' spacer
+
+    4) ^A
+        Check target list for occurrence of a single element that has same
+        value as variable A.
+
+    5) ^^A
+        A holds a list of elements that must be same as a sequence of
+        elements in target list.
+
+    6) ?A
+        Set A to have value of single element in the matching target list.
+
+    7) ??A
+        Set A to have value of sequence of elements in matching target list.
+
+    8)  ?A:TEST
+        Only allow A to match an element such that TEST(A) is TRUE.
+
+    9) ??A:TEST
+        Like (8), but the TEST is applied to a LIST of successive elements
+        from the target list.
+
+-- MATCHing on a corpus of lists - the DATABASE concept ---------------
+
+The description of some task situation e.g. a fragment of 'the Blocksworld'
+or a simple pictorial pattern may take the form of a large list corpus. The
+program SEEPICTURE builds up just such a list representation of a PICTURE
+pattern to provide a basis for recognition. The ELIZA program makes heavy use
+of this kind of representation to store its 'conversational rules' - i.e. the
+patterns that it will look for in your remarks to it.
+
+-- ADDING AND REMOVING DATABASE ITEMS ----------------------------------
+
+We can build up a DATABASE using ADD
+
+    : vars database;
+    : [] -> database;
+    : add([a]);
+    : add([b]);
+
+or more concisely using ALLADD
+
+    : alladd([[c] [d]]);
+
+The items will be ordered in the DATABASE consistently with the order in
+which they were added.
+
+    : database =>
+    ** [[d] [c] [b] [a]]
+
+that is the last shall be first! This is not a property of ADD and ALLADD
+that applications of the DATABASE would normally exploit.
+
+Complementing ADD and ALLADD we have REMOVE and ALLREMOVE.
+
+    : remove([c]);
+    : database =>
+    **[[d] [b] [a]]
+
+The order of items in a call of ALLREMOVE is not important i.e. it does not
+need to reflect the ordering of the DATABASE
+
+    : allremove([[a] [b] [d]]);
+    : database =>
+    ** []
+
+The procedure REMOVE will remove at most one item from the database, even if
+it is given a pattern which matches several. Thus REMOVE([==]); instead of
+removing everything, removes just one item. Moreover, REMOVE will generate a
+MISHAP if it doesn't find one item to remove. Similarly, ALLREMOVE will
+generate a mishap if it can't remove something for every element of the list
+of patterns given to it as argument.
+
+The procedure FLUSH is provided without these restrictions. FLUSH deletes
+everything in the database that matches its argument, but if there is nothing
+that matches, then FLUSH does nothing!
+
+The argument given to FLUSH is a pattern specification, that is FLUSH carries
+out a MATCH to determine the list items that it will DELETE. It is however
+very powerful in its action... it removes ALL the matching DATABASE entries.
+Thus with the DATABASE [[D] [C] [B] [A]] the action
+
+    : flush([=]);
+
+clears the DATABASE, thus:
+
+    : database =>
+    ** []
+
+Thus FLUSH([=]) is equivalent in this situation to
+
+    : allremove([[a] [b] [c] [d]]);
+
+Whenever the database contains only one-element lists
+
+    : flush([=]);
+
+will remove them all.
+
+Similarly
+
+    : flush([==]);
+
+will empty the database no matter what is in it, and is therefore equivalent
+to
+
+    : [] -> DATABASE;
+
+-- WHAT WAS REMOVED? ---------------------------------------------------
+
+After using FLUSH or REMOVE the variable IT will hold the item last removed.
+E.g.
+
+    : add([dogs like meat]);
+    : remove([dogs like == ]);
+    : it =>
+    ** [dogs like meat]
+
+The procedure ALLREMOVE, uses the variable THEM instead. This will be a list
+of all the items removed. Similarly, ADD updates IT, and ALLADD records
+things in THEM.
+
+-- FINDING ITEMS IN THE DATABASE ---------------------------------------
+
+Perhaps the most commonly used procedure is PRESENT which takes a pattern and
+starts MATCHing it against every database item. If the match is ever
+successful then the item is returned as the result of PRESENT otherwise the
+result is false.
+
+    : alladd([[a b c d] [d c b a] [a b d c]]);
+    : present([== b ==]) =>
+    ** [a b d c]
+    : present ([== b c]) =>
+    ** <false>
+
+Notice that PRESENT finds the 'first' matching item. PRESENT is frequently
+employed in a conditional e.g.
+
+    IF PRESENT(pattern) THEN action
+
+The 'IF... THEN' construction 'uses up' the value returned before THEN ie. try
+
+    : IF PRESENT([== B ==]) THEN => ENDIF;
+
+This arises because POP11 treats the value returned by PRESENT between "IF"
+and "THEN" as <TRUE> or <FALSE>. For many purposes however we will need to
+know what the matched item is for example to use it in the THEN branch of the
+conditional. For this purpose the DATABASE variable IT is set to have the
+value of the matching item, when PRESENT finds something.
+
+    : if present([== b ==]) then
+    :   it =>
+    :   remove(it);
+    : endif;
+    ** [a b c d]
+
+Which is of course the MATCHed item that PRESENT found. REMOVE has however
+REMOVEd it -
+
+    : database =>
+    ** [[d c b a] [a b c d]]
+
+Note that it found only ONE item, matching the pattern, and removed it.
+FOREACH, explained below, shows how you can search for ALL items matching
+some pattern.
+
+-- RETRIEVING VALUES FROM WITHIN AN ITEM -------------------------------
+
+Since all of the apparatus of MATCH is utilised in those DATABASE Functions,
+PRESENT can be used to set values of appropriately queried variables in the
+pattern specification.
+
+    : vars x;
+    : present([?x b ==]) =>
+    ** [a b c d]
+    : x =>
+    ** a
+
+Notice that if "?" or "??" is used before a word in a pattern, then that word
+should be declared as a variable name. Hence the "VARS X;" above. If the
+variables in patterns are not declared to be local, to the procedures which
+use them, then different procedures can mess each other up. This applies to
+procedures which use MATCH or any of the database operations PRESENT, FLUSH,
+LOOKUP, REMOVE, etc.
+
+We do not always want the matching item. Sometimes we will know that the item
+is present in the DATABASE and want only the value of some fragment of it.
+For this purpose the procedure LOOKUP is provided. It does not return <TRUE>
+or <FALSE> but merely sets the value of queried pattern variables when a
+match is found.
+
+    : lookup([?x b ==]);
+    : x =>
+    ** a
+
+In the event of no match being found an error will result
+
+    : lookup([?x == c]);
+    MISHAP:     LOOKUP FAILURE
+    INVOLVING:  [?X == C]
+    DOING:      LOOKUP
+
+-- Retrieving all the items PRESENT which match a pattern --------------
+
+There will often be a need to find not just one matching item in the
+DATABASE, (or to set the value of queried pattern variable for just one
+matching item) but to find all of them. For this purpose the looping
+construct FOREACH is provided:
+
+    : foreach [== b ==] do
+    :   it =>
+    : endforeach;
+    ** [d c b a]
+    ** [a b c d]
+
+Note that FOREACH is a 'syntax' word (like IF and DEFINE), not a procedure
+name, and hence the pattern specification that follows need not be enclosed
+in round brackets '(' ')'.
+
+Examples of the use of these procedures can be found in the handout TELLME.
+See also TEACH MATCH; TEACH DATABASE; TEACH FOREACH;
+
+-- CHECKING A SET OF PATTERNS AGAINST THE DATABASE ---------------------
+
+Just as ALLADD and ALLREMOVE can be given a list of patterns to add or
+remove, similarly, ALLPRESENT can be given a list of patterns to look for in
+the database. If it finds items for all of them it returns a list of the
+found items (and also assigns it to the variable THEM). Otherwise its result
+is false. E.g. to find a grandson of TOM:
+
+    : alladd([
+    :       [dick father harry]
+    :       [tom father jack]
+    :       [bill father tom]
+    :       [jack father dick]]);
+    : vars x, y;
+    : if allpresent([[tom father ?x] [?x father ?y]]) then
+    :   y =>
+    : endif;
+    ** dick
+    : them =>
+    ** [[tom father jack] [jack father dick]]
+
+For more information on the database procedures see HELP ADD, HELP PRESENT,
+HELP REMOVE, HELP FLUSH and HELP LOOKUP.
+
+In addition to these procedures the POP11 library contains some more powerful
+procedures SCHECK and SCHOOSE, for matching a whole database pattern against
+a database, and indicating whether the match was partially successful, what
+was missing, what was surplus, etc.
+
+
+--- C.all/teach/popnotes
+--- Copyright University of Sussex 1990. All rights reserved. ----------

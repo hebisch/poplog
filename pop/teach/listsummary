@@ -1,0 +1,328 @@
+TEACH LISTSUMMARY                      Aaron Sloman, updated Oct 1986
+
+A PARTIAL SUMMARY OF LIST-PROCESSING IN POP11
+
+CONTENTS - (Use <ENTER> g to access desired sections sections)
+
+ -- CREATING LISTS
+ -- ACCESSING COMPONENTS OF LISTS
+ -- MISCELLANEOUS PROCEDURES
+ -- GLOBAL VARIABLE  (EMPTY LISTS)
+
+-- CREATING LISTS -----------------------------------------------------
+
+>>>> [     ]
+
+These "list constant brackets" may contain text items, i.e  words,
+numbers and strings. E.g.:
+
+       [ a b c d]            is a list of four words
+       [1 cat 2 dog 3 pig ]  is a list of six items.
+       [string 'a short string' 66]
+          is a list with a word a string and a number.
+
+[]  is the empty list. Can also be called NIL.
+
+List brackets may also contain lists,  E.g.:
+
+       [ [1 2]  [3] 4 ] is a list with two lists and one number.
+
+It contains exactly three elements, of which the first contains two.
+
+>>>>  [%    %]
+
+These "decorated list brackets" are used to create lists whose contents
+depend on the values of variables or the results of executing
+procedures. For instance:
+
+       [% 3, cat,  hd(l)  %]
+
+is a list containing the number 3, the value of the variable CAT and the
+first element of L, which must be a list, whereas
+
+       [ 3, cat, hd(l) ]
+
+contains the number 3, the comma, the word "CAT", a comma, the word
+"HD", the word "(", etc.
+
+        [% [% a %], [% b, c%], [% d %] %]
+
+is a list of three lists, whose contents depend on the values of A B C
+and D.
+
+>>>>  ^   (the "up-arrow" or "hat" symbol)
+
+Can be used in place of "%". For example
+
+       [ ^x + ^y is ^(x + y) ]         is the same as
+       [% x, "+", y, "is", x + y %]    and
+       [ %x% + %y% is %x + y% ]
+
+When followed by a variable, "^" means: "use the value of this
+variable". When followed by a parenthesised expression, it means:
+
+   "use the value of the parenthesised expression".
+
+>>>>  ^^  (double "up-arrow" or "hat" symbol)
+
+This is used to merge the contents of a list into an enclosing list.
+Thus:
+
+       [ b c d ] -> list;
+       [a ^list e ] =>
+       ** [a [b c d] e]
+
+       [a ^^list e ] =>
+       ** [a b c d e]
+
+The prefix "^^" can be thought of as "remove the list brackets".
+
+>>>>  ::
+
+This is an operation for joining an element onto an existing list, to
+make a new list, e.g.
+
+       3 :: [4 5 6]     is  a list of four numbers.
+       "cat" :: []      is  the same as [cat]
+       "cat" :: "dog"   will cause an error,
+
+since :: must have a list as its second argument. Notice that
+
+       x :: y
+
+is equivalent to
+
+       [^x ^^y]
+
+The operation :: is easier for the machine, but otherwise has no
+advantage.
+
+>>>>  CONSPAIR
+
+This is a procedure, which can be thought of as equivalent to :: .
+That is
+
+        conspair(x,l)
+is the same as
+        x :: l
+
+The only difference is that the second argument of CONSPAIR need not be
+a list. E.g.
+
+       conspair(3, 4) -> l;
+       l =>
+       ** [3|4]    ;;; note the use of the vertical bar - indicating that
+                   ;;; the second element is not a list
+       tl(l) =>
+
+This now produces an error, because TL insists on a proper list, and a
+pair whose second element is not a pair is not acceptable. The procedure
+BACK has no such qualms.
+
+       back(l) =>
+       ** 4
+
+CONSPAIR is rarely needed in straightforward programs.
+
+>>>>  <>
+
+This is an operator which takes two lists and "concatenates" them to
+produce a new list. The first list is copied, so that the original does
+not have any extra elements added to its end. E.g.
+
+       [cat dog ] <> [pig mouse]
+is the same as:
+       [cat dog pig mouse]
+
+       lista <> listb
+
+means: make a new list containing the elements of LISTA and the elements
+of LISTB.
+
+       [^x] <> l -> l    is the same in effect as
+       x :: l -> l;
+or
+       [^x ^^l] -> l;
+
+But the former is much less efficient, since <> copies the first list.
+Notice that when X and Y are lists:
+
+       x <> y
+
+   is equivalent to
+
+       [^^x ^^y]
+
+The former has no advantages except that it is easier for the machine.
+
+The operator <> can also be used to join two words, two vectors, two
+strings.
+
+>>>>  REV
+
+This is a procedure which takes a list as argument and creates a new one
+containing the same elements in reverse order. E.g.
+
+       rev([a b c])   is   [c b a]
+
+>>>>  MAPLIST
+
+This is a procedure which takes a list and a procedure and applies the
+procedure to every element of the list, finally creating a new list
+containing all the results. E.g.
+
+       maplist(l, identfn)               makes a copy of the list l.
+
+       maplist([cat dog 2 mouse 3 4 ], isword) =>
+       ** [<true> <true> <false> <true> <false> <false> ]
+
+It could have been defined thus, were it not in the system:
+
+       define maplist (l,f);
+         vars x;
+         [% for x in l do f(x) endfor%]
+       enddefine;
+
+Compare the procedure APPLIST.
+
+>>>>  DATALIST
+
+This procedure can be applied to a word, string, or vector. It will
+create a list containing all the elements of the word string or vector.
+The elements of a word or string will be the numbers representing the
+characters in it. (The code for lower case A is 97, for B 98, for Z
+122.) So:
+
+       datalist('abz') and datalist("abz")
+          both give the list [97 98 122]
+
+       maplist([cat dog mouse], datalist) =>
+       ** [ [99 97 116] [100 111 103] [109 111 117 115 101] ]
+
+This produces a list of lists of character codes. (See MAPLIST, above.)
+
+NOTE: strictly, the above codes refer to the LOWER CASE characters.
+
+
+-- ACCESSING COMPONENTS OF LISTS --------------------------------------
+
+>>>>  HD
+
+This procedure takes a list as argument and returns the first element of
+the list. HD(LIST) is equivalent to LIST(1). (See below).
+
+>>>>  TL
+
+This procedure takes a list as argument and returns as its result the
+sublist containing all but the first element. E.g. if L is a list then:
+
+       hd(tl(l))            is the second element
+       hd(tl(tl(l)))        is the third element = l(3)
+
+>>>>  LAST
+
+This library procedure, when applied to a list returns its last element:
+
+       last([a b c d]) =>
+       ** d
+
+Notice that:
+
+       last(x)
+
+is equivalent to:
+
+       x(length(x))
+
+>>>>  Numerical subscripting of lists
+
+In POP11 lists can be treated as procedures which take a number N, to
+get the N'th element of a list. E.g.
+
+       vars l;
+       [a b c d] -> l;
+
+       l(2) =>
+       ** b
+
+       l(3) =>
+       ** c
+
+The N'th element can also be altered by an assignment. Thus to replace
+the third element with the list [THIRD ELEMENT], do:
+
+       [third element] -> l(3);
+       l =>
+       ** [a b [third element] d]
+       l(3) =>
+       ** [third element]
+
+
+-- MISCELLANEOUS PROCEDURES -------------------------------------------
+
+>>>>  LENGTH
+
+This procedure takes a list and counts the elements, returning a number
+as its result. E.g
+
+       length([ 99 a [a b c] d])  is 4
+       length([])                 is 0
+
+>>>>  ATOM
+
+This is a type-testing procedure, which returns TRUE or FALSE as its
+result. IF it is applied to a non-empty list (i.e. a list other than
+[]), its result is FALSE. If it is applied to anything else, e.g. a
+word, a procedure, a string, or [], the result is TRUE. So:
+
+       atom([])        is true
+       atom(99)        is true
+       atom("cat")     is true
+       atom(hd)        is true
+       atom([cat dog]) is false
+       atom(3 :: [])   is false
+
+>>>>  APPLIST
+
+This procedure takes a list and a procedure and applies the procedure to
+every element of the list. (Compare MAPLIST.) E.g.
+
+       applist([ 99 ], isinteger)           yields <true>,
+       applist([ 1 2 a b 3], isinteger)     puts on the stack:
+       <true>,<true>,<false>,<false>,<true>
+
+whereas
+       applist([], f)
+does nothing, whatever procedure F is.
+
+APPLIST could have been defined like MAPLIST (above), but without the
+decorated list brackets.
+
+>>>>  ISPAIR
+
+This is TRUE if applied to a list (other than the empty list) FALSE
+otherwise.
+
+
+-- GLOBAL VARIABLE  (EMPTY LISTS) --------------------------------------
+
+>>>>  NIL
+
+This is a variable provided by the system whose value is the word "[]"
+so that [], NIL, and VALOF("NIL") all refer to the same thing. [] is
+conventionally used to represent the "empty" list, so that if you take a
+list L and then assign TL(L) to L repeatedly, you'll end up with L
+having the value []. Trying to apply HD or TL to [] will produce an
+error ("non-list argument for list procedure, culprit []").
+
+For more on lists see
+    R.Barrett, A.Ramsay, A.Sloman,
+         POP-11: A Practical language for Artificial Intelligence
+         Ellis Horwood and John Wiley, 1985.
+
+Also, try the following TEACH files.
+
+TEACH  * LISTS  *ARROW  *PERCENT * MATCHES  * MOREMATCH  * DATABASE
+TEACH  * SETS
+
+-----<Copyright University of Sussex 1986.  All rights reserved.>-------

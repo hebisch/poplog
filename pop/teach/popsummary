@@ -1,0 +1,765 @@
+TEACH POPSUMMARY                                Aaron Sloman, February 1982
+
+=== PROGRAMMING IN POP11 : BRIEF SUMMARY =============================
+
+This is a summary of the most basic facilities in POP11.
+
+On a first reading, you may prefer to skip the next section, on POP11
+constructs.
+
+--- POP11 CONSTRUCTS -------------------------------------------------
+
+A POP11 program is a piece of text, which may be composed of combinations of
+
+    Declarations  (e.g. variable declarations, procedure definitions).
+    Imperatives   (e.g. assignments ( X + Y -> X), procedure calls).
+    Expressions   (e.g. 3, 99 + X, HD(LIST), HD(TL(LIST)))
+
+Roughly, declarations say how something is to be used, but don't ask the
+computer to do anything yet; while imperatives say do something which
+will produce a change of some kind in the machine or on the terminal;
+and an expression is a sort of name for an entity which is to be
+computed in a manner specified by the expression. So the declaration
+
+    vars fred, x, y;
+
+says that FRED, X and Y are to be used as names of variables. The
+imperative
+
+    add([fido isa dog]);
+
+tells POP11 to put a new list into the DATABASE, whereas the expression
+
+    hd([fido isa dog])
+
+is a name, or referring expression, denoting the first element of the
+list, namely the word "FIDO". A typical place where you'd use an
+expression is on the left hand side of an assignment, e.g.
+
+    hd([fido isa dog]) -> w;
+
+or in a sequence of expressions representing the input to a procedure,
+e.g.
+
+    last(database) matches hd(patternlist)
+
+which has two expressions denoting inputs to the procedure MATCHES. The
+whole thing can be used to denote the result of MATCHES, i.e. TRUE or
+FALSE, and is therefore also an expression.
+
+Imperatives and declarations are separated by semi-colons ';' (or the
+print-arrow '=>' or '==>', whereas expressions (e.g. inputs to a
+procedure) are separated by commas ','. An imperative does not need a
+semi colon immediately before a closing bracket, such as ')',
+'ENDDEFINE', 'ENDIF'. (Some people would call declarations a type of
+imperative.)
+
+Sometimes you cannot tell from its form whether something is an
+expression or an imperative. That depends on context. Thus, a
+conditional (see below) may be an imperative, as in:
+
+      if x > y then x -> max else y -> max endif;
+
+which specifies which of two things to DO, whereas in
+
+      if x > y then x else y endif -> max;
+
+the whole thing is an imperative, whereas the bit between IF and ENDIF
+is an expression which denotes either the value or X or the value of Y,
+depending on which is greater. The conditional expression (the bit
+between IF and ENDIF) says which of two things is to be DENOTED, rather
+than which of two things is to be DONE.
+
+Looping constructs (e.g. using UNTIL, WHILE, FOR, REPEAT, FOREACH,
+FOREVERY, - see below) are normally imperatives but can also sometimes
+be used as expressions, like conditionals.
+
+There are several kinds of 'primitive' expressions in POP11, e.g.
+
+    Identifiers   (X, MATCH, LIST, etc - used as names of something else)
+    Quoted words ("X", "MATCH", "LIST" - used to refer to themselves)
+        Identifiers and quoted words are entered in a dictionary to
+        prevent the same one being created twice.
+    Strings of characters ('X', 'A LONGER STRING', '19827364&!#&%$$')
+        These are partly like words, but are not in the dictionary, so
+        two different strings may have the same characters.
+    Numbers (integers: 3, 999, reals: 3.1415926, 3.0,
+        binary numbers: 2:10111001, octal numbers:  8:77315)
+
+An important type of expression in POP11 which is not primitive is a
+LIST expression, which may contain expressions of other sorts, e.g.
+
+      [ a list of five words ]
+      [two words [a list] 'a string' 99 %x + y%]
+
+(for more on list expression see TEACH * LISTSUMMARY).
+
+Another type, used when it is important to save space, is the VECTOR,
+which is a one-dimensional array of objects, e.g.
+
+      {a vector with five words and 99 [a list] 'a string'}
+
+Notice that 'curly' brackets are used for vectors, square brckets for
+lists.
+
+This is not a complete list of types of expressions, nor is it a
+complete list of types of objects which POP11 programs can refer to. The
+rest of this document elaborates on these ideas, indicating the main
+types of declarations, imperatives and expressions in POP11.
+
+--- ARITHMETIC -------------------------------------------------------
+
+The following operations are available
+
+    +   add two numbers
+    -   subtract two numbers, or negate one number.
+    *   multiply two numbers
+    **  exponentiation: e.g. A ** 3 means A*A*A i.e. A cubed.
+    /   divide first number by second
+    //  divide first number by second, produce
+        remainder and quotient.
+
+    >   test two numbers: TRUE if first greater than second.
+    <   test two numbers: TRUE if first less than second.
+    >=  test two numbers: TRUE if first greater than or
+        equal to second.
+    =<  test two numbers: TRUE if first less than or
+        equal to second.
+
+    X div Y returns the number of times Y goes into X. Both integers.
+    X rem Y returns the remainder on dividing X by Y.
+
+For more information see HELP * MATH.
+
+Most of the above are 'binary' operations, and can be used to form an
+expression by being combined with two expressions representing numbers,
+e.g.
+
+    x + y
+    99 > (x + y)
+    (x + y) * (99 - z/3)
+
+--- EQUALITY TESTING -------------------------------------------------
+
+    ==  test any two objects. TRUE if they are identical.
+
+    =   test any two objects. TRUE if they are identical,
+        OR if they are of the same type with the same elements.
+
+E.g.
+
+    [a b c] == [a b c]  is false, since they are two lists
+    [a b c] =  [a b c]  is true.
+    'a string' == 'a string'    is false, but
+    'a string' = 'a string'     is true
+
+
+Since words are standardised in the dictionary, both the following are
+TRUE:
+
+    "cat" == "cat" and  "cat" = "cat"
+
+Writing two expressions on either side of an equality operation produces
+a new expression, which denotes a truth-value, TRUE or FALSE.
+
+(For more information on = se HELP * CLASSES).
+
+The operation MATCHES provides more sophisticated facilities for
+matching lists against a partially specified pattern. It is used by the
+database procedures, ADD REMOVE PRESENT LOOKUP FLUSH and FOREACH. See
+TEACH * POPNOTES for details.
+
+--- THE STACK --------------------------------------------------------
+
+Procedures in POP-11 get their arguments from the user stack, and leave
+their results on the stack. Also the assignment arrow "->" (see below)
+takes an item off the stack. For more on the stack see TEACH * STACK.
+
+--- PRINT-ARROW, FOR PRINTING OUT RESULTS ----------------------------
+
+   => (ordinary print arrow)  ==> (pretty-print arrow)
+
+Examples:
+
+    33 + 66 =>
+    ;;; print sum of 33 and 66. Output is preceded by two asterisks.
+    ** 99
+
+    234 + 22  >  33 * 66  =>    ;;; is 234 + 22 bigger than 33 times 66?
+    ** <false>
+    x + 5 < y =>                ;;; is the sum of x and 5 less than y?
+                                ;;; x and y should have numbers as values.
+    99 + 5 = 95 + 9  =>         ;;; is 99 + 5 equal to 95 + 9?
+    ** <true>
+
+    x = y  =>                   ;;; does x have the same value as y?
+    x =>                        ;;; print out the value of x.
+    10 // 3 =>                  ;;; prints out remainder and quotient
+    ** 1 3
+    [a [nested list of several words] and [another nested list
+               of several words] too long to print easily] =>
+
+When lists are deeply nested the printout from => can be a little
+confusing, so it is then best to use ==> instead.  You can in fact
+always use '==>'.
+
+Note that => or ==> can be used to terminate an imperative without a [
+semi-colon.
+
+--- DECLARING VARIABLES ----------------------------------------------
+
+Type VARS then variables, separated by commas, then semi-colon. E.g.
+
+    vars list1 list2 x y z;     ;;; this declares five variables.
+
+Variables may be declared locally, in a procedure, or globally.
+Variables may be used without being declared. This is equivalent to
+declaring them globally, except that POP11 prints out a warning message.
+
+(More complex declarations are available for identifiers to be used as
+macro names or infix operators.)
+
+-- ASSIGNMENTS. (FROM LEFT TO RIGHT IN POP11) -----------------------
+
+    ->   assign to, or "goes to"
+
+E.g. - to give the variable X the value 33 do:
+
+    33 -> x;
+
+to give the variable Y twice the value of X do:
+
+    x + x -> y;
+
+or
+
+    (x + x) -> y;
+
+to assign a list of numbers to LIST1 do something like
+
+    [ 1 2 3 4 5 ]  -> list1;
+
+To assign a list of words to LIST2
+
+    [cat dog mouse elephant] -> list2;
+
+To assign a list like LIST1 but in reverse order to X, do:
+
+    rev(list1)  ->x;
+    x =>
+    ** [5 4 3 2 1]
+
+Note: "->" can also be used to define "output locals" in procedures.
+See TEACH * STACK for more on assignment.
+
+-- THE MATCHER ARROW "-->" ---------------------------------------------
+
+This can be used to check that a list has a certain format:
+
+    list --> [junction == ];
+
+checks that LIST starts with "JUNCTION". If not, an error occurs. It can
+also be used to decompose a list.
+
+    list --> [?first ?second ??rest];
+
+causes an error if LIST has fewer than two elements, otherwise gives
+FIRST the first element, as its value, SECOND the second element, and
+REST a list containing all the remainder.
+
+-- DEFINING PROCEDURES ------------------------------------------------
+
+Format for a procedure definition:
+
+    define
+        then <name of procedure>
+        then <formal parameters in parentheses, separated by commas>
+        then semi-colon
+        then action to be performed
+            (may include conditionals, loops, etc.)
+        then
+    enddefine;
+
+
+Example - a procedure, named DOUBLESUM which takes two numbers, and
+produces a new number got by doubling the sum of the two.
+
+    define doublesum (num1, num2);
+        2 * (num1 + num2)
+    enddefine;
+
+Another example - a procedure named SQUARE which will take a number, called
+SIDE in the procedure, and will draw a square of the appropriate size:
+
+    define square (side);
+        repeat 4 times
+            draw(side);
+            turn(90);
+       endrepeat;
+    enddefine;
+
+This assumes that the procedures DRAW and TURN have been defined
+previously. (They are provided the in 'turtle' library package.
+
+NOTE: see also 'output locals' below
+For more details see HELP * DEFINE, and REF * SYNTAX.
+
+-- EXECUTING (CALLING, RUNNING, APPLYING) A PREVIOUSLY DEFINED PROCEDURE --
+
+    square(5);
+
+I.e.: execute the procedure square with 5 as argument. i.e. side gets
+the value 5.
+
+    doublesum(3,99) =>
+
+I.e.: execute the procedure doublesum, with 3 and 99 as arguments. I.e
+NUM1 gets the value 3 and NUM2 the value 99. The result is printed out
+by =>
+
+    doublesum(4,60) -> x;
+
+i.e. as before, but assign the result to x.
+
+-- OUTPUT LOCALS OF A PROCEDURE ---------------------------------------------
+
+If a procedure is to return one or more results, it can be given OUTPUT
+LOCALS.
+
+For example, here is a procedure which takes a list of numbers and
+produces the sum of all the numbers, and their average, i.e. two
+results. The two results are left on the stack when the procedure exits.
+
+    define stats(numlist) -> sum -> average;
+    vars num;
+        length(numlist) -> num;
+        0 -> sum;
+        until   numlist == [] do
+            hd(numlist) + sum -> sum;
+            tl(numlist) -> numlist
+        enduntil;
+        sum/num -> average
+    enddefine;
+
+    vars s a;
+    stats([ 1 3 5 9 ]) -> s -> a;
+    s =>
+    ** 18
+    a =>
+    ** 4.5
+
+Output locals can be assigned to anywhere in the procedure. When the
+procedure finishes, the values of the output locals are left on the
+stack. In the example they are then taken off the stack, after the
+procedure STATS has finished, and assigned to A and to S.
+
+-- LOOPS: INSTRUCTIONS TO DO SOMETHING REPEATEDLY ----------------
+
+Several looping constructs are provided.
+
+Where the word DO is used, the word THEN would suffice. The two words are
+treated the same by the POP-11 system; use which ever looks prettier!
+
+    until <condition> do <action> enduntil;
+
+This means, check if the <condition> is true, and if not keep on
+repeating the <action> until it becomes true. The condition is tested
+again each time after <action> is done. For example, to print out all
+the numbers from 3 to 99 do:
+
+    vars num;
+    3 -> num;
+    until num > 99 do
+        num =>
+        num + 1 -> num;
+    enduntil;
+
+To print out the words "THE" "CAT" "SAT" "ON" "THE" "MAT", you could
+make a list of the words, then keep printing out elements of the list
+and chopping one off until the list is [], thus:
+
+    vars list;
+    [the cat sat on the mat ]  -> list;
+    until list = [] do
+        list(1) =>      ;;; print first element
+        tl(list) -> list;
+    enduntil;
+
+ ----------------------------------------------------------------
+
+     repeat <number> times <action> endrepeat;
+
+After the word REPEAT you can have a number, e.g. 4, or a variable whose
+value is anumber, e.g. REPEAT N TIMES... or a more complex expression
+which calculates a number, e.g. REPEAT 66+53 TIMES....
+
+The <action> will be done the specified number of times.
+
+Example: to print out  10 blank lines, do
+
+      repeat 10 times pr(newline) endrepeat;
+
+See also the definition of procedure SQUARE, above.
+
+For indefinite iteration do
+
+      repeat forever <action> endrepeat;
+
+(interrupt with CTRL-C)
+
+(See HELP * LOOPS for more on loops and interrupting them)
+
+ -----------------------------------------------------------------------
+
+     while <condition> do <action>  endwhile;
+
+This means, keep on doing the <action> over and over again, so long as
+the condition remains TRUE. E.g. to print  out positive integers from 66
+in descending order do
+
+    vars num;
+    66 -> num;
+    while num > 0 do
+        pr(num);
+        num - 1 -> num;
+    endwhile;
+
+--------------------------------------------------------------------------
+
+   for <initiate> step <step> till <condition> do
+      <action>
+   endfor;
+
+This is equivalent to:
+
+    <initiate>;
+    until <condition> do <action>; <step> enduntil;
+
+In other words, do the initialisation, then, until the condition
+evaluates to TRUE, repeatedly do the action followed by the step.
+
+For example, to print out all the numbers from LO to HI, separated by
+spaces:
+
+    for lo -> x step x + 1 -> x till x > hi do
+        pr(x);
+        pr(space)
+    endfor;
+
+N.B. The 'step' is not done until after the 'action'.
+
+To apply the procedure FOO to every element of the list [A B C D];
+
+    for [a b c d] -> l step tl(l) -> l till l = [] do
+        foo(l(1))
+    endfor;
+
+ ----------------------------------------------------------------
+
+    for x in list do <action> endfor;
+
+X will take on as its value the first element of LIST, then the second
+element, then the third, etc. Each time the <action> may be performed on
+X.
+
+  ----------------------------------------------------------------
+
+    for l on list do <action> endfor;
+
+Here, the first time the <action> is done L will refer to the whole
+LIST. The second time it will refer to the TAIL of the list (i.e. a list
+of all but the first element). The next time a still shorter list, and
+so on. E.g.
+
+    for l on [a b c] do
+        l =>
+    endfor;
+    ** [a b c]
+    ** [b c]
+    ** [c]
+
+    for x from <number> by <number> to <number> do
+        <action>
+    endfor;
+
+e.g. to print out numbers from 2 to 30 going up in steps of 7
+
+      for x from 2 by 7 to 30 do  x => endfor;
+
+-- ITERATION OVER THE DATABASE --------------------------------------
+
+    foreach <pattern> do <action> endforeach;
+
+For example, to print out every item in the database representing
+something blue:
+
+    vars x;
+    foreach [??x is blue] do
+        x ==>
+    endforeach;
+
+Inside the <action> the variable IT is available to represent the
+database item which has matched the pattern. E.g. to make a list of all
+the blocks:
+
+      [% foreach [??x isa block] do
+            it
+         endforeach
+      %] -> blocks;
+
+Each time round the value of IT is left on the stack and the [%...%]
+brackets make a list of all of them.
+
+FOREACH can be followed by IN to specify a list other than DATABASE to search
+in, i.e.
+
+    foreach <pattern> in <list> do <action> endforeach;
+
+
+FOREVERY can be used for multiple patterns, e.g.
+
+    forevery [[?x isa block] [colour ?x ?col]] do
+        [^x is a ^col block] =>
+    endforevery
+
+-- CONDITIONALS. THESE CAN HAVE SEVERAL FORMS ------------------
+
+All the <conditions> in what follows should be expressions which evaluate to
+TRUE or FALSE.
+
+(1) IF <condition> THEN <action> ENDIF;
+
+(2) IF <condition> THEN <action1> ELSE <action2> ENDIF;
+     if the <condition> is true, then <action1> will be executed,
+     otherwise <action2> will be executed.
+
+(3) IF <condition1> THEN <action1>
+    ELSEIF <condition2> THEN <action2>
+    ELSEIF <condition3> THEN <action3>
+    ELSEUNLESS <condition4> THEN <action4>
+    .............
+    .............
+    ELSE <default action>
+    ENDIF;
+
+This says try <condition1> then <condition2> etc in turn until an ELSEIF
+condition is found which is TRUE, or an ELSEUNLESS condition is found
+which is FALSE. If either is found, execute the corresponding <action>.
+If none of the conditions comes out TRUE then do the thing following
+ELSE, i.e. <default action>.
+
+Note that in an imperative you don't have to have the ELSE <default
+action> bit. Though you must have it in an expression, for an expression
+must denote something whatever the conditions. You can include as many
+ELSEIF clauses as you like.
+
+  (4)   UNLESS <condition> THEN  <action> ENDUNLESS;
+       this is equivalent to:
+       IF NOT(<condition>) THEN <action> ENDIF;
+
+UNLESS can also have ELSEUNLESS and ELSEIF and ELSE clauses.
+
+Note: the words NOT, AND and OR are available for use in formulating complex
+conditions. E.g.
+
+    if <condition1> or (<condition2> and not(<condition3>))
+
+-- EXAMPLES ------------------------------------------------------------
+
+To test whether the value of X is bigger than the value of Y, and print
+out the bigger value do:
+
+    if x > y then
+        x =>
+    else
+        y =>
+    endif;
+
+Compare:
+
+    if x > y then
+        x =>
+    elseif y > x then
+        y =>
+    else
+        "same" =>
+    endif;
+
+    if 2 < x and x < 6 then
+        true
+    else
+        false
+    endif =>
+
+Note that the last example is exactly equivalent to:
+
+      2 < x and x < 6  =>
+
+If LIST1 and LIST2 are two lists and you want to print out the one which
+is shorter you could do:
+
+    if length(list1) < length(list2) then
+        list1
+    else
+        list2
+    endif =>
+
+If N and M are two numbers, and you wish to assign the bigger one to the
+variable MAX then do:
+
+    if m > n then
+        m
+    else
+        n
+    endif -> max;
+
+--- VECTORS ----------------------------------------------------------
+
+This is a data structure made of some number of elements, stored
+consecutively in the memory of the computer, unlike lists, which are
+chains of items, where links in the chain may be located in very
+different places. To create a vector you can use the brackets { .... }
+e.g.
+
+    {3 cat [a list] 99 }
+
+is a vector containing two numbers, a word and a list. If you need a
+vector to contain the values of some variables, or the result of some
+computation, use {% .... %} e.g.
+
+    {% "cat", hd(list), x+y, list %}
+
+Warning, in many ways vectors are like lists (though they take up less
+space). They are not the same as lists however. HD and TL cannot be
+applied to them. "^", "^^" and MATCHES can be used with VECTORS as well
+as with LISTS.  However "?" and "??" do not work for vectors with
+MATCHES. (See HELP * MATCHES)
+
+To access an element of a vector, use a numerical index. E.G.
+
+    {a cat} -> x;
+    x(2) =>
+    ** cat
+
+For efficiency the procedure SUBSCRV is also available. It takes a
+number and a vector and returns (or updates) the corresponding element
+of the vector.
+
+Vectors can be concatenated like lists using <> .
+
+For more details see REF * VECTORS. Users can define their own classes
+of vectors. See HELP * VECTORCLASS.
+
+-- STRINGS (Character vectors) -----------------------------------------
+
+A string is a special kind of vector containing character codes, stored
+compactly.
+
+String constants may be typed in between string quote marks, e.g.
+
+    'A string with letters and spaces' -> string;
+
+If the string is to extend over several lines, then a backslash
+character, "\" must appear at the end of each line of the string, e.g.:
+
+    'This is the first line\
+    and this is the second' -> string;
+
+Alternatively, you can insert a newline character into the string thus:
+
+    'This is the first line \nand this is the second' -> string;
+
+I.e. "\n" inserts a newline. Similarly "\'" inserts a string quote,
+"\b", inserts a back-space character, "\t" inserts a tab.
+
+Strings can be concatenated using the infix operation ><, e.g.
+
+    string1 >< string2  -> string3;
+
+will assign to STRING3 a string formed by joining the strings referred
+to by STRING1 and STRING2. The arguments of >< don't have to be strings.
+They can also be words or numbers, but the result will always be a
+string. So, if the value of X is an integer, to create a string made of
+the corresponding characters, concatenate it with the empty string thus:
+
+    x >< ''  -> numstring;
+
+Normally strings are printed out without their quote marks.
+
+The elements of a string are integers representing character codes. They
+can be accessed by numerical indexing, e.g.
+
+    'cat' -> x;
+    x(2) =>
+    ** 97
+
+(assuming its a lower case 'a').
+
+The procedure SUBSCRS, which takes a number and a string, is available
+for more efficient accessing and updating of string elements.
+
+See HELP * STRINGS for more details.
+
+-- SWITCH STATEMENTS ---------------------------------------------------
+
+POP11 provides a command GO_ON which can be used thus
+
+    go_on <numerical expression> to <label1> <label2> <label3> ...<labeln>;
+
+The expression must evaluate to a number in the range 1 to N, if N is
+the number of labels. The labels must be repeated elsewhere in the
+procedure, followed by colons. For instance, the following will
+translate numerals:
+
+    define trans(num);
+        go_on num to la lb lc ld;
+        la:  "one" ; return;
+        lb: "two" ; return;
+        lc: "three" ; return;
+        ld: "toobig";
+    enddefine;
+    trans(2) =>
+    ** two
+
+A GO_ON instruction may end with ELSE <default label> ; See HELP *
+GO_ON.
+
+-- TRACING -------------------------------------------------------------
+
+To trace some procedures, type TRACE, followed by the names of the
+procedures. example:
+
+      trace square doublesum;
+
+will cause the two procedures to be traced whenever they are executed.
+UNTRACE is used to undo tracing, e.g.
+
+      untrace square doublesum;
+
+--- OPERATING SYSTEM COMMANDS ----------------------------------------
+
+Commands can be given to the operating system by preceding them with the
+operating system prompt, for example on a VMS system DCL commands can be
+given by typing the dollar as the first symbol on the line, e.g.
+
+    $ SHOW TIME
+
+or
+    $ DIR *.P
+
+-- FURTHER INFORMATION ----------------------------------------------------
+
+HELP * HELPFILES will give information about the main information files
+in the *LIBRARY.
+
+TEACH * LISTSUMMARY gives more information on LISTS.
+See also HELP * LISTS.
+
+TEACH * POPNOTES summarises information on the MATCHER and DATABASE. See
+also TEACH *  MATCHES and *DATABASE.
+
+Note: POP11 is a lower-case language. Identifiers may use upper case to
+prevent clashes. So
+      vars cat, Cat;
+
+declares two different variables.

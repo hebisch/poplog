@@ -1,0 +1,500 @@
+TEACH PROGLECT6                                 Aaron Sloman 22 Oct 1996
+                                                        Updated Nov 2000
+
+Previous lectures are summarised as teach files, with examples which you
+can run.
+
+    TEACH PROGLECT1
+    TEACH PROGLECT2
+    TEACH PROGLECT3
+    TEACH PROGLECT4
+    TEACH PROGLECT5
+
+This file is about searching and some of the properties of searching
+problems.
+
+See TEACH * TOWER, TEACH * SEARCHING, TEACH * PRBRIVER
+
+CONTENTS
+
+ -- Towards understanding search.
+ -- Different kinds of search
+ -- a. Linear search through a pre-exsiting ordered set
+ -- b. Linear search through an ordered set created on demand.
+ -- c. Searching a branching network
+ -- The "tower" problem
+ -- The tower search space
+ -- Getting Pop-11 to solve the problem
+ -- -- sumlist
+ -- -- random_subset(inlist)
+ -- -- random_solve_tower
+ -- -- nextstates
+ -- -- solve_tower
+ -- Problems in searching
+ -- Using factorial to illstrate the effect of permutations
+ -- An example of searching in a learning system: TEACH FINGER
+
+-- Towards understanding search. --------------------------------------
+
+A great deal of AI is about search. Some involves searching using symbol
+manipulating programs. Some involves searching with neural nets. Some
+involves searching using genetic or evolutionary algorithms. But
+searching is everywhere, and unavoidable. The most you can do is try to
+contain or control it.
+
+For an introduction to some basic ideas about search
+
+    Start work on TEACH TOWER
+        If you are very short of time, skip the random problem solver
+
+    If you have extra time, then go on to TEACH SEARCHING, which
+    generalises the techniques in TEACH TOWER
+
+
+
+-- Different kinds of search ------------------------------------------
+
+-- a. Linear search through a pre-exsiting ordered set
+
+    Searching a list
+
+        for item in list do
+            if ... then
+                ... item ....
+                quitloop()
+            endif
+        endfor
+
+    Searching a database
+
+        foreach pattern do
+            if ... then
+                ... item ....
+                quitloop()
+            endif
+        endfor
+
+
+-- b. Linear search through an ordered set created on demand.
+
+    E.g. finding pairs of numbers satisfying a test
+
+
+    vars x,y;
+
+    for x from 0 by 3 to 100 do
+        for y from 0 by 5 to 100 do
+
+            if .... .[^x ^y] then .....
+            quitloop(2)
+        endfor
+    endfor
+
+
+            0       3       6       9       12 ....
+      0    [0 0]   [3 0]   [6 0]   [9 0]
+      5    [0 5]
+     10
+     15
+
+etc.
+
+
+-- c. Searching a branching network
+
+    c.1 pre-existing (e.g. a list of lists of lists)
+
+    c.2 constructed as required
+            (e.g. solutions to the tower problem)
+            (e.g. finding a parse tree. See TEACH GRAMMAR)
+
+
+
+-- The "tower" problem ------------------------------------------------
+
+Find a combination of blocks from a collection of different sizes, in
+order to form a tower of exactly a specified height.
+
+PROBLEM NUMBER      BLOCK SIZES            HEIGHT
+    1               [1 1 2 3 4]             8
+
+    2               [1 4 7 9 11 23]         6
+
+    3               [7 15 11 3 9 22]       47
+
+    4               [3 3 3 3 3 3 3 3 3]    13
+
+
+
+-- The tower search space ---------------------------------------------
+
+Extract from TEACH TOWER
+
+A picture of the "solve_tower" search tree for inlist [6 5 7 4]
+
+Here is a part of the search tree. Try to complete it. Some of the node
+numbers have been left out, and replaced by "?". Try inserting all node
+numbers in a sequence corresponding to a depth first search as described
+above.
+
+
+                            (start node)
+                                {0}
+                          [] [6 5 7 4]
+                                = 0
+                                 |
+                                 |
+      *------------------*------------------*------------------*
+     {1}                {?}                {?}                {?}
+     [6] [5 7 4]        [5][6 7 4]         [7][6 5 4]      [4][6 5 7]
+     = 6                = 5                = 7             = 4
+     |                  |                  |               |
+     |             *----*----*        *----*----*     *----*----*
+     |            {?}  {?}  {?}      {?}  {?}  {?}   {?}  {?}  {?}
+     |                 <..........missing subtrees............>
+  *------------*------------*
+ {2}          {7}          {?}
+[6 5] [7 4]  [6 7][5 4]   [6 4][5 7]
+= 11          = 13         = 10
+   |        <missing subtrees>
+   |
+ *-------------*
+{3}           {5}
+[6 5 7][4]    [6 5 4][7]
+= 18          = 15
+ |             |
+{4}           {6}
+[6 5 7 4][]   [6 5 4 7][]
+= 22          = 22
+
+
+-- Getting Pop-11 to solve the problem --------------------------------
+
+-- -- sumlist
+
+For the computer to solve this we require some procedures
+to perform subtasks.
+
+define sumlist(numlist) -> total;
+    ;;; Given a list of numbers return a number which is the sum
+    ;;; of all the numbers in the list.
+
+    ;;; Initialise the output local to 0
+    lvars total = 0;
+
+    ;;; Repeatedly add the next number from the list to total.
+    ;;; Iterate over the list, using "number" as the "loop variable"
+
+    lvars number;
+    for number in numlist do
+
+        ;;; use number and the previous value of total to get a new
+        ;;; number to assign to total
+
+        number + total -> total
+
+    endfor;
+
+enddefine;
+
+/*
+sumlist([]) =>
+sumlist([2 3 4]) =>
+sumlist([ 2 4 7 8]) =>
+*/
+
+
+-- -- random_subset(inlist)
+
+;;; We can start by trying a random searching method
+
+define random_subset(inlist) -> sublist;
+
+    ;;; Build a list of things randomly chosen to be left on the stack
+    lvars item;
+    [%
+        for item in inlist do
+            if random(100) > 50 then item endif
+        endfor
+
+    %] -> sublist
+
+enddefine;
+
+/*
+
+random_subset([1 2 3 3 4 2 5 ]) =>
+
+*/
+
+-- -- random_solve_tower
+
+define random_solve_tower(inlist, target) -> outlist;
+
+    ;;; This local variable will be needed below:
+    lvars testlist;
+
+    repeat
+        ;;; generate a random subset
+        random_subset(inlist) -> testlist;
+
+        ;;; Do a little "trace" printing to show what's happening
+        [Testing the list ^testlist] =>
+
+        ;;; Check if the solution has been found.
+        if sumlist(testlist) = target then
+            [Eureka : found the solution ^testlist] =>
+
+            ;;; Assign the answer to the output local variable.
+            testlist -> outlist;
+
+            ;;; Exit this procedure, and "return" to the previous program.
+            return()
+        endif;
+    endrepeat;
+enddefine;
+
+/*
+    ;;; Try each several times
+    random_solve_tower([3 5 7], 12) =>
+    random_solve_tower([2 2 2 2 2 2 2], 8) =>
+    random_solve_tower([2 2 2 2 2 2 2], 11) =>
+*/
+
+
+-- -- nextstates
+
+define nextstates(this_state) -> newalternatives;
+    ;;; Given a state, produce a list of successor states.
+    ;;; Each state is a list containing a sofar list and an available list.
+
+    ;;; Each successor state adds one item from the available list to
+    ;;; the original sofar list to give a the new sofar list.
+    ;;; The rest go into a new available list.
+
+    ;;; Five pattern variables are needed, for use with -->
+    lvars sofar, available, number, lefts, rights;
+
+    ;;; Dig out the sofar and available lists from the current state
+    this_state --> ! [?sofar ?available];
+
+    ;;; Declare a variable index to range from 0 to
+    ;;;         (length(available) - 1),
+    ;;; and repeatedly get a new item for sofar, and a combined set of
+    ;;; lefts and rights for the new available.
+
+    ;;; start building a list to be assigned to newalternatives
+    [%
+        lvars index;    ;;; loop counter
+        for index from 0 to length(available) - 1 do
+
+            ;;; split the list before and after the indexed item
+            available --> ! [??lefts: ^index ?number ??rights];
+
+
+            ;;; Now build a new state.
+
+            lvars nextstate;
+
+            ;;; the new sofar, is the old one, with number added.
+            ;;; The new available is made from lefts and rights
+            [[^^sofar ^number]  [^^lefts ^^rights]] -> nextstate;
+
+            ;;; Add some trace printing to help you during development
+            [nextstate ^nextstate] =>
+
+            ;;; leave nextstate on the stack, to go into the list
+            ;;; made by the list brackets.
+            nextstate;
+        endfor
+    %] -> newalternatives;
+
+enddefine;
+
+
+/*
+    ;;; Some test examples for nextstates
+
+    nextstates([[]  [5 6 7]]) =>
+    nextstates([[4] [5 6 7]]) =>
+    nextstates([[4 5] [6 7]]) =>
+
+*/
+
+
+-- -- solve_tower
+
+define solve_tower(inlist, target) -> outlist;
+    ;;; Given a list of numbers, inlist, and a target number target,
+    ;;; create a list of elements of inlist that add up to target,
+    ;;; and assign that list to outlist, to be the result of this
+    ;;; procedure
+
+    ;;; local lexical variables, not for use in patterns
+    lvars , alternatives, newalternatives;
+
+    ;;; pattern variables
+    lvars state, remainder, sofar, available;
+
+    ;;; add some "trace printing" which can later be removed
+    [Starting with inlist ^inlist and target ^target] =>
+
+    ;;; create a list of alternatives containing one state, the
+    ;;; initial state, with empty sofar list. Derived states will be
+    ;;; added to the list after
+    ;;; this state has been checked
+
+    [ [ [] ^inlist ] ] -> alternatives;
+
+    repeat
+        if alternatives = [] then
+            ;;; Case 1: failed -- no more alternatives to consider
+            ;;; so make outlist false, and return from this procedure
+            false -> outlist;
+            return();
+        else
+            ;;; Explore remaining alternatives
+            ;;; get next state and remainder of alternatives
+            ;;; Case 2
+            alternatives --> ! [?state ??remainder];
+
+            ;;; get the elements of the state
+            state --> ! [?sofar ?available];
+
+            ;;; Some temporary trace printing during development and
+            ;;; testing
+            [Trying to extend state with
+                ^sofar sofar and ^available left] =>
+
+            ;;; First check this state against the goal
+            if sumlist(sofar) = target then
+                ;;; Case 2.a: problem solved. Insert some trace printing
+                [Solution found: choose ^sofar] =>
+                sofar -> outlist;
+                return()
+            elseif available = [] then
+                ;;; Case 2.b: no successors for this state
+                ;;; so continue with remainder, from alternatives
+                remainder -> alternatives;
+                [No successors for ^state, so backtrack] =>
+            else
+                ;;; Case 2.c: Generate successors to this state
+                nextstates(state) -> newalternatives;
+                ;;; add them to the front of remaining alternatives
+                [^^newalternatives ^^remainder] -> alternatives
+            endif
+        endif;
+    endrepeat;
+enddefine;
+
+
+/*
+    solve_tower([3 5 7], 12) =>
+    solve_tower([2 2 2 2 2 ], 11) =>
+    solve_tower([2 2 2 ], 11) =>
+    solve_tower([2 2 2 2 2 2 2], 8) =>
+*/
+
+
+
+
+-- Problems in searching ----------------------------------------------
+
+1. Making sure that you cover all the cases.
+        Requires a memory of what you have not yet tried.
+        Usually requires some sort of stack.
+
+2. Making sure that you don't go round in circles
+        Requires a memory of what you have already tried
+
+3. Making sure you don't waste time on sub-trees or sub-nets where
+        there is no chance of finding a solution (e.g. if the total
+        is already above the limit, don't try adding more).
+
+4. Making sure you follow the most likely paths first
+    Heuristic search    -- impossible to generalise?
+
+5. The combinatorics:
+    If you have to make N choices with only 2 options at each choice
+    point the total number of combinations is
+             N
+            2
+
+    Some numbers
+
+    N  1  2  3  5   10     20       50          100
+
+ N
+2      2  4  8  32  1024   1048576  1125899906842624
+
+                                        1267650600228229401496703205376
+
+EXPONENTIAL FUNCTIONS SHOULD BE AVOIDED AT ALL COSTS
+
+FACTORIAL GROWS EVEN FASTER
+
+-- Using factorial to illstrate the effect of permutations ------------
+
+How many ways are there of (re-)ordering list of different lengths?
+I.e. how many permuations of a list of length N
+
+N
+1   [a]          1
+
+2   [a b]        2
+
+3   [a b c]      6
+
+4   [a b c d]   24
+etc.
+
+define fact(x) -> out;
+    if x == 0 then 1
+    else x * fact(x-1)
+    endif -> out
+enddefine;
+
+2**2, fact(2)=>
+** 4 2
+
+2**3, fact(3)=>
+** 8 6
+
+2**4, fact(4)=>
+** 16 24
+
+2**5, fact(5)=>
+
+2**10, fact(10)=>
+** 1024 3628800
+
+2**20, fact(20)=>
+** 1048576 2432902008176640000
+
+2**30, fact(30)=>
+** 1073741824 265252859812191058636308480000000
+
+2**40, fact(40)=>
+** 1099511627776 815915283247897734345611269596115894272000000000
+
+2**50, fact(50)=>
+** 1125899906842624 30414093201713378043612608166064768844377641568960512000000000000
+
+2**1000=>
+fact(1000) =>
+
+
+-- An example of searching in a learning system: TEACH FINGER ---------
+
+Look at TEACH * FINGER and see if you can teach the program to count.
+
+Many teachers do not appreciate the searching problem that their pupils
+are faced with.
+
+See also
+TEACH * PRBRIVER
+TEACH * NEWSOLVER
+TEACH * WALTZ
+
+--- $poplocal/local/teach/proglect6
+--- Copyright University of Birmingham 2000. All rights reserved. ------

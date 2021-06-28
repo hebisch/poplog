@@ -1,0 +1,249 @@
+
+
+-- -- EXERCISE 5: using setup to create parsers, to test sentences
+
+Try using the parser generator in lib grammar to test sentences that you
+think your grammar and lexicon can handle.
+
+If you have not compiled your grammar and lexicon since this editing
+session started, go to your file containing them, mark the whole range,
+from the 'vars' declaration to the end of the second assignment, to
+blocks_lex. Then compile that range (CTRL-d). Test that you have
+compiled both by printing out the grammar and the lexicon (ESC d on each
+line):
+
+    blocks_gram ==>
+    blocks_lex ==>
+
+Now make sure that the grammar library is loaded ( ESC d ):
+
+    uses grammar
+
+A procedure you have not yet met is provided to create a collection of
+parsers from your grammar and your lexicon. The procedure is called
+setup. You can ask Pop11 what setup is
+
+Use ESC-d:
+
+    setup =>
+
+that prints out:
+    ** <procedure setup>
+
+NB in Pop11 procedures are objects just as lists, numbers, words,
+strings, and arrays are (among other things).
+
+We use setup to create parsers  by applying the procedure to the grammar
+and the lexicon (ESC-d):
+
+    setup(blocks_gram, blocks_lex);
+
+That command does not print anything out but it creates a collection of
+procedures for recognising items that the grammar deals with, one
+procedure for each of the capitalised sentence components in the
+grammar, and one for each type of word in the lexicon.
+
+You can ask pop11 to print out some of the procedures
+
+    s =>
+    ** <procedure s>
+
+    QUEST =>
+    ** <procedure QUEST>
+
+    ONTO_PP =>
+    ** <procedure ONTO_PP>
+
+    NOUN =>
+    ** <procedure NOUN>
+
+    DET =>
+    ** <procedure DET>
+
+(You can think of these procedures as compiled versions of the grammar
+rules. But they are procedures for recognition, whereas the grammar
+rules can also be used for generation, as we saw previously.)
+
+Try using the recognisers, and see if they do what they should do. The
+lexical recognisers can only recognise words (represented in double
+quotes in Pop11, if not in a list expression).
+
+E.g. notice that DET returns a description of what it recognized:
+
+    DET("the") =>
+    ** [DET the]
+
+otherwise it returns one of Pop11's two booleans (true and false are
+booleans):
+
+    DET("blue") =>
+    ** <false>
+
+Copy and edit the DET command and try it with other words from the
+lexicon. Do the same with some of the other newly created procedures
+for recognising lexical entries, e.g.
+
+    ADJ("red") =>
+    ** [ADJ red]
+
+    ADJ("the") =>
+    ** <false>
+
+Now try some recognisers for complex constructs.
+
+Reminder: these are the constructs (unless you changed the grammar):
+    s QUEST COM NP SNP AP PP ONTO_PP
+
+Each now is the name of a procedure, e.g. (use ESC d):
+
+    QUEST, COM, PP =>
+    ** <procedure QUEST> <procedure COM> <procedure PP>
+
+So they can also be run. But because they come from the grammar, not the
+lexicon, they must be applied to lists of words, not individual words.
+
+E.g. run these (using ESC d on each), and try editing them to see what
+results you get:
+
+    AP([big red]) ==>
+
+    ** [AP [ADJ big] [AP [ADJ red]]]
+
+The adjectival phrase is an adjectival phrase starting with and
+adjective indicated by
+
+    [ADJ big]
+
+and followed by an adjectival phrase indicated by
+
+    [AP [ADJ red]]
+
+Compare these:
+
+    AP([the red]) ==>
+    ** <false>
+
+    AP([big red box]) ==>
+    ** <false>
+
+But compare
+
+    NP([the big red box]) ==>
+    ** [NP [DET the] [SNP [AP [ADJ big] [AP [ADJ red]]] [NOUN box]]]
+
+This is noun phrase because it contains a determiner:
+
+    [DET the]
+
+Followed by a simple noun phrase SNP, which is an AP followed by a NOUN
+
+    [SNP [AP [ADJ big] [AP [ADJ red]]] [NOUN box]]]
+
+-- Using showtree -----------------------------------------------------
+
+The library program showtree can be used to display the NP description
+in a graphical format. (This will work in XVed, and also in Ved if you
+are using an 'xterm' window, or using PuTTY in windows to access Poplog
+remotely:
+
+Compile the library (ESC d)
+
+    uses showtree
+
+Apply the procedure to the full NP description (using ESC d):
+
+    showtree([NP [DET the] [SNP [AP [ADJ big] [AP [ADJ red]]] [NOUN box]]])
+
+If it works on your terminal it will look something like this (only
+prettier):
+
+      |NP|
+  -----------
+|DET|     |SNP|
+  |     ---------
+  |     |       |
+ the  |AP|    |NOUN|
+    -------     |
+  |ADJ|  |AP|  box
+    |     |
+    |     |
+   big  |ADJ|
+          |
+          |
+         red
+
+Now try testing sentences that you construct to see if the "top level"
+parsing procedure "s" recognises them:
+
+Examples:
+
+    s([which big box is above it]) ==>
+** [s [QUEST [WH_SELECT which]
+             [SNP [AP [ADJ big]] [NOUN box]]
+             [VBE is]
+             [PP [PREP above] [NP [PN it]]]]]
+
+Examine that closely to work out where all the descriptions come from.
+
+Why doesn't this one work:
+
+    s([which large box is below it]) ==>
+    ** <false>
+
+Can you fix either the grammar or the lexicon, then recompile it, then
+re-run the setup procedure so that that example is accepted?
+
+The showtree library includes a pop11 macro "---" defined so that
+
+    showtree([ word word word ..... ] ) ==>
+
+can be abbreviated like this and compiled as before.
+
+    --- word word word .....
+
+e.g. try
+
+   ---  is some box above it
+
+** [s [QUEST [VBE is]
+             [NP [DET some] [SNP [NOUN box]]]
+             [PP [PREP above] [NP [PN it]]]]]
+
+    --- where are all the large boxes
+    ** <false>
+
+    --- where is every large green box
+    ** [s [QUEST [WH_LOC where]
+                 [VBE is]
+                 [NP [DET every] [SNP [AP [ADJ large] [AP [ADJ green]]] [NOUN box]]]]]
+
+Try using some of the output of the generate(<grammar>, <lexicon>)
+command, and see if the s procedure recognises everything generated,
+and parses it correctly into sub-structures.
+
+-- EXERCISE: Make a summary of what you have learnt from this file ----
+
+-- TO BE ADDED --------------------------------------------------------
+
+Further developments of these ideas
+
+Designing and implementing a parser, instead of using lib grammar
+
+Combining parsing with other components in a complete architecture, e.g.
+for a chatbot or simple expert system, or travel adviser.
+
+Combine the above ideas with an image analyser to generate descriptions
+of what is in various images.
+
+Combine the above ideas with a program for making pictures, and make it
+draw a picture when given a sentence describing the desired contents.
+
+What other applications can you think of?
+
+Further reading
+    TEACH * ISASENT
+    TEACH * PARSESENT
+    TEACH * PARSING
+
+--- $usepop/pop/teach/gram3
+--- University of Birmingham 2011. All rights reserved. ------

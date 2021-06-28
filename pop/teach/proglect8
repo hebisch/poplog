@@ -1,0 +1,559 @@
+TEACH PROGLECT8                                    Aaron Sloman Nov 1996
+                                                        Updated Dec 2000
+
+This lecture provides an introduction to Object Oriented Programing,
+often referred to as OOP
+
+Previous lectures are summarised as teach files, with examples which you
+can run.
+
+    TEACH * PROGLECT1
+    TEACH * PROGLECT2
+    TEACH * PROGLECT3
+    TEACH * PROGLECT4
+    TEACH * PROGLECT5
+    TEACH * PROGLECT6
+    TEACH * PROGLECT7
+
+CONTENTS
+
+ -- Introduction
+ -- What is OOP? Confusions abound
+ -- OOP in Pop-11
+ -- What are classes and sub-classes?
+ -- Examples from the sim_agent toolkit
+ -- Extra subclasses are defined in TEACH SIM_DEMO
+ -- Illustrating objectclass using TEACH RC_LINEPIC
+ -- Drawing movable pictures in a graphic window
+ -- Making the the object drag1 draggable with the mouse
+ -- Adding buttons to control a movable object
+ -- Additional documentation
+
+-- Introduction -------------------------------------------------------
+
+Object Oriented Programming (OOP) is one of the many aspects of
+computing that have been the subject of exaggerated hopes and claims,
+including the claim that it will solve the problem of the software
+crisis, namely that it appears to be impossible to develop large
+software systems
+
+    that are delivered on time
+    that work
+    that do not cost more than the estimated budget
+
+It is best to forget the hyperbole and simply accept that there is a
+class of programming language features and an associated set of software
+design concepts that can be very useful in many cases.
+
+-- What is OOP? Confusions abound -------------------------------------
+
+Unfortunately different people have different views as to what is
+important in OOP (for more on this see TEACH OOP).
+
+Alleged central ideas are
+
+o Reference to objects (What does that mean? Data-structures?)
+
+o Message sending
+
+o Data encapsulation (abstract data types)
+
+o Polymorphism (using the same procedure names to specify different
+    things for different types of objects)
+    (Compare, print procedures, +, = )
+
+o Classes, subclasses, and inheritance
+    (single inheritance, multiple inheritance)
+
+o Methods associated with classes
+    (similar to polymorphism, but often more flexible)
+
+o Defaults that can be overriden in special cases
+
+
+Much of this can be done in any programming language. What is often hard
+is to get the notion of classes, inheritance, defaults and associated
+methods.
+
+For some history of OOP see TEACH OOP and things cited therein.
+
+
+-- OOP in Pop-11 ------------------------------------------------------
+
+There are two extensions to Pop-11 providing OOP.
+
+One is the FLAVOURS library, which is very flexible in some resepects,
+but relatively inefficient and not very consistent with the general
+style of Pop-11 syntax.
+
+The more recent one, which is now used as part of the RCLIB package and
+SimAgent toolkit (See TEACH SIM_AGENT), and is well integrated with
+Pop-11 11 is the Objectclass system, originally designed and implemented
+by Steve Knight when he was at Hewlett Packard Research Labs. (He is now
+called Steve Leach, and often posts messages to comp.lang.pop).
+
+Objectclass is the OOP system we mainly use here now.
+
+Objectclass provides classes, subclasses and instances, with multiple
+inheritance, multi-methods (sometimes called generic functions), and
+various other things.
+
+It also provides "mixins" which are classes that cannot have instances
+on their own.
+
+It does NOT use "message sending", which is often just "syntactic sugar"
+for a procedure call.
+
+
+-- What are classes and sub-classes? ----------------------------------
+
+Simple examples from TEACH * OBJECTCLASS_EXAMPLE
+
+uses objectclass;
+
+define :class person;
+    slot person_name = undef;
+    slot person_age  = 0;
+    slot person_sex  = undef;
+enddefine;
+
+    vars P;
+    consperson("fred", 5, "male" ) -> P;
+
+    isperson(P) =>
+
+    isperson(99)=>
+
+define :method birthday( p:person );
+    lvars p, age;
+    person_age(p) + 1 -> age;
+    age -> person_age(p);
+    [Happy birthday ^(person_name(p)) - now aged ^age] =>
+enddefine;
+
+    birthday(P);
+
+
+define :class adult;
+    is person;                      ;;; specify superclass
+    slot person_spouse = false;     ;;; and additional slot
+enddefine;
+
+;;; Here's another way to create instances, using define :instance
+
+define :instance adam:adult;
+
+    person_name = "adam";
+    person_age = 33;
+    person_sex = "male";
+
+enddefine;
+
+define :instance eve:adult;
+
+    person_name = "eve";
+    person_age = 35;
+    person_sex = "female";
+
+enddefine;
+
+define :instance dot:adult;
+
+    person_name = "dot";
+    person_age = 25;
+    person_sex = "female";
+
+enddefine;
+
+
+adam =>
+eve =>
+dot =>
+
+We can improve the printing of adults by having only the NAME of the
+spouse printed out.
+
+define :method print_instance(a:adult);
+    lvars a, spouse;
+    person_spouse(a) -> spouse;
+
+    ;;; printf takes a control string and a list
+    printf(
+        '<adult name:%P age:%P sex:%P spouse:%P>',
+
+        [%
+            person_name(a),
+            person_age(a),
+            person_sex(a),
+            if spouse then person_name(spouse) else false endif
+        %])
+
+enddefine;
+
+
+adam =>
+eve =>
+dot =>
+
+
+
+;;; Let's introduce a marriage ceremony, including a check for
+;;; bigamy
+
+define :method marry( p1:person, p2:person );
+    lvars spouse;
+
+    ;;; see if p1 and p2 are of the same sex
+    if person_sex(p1) == person_sex(p2) then
+        [hmm very modern] =>
+    endif;
+
+    person_spouse(p1) -> spouse;
+
+    if spouse then
+        ;;; check p1 is not already married to someone else
+        if spouse == p2 then
+            [^(person_name(p1)) marrying ^(person_name(p2)) again???] ==>
+        else
+            mishap('BIGAMY', [% person_name(p1), person_name(p2) %]);
+        endif
+    else
+        ;;; not already married. Fix it
+        ;;; update my spouse slot
+        p2 -> person_spouse(p1);
+        ;;; take the vows
+        [I ^(person_name(p1)) take thee ^(person_name(p2))
+            to be my lawfully wedded other] =>
+
+        ;;; Now make sure the other person does the same
+        marry(p2, p1)
+    endif
+enddefine;
+
+
+;;; test this
+false -> popsyscall;    ;;; supppress spurious information in mishaps
+
+;;; Check that adam and eve are not yet married
+
+    person_spouse(adam) =>
+
+    person_spouse(eve) =>
+
+;;; Now marry them
+
+    marry(adam, eve);
+
+    person_name(person_spouse(adam)) =>
+
+    person_name(person_spouse(eve)) =>
+
+
+;;; What if adam tries to marry dot?
+    marry(adam, dot);
+
+The TEACH OBJECTCLASS_EXAMPLE file gives lots more examples and
+information about objectclass.
+
+
+-- Examples from the sim_agent toolkit --------------------------------
+
+In the TEACH SIM_AGENT toolkit, you will find the following classes:
+
+The class sim_object, is the top level class provided by the library.
+
+This is associated with a collection of default "slots" in each instance
+of the class, e.g. the following slots, or components of objects:
+
+    sim_name(object)
+    sim_data(object)
+    sim_rulesystem(object)
+    sim_sensors(object)
+
+In addition the class defines a set of methods, such as methods for
+printing instances out, and methods to enable objects to "run" in every
+simulated time interval.
+
+A subclass of sim_object is sim_agent, which is similar, but has some
+additional slots and different methods for "running" instances. E.g. the
+extra slots are
+
+    sim_in_messages(agent)
+    sim_out_messages(agent)
+
+since agents are thought of as capable of communicating with one
+another. The tracing methods and various other methods are different for
+instances of the sim_agent subclass.
+
+There is also graphical extension to Pop-11 which provides a number
+of "mixins" and classes, e.g.
+
+Mixins:
+    rc_linepic
+        For objects that can be drawn on the screen
+
+    rc_linepic_movable
+        For rc_linepic objects that can be moved to a new location
+
+    rc_rotatable
+        For rc_linepic_movable objects that can also be drawn rotated
+        (i.e. appearing in different orientations).
+
+    rc_selectable
+        For things that can be selected by the mouse, and activated
+        by the mouse
+
+
+Each of these has an associated set of "slots" and methods for doing
+things with them, e.g. drawing them in the graphic window, removing
+them, changing their location, changing their orientation, or invoking
+additional event handlers depending on whether a mouse button is pressed
+or released, etc.
+
+-- Extra subclasses are defined in TEACH SIM_DEMO ---------------------
+
+    class team_agent (is rc_linepic_movable  sim_agent)
+        This is used to extend the sim_agent subclass by providing
+        additional slots and more specialised methods.
+
+        Automatically inherits slots and methods from
+            rc_linepic_movable sim_object
+
+    class team_mover (is team_agent)
+        This is the first new subclass of team_agent. Its instances will
+        be movable members of a "team". There is a blue team and
+        a red team, and several instances in each team.
+
+    class team_captain (is team_agent)
+        This is the second subclass, whose instances will be
+        immovable members of a team, giving orders to the other
+        members, and receiving messages.
+        There are two team_captains, and they don't move, though
+        they instruct the team_movers in their team to move
+
+    class team_static (is rc_linepic sim_object)
+        Obstacles and targets are instances of this class. This is the
+        only class whose instances do not do any sensing of other
+        objects, and which do not move of their own accord.
+
+Each agent, and each object, can also contain a rulesystem, which is a
+collection of internal rule-based systems.
+
+The methods defined for these classes and mixins interact in quite
+complex ways with the rules in the rulesystem, and anyone who is
+familiar with Objectclass and Poprulebase can look at TEACH SIM_DEMO to
+see how to build the system demonstrated in the first few movies in
+
+    http://www.cs.bham.ac.uk/~axs/cog_affect/sim_demo/sim_movies.html
+
+NB there's a simpler demonstration in
+
+    TEACH * SIM_FEELINGS
+
+This shows how to create two agents with superficially plausible
+emotional states labelled "glum" "neutral" "surprised" or "happy".
+
+
+-- Illustrating objectclass using TEACH RC_LINEPIC --------------------
+
+NOTE: as of late 1997 there's a more general overview of the
+RCLIB package in TEACH RCLIB_DEMO.P
+
+-- Drawing movable pictures in a graphic window -----------------------
+
+The rclib package makes use of a number of classes and mixins with
+associated methods.
+
+LIB RC_LINEPIC defines a variety of mixins for pictures, drawable,
+movable, rotatable
+
+LIB RC_MOUSEPIC and LIB RC_WINDOW_OBJECT make it easy to
+create a mouse-sensitive window, in which picture objects of various
+kinds can be created, including objects that can be selected and moved.
+
+Picture objects which are instances of the mixin rc_linepic
+are defined by a list of instructions for drawing lines, circles, blobs etc.
+in an rc_graphic (relative coordinates) reference frame local to the
+picture object, along with a list of instructions for printing
+strings in the picture.
+
+uses rclib;
+uses rc_linepic;
+uses rc_window_object;
+uses rc_mousepic;
+uses rc_buttons;
+
+;;; Create a window, with origin in the middle, and y going up
+;;; which is also able to include buttons
+vars
+    win1 = rc_new_window_object(
+                500, 40, 400, 400, true, newrc_button_window, 'win1');
+
+;;; Use the predefined mixins
+;;;     rc_keysensitive rc_selectable rc_linepic_movable
+;;; to define a new class of movable draggable objects: dragpic
+
+define :class dragpic;
+    ;;; this class inherits from three different "mixins"
+    is rc_keysensitive rc_selectable rc_linepic_movable;
+
+    ;;; make instances easy to drag
+    slot rc_mouse_limit = 30;
+
+enddefine;
+
+define :method print_instance(p:dragpic);
+    ;;; define a print method to simplify printing of instances
+    printf('<dragpic %P %P %P>', [%pic_name(p), rc_coords(p) %])
+enddefine;
+
+
+;;; Create an instance of the class dragpic, containing
+;;; a blue square a blue rectangle and red and green text strings.
+
+define :instance drag1:dragpic;
+    pic_name = "drag1";
+
+    ;;; location of the picture's reference frame origin
+    rc_picx = 100;
+    rc_picy = 50;
+
+    ;;; define the object's graphical appearance: a square and a
+    ;;; rectangle, overlapping
+    rc_pic_lines =
+        [WIDTH 2 COLOUR 'blue'
+            [SQUARE {-40 40 80}]
+            [CLOSED {-45 20} {45 20} {45 -20} {-45 -20}]
+        ];
+
+    ;;; and two strings
+    rc_pic_strings =
+        [FONT '9x15bold'
+            [COLOUR 'red' {-22 -5 'drag1'}]
+            [COLOUR 'green' {-22 -35 'hello'}]];
+
+enddefine;
+
+;;; Compile that definition
+;;; Now draw drag1 on win1
+
+win1 -> rc_current_window_object;
+rc_draw_linepic(drag1);
+
+;;; See how it prints out:
+
+drag1=>
+
+;;; You cannot yet drag the picture (try it), though you can move it
+;;; under program control
+
+repeat 20 times rc_move_by(drag1, -5, 5, true); syssleep(1); endrepeat;
+drag1 =>
+
+;;; Draw a blob then move it down over the blob
+rc_draw_blob(0,0,100,'grey5');
+
+repeat 60 times rc_move_by(drag1, 0, -5, true);syssleep(1) endrepeat;
+
+;;; and up over the blob
+
+repeat 60 times rc_move_by(drag1, 0, 5, true);syssleep(1) endrepeat;
+
+drag1 =>
+
+
+If the "true" argument in rc_move_to or rc_move_by is replaced by
+false, no motion is shown in the picture though the coordinates change.
+If it is replaced by "trail" the picture leaves a (messy) trail
+while moving.
+
+repeat 30 times
+    rc_move_by(drag1, 0, -5, "trail")
+endrepeat;
+
+;;; Undraw the picture object
+rc_undraw_linepic(drag1);
+
+;;; clear the current window
+rc_start();
+
+;;; redraw the picture
+rc_draw_linepic(drag1);
+rc_move_to(drag1, 0, 0, true);
+
+-- Making the the object drag1 draggable with the mouse ---------------
+
+Now make the window mouse button sensitive:
+
+rc_mousepic(win1, [button motion ]);
+
+and tell the window win1 about drag1
+
+rc_add_pic_to_window(drag1, win1, true);
+
+Now you should be able to drag the picture around, using the
+sensitive area near the middle of the picture. See how
+the printed information changes after each move:
+
+drag1 =>
+rc_coords(drag1)=>
+
+
+-- Adding buttons to control a movable object -------------------------
+
+Move the drag1 picture to bottom right of the window
+Add buttons to move the picture up and down
+
+uses rclib
+uses rc_buttons
+
+Create a button of type "action" labelled "UP" to move the picture
+up. Its width is 60 pixels, its height 25. It is located on the left
+below the centre (with top left corner at -200, 0).
+
+vars button1 =
+    create_rc_button(
+        -200,0,60,25,
+            ['UP' [POP11 rc_move_by(drag1,0,5,true)]], "action", false);
+
+Create a button labelled "DOWN" to move the picture down, located
+below the Up button, at (-200, -30).
+
+vars button2 =
+    create_rc_button(
+        -200,-30,60,25,
+            ['DOWN' [POP11 rc_move_by(drag1,0,-5,true)]], "action", false);
+
+
+Try clicking on the buttons to move the drag1 object up or down. Note the
+change of appearance as you press and release the mouse button, and also
+what happens if you move the mouse out of the button before releasing it.
+(Buttons can have various visible appearances: this demonstration uses
+the default. There are also alternative ways of associating an action with
+a button. See HELP RC_BUTTONS, and HELP RC_CONTROL_PANEL.)
+
+For more on this see
+    TEACH RCLIB_DEMO.P
+    TEACH RC_LINEPIC,
+    HELP RC_LINEPIC
+    TEACH RC_CONTROL_PANEL
+
+-- Additional documentation -------------------------------------------
+
+TEACH ADVENT_OBJECTCLASS
+
+which shows how to implement the beginnings of an adventure game.
+
+HELP OBJECTCLASS gives a more complete overview.
+
+REF OBJECTCLASS gives full gory details
+
+TEACH SIM_AGENT
+TEACH SIM_DEMO
+    Combines objectclass, poprulebase, sim_agent, rc_linepic
+
+TEACH GO
+    Another approach to graphics using objectclass and methods.
+
+--- $poplocal/local/teach/proglect8
+--- Copyright University of Birmingham 2000. All rights reserved. ------

@@ -1,0 +1,1004 @@
+TEACH DATASTRUCTURES                                   A.Sloman May 1988
+
+
+DATA STRUCTURES
+
+This teach file explains what data-structures are in general and gives
+an introduction to the data-structures available in POP-11, whilst
+mentioning facilities in other languages.
+
+CONTENTS - (Use <ENTER> g to access required sections)
+
+ -- Introduction
+ -- What are data-structures?
+ -- Data types
+ -- Primitive and derived data-types
+ -- Formal specificaton of a data-type
+ -- Data-types in POP-11
+ -- Compile time vs run time types
+ -- How are higher level types implemented?
+ -- Common data types
+ -- Lazy evaluation
+ -- Virtual data-types in POP-11
+ -- Implicit structures - the POP-11 user stack, etc.
+ -- Implementation issues
+ -- Where does a structure end?
+ -- Tagged architectures
+ -- Garbage collection
+ -- Association structures
+ -- Structure sharing: context mechanisms
+ -- Control structures
+ -- Operating systems require data-structures
+ -- Compilers require data-structures
+ -- Conclusion
+ -- Reading
+ -- Relevant TEACH, HELP and REF files
+
+-- Introduction -------------------------------------------------------
+
+In a typical course on datastructures there would be a survey of some of
+the main kinds of datastructures used in computing systems, techniques
+for implementing them on digital computers, and algorithms for operating
+on them.
+
+For example, such a survey might include a discussion of integers,
+floating point numbers, strings, words, vectors, arrays, records, lists,
+trees and graphs (networks), and ways in which they could be implemented
+in terms of bit patterns, the basic structures provided in a computer.
+Algorithms discussed might include methods for searching a structure for
+an element, re-ordering elements of a structure into numerical or
+alphabetical order, matching two structures to see if they have the same
+elements, and so on.
+
+The books listed at the end include such surveys. However, this file not
+an attempt to summarise or duplicate such standard material, but is
+concerned with more general, almost philosophical, issues about what
+datastructures are and their uses both inside and outside computers.
+
+-- What are data-structures? ------------------------------------------
+
+Data-structures are the entities that programs operate on. They are
+metaphorically referred to as things in the machine (in memory or on
+disk), but are usually "virtual" entities like lists, trees, networks,
+strings, words, numbers, or even bit-patterns, rather than physical
+entities like transistors, electrons, voltages, or bits of iron oxide.
+
+This is analogous to the way in which a book contains virtual objects
+like words, sentences, arguments, accounts, stories, etc. rather than
+simply bits of paper, ink, atoms, molecules, etc. Similarly a person's
+estate may include a piece of land, various buildings, money in the
+bank, partial ownership of a company and so on. The contents of the
+estate would change if some of the land were sold. The change is not one
+that would show up as a visible new boundary on some field: it might be
+accomplished simply by alterations to some paper (or computer-based)
+records. The estate is a virtual data-structure, as are most of the
+things in it.
+
+Data-structures in a computer are usually used to represent things
+outside the machine, and operations on them are usually intended to
+represent operations on external things. This may be done for purposes
+of keeping records, making predictions, controlling things, etc.
+However, some structures in the machine are often used to refer to other
+structures in the machine, and are therefore called "pointers".
+
+Some data-structures are "persistent" or "permanent", i.e. they can be
+stored in files which continue to exist whether a program is running or
+not. Others are created within the program's address space while a
+process runs, and are lost when the program finishes. An example of the
+former would be an online library catalogue, or database of employee
+information in a company. An example of the latter would be a POP-11
+list, or a procedure activation record. (Structures stored in "saved
+images" are an intermediate case.) (The POP-11 DATAFILE library program
+allows some structures, like lists, to be treated as permanent.)
+
+-- Data types ---------------------------------------------------------
+
+Data-structures are usually divided into different "types", where each
+type may have many instances. There are some exceptions. In POP-11, the
+type "termin" has exactly one instance, the object -termin-, and the
+type "boolean" has exactly two instances -true- and -false-.
+
+Each type has a class of procedures which operate on its instances. In
+some ways that is what defines the type, although there may be
+similarities between different types because similar operations on them
+are possible. Thus in POP-11 the list [a b c d] is similar to the vector
+{a b c d} because you can ask for the -length- of either, or access or
+update the third element of either, print either, and so on. But they
+are different types.
+
+This is because although you can ask for the first element of either,
+the list has a special feature. You can ask for its "tail" (using the
+procedure -tl- or -back-). If you take the tail of a list, and update
+its first element, this will update the second element of the original
+list. I.e. the tail is part of the original. For a vector
+    allbutfirst(1, vector)
+is superficially like tl(list):
+
+    allbutfirst(1, {a b c d}) =>
+    ** {b c d}
+
+but this produces a new vector containing the last three elements. It is
+not part of the original vector, unlike the tail of a list.
+
+    vars list1=[a b c d];
+    vars list2=tl(list1);
+    list2 =>
+    ** [b c d]
+    99 -> hd(list2);
+    list2 =>
+    ** [99 c d]
+    list1=>
+    ** [a 99 c d]
+
+I.e. updating list2 changed list1.
+
+Moreover with a list, but not a vector, you can splice in new elements
+and extend it, e.g.
+    vars list = [a b c d];
+    list =>
+    ** [a b c d]
+    [99 ^^(tl(tl(list)))] -> tl(tl(list));
+    list =>
+    ** [a b 99 c d]
+
+So -list- has been lengthened by 1, by adding a new list link (a new
+pair) into the chain. (See TEACH * WAL).
+
+In addition to the procedures specific to a particular data-type there
+are usually general procedures that operate on a range of different
+data-types: e.g. the printing procedure or the equality tester operate
+on all types, as do the procedures -datakey-, -dataword-, -isinteger-,
+-islist-, -isvector- and other "recognizer" procedures. Even though the
+same procedures can be used on two different types of objects, they will
+generally produce different results. In POP-11 the concatenator <> works
+on instances of most but not all types.
+
+Summary:
+    What defines a data-type is primarily its functionality, i.e.
+    the class of procedures that can be used to create instances or
+    operate on instances, and the results they produce; more generally
+    what defines a data-type is what can be done with its instances.
+
+Describing a data-type then involves specifying the procedures that can
+operate on it, including the procedures for constructing instances,
+recognising instances, accessing components (of a compled data type),
+changing components, and so on. Sometimes this would include specifying
+the relationships of the data-type to other types. E.g. in POP-11 the
+components of strings and words are characters (i.e. 8-bit numbers). So
+part of the specification of a string is that the string constructor
+-consstring- takes characters, and that the component accessor -subscrs-
+returns characters. (See HELP * STRINGS)
+
+-- Primitive and derived data-types -----------------------------------
+
+Some data-structures in a language are "primitive", whereas others
+are "derived", i.e. define in terms of them. For example, in POP-11
+pairs are given as primitive structures, but lists are a derived kind
+of data-structure built out of pairs. If lists did not exist, users
+could define them in terms of pairs. (See TEACH * WAL - What Are Lists).
+
+Similarly, arrays are constructed from vectors.
+
+From the point of view of the language implementor the only primitive
+datatype is a bit, or perhaps a pattern of bits, since the machine will
+provide procedures for operating on collections of bits 8, 16, or 32
+bits long, (or more). So from an implementors point of view all the
+familiar data-types are derived, data-types, though from the user's
+point of view they may be primitive. Similarly the electronic engineers
+who build the computers will treat the bit patterns as derived
+abstractios, built on more primitive electronic structures and their
+operations.
+
+-- Formal specificaton of a data-type ---------------------------------
+
+It is generally not important for the user HOW a data-type and its
+procedures are implemented, as long as they work as specified. The
+notion of "data-abstraction" is sometimes used to refer to this kind of
+specification. It aids modular programming and allows the implementation
+of a particular type to be changed without changing the other programs
+that use it. For example, if all you know about pairs is that they are
+created using -conspair- and that the procedures -front- and -back- are
+used for accessing or updating their elements, then as long as you
+simply use these three procedures on pairs your programs should not be
+affected if a new technique for representing pairs in the machine is
+implemented. Similarly it should matter if you move to another machine
+where instead  of being implemented using 32-bit addresses they use
+64-bits.
+
+Alas, sometimes the method of implementation can affect users. For
+example, when things go wrong deep in the system, the error message may
+not be intelligible except in relation to how they are implemented.
+Similarly performance issues may be affected, such as how much space
+they use, or how fast programs run.
+
+Occasionally different types are provided which are identical in their
+abstract functionality, but differ in implementation details that make a
+difference only to efficiency. E.g. there may be two ways of
+implementing a kind of structure, one of which makes it faster to access
+components, while the other makes instances take up much less space.
+Which should be used would depend on whether space or time is more
+important. An example in POP-11 would be -assoc- and -newproperty- both
+of which create structures for storing relationships between objects.
+However -assoc- does it by making a list of the associations, and
+-newproperty- builds a "hash-coded" association table. For more on this
+see HELP * ASSOC. The structures used by assoc will be smaller and
+faster to search when they contain very few elements. The structures
+built by newproperty will be faster if they contain lots of elements.
+(There are other functional differences which are not relevant to this
+discussion.)
+
+It is useful if the nature of a data-type and the kinds of procedures
+that can operate on it can be specified mathematically. This makes it
+possible to have a well defined notion of what the implementation is
+supposed to do, so that it can be tested. More importantly, if
+application programs use data-types that are mathematically specified,
+then makes it possible to give a mathematical specification of what the
+programs are supposed to do, and this leads to the hope that:
+
+    (a) it will be possible formally to prove that the program itself
+    is correct according to the specification
+
+    (b) it may even be possible (in some cases) for the program to be
+    automatically generated from the specification.
+
+This kind of work on "formal methods" is becoming increasingly
+important in software engineering.
+
+An example of the sort of thing that might go into a mathematical
+specification would be an equation defining the relationships between
+various functions. For examble if "<>" is a structure concatenator then
+its specification might include the the following:
+
+    length(S1 <> S2) = length(S1) + length(S2)
+
+The specification for pairs might include
+
+    front(conspair(X,Y)) = X
+
+I.e. if you build a pair containing two objects then front gets you back
+the first of them.
+
+Alternatively a formal specification might indicate the behaviour of
+pieces of program by relating prior states, the program fragment, and
+the subsequent states.
+
+E.g. if A is an array, N is an integer, X is any object, and
+V is a variable, and initially A(N) = X, then after the assignment
+
+    A(N) -> V
+
+the following will be true
+    V = X
+
+-- Data-types in POP-11 -----------------------------------------------
+
+POP-11 has a wide variety of built in data-types including
+    numbers
+        integers, bigintegers, decimals, ddecimals,
+        ratios, complex numbers
+    booleans
+        i.e. true and false
+    pairs (used to implement lists)
+    strings
+    vectors
+    arrays
+    procedures (yes they are a kind of data)
+    closures (of procedures)
+    properties
+
+and more. For a full list of POP-11 data-types see REF * DATA.
+
+
+Two important kinds of data-types are record-types and vector-types.
+Examples of record-types are pairs and references. Examples of
+vector-types are strings and full vectors. A record type has instances
+with a number of fields, each field having a separate procedure for
+accessing or updating it, whereas a vector type has instances whose
+fields are accessed only via numerical subscripts, possibly using a
+special subscripting procedure.
+
+Thus, the field names for pairs are FRONT and BACK. For vectors the
+subscripting procedure is -subscrv-, and for strings -subscrs-. Both
+are vector classes.
+
+Procedures defined to work on one data-type will not necessarily
+work on another. E.g.
+
+    vars pair,array,int;
+
+    conspair(3,4) -> pair;
+    newarray([1 5 1 5]) -> array;
+    12345678 -> int;
+
+    pair, array, int =>
+    ** [3|4] <array [1 5 1 5]> 12345678
+
+    front(pair) =>
+    ** 3
+    front(array) =>
+    ;;; MISHAP - PAIR NEEDED
+    ;;; INVOLVING:  <array [1 5 1 5]>
+    ;;; DOING    :  front compile
+
+    boundslist(array) =>
+    ** [1 5 1 5]
+    boundslist(pair) =>
+    ;;; MISHAP - ARRAY NEEDED
+    ;;; INVOLVING: [3|4]
+    ;;; DOING    :  mishap boundslist compile
+
+    int * int =>
+    ** 152415765279684
+
+    pair * pair =>
+    ;;; MISHAP - NUMBER(S) NEEDED
+    ;;; INVOLVING:  [3|4] [3|4]
+    ;;; DOING    :  * compile
+
+POP-11 provides recognisers for different data-types:
+
+    ispair(pair), ispair(array), ispair(int) =>
+    ** <true> <false> <false>
+
+    isarray(pair), isarray(array), isarray(int) =>
+    ** <false> <array [1 5 1 5]> <false>
+
+    isinteger(pair), isinteger(array), isinteger(int) =>
+    ** <false> <false> <true>
+
+A recogniser should work with everything. The only recogniser that
+recognises itself is -isprocedure-
+    isprocedure(isprocedure) =>
+    ** <true>
+
+Besides the built-in data-types, POP-11, like many other languages,
+provides facilities for the user to define new classes of records or
+vectors. Higher level virtual data-types can be defined by the user in
+ways sketched below.
+
+
+-- Compile time vs run time types -------------------------------------
+
+In some languages all identifiers have types and these are used by
+the compiler to check consistency, allocate store, and do optimisations.
+
+Standard ML is an example of a more recent language with a "polymorphic
+type" system. Instead of defining one list membership function for lists
+of integers and another for lists of words you can define a single
+list membership function which will, at compile time, be specialised
+according to the type of the arguments, where possible.
+
+In POP-11 there are some identifiers of type "procedure", e.g. all infix
+operations and identifiers declared using
+
+    vars procedure f;  or   vars procedure (f1, f2, f3);
+
+When such identifiers are used in procedure calls the compiler can
+produce instructions for a fast procedure call, whereas for others it
+has to produce instructions that check that the value really is a
+procedure.
+
+Apart from this, POP-11 has (at present) no syntactic typing. So only
+when a value has been assigned to a variable is it possible to find out
+what kind of object it has as its value. Lisp and Prolog are like this
+too. It gives more flexibility and generality (and faster compilation)
+at the cost of slower running because of the type checking.
+
+The distinction between compile time and run time types is sometimes
+described as a difference between syntactic and semantic types.
+
+-- How are higher level types implemented? ----------------------------
+
+The people who built the computers did not take account of the needs of
+POP-11 and its data-types. So how does the computer get to know aout
+them?
+
+Computers are generally built with certain kinds of primitive structures
+and resources for manipulating them. E.g. they come with mechanisms for
+handling bit-patterns of various lengths and provide operations for
+doing things like:
+
+    tests:      are p1 and p2 equal?
+                is the N'th bit of p1 set?
+
+    copying:    copy contents of loc1 to loc2
+
+    alteration: set the N'th bit of p1
+                shift p1 N bits left or right
+
+    arithmetic: treat p1 and p2 as numbers and store the result
+                of adding them in loc1.
+
+
+Unfortunately bit patterns are not an adequate representation for most
+of the things we want to apply computers to. I.e. we need to represent
+the shapes of objects, the structures of plans, sentences, family trees,
+the contents of images, the organisation of a factory, the current state
+of an order book, the stock in a warehouse, the contents of a
+dictionary, etc. etc.
+
+Similarly the operations that we need to perform on representations are
+not necessarily the operations provided by the computer. E.g. we may
+want to match two networks (graphs) and produce a description of how
+they differ.
+
+Computer scientists have therefore devised ways of implementing more
+abstract data-types (virtual data-types) in terms of the primitive ones.
+This enables us to talk about the computer as containing such things as
+strings of characters, words, arrays, lists of words, trees, networks,
+inference rules, data-bases, association tables, procedures, etc.
+
+Associated with each class of data, or data-type, will be a family of
+procedures, which help to define what that data-type is. E.g. associated
+with a data-type may be procedures concerned with:
+
+    constructing instances,
+    recognising them,
+    matching two structures,
+    interrogating:
+        e.g. how big is it? what is its N'th component?, etc.
+    traversing (e.g. doing something to every component),
+    searching,
+    changing the contents of instances:
+        e.g. inserting , deleting, replacing a component,
+    sorting components
+        (e.g. into alphabetic or numeric order)
+    merging instances,
+    building networks of instances,
+    printing,
+    reading in external representations,
+    associating other entities with instances,
+    sending messages to instances.
+
+
+-- Common data types --------------------------------------------------
+
+Most programming languages support booleans, integers, reals (decimals),
+strings (one-dimensional arrays or vectors of characters),
+multi-dimensional arrays, records of fixed length.
+
+Usually it is up to the user to implement additional structures in terms
+of these. Most books on data-structures show various ways to implement:
+
+    stacks
+    queues
+    linked lists
+    trees
+    graphs (networks - directed or undirected)
+
+From books on data-structures and algorithsm you will discover how to
+implement a range of procedures associated with particular classes of
+structures. E.g. there are algorithms for searching a large string to
+find out whether a given string is contained in it. Similarly searching
+a graph to see if a  smaller graph is containined in it, or checking
+whether two graphs match.
+
+Algorithms have to be very carefully designed: a bad design may be so
+much slower, or require so much more space, that it is unusable on
+larger data-structures.
+
+
+-- Lazy evaluation ----------------------------------------------------
+
+Sometimes structures are created only as required. This is sometimes
+called "lazy evaluation". For example POP-11 allows the creation of
+dynamic lists, defined in terms of a procedure which returns a new
+result each time it is called. (A generator procedure). The procedure
+PDTOLIST (ProceDure TO LIST) when applied to such a generator returns a
+dynamic list.
+
+    lvars counter=0;
+    define count()-> result;
+        lvars result=counter;
+        counter + 1 -> counter;
+    enddefine;
+
+    vars dlist=pdtolist(count);
+    dlist =>
+    ** [...]    ;;; unexpanded dynamic list
+    hd(dlist) =>
+    ** 0
+    hd(tl(dlist)) =>
+    ** 1
+    dlist =>
+    ** [0 1 ...]
+    hd(tl(tl(dlist))) =>
+    ** 2
+    dlist =>
+    ** [0 1 2 ...]
+    "cat" -> dlist(5);
+    dlist =>
+    ** [0 1 2 3 cat ...]
+
+DLIST is a list of (potentially) infinite length.
+
+AI programs often need to create structures that are potentially
+infinite. For example, a knowledge store may contain some axioms and
+inference rules, and may be used as if all the consequences derivable
+from the axioms via the rules were in the store already. Each time you
+ask for some information, if it is not explictly there the data-base
+manager checks whether it is derivable, and if so adds it explicitly,
+reporting that it is there. The user cannot tell that it wasn't there
+all along, except that there may be a delay before the answer comes.
+
+
+-- Virtual data-types in POP-11 ---------------------------------------
+
+In POP-11 the range of procedures associated with a data-type can be
+found in the HELP CLASSES file. You can find more technical detail in
+REF DATA and REF KEYS.
+
+POP-11 is unusual in that it allows data-structures to be treated as
+procedures, in which case the "class_apply" procedure for the data type
+will be invoked. This is analogous to the approach of "object oriented"
+systems, which allow "messages" to be sent to data.
+
+In addition to general procedures associated with a range of data-types
+there will also be very specific procedures. E.g. arithmetic operations
+such as subtraction and multiplication are not defined on lists, though
+they are defined on a range of number types:
+
+    integers, big integers, ratios,
+    decimals, ddecimals, complex numbers.
+
+Similarly there is a collection of procedures associated with arrays
+(See HELP ARRAYS), which will not work on other objects.
+
+Some languages have a fixed set of data-types. Others, like POP-11, C,
+Pascal, Algol68, ML, and modern versions of Lisp, allow the user to
+define new data-types, since the built in set may not meet the needs of
+all applications.
+
+However, even the built-in methods of extending data-types may be too
+restricted.
+
+For example, the most common extensions are to allow new record classes,
+and new vector classes (or array classes). The built in mechanisms will
+then provide a means of building a new vector or record of the newly
+defined class.
+
+However, if what you want is to be able to represent a more complex
+structure e.g. in the form of a network or tree, then you will usually
+have to define for yourself the procedures which create such entities
+out of those the system can already handle. Similarly, the built in
+mechanisms, which usually provide procedures for recognition, accessing
+and modification of structures, may not provide all the kinds of
+procedures required. E.g. you may wish to have an accessing procedure
+which not only tells you what the first element of a structure is, but
+also records the number of times it has been invoked on that structure
+by modifying one of the fields of that structure. If so you will have to
+define it yourself.
+
+In this way, programs can define more and more abstract kinds of
+"virtual" structures built layer by layer on top of those given by the
+machine. An interesting question for AI is whether the kinds of things
+that we refer to in talking about the mental states of intelligeng
+agents could be defined in terms of abstract virtual data-structures.
+For example beliefs, desires, intentions, skills, personality traits,
+might all be virtual data-structures, perhaps often made up of component
+virtual data-structures. E.g. the belief that food is in the oven, the
+desire to eat the food and the intention to eat it may all share a
+common sub-structure. However these are controversial issues.
+
+
+-- Implicit structures - the POP-11 user stack, etc. ------------------
+
+The POP-11 stack is not a data-structure that users can point to. It is
+a unique part of the address space used by the system. It can (with
+caution!) be treated as a variable length vector, and the procedure
+SUBSCR_STACK (and its updater) can be used to access its components.
+
+It is accessed implicitly by:
+    assignments:            -> x      (remove top of stack)
+    variable accesses:      x;        (copy value to top of stack)
+    calls of procedures:    f(x)      (arguments taken off stack,
+                                        results left on stack)
+    calls of updaters:      -> f(x)   (if something is taken off stack)
+
+TEACH * STACK explains more. HELP * STACK summarises stack operations,
+including explicit stack operatoins like * DUP, SUBSCR_STACK and =>
+
+
+Besides the built in user stack, there are other "hidden" stacks used
+by POP-11, e.g. the stack of procedure activations, the Prolog
+continuation stack.
+
+In addition users may create their own stacks, e.g. using lists (with a
+garbage collection overhead) or vectors.
+
+
+-- Implementation issues ----------------------------------------------
+
+Given that the computer is provided with a linear (virtual) memory
+composed of bit patterns (bytes, words, long-words), how can a rich
+variety of data-types be created?
+
+The usual technique is to set aside a portion of the memory called
+the "heap", and to divide it up into sub-portions representing different
+sorts of structures. Systems vary in the degree of flexibility. Issues
+include:
+
+1. Does the heap have to have a fixed size or can it be dynamically
+enlarged or compressed?
+
+2. Does the allocation of the heap to different data-types have to be
+rigid or can the system determine allocation dynamically as required?
+
+3. Can the system automatically reclaim and re-allocate space that is
+no longer required? (I.e. is garbage collection provided.)
+
+4. Must everything always be created explicitly or can some structures
+be represented implicitly and extended "on demand" (e.g. dynamic lists
+in POP-11 or sparse arrays, most of whose locations do not exist).
+
+5. Can type-checking (i.e. ensuring that a procedure is not applied to
+the wrong sort of data) be done at compile time or must it be done at
+run time? Languages like Pascal, C and ML do it at compile time, whereas
+Pop-11 and Lisp do it at run-time.
+
+6. Should run-time checking be implemented by means of "tags" or by
+"keys". This issue is discussed below.
+
+If a structure is represented by a portion of the heap of arbitrary size
+then it will not generally be able to fit into the computer's registers,
+nor be able to be operated on as a single chunk. It is therefore
+normally represented by a "pointer" i.e. a smaller structure (usually
+the size of a machine word) that says where it is in the heap, i.e.
+gives its address.
+
+Entities that can fit into a single machine word need not be represented
+by pointers. In POP-11 there are two such types: integers and decimals:
+they are called "simple" and all other types are called "compound".
+(But BIGINTEGERS and DDECIMALS are compound.)
+
+
+-- Where does a structure end? ----------------------------------------
+
+Given a pointer that indicates where a structure is in the heap a
+procedure to operate on that structure will need to know how much of the
+heap is part of the same structure, i.e. what its size is.
+
+There are three main cases, depending on the type of structure:
+
+1. Contiguous fixed length (record classes):
+    All instances of the type have the same length. E.g. all PAIRS have
+    two elements. All RATIOS have two elements. All REFERENCES have only
+    one element. A user-defined record calss might consist of three-
+    element structures.
+
+    In this the type of structure and its starting point in the heap
+    (i.e. its address) suffices to determine how much of the heap
+    the structure occupies.
+
+2. Contiguous variable length (vector classes):
+    Here different instances of the same type have different lengths.
+    E.g. 'cat' and 'catch' are strings (character vectors) with three
+    and five elements respectively. So knowing that something is a
+    string does not tell you how long it is. Usually the length is
+    indicated near the beginning of the structure. E.g. it might be
+    in the first word of the structure.
+
+3. Non-contiguous structures.
+    Lists in POP-11 are made of two-element links called pairs. The
+    pairs comprising one list may be scattered all over the heap. In
+    this case the basic mechanisms manage only the contiguous structures
+    and special purpose list processing procedures have to be defined
+    for dealing with the non-contiguous virtual structures. E.g. the
+    LISTLENGTH procedure chains down the list counting elements until
+    it gets to the end. (Would it be possible to associate the remaining
+    length with each list link, if each link had three, instead of two
+    fields?)
+
+There are also cases where the whole structure is never created in full.
+Instead bits of it are created as they are needed. The dynamic list,
+illustrated above, demonstrates this.
+
+There are (at least) two reasons why non-contiguous structures are
+sometimes needed.
+
+a. At the time the structure is created it may not be known how many
+elements it is going to have eventually. So the initial size allocated
+on the heap may not be enough. If it later has to be extended there
+may not be spare space adjacent to it on the heap. Instead of shifting
+everything about to make more room it may be simpler to "chain"
+different structures together, treating them as one large structure.
+
+b. It may be necessary for one substructure to be part of two or more
+larger structures. This can be achieved by allowing larger structures to
+share sub-structures in different parts of the heap. E.g suppose you want
+to make a list representing all the subsets of a set of elements in a
+given list [a b c]. Including the empty set, which is a subset of
+everything, the eight sub-sets would be (using the convention that
+elements are stored in alphabetical order):
+
+    1   2    3    4    5      6      7      8
+    []  [a]  [b]  [c]  [a b]  [a c]  [b c]  [a b c]
+
+By letting list 3 be the "tail" lf list 5, and letting list 4 be the
+tail of lists 6 and 7, and letting 7 be the tail of 8, we can save quite
+a lot of construction of new lists.
+
+
+-- Tagged architectures -----------------------------------------------
+
+Sometimes the type of a structure determines its length. Sometimes it
+doesn't. But in any case it is necessary to determine the type of a
+structure, e.g. in order to decide how an operation is to be applied
+to it (e.g. how should it be printed? or how should two of them be
+compared by the equality test?).
+
+One way to indicate type is to use some extra bits in the "pointer",
+which then has a type-field (or "tag") and an address-field saying where
+the stucture is in the heap. Any procedure attempting to identify the
+type need only look at the tag bits, and use them as a key into a
+table.
+
+A related technique is to divide the address space into different
+"cages" and put data of different types in the different cages. The
+different cage boundaries can then, in principle, be shifted around
+depending on how many different instances there are of each type.
+
+Another alternative, used in POPLOG, is to add an extra field to each
+structure (apart from the simple ones). The extra field points to a
+"key" for the data-type. The key is itself a record of a special type,
+and contains information about the type, e.g. how to print it, how to
+select or update fields, etc. This is a very simple mechanism but has
+the disadvantage that checking the type of any item requires getting
+the key field out of memory, and this can be slower than simply
+inspecting the pointer to examine the tag bits or check which address
+range it points to.
+
+The problem with tag bits is that it may require a non-standard memory
+(e.g. lisp machines have 36 bit word length), and moreover there may not
+be enough tag bits to cater for all the data-types required.
+
+
+-- Garbage collection -------------------------------------------------
+
+There are many different techniques for this, depending on the kind of
+data representation used. POPLOG uses a "stop and copy" method, which
+requires more space to be available during garbage collection but has
+the advantage that only the non-garbage items are ever looked at.
+
+Alternatives involve shuffling items down the heap to compact them,
+which has the advantage that the order of items on the heap always
+corresponds to the order in which they were created, which can be
+useful.
+
+Incremental garbage collectors are useful for programs that need to
+operate in "real time" and therefore cannot suddenly stop for a length
+garbage collection.
+
+Some garbage collection methods require an extra bit of every item to be
+made available to mark it as already examined during the sweep through
+the heap.
+
+
+-- Association structures ---------------------------------------------
+
+These are of various kinds. E.g.
+    two arrays with N'th elements of each associated
+    one array of two element fields
+    association lists (see HELP *ASSOC)
+    hash tables (see HELP * NEWPROPERTY, HELP * NEWANYPROPERTY)
+
+
+-- Structure sharing: context mechanisms ------------------------------
+
+Sometimes it is useful to associate values with objects in such a way
+that the value can change over time, or be different in different
+"contexts", e.g. different hypothetical situations considered during
+planning.
+
+"context" or "viewpoint" mechanisms make this possible without having to
+duplicate everything that changes, by allowing one context to be a
+descendent of another in a context tree, and only storing in a lower
+level context items that have changed from higher level contexts.
+An illustrative library package is described in TEACH * VIEWS and
+HELP * VIEWS (in POPLOG 12.6 onwards).
+
+
+-- Control structures -------------------------------------------------
+
+Different control structures are required for operations on different
+sorts of data. For example, traversing a linear list or vector can
+easily be done by means of a loop:
+
+    for x in list do .... x.... endfor
+
+    for x from 1 to datalength(vector) do
+        .....subscrv(x,vector)...
+    endfor
+
+
+However, for traversing a tree it is normally useful to use recursion.
+E.g. to count all the atoms in a tree:
+
+    define count(tree) -> total;
+        lvars tree,total;
+        if tree == [] then 0 -> total
+        elseif atom(tree) then 1 -> total
+        else count(hd(tree)) + count(tl(tree)) -> total
+        endif
+    enddefine;
+
+    vars tree=[1 2 [3 [4 [5] ] 6]];
+
+    count(tree) =>
+    ** 6
+
+    trace count;
+    count(tree) =>
+    >count [1 2 [3 [4 [5]] 6]]
+    !>count 1
+    !<count 1
+    !>count [2 [3 [4 [5]] 6]]
+    !!>count 2
+    !!<count 1
+    !!>count [[3 [4 [5]] 6]]
+    !!!>count [3 [4 [5]] 6]
+    !!!!>count 3
+    !!!!<count 1
+    !!!!>count [[4 [5]] 6]
+    !!!!!>count [4 [5]]
+    !!!!!!>count 4
+    !!!!!!<count 1
+    !!!!!!>count [[5]]
+    !!!!!!!>count [5]
+    !!!!!!!!>count 5
+    !!!!!!!!<count 1
+    !!!!!!!!>count []
+    !!!!!!!!<count 0
+    !!!!!!!<count 1
+    !!!!!!!>count []
+    !!!!!!!<count 0
+    !!!!!!<count 1
+    !!!!!<count 2
+    !!!!!>count [6]
+    !!!!!!>count 6
+    !!!!!!<count 1
+    !!!!!!>count []
+    !!!!!!<count 0
+    !!!!!<count 1
+    !!!!<count 3
+    !!!<count 4
+    !!!>count []
+    !!!<count 0
+    !!<count 4
+    !<count 5
+    <count 6
+    ** 6
+
+
+-- Operating systems require data-structures --------------------------
+
+An operating system will generally require a range of data-structures
+representing the current state of the file-store, the different
+processes currently running, the allocation of processes to main memory
+and to disk, information about various users and the groups they belong
+to, the various devices attached to the computer (e.g. disks, terminal
+channels, frame-stores, etc.). In many systems there will be accounting
+information associated with each user, e.g. a record of the amount of
+CPU time, the number of disk accesses, the size of memory used for
+various lengths of time, etc.
+
+
+-- Compilers require data-structures ----------------------------------
+
+A compiler needs to store information about various symbols that can be
+recognised in the input stream (a symbol table), information about the
+syntactic rules of the language, information about the machine code
+equivalents of various kinds of operations in the language being
+compiled (i.e. its semantics). During compilation it has to build
+temporary structures representing what it has read in so far and how it
+has analysed it. Some compilers build parse-trees as an intermediate
+representation.
+
+The result of compilation may be a new structure, a record consisting of
+machine instructions to be run and some additional data-structures
+representing information required when the procedure runs.
+
+In POP-11 procedures are compiled into records which contain a range of
+information, e.g.
+    the key (i.e. a pointer to the procedure key)
+    what type of procedure it is (there are several types in POP-11)
+    the PDPROPS (usually containing the name of the procedure0
+    the PDNARGS (a field specifying the number of arguments)
+    the UPDATER (a field specifying the action to be executed when
+        the procedure is called to the right of an assignment arrow.)
+
+In addition there will be information not accessible to the user, about
+the local variables and other structures used by the procedure, and the
+other procedures it invokes.
+
+-- Conclusion ---------------------------------------------------------
+
+This file does not pretend to be a complete survey of the concepts,
+problems and techniques associated with the notion of a datastructure.
+It merely introduces the issues. A particularly important issue that has
+not been addressed, and which is specially relevant to the design of
+intelligent systems, is how a machine can use structures within it to
+refer to things outside itself. But this problem arises also for human
+beings. At least we know that machines can use pointers to refer to
+things inside themselves.
+
+-- Reading ------------------------------------------------------------
+
+In general books on this topic tend to be rather dated and simplistic.
+But you should read some anyway, in order to see what the "standard"
+material looks like. New books are coming out all the time, and it is
+very likely that there are some very good new ones that I don't know
+about.
+
+The first boook is good and cheap.
+
+Seymour Lipschutz
+    Theory and problems of data structures
+    Schaum's outline series
+    McGraw-Hill 1986            Paperback 7.95
+
+Here are more, culled from a reading list produced by Jon Cunningham,
+with his comments, plus a few cross-references found in other texts:
+
+Mark Elson
+    Data Structures
+    Science Research Associates, 1975
+    This one looks quite good, but the library only has three copies.
+
+E Horowitz & S Sahni.
+    Fundamentals of Data Structures
+    Apparently they invent their own language, which could be
+    confusing.
+
+The following two books use PASCAL, but you should be able to make
+sense of them.
+
+Page & Wilson
+    Information representation and manipulation in a computer
+    (2nd Edition) Cambridge Univ Press, 1978
+
+Aho, Hopcroft & Ullman.
+    Data Structures and Algorithms
+
+D. Knuth
+    Fundamental Algorithms, (chapter 2).
+
+M.J.R Shave
+    Data Structures
+    McGraw-Hill, London 1975.
+    Elementary, but dated and uses ALGOLW
+
+D. Coleman
+    A structured approach to data
+    Macmillan, London 1978
+
+-- Relevant TEACH, HELP and REF files ---------------------------------
+
+There are several TEACH, HELP, and REF files in POPLOG that provide
+additional information that you may find useful:
+
+TEACH * WAL tells you how lists are represented in terms of PAIRS in
+            POP-11.
+
+TEACH * LISTS, * SETS, * SETS2 (how to represent sets in terms of lists)
+
+The following explain some commonly used data types
+HELP * PAIR, * LISTS, * VECTORS, * STRINGS, * ARRAYS, * REF
+
+HELP * PDTOLIST     - on dynamic lists
+HELP * PROPERTIES   - on structures mapping objects to objects
+HELP * CLOSURES     - structures combining a procedure and some data
+
+Overview help files
+HELP * DATASTRUCTURES, * CLASSES,
+
+Defining new record or vector types
+HELP * RECORDCLASS, * VECTORCLASS
+
+HELP * MATH, and REF * NUMBERS, describe number data types in POPLOG
+    and the operations on them.
+
+REF  * DATA, * RECORDS, * VECTORS, * STRINGS, * KEYS, * PROPS
+
+--- C.all/teach/datastructures -----------------------------------------
+--- Copyright University of Sussex 1988. All rights reserved. ----------

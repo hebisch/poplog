@@ -1,0 +1,809 @@
+TEACH SETS2                              A. Sloman and S. Hardy Oct 1980
+                                           Revised Aaron Sloman Dec 1996
+
+     PREDICATES - LISTS - SETS - LOGIC: Some Basic Procedural Ideas
+     ==============================================================
+
+For your work on this teach file, create a file of your own called
+
+    sets2.p
+
+Specimen answers may be made available later, which you can compare with
+your answers.
+
+
+CONTENTS
+
+ -- Introduction
+ -- Predicates
+ -- Exercises defining predicates
+ -- Defining relations
+ -- Defining issubset
+ -- Checking whether a list is redundant
+ -- Searching for an instance of a predicate: exists
+ -- Using an anonymous procedure with exists
+ -- Using Partial application (Optional topic)
+ -- The findone exercise
+ -- Defining all(list, pred) -> boolean
+ -- Defining hasodd, haseven, allodd, alleven
+ -- Extending findone to findall(list, pred) -> newlist
+ -- Understanding secret
+ -- Pruning redundant elements from a list
+ -- Defining union(list1, list2) -> newlist
+ -- Defining intersection
+ -- Defining larger(list1, list2) -> boolean
+ -- Defining more(list1, pred1, list2, pred2) -> boole;
+ -- Defining most
+ -- Defining removall and subtract
+ -- Defining overlaps and excludes
+ -- The subculture problem
+ -- Towards an intelligent database
+
+-- Introduction -------------------------------------------------------
+
+Read TEACH SETS before working on this file. You should be familiar with
+the syntax for defining procedures. See HELP * DEFINE for revision,
+or the Pop-11 primer (chapter 4). TEACH STACK is also useful for
+understanding how procedures communicate with one another.
+
+Note that the syntax of Pop-11 has changed somewhat since this file was
+first produced.
+
+Examples have been modified to conform to the syntax of Pop-11 since
+Poplog Version 15.01 (late 1995).
+
+Some of these exercises are quite easy, others fairly advanced. They
+will give you a lot of experience of list-processing, and using
+"logical" concepts.
+
+Questions 23 and 24 are quite difficult. They illustrate quite complex
+programming tasks that are manageable in a language that includes list
+processing facilities and automatic garbage collection but could be much
+more difficult in other languages (e.g. Pascal, C, C++).
+
+
+[[NOTE
+Some of the exercises have an optional section enclosed in double
+square brackets [[ .... ]]. These sections presuppose an understanding
+of "partial application". They can be ignored if you don't know about
+partial application.
+
+Partial application is a powerful technique for combining procedures
+with data (which may be other procedures) to form new procedures. If you
+want to learn about it look at:
+
+    HELP * CLOSURES
+    TEACH * PERCENT/closures,
+    HELP * PARTAPPLY
+
+or section 11.3 of the Barrett, Ramsay and Sloman book on Pop-11, or
+the sections on closures and partial application in chapter 4 of
+the Pop-11 Primer: TEACH PRIMER/'CHAPTER.4'
+END NOTE]]
+
+
+The next few exercises are rather trivial, but are designed to get you
+used to some important terminology.
+
+-- Predicates ---------------------------------------------------------
+
+Here is an introduction to an important concept from logic.
+
+A predicate is a procedure which produces the result TRUE or FALSE.
+I.e. its result is a "boolean" object.
+
+Standard predicates in POP11 include ISINTEGER, ISPROCEDURE, ATOM, ISWORD.
+
+These are "recogniser" predicates can be applied to any object at all,
+no matter what its type. Some predicates (like ODD and EVEN) defined
+below can be applied only to a restricted class of objects (e.g.
+numbers).
+
+Predicates are frequently used in IF or UNLESS expressions, e.g:
+
+     IF ISINTEGER(X) THEN ... ELSE ... ENDIF
+
+     UNLESS ISWORD(X) THEN ... ELSE ... ENDUNLESS
+
+That is because the conditional expression that occurs before THEN
+should evaluate to a result that is true or false.
+    o If it is false then the instructions following THEN will not be
+      obeyed.
+    o If it is true, or anything else other than false, then the
+      instructions after THEN will be obeyed.
+
+This means that in POP-11 any object can count as TRUE, as long as it
+isn't the unique object FALSE.
+
+Here is a predicate to decide whether a number is bigger than ten:
+
+    define aboveten(number) -> boolean;
+        number > 10 -> boolean
+    enddefine;
+
+Notice that this produces a result, which is left on the stack. The
+result is in fact the result of the operator ">", i.e. TRUE or FALSE.
+The operator ">" leaves its result on the Pop-11 stack. It is then
+assigned to the local variable boolean. However that is an output local
+so when aboveten finishes running the value of boolean is put on the
+stack. That is then the result of the whole procedure.
+
+Test it
+
+/*
+    aboveten(3) =>
+    ** <false>
+    aboveten(10) =>
+    ** <false>
+    aboveten(11) =>
+    ** <true>
+
+    aboveten("cat") =>
+    ;;; MISHAP - NUMBER(S) NEEDED
+    ;;; INVOLVING:  cat 10
+    ;;; DOING    :  > aboveten runproc
+
+*/
+
+Some people prefer the functional style of programming where an output
+local variable is not used, as here:
+
+    define aboveten(number);
+        number > 10
+    enddefine;
+
+I.e. the result of the procedure is whatever the result is of the
+expression
+    number > 10
+
+
+-- Exercises defining predicates --------------------------------------
+
+1. Define the following predicates:
+
+
+    positive(number) -> boolean
+        (TRUE iff its argument is greater than zero),
+
+    negative(number) -> boolean
+        (TRUE iff its argument is less than zero),
+
+
+    even(number) -> boolean
+        (TRUE iff its argument leaves a zero remainder when divided
+        by two)
+
+    odd(number)
+
+In defining the first two you can use the Pop-11 arithmetic infix
+operators:
+    > and <
+
+For the last two you may find it helpful to use the infix operator
+"mod", described in HELP * MOD. (You may also need the procedure NOT.)
+
+
+2) What will be printed out by the following?
+
+    (You should first decide what will be printed out -- preferably
+    writing your answer down, and then check your answers using the
+    computer to compile each line)
+
+    isinteger(1), isinteger("a"), isinteger(1+5) =>
+
+    isinteger(1.5), isinteger(1.0) =>
+
+    isinteger([1]) =>
+
+    islist([1]) =>
+
+    isinteger('1'), isinteger(isinteger)=>
+
+    isprocedure(isinteger), isprocedure(isprocedure) =>
+
+    isprocedure(3), isprocedure("a")=>
+
+    isword("cat") =>
+
+    isword('cat') =>
+
+    isword([cat]) =>
+
+    islist([cat]) =>
+
+    atom(3) =>
+
+    atom(atom), atom(isinteger), atom("a"), atom([a b c])=>
+
+
+-- Defining relations -------------------------------------------------
+
+3) Questions (1) and (2) were about predicates of one argument. The
+operations =, >=, <=, > and < (see POPSUMMARY or PRIMER) can be thought
+of as predicates as they too produce the result TRUE or FALSE.
+
+Predicates that take two or more arguments are sometimes called
+"relations" or "relational predicates".
+
+Sometimes they are called "binary predicates", "ternary predicates"
+"N-ary predicates" etc. depending on whether they take two, three or N
+arguments.
+
+We can define our own "relational predicates", e.g.
+
+    define isless(numberone, numbertwo);
+        numberone < numbertwo
+    enddefine;
+
+You will notice that many of the relations already defined in POP11 have
+names which are infix operations, which means that they can be executed
+by putting their names between their arguments, as in
+
+    X > 5
+
+    Y >= X
+
+Not all system predicates are like this, for example MEMBER.
+
+As an exercise define a relation MUCHLESS of two arguments which returns
+TRUE if its second argument exceeds its first by more than 100.
+
+
+    define muchless(num1, num2) -> boole;
+        ...
+    enddefine;
+
+What should replace "..."
+
+/*
+;;; Test it
+
+    muchless(3, 2) =>
+    muchless(3, 400) =>
+    muchless(3, 2200) =>
+
+*/
+
+
+4) Predicates can be applied to all sorts of things - not just numbers
+as in most of the examples above.
+
+We could, for example, define a procedure which given a 'thing' and a
+list returns TRUE if the thing is in the list and FALSE otherwise. This
+procedure, called MEMBER is already part of the Pop-11 system (at least
+in Poplog).
+
+TEACH SETS shows how you can define a similar procedure called
+ISELEMENT.
+
+Try the procedure member on various pairs of arguments, e.g.
+
+    vars cat = 99;
+
+    member(cat,  [dog cat mouse]) =>
+
+    member("cat", [dog cat mouse])=>
+
+    member('cat', [dog cat mouse])=>
+
+    member('cat', ['dog' 'cat' 'mouse'])=>
+
+    member([cat], [dog cat mouse])=>
+
+    member([cat], [[dog] [cat] [mouse]])=>
+
+In each case try to predict the result, before you try it. If you get
+the result wrong and don't know why, ask for help.
+
+-- Defining issubset --------------------------------------------------
+
+5) Use the procedure MEMBER to write a procedure called ISSUBSET which
+takes two lists and returns TRUE if every element of the first list is
+a MEMBER of the second, but FALSE otherwise. It should have this header.
+
+    define issubset(list1, list2) -> boolean;
+
+I.e.
+    issubset([2 4 3 1], [6 7 1 4 3 2 5])
+
+should be TRUE but not
+
+    issubset([e d], [a b c d])
+
+
+HINT: use a loop in which you take each element of the first set, and
+check whether it is a member of the second set. If you ever find one
+that is not, return false. If you get through without finding one,
+return true. Make sure that your definition of issubset (in your file
+sets2.p) has proper comments explaining WHAT the procedure is supposed
+to do (not HOW it does it), and including some tests in a comment after
+the definition.
+
+What would you expect the following to return?
+
+     issubset([], [1 2 3 4])=>
+     issubset([a e], [a b [e] d c])=>
+     issubset("a", [a b c d])=>
+
+Check your version on those examples.
+
+
+-- Checking whether a list is redundant -------------------------------
+
+6) If the following is true
+
+    member(hd(list), tl(list))
+
+then the first element of the list (hd(list)) must occur at least
+twice in the list.
+
+Can you use this fact to write a procedure, called REDUNDANT, which,
+given a list, returns TRUE if there are any repeated elements, so that:
+
+     redundant([])=>
+    ** false
+     redundant([1 3 5 2 1])=>
+    ** <true>
+
+What about this?
+    redundant([[a] [b] [a]])
+
+Put your definition into your sets2.p file, preceded by a specification
+of what it does, and followed by test examples.
+
+
+-- Searching for an instance of a predicate: exists -------------------
+
+7) What does the following procedure do? (Assume LIST is a list and
+PRED a predicate.)
+
+    define exists(list, pred) -> result;
+        if  list == [] then
+            false -> result
+        elseif  pred(hd(list)) then
+            true -> result
+        else
+            exists(tl(list),pred) -> result
+        endif
+    enddefine;
+
+what will The following do (TRACE EXISTS for some of them):
+
+    exists([a b 1 2 3 e] , isinteger)=>
+    exists([a b 1 2 3 e] , isword)=>
+    exists([a b 1 2 3 e] , isprocedure)=>
+    exists([% "a", "double", "hd", tl %], isprocedure)=>
+    exists([% "a", "double", "hd", "tl" %], isprocedure)=>
+
+Try changing the definition of exists so that instead of returning TRUE
+it returns the actual object found that satisfies the predicate, e.g.
+
+    exists([a b 1 2 3 e] , isinteger)=>
+    ** 1
+
+    exists([a b 1 2 3 e] , isword)=>
+    ** a
+
+-- Using an anonymous procedure with exists ---------------------------
+
+We can use PROCEDURE ..... END to create AN ANONYMOUS procedure to be
+the second argument of EXISTS, if a suitable procedure has not
+previously been defined, as in
+
+    exists([a 1 b 2 c 3], procedure(x); member(x,[2 4 6 8]) endprocedure)=>
+
+This checks whether there exists an element of [A 1 B 2 C 3] which is
+also an element of [2 4 6 8].
+
+You can also write the above as:
+
+    exists([a 1 b 2 c 3],
+        procedure(x); member(x,[2 4 6 8]) endprocedure)=>
+
+(In Pop-11 line breaks are normally equivalent to spaces.)
+
+
+-- Using Partial application (Optional topic) -------------------------
+
+[[Ignore everything up to the next section header if you have not learnt
+about partial application, or if you are finding it hard to keep up:
+
+Alternatively, instead of using PROCEDURE to create a whole new
+procedure, we can "partially apply MEMBER to a list to create a
+procedure which tests if its argument is a member of the list, thus:
+
+     exists([a 1 b 2 c 3], member(% [2 4 6 8] %))=>
+
+Here
+    member(% [2 4 6 8] %)
+
+is a new predicate created from member by partially applying it to the
+list [2 4 6 8]. This sort of procedure is called a "closure" - in this
+case a closure of member. See HELP * CLOSURES).
+
+]]
+
+-- The findone exercise -----------------------------------------------
+
+8) Using a method similar to the previous definition of exists, or
+another method if you prefer, define a procedure called FINDONE which
+takes a list and a predicate as arguments. If there is an element of the
+list which satisfies the predicate then FINDONE should produce the first
+such element as its result; if there isn't one the result should be
+FALSE. thus:
+
+    findone([a b 3 4 5], isprocedure)=>
+    ** <false>
+
+    findone([a b 3 4 5], isinteger)=>
+    ** 3
+
+    findone([a b ^sqrt 3 4 5 ^hd], isprocedure)=>
+    ** <procedure sqrt>
+
+See if there is an ATOM (i.e. a non-list) in some list thus:
+
+     findone([[a b] [c d] [e]], atom) =>
+    ** <false>
+
+     findone(
+        [a b [a b] [c d] e],
+        procedure(x); lvars x; not(atom(x)) endprocedure)=>
+    ** [a b]
+
+Instead of that complex anonymous procedure we can create a procedure
+by composing atom and not using <> thus;
+
+     findone([a b [a b] [c d] e], atom<>not) =>
+
+-- Defining all(list, pred) -> boolean
+
+9) Define a procedure ALL which, like EXISTS, takes two arguments LIST
+and PRED and produces TRUE if every element of the LIST satisfies PRED
+but FALSE if at least one element of LIST does not satisfy PRED.
+
+    all([2 4 6 8 a], isinteger)=>
+    ** <false>
+
+    all([2 4 6 8], isinteger)=>
+    ** <true>
+
+    all(
+        [a b c],
+        procedure x; lvars x; member(x, [a 1 3 c 2 b]) endprocedure)=>
+    ** <true>
+
+[[Ignore the next two, if you don't know about partial application
+
+    all([a b c], member(% [a 1 3 c 2 b] %))=>
+    ** <true>
+
+    all([a b c], member(% [d 1 3 e 2 f] %))=>
+    ** <false>
+
+]]
+
+What result should the following produce?
+
+    all([], isprocedure) =>
+    all([], isword) =>
+
+It may help to be reminded of the ISSUBSET procedure from question 5.
+
+
+-- Defining hasodd, haseven, allodd, alleven
+
+10) Using the predicates ODD and EVEN (see question one) and the
+procedure EXISTS (see question seven) define two predicates HASODD and
+HASEVEN each of which takes a list and produces TRUE if at least one
+element of the list is odd (for HASODD) or even (for HASEVEN).
+
+Similarly, using the procedure ALL define two predicates ALLODD and
+ALLEVEN such that:
+
+    allodd([1 3 5 6 7])=>
+    ** <false>
+    allodd([1 3 5 7])=>
+    ** <true>
+
+-- Extending findone to findall(list, pred) -> newlist ----------------
+
+11) Define a procedure FINDALL which takes a list LIST and a predicate
+PRED and produces as a result a list (possibly []) containing all the
+elements of LIST which satisfy PRED.
+
+    findall([a 1 b 2 c 3], isinteger)
+
+should produce the result [1 2 3]. Try to instantiate the following
+schema, and test your procedure.
+
+    define findall(list, pred) -> result;
+
+       if   .... then
+            ... -> result
+       elseif  pred(hd(list)) then
+            [^( ...) ^^(findall(... , ...))] -> result
+       else
+            ...
+       endif
+     enddefine;
+
+
+-- Understanding secret -----------------------------------------------
+
+12) What does the following procedure do?
+
+    define secret(item, list) -> result;
+       if  list == [] then
+            [] -> result
+       elseif  item = hd(list) then
+            tl(list) -> result
+       else
+            [ ^(hd(list)) ^^(secret(item,tl(list)))] -> result a
+       endif
+     enddefine;
+
+
+What will the following print? (Predict the answer then check it.)
+
+     secret("b", [b])=>
+     secret("b", [a b c])=>
+     secret("b", [[a] [b] [c]])=>
+     secret("b", [a b c d e])=>
+     secret("b", [a b c b a])=>
+     secret([b], [[a] [b] [c]])=>
+
+There is a library procedure which behaves like SECRET, except that it
+deletes all occurrences of ITEM in the list. It is called delete. Try
+all these
+
+     delete("b", [b])=>
+     delete("b", [a b c])=>
+     delete("b", [[a] [b] [c]])=>
+     delete("b", [a b c d e])=>
+     delete("b", [a b c b a])=>
+     delete([b], [[a] [b] [c]])=>
+
+Actually delete can be used in several different formats
+See REF * delete
+
+
+-- Pruning redundant elements from a list -----------------------------
+
+13) Using the library procedure DELETE define a procedure PRUNE which
+takes a list as argument and produces a list as its result. The new list
+should contain the same elements as the original one, but with all
+redundancies removed (compare question 6).
+
+Thus prune([A B 1 2 C 2 1 B A]) should produce [A B 1 2 C].
+
+The above definition is ambiguous. Can you explain why?
+
+Can you make it more precise, so that the result should be [A B 1 2 C]
+and not for example [C 2 1 B A] which also contains no repetitions?
+
+
+-- Defining union(list1, list2) -> newlist ----------------------------
+
+14) Using the procedure PRUNE (or the procedure DELETE) define a
+procedure called UNION which takes two lists as arguments and produces a
+new list which contains every element of the two arguments but with no
+redundant elements, thus:
+
+    union([a b c d], [e f c d])=>
+    ** [a b e f c d]
+
+Compare what happens if you reverse the order:
+    union([e f c d], [a b c d])=>
+    ** [e f a b c d]
+
+To make sure that the union of two lists is uniquely defined by their
+elements you could use the library procedure SORT to sort the list after
+it has been pruned. This will only work on lists of words, or lists of
+numbers. Then:
+
+     union([a b c d], [e f c d])=>
+     ** [a b c d e f ]
+
+
+-- Defining intersection ----------------------------------------------
+
+15) Define a procedure called INTERSECTION which takes two lists as
+arguments and returns a list of all the items common to both, thus:
+
+    intersection([a b c d], [e c f d])=>
+    ** [c d]
+
+
+-- Defining larger(list1, list2) -> boolean ---------------------------
+
+16) Define a procedure called LARGER which takes two lists as arguments
+and produces the result TRUE if the first has MORE distinct elements
+than the second, otherwise FALSE, thus:
+
+    larger([a a a], [b c])=>
+    ** <false>
+
+    larger([1 2 3], [a b a b])=>
+    ** <true>
+
+You may find it useful to define a procedure called SETSIZE in terms of
+PRUNE and the system procedure LENGTH.
+
+    setsize([a a a]) =>
+    ** 1
+    setsize([a b a b a c]) =>
+    ** 3
+
+
+-- Defining more(list1, pred1, list2, pred2) -> boole; ----------------
+
+17) Define a procedure called MORE which takes four arguments, thus:
+
+    define more(list1, pred1, list2, pred2) -> boole;
+        lvars list1, pred1, list2, pred2, boole;
+       ...
+     enddefine;
+
+Where LIST1 and LIST2 are lists and PRED1 and PRED2 are predicates.
+
+MORE is to return TRUE if the number of elements of LIST1 which satisfy
+PRED1 is greater than the number of elements of LIST2 which satisfy
+PRED2, otherise false. thus:
+
+     vars lista = [1 2 3 a b];
+     vars listb = [1 2 b c d];
+
+     more(lista, isinteger, listb, isinteger)=>
+     ** <true>
+
+     more(listb, isword, lista, isinteger)=>
+     ** <false>
+
+     more(lista, isinteger, lista, isword)=>
+     ** <true>
+
+You will find it helpful to define a procedure HOWMANY(LIST, PREDICATE)
+which counts the number of elements in LIST which satisfy PREDICATE. You
+could use FINDALL, mentioned above, and LENGTH.
+
+What do you think should be done if one of the lists has repeated
+elements?
+
+-- Defining most ------------------------------------------------------
+
+18) Using MORE define a procedure, called MOST, which takes two
+arguments - a list and a predicate - and returns TRUE iff MOST of the
+elements of the list satisfy the predicate. Is there a better way to
+define MOST than by using MORE?
+
+WARNING: if you forget to declare some of your local variables as
+lexically scoped using lvars, you may find that your procedures produce
+very strange errors, including infinite recursion (or recursion stack
+overflow).
+
+
+-- Defining removall and subtract -------------------------------------
+
+19) Define a procedure called REMOVEALL which, when applied to a list
+and a predicate produces a list containing all the elements of the list
+which do NOT satisfy the predicate. Can you do this using FINDALL (see
+question 11)?
+
+
+20) Define a procedure called SUBTRACT which takes two lists, called say
+LISTA and LISTB, and produces a new list of the elements of LISTA which
+are not in LISTB. Thus:
+
+    subtract([b c d e f g], [a b c d g])=>
+    ** [e f]
+
+[[If you know about partial application, you may find it helpful to
+employ REMOVEALL and MEMBER, using the fact that MEMBER partially
+applied to LISTA (i.e. MEMBER(%LISTA%)) is a predicate TRUE only for the
+elements of LISTA.]]
+
+
+-- Defining overlaps and excludes -------------------------------------
+
+21) Define a procedure called OVERLAPS which takes two lists and
+produces TRUE iff (i.e. if and only if) their INTERSECTION is non-empty.
+
+
+22) Define a procedure EXCLUDES which takes two lists and returns TRUE
+iff the two lists do not OVERLAP.
+
+
+-- The subculture problem ---------------------------------------------
+
+23) Suppose there are ten people in a town, their names being
+
+    a b c d e f g h i j.
+
+You are told that the following pairs of people talk to each other:
+
+     [[a f] [f e] [g i] [h b] [c h] [j d] [g j] [b h] [d i]]
+
+I.e. a and f talk to each other, f and e talk to each other, g and i
+talk to each other, but a and b do not talk to each other.
+
+We define a sub-culture as a set of people individuals who are
+"connected" by talking. Thus information given to one member of a
+subculture can flow to all the others.
+
+Thus although i does not talk to j, i and j are connected via g. Some
+connections may take more steps.
+
+Clearly(!) a, e and f form a 'sub-culture' in this sense: information
+given to any of them could get to any of the others, but not necessarily
+to members of the other sub-cultures.
+
+
+Define a procedure called SUBCULTURE which when given a list of two
+element lists (like that above) groups the pairs together into larger
+lists each of which is a maximal subculture, thus:
+
+    subculture([[a b] [b c] [d e] [e f]]) =>
+    ** [[a b c] [d e f]]
+
+    subculture([[a e] [b f] [c g] [d g]]) =>
+    ** [[a e] [b f] [c g d]]
+
+Put your definition in the file sets2.p. Make sure you precede it with a
+comment giving a specification of what the procedure does. Is the
+specification given in this question sufficiently precise to cover all
+cases? Does it determine the order in which the subcultures should be
+listed? Does it determine the order in which the elements of each
+subculture should be listed? Can you make your definition specify this?
+
+Follow your definition with a comment including the above tests, and
+more of your own.
+
+Can you see any purpose for a program like this? What if the input were
+a list of pairs of towns connected by railway lines? Or a list of pairs
+of numbers with common factors?
+
+Subculture finds maximal "cliques", i.e. maximal subsets of items
+that occur in the same list.
+
+
+-- Towards an intelligent database ------------------------------------
+
+24) Suppose you were given the following information about a set of
+individuals A, B, C, D etc.
+
+     A HAS PROPERTIES P1 P3 P5 AND P6.
+     B HAS PROPERTIES P1 P3 P4 AND P7.
+     C HAS PROPERTIES P2 P4 AND P5.
+      ...
+
+For example, the properties might be things like FEMALE, UNMARRIED,
+HASCHILDREN, ISTEACHER, ISSPINSTER, TALL, BLONDE, BROWNHAIRED,
+FAIRHAIRED etc.
+
+You are asked to make guesses about which properties can be wholly or
+partially 'explained' in terms of the others.
+For example:
+
+    Are all SPINSTERs UNMARRIED?
+    Is being OVER6FT a sufficient condition for being TALL?
+    Is being UNMARRIED a sufficient condition for being a SPINSTER?
+
+Think about, and if possible develop, a program which can make 'good'
+guesses about the answers to questions like these.
+
+For example, to refute the assertion that P1 is necessary for P2 find an
+individual of which P2 is TRUE but not P1.
+
+You may want to assume that an individual lacks any property not
+explicitly ascribed to him or her.
+
+You may find it useful also to look at some of the ideas in
+    TEACH * SETS
+and TEACH * LISTQUESTIONS
+
+Revision material is in TEACH * DEFINE, TEACH * STACK
+
+
+--- $poplocal/local/teach/sets2
+--- Copyright University of Birmingham 1996. All rights reserved. ------

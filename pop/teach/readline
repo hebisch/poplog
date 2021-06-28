@@ -1,0 +1,347 @@
+TEACH READLINE                                Aaron Sloman Feb 23 1979
+                                                     Improved Feb 1984
+
+=== USING READLINE ===================================================
+
+READLINE is a procedure used for writing conversational programs.  It
+takes no inputs, and produces as output a list containing words typed at
+the terminal by the user.
+
+Try the following:
+
+    readline() =>
+
+This will produce the prompt '?', to which you can type something and
+press RETURN:
+
+    ? this is my input to readline
+
+READLINE will read in what you typed and make a list of it. The print
+arrow '=>' will then print it out:
+
+    ** [this is my input to readline]
+
+Try again:
+
+    readline() =>
+    ? happy birthday to you
+    ** [happy birthday to you]
+
+Don't type the '?' : thats the prompt produced by READLINE.
+
+-- SAVING THE LIST IN A VARIABLE --------------------------------------
+
+READLINE is a procedure of no arguments, which asks the system to hand
+it the next line of text which you type in. It then breaks that line up
+into separate items (e.g. words and numbers) and makes a list of those
+items, which it returns as its  result. The result was printed out by
+the print-arrow, above. Instead, you can assign the result to a
+variable. Try:
+
+    vars input;
+    readline() -> input;
+    ? 1 or 2 words and numbers
+    input =>
+
+-- CHANGING THE PROMPT ------------------------------------------------
+
+The only warning that READLINE is waiting for you to type something in
+Is the '?' prompt. You can write a procedure which prints out a message
+to tell you that input is wanted, and then uses READLINE to read in the
+input. Try this:
+
+    define getline(message) -> result;
+        message =>
+        readline() -> result;
+    enddefine;
+
+
+That defined a procedure which produces as its result whatever READLINE
+reads in. You can test it, thus:
+
+    getline( [ please type your name ] ) -> input;
+    ** [please type your name]
+    ? joe bloggs
+
+The line with two asterisks will be printed out before the prompt '? '.
+Nothing more will be printed out when you press RETURN. But you can
+print out what was assigned to INPUT, thus:
+
+    input =>
+    ** [joe bloggs]
+
+Try that, and variations of your own:
+
+    getline( [ whats the day today ] ) -> input;
+    ** [whats the day today]
+    ? tuesday 13 march
+    input =>
+    ** [tuesday 13 march]
+
+Notice that the computer prints something out before you type the second
+line in each group. NB don't put an apostrophe in 'WHAT'S'. See TEACH
+APOSTROPHE.
+
+Similarly, you can't include an apostrophe in the response to READLINE.
+E.g. if you type
+
+    ? it's tuesday
+
+you'll get a mishap as POP11 misinterprets the APOSTROPHE as a string quote.
+
+-- A SIMPLE NUMBER QUIZ -----------------------------------------------
+
+You can use GETLINE to write a simple quizzing program.
+
+    define quiz(x,y);
+        vars input, sum;
+        x + y -> sum;
+        getline([ whats ^x plus ^y ]) -> input;
+        if  input = [^sum]
+        then    [well done] =>
+        else    [wrong you dummy - try again] =>
+            quiz(x,y);
+        endif;
+    enddefine;
+
+
+Actually, typing 'you dummy' in a REAL teaching program would probably
+be a very bad strategy, but never mind.
+
+Put that in a file, with your procedure GETLINE, defined above
+
+Now test your procedure. Try:
+
+    quiz(3,4);
+    quiz(-5, 99);
+
+try giving it some wrong answers.
+
+You can  perhaps see more clearly what is happening if you
+trace all the procedures:
+    trace readline getline quiz;
+    quiz(3,4);
+
+etc. Try that.
+
+-- USING RANDOM TO SELECT THE NUMBERS ---------------------------------
+
+You can make the computer choose the numbers for QUIZ, by using the
+procedure RANDOM. It takes a positive integer as input, and produces an
+unpredictable integer less than that as output. Try this:
+
+    repeat 5 times random(20) => endrepeat;
+
+Which may print something like:
+    ** 10
+    ** 12
+    ** 10
+    ** 2
+    ** 8
+
+You may get different results printed out. You can use a bigger 'upper
+bound' for the random numbers:
+
+    repeat 5 times random(100) => endrepeat;
+    ** 28
+    ** 93
+    ** 93
+    ** 9
+    ** 12
+
+Now you can test your own arithmethic thus:
+
+    untrace readline getline quiz;
+    repeat 10 times
+        quiz(random(100), random(100))
+    endrepeat;
+
+This could produce an interaction like:
+    ** [whats 52 plus 90]
+    ? 145
+    ** [wrong you dummy - try again]
+    ** [whats 52 plus 90]
+    ? 142
+    ** [well done]
+    ** [whats 4 plus 77]
+    ? 81
+    ** [well done]
+    ** [whats 17 plus 15]
+
+etc....
+
+-- DEFINING A PROCEDURE TO CALL QUIZ ----------------------------------
+You can define a procedure which will call QUIZ over and over again
+until you interrupt, by typing CTRL-C, as follows:
+
+    define play();
+        repeat
+          quiz(random(50), random(50))
+        endrepeat
+    enddefine;
+
+Try that, then type
+
+    trace quiz readline;
+    play();
+    ** [whats 32 plus 46]
+    ? 78
+    ** [well done]
+    ** [whats 42 plus 43]
+    ? 95
+    ** [wrong you dummy - try again]
+    ** [whats 42 plus 43]
+    ?
+If you then press CTRL-C you will interrupt this. If you are testing
+this inside the editor, you may have to press the screen refresh button
+afterwards to clear the mess off the screen.
+
+-- STOPPING BY MEANS OF A CONTROL VARIABLE ----------------------------
+
+You can define a procedure which will call QUIZ over and over again
+until you type in BYE, as follows.
+
+First redefine the procedure QUIZ so that if the INPUT is the word "bye"
+then it assigns TRUE a variable FINISHED, then exits.
+Replace line 5 of procedure QUIZ with an additional test as follows:
+
+    define quiz(x,y);
+        vars input, sum;
+        x + y -> sum;
+        getline([ whats ^x plus ^y ]) -> input;
+        if input = [bye] then
+            true -> finished
+        elseif  input = [^sum]
+        then    [well done] =>
+        else    [wrong you dummy - try again] =>
+            quiz(x,y);
+        endif;
+    enddefine;
+
+You can test the effect thus
+    vars finished;
+    false -> finished;
+    repeat
+      quiz(random(100),random(100));
+    quitif(finished);
+    endrepeat;
+
+    ** [whats 36 plus 23]
+    ? 59
+    ** [well done]
+    ** [whats 46 plus 22]
+    ? bye
+
+It stops without the need for CTRL-C.
+
+Now you can define a procedure PLAY which sets up FINISHED and repeatedly
+calls QUIZ
+    define play();
+        vars finished;
+        false -> finished;
+        repeat;
+          quiz(random(50), random(50));
+        quitif(finished)
+        endrepeat;
+        [bye -- hope you enjoyed the quiz]=>
+    enddefine;
+
+Notice that the line
+    quitif(finished)
+
+could have been expressed
+    quitfi(finished = true)
+
+which might have been easier to understand, but comes to the same thing
+for POP-11.
+
+Try all that, then type
+    trace quiz readline;
+    play();
+
+-- A MORE MODULAR VERSION OF QUIZ AND PLAY ----------------------------
+
+This is not a very good strategy, since the procedure QUIZ is used to
+directly change a variable (FINISHED) which really belongs to another
+procedure. This sort of thing can produce errors and make programs hard to
+debug. It would be better to alter QUIZ so that it produces a result, which
+is TRUE or FALSE, depending on whether quizzing should stop. That result
+could be assigned to a variable in PLAY, which uses the value of that
+variable to decide what to do. PLAY can use a different name for that
+variable. I.e. in writing the procedure PLAY you would then not need to
+know what variables were used in  QUIZ. Thus the task of programming
+could be shared between two people.
+
+The procedure heading for QUIZ could be something like:
+
+    define quiz(x,y) -> finished;
+
+Make sure that FALSE is assigned to FINISHED inside QUIZ if the input is a
+number. E.g.
+    if input = [bye] then true -> finished
+    ...
+
+The line after repeat in PLAY could then go:
+
+        quiz(random(50), random(50)) -> finished;
+
+followed by
+        quitif(finished)
+
+as before, or
+        quiz(random(50), random(50)) -> done;
+        quitif(done)
+
+In the latter case VARS FINISHED would have to be replaced by
+VARS DONE;
+
+
+To learn how to define a procedure so as to produce results, using an
+'output local' variable, see TEACH DEFINE.
+
+-- MAKING THE BOUNDS VARIABLE -----------------------------------------
+
+So far we have assumed that numbers between 1 and 50 are acceptable for
+the quiz. But you might want to be able to have easier quizzes. So you
+can define the procedure PLAY so that it takes in two numbers which it
+gives to RANDOM to get the inputs for QUIZ. So if PLAY is re-defined to
+have to input variables, say NUM1 and NUM2. Then instead of just 50,
+NUM1 and NUM2 can be used in the line which calls quiz.
+
+    define play(num1,num2);
+
+        .....
+
+            quiz(random(num1), random(num2) -> finished
+
+        ....
+    enddefine;
+
+Then test your program by trying an easy quiz:
+
+    play(10,10);
+
+-- GENERALISING THE QUIZ ----------------------------------------------
+
+The technique demonstrated here can be used for defining programs which
+play games, or repeatedly read in a sentence and respond to it, etc. As
+an exercise try altering QUIZ so that it tests multiplication, using "*"
+instead of "+".
+
+
+Then alter PLAY so that it asks whether you want to do multiplications
+or additions. Alter QUIZ so that PLAY can call QUIZ with an input which
+is "*" or "+", and depending which it is it will do either a
+multiplication or an addition.
+
+There is in fact a version of GETLINE in the POP11 library, so you don't
+actually need to define your own. You can just use it. Besides GETLINE
+and READLINE POP11 includes several procedures for reading things,
+e.g. ITEMREAD, READITEM, NUMBERREAD, LISTREAD. It is best to avoid them
+unless you are an expert and know exactly what you are doing. READLINE
+and GETLINE should suffice for almost all purposes.
+
+TEACH * RESPOND may prove a useful exercise to try next, if you have not
+already done it.
+
+See also HELP * READLINE, *GETLINE, *REQUESTLINE

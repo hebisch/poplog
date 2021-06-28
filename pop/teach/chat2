@@ -1,0 +1,1972 @@
+TEACH CHAT2
+
+See TEACH MINIVED
+    TEACH ESSENTIALKEYS
+
+=======================================================================
+
+By building your own mini Eliza you can
+
+    o Learn more about Pop-11, and general programming techniques,
+      including loops, conditionals, lists, variables, the pattern
+      matcher, and interactive conversational programs (this is the main
+      justification for this exercise).
+
+    o Get a good feel for why this sort of technique will be inadequate
+      for more sophisticated natural language processing, though useful
+      for simple conversational interfaces.
+
+    o Have practice at designing and documenting a program.
+
+    o Begin to understand the importance of the architecture of a
+      program.
+
+    o Have a bit of fun.
+
+    o Continue to develop fluency with the editor, etc.
+
+
+-- Running the Pop-11 Eliza Program -----------------------------------
+
+The Pop-11 library has its own version of Eliza and you can try playing
+with it for a while to get a feel for what it does.
+
+Depending on how things have been set up you may be able to invoke Eliza
+from one of the mouse selectable menus set up for you. Otherwise try
+typing this to a the prompt in an xterm/console window.
+
+    pop11
+
+That will print out something like this (probably with a different
+version and date):
+
+   Sussex Poplog (Version 15.62 Wed May 20 22:11:54 BST 2009)
+   Copyright (c) 1982-2008 University of Sussex. All rights reserved.
+
+   Setpop
+
+   :
+
+The colon indicates that Pop-11 is waiting for you to type something.
+Type this on the same line as the colon, to invoke the 'eliza' program:
+
+    eliza();
+
+(including the semi-colon at the end) followed by the 'RETURN' key.
+
+If you forget the semi-colon, type it on the next line, followed by
+the RETURN key. Then follow instructions.
+
+-- When you have eliza running ----------------------------------------
+
+It will start up with an introduction, beginning something like this:
+
+    ELIZA HERE!
+    This program simulates a non-directive psychotherapist.
+    It will appear to engage you in conversation about your problems.
+
+followed by further information and instructions.
+
+You can type one sentence at a time to Eliza. End each sentence by
+pressing the RETURN key. You will then get a response from eliza.
+
+Don't go on too long: you can easily spend a lot of time having fun
+without learning much! When ready to finish, type a line containing only
+the word
+
+    bye
+
+and press RETURN. If you then find you get a colon prompt, type "bye"
+again, to finally exit from Pop-11.
+
+-- Things to try on Eliza ---------------------------------------------
+
+There is no restriction on what you can type in: anything will produce a
+response. You will generally get more interesting responses if you make
+assertions rather than asking questions. Also (unless you are trying to
+find Eliza's limitations), avoid sentences with complex syntactic
+structures (e.g. subordinate clauses), and don't type more than one
+sentence on a line.
+
+If you are unlucky the results will be boring. You can try typing in
+some sentences that start with "I" and end with "you", such as
+
+    I am better looking than you
+
+and you MAY get an interesting response. The results are not predictable
+because Eliza uses a randomizer to order its rules, and the same
+sentence typed in repeatedly can trigger different rules each time.
+
+Investigate how Eliza gets confused if you type in complex syntactic
+forms that include embedded sentences, to see how Eliza gets confused,
+e.g.
+
+    I am very clever and so are you
+    If you are conscious then you must be lonely
+
+You can also type complete gibberish and see how eliza responds, e.g.
+
+    I fhlunk the rrudgnenenee 8-93333&*^*^* sdennn you
+
+Remember to end each of your assertions or questions by pressing the
+RETURN key. When finished, type "bye" alone on a line.
+
+You can now read on and learn how to build your own mini Eliza.
+
+-- Prerequisites ------------------------------------------------------
+
+Before proceeding with this teach file you should be fluent in the use
+of the editor, and be able to create your own files, and mark and load
+lines of program. If you need revision you can go back to these teach
+files:
+
+    TEACH MARK      (How to mark ranges in VED files)
+    TEACH LMR       (How to Load a Marked Range in a VED file)
+    TEACH VEDPOP    (Introduction to programming using LMR in VED)
+    TEACH BUFFERS   (How to switch between files in VED)
+
+The last file introduces the syntax for defining simple procedures. More
+practice is given in TEACH RIVER.
+
+More elementary revision teach files on the editor are
+    TEACH VED, WINDOW, SWITCHWINDOW, USEFULKEYS
+
+A summary of VED facilities is in TEACH VEDNOTES. You may scan that
+for reminders on how to do things.
+
+There is another teach file that introduces some of the key ideas of the
+Pop-11 pattern matcher, namely TEACH MATCHES. You can try working
+through that one either before this one or after it.
+
+-- The table of contents ----------------------------------------------
+
+There is a table of contents below. You can move to it using the command
+    ENTER g <RETURN>
+
+Then you can get to any section you desire by putting the VED cursor on
+the required line, and then again doing
+    ENTER g <RETURN>
+
+Redo ENTER g at any time to get back to the table of contents.
+
+
+-- More specific overview of objectives for this file -----------------
+
+In working through this TEACH file you will learn and practise a number
+of skills:
+
+1) You will define procedures which take an input (often called an
+    'argument' and produce an output (referred to as a 'result'). Each
+    procedure will have a name, as well as names for its input variables
+    and its output variable(s). Some procedures also have other local
+    (private) variables used for temporary storage.
+
+2) You will learn about some of the structures in Pop-11, to which
+    procedures can be applied, notably words, strings, and lists.
+
+3) You will find out how to get POP-11 to obey a procedure with some
+    input that you specify, and get the output printed out, using the
+    print arrow.
+   (This is an important part of testing your programs.)
+
+4) You will link procedures together by making one procedure `invoke'
+    another, giving it a structure as input to operate on. The second
+    procedure may then produce some result or output, which is used by
+    the first. The second procedure may do this partly by invoking
+    yet more procedures, and so on.
+
+5) You will make procedures which behave differently according to their
+    input, by using 'if ... then ... elseif then ... else ... endif'
+    expressions. I.e. you will learn about conditional instructions.
+
+6) You will make POP-11 construct lists of words, using the
+   brackets [ and ], and using the symbol "^^" to insert a list of
+   items into another list.
+
+7) You will use the 'matches' operation to distinguish different forms
+   of lists, in order to decide which action to perform, and you will
+   learn how to build patterns for the matcher to use, with "??" to
+    specify variables that have to be assigned to.
+
+8) You will build a larger procedure out of several smaller procedures,
+   each of which performs part of the task of the big one.
+
+9) You will learn to use the Pop-11 library procedure called readline,
+    to get a line of input from the user, in the form of a list of
+    words.
+
+10) You will learn to use the editor VED to switch between three files:
+    o your program file 'respond.p' in which you define your program,
+    o the output file 'output.p' in which test commands are given and
+      output appears, and
+    o this TEACH file.
+
+The relevant features of Pop-11 are summarised in the TEACH POPCORE file
+(available in printed form), and in text books on Pop-11, as well as
+TEACH PRIMER, (also available in printed form).
+
+We'll start by introducing a subset of the techniques required for
+Eliza, and then design and implement a more elaborate version, later on.
+
+-- Planning the architecture of your program --------------------------
+
+A program should have an architecture, like a house, or a machine. That
+is, there should be some well defined main components performing
+different tasks, like the different rooms of a house and also its walls,
+doors, windows, etc., or the different parts of a car (seats,
+driving controls, fuel system, electrical system, engine, lights, etc.)
+
+For a program like Eliza it may suffice to have two main components
+
+    1. An interface
+        This deals with starting up the interaction with the user,
+        finishing off the interaction with the user, and in between
+        repeatedly getting input from the user and printing out a
+        response.
+
+    2. An "inference engine"
+        This is used by the interface. Every time the user types in a
+        new sentence the sentence is passed to the inference engine to
+        work out what the response should be. The response is handed
+        back to the interface which then prints it out.
+
+Thus, we can define the interface as a sub-program which prints out a
+greeting, then repeatedly reads in a sentence and prints out a sentence,
+until the user types "bye". Then it prints out a farewell message and
+stops.
+
+We can represent the architecture diagrammatically:
+
+  *------*  --- > ---  *---------*  --- > ---  *----------------*
+  | USER |             |INTERFACE|             |INFERENCE ENGINE|
+  *------*  --- < ---  *---------*  --- < ---  *----------------*
+
+You will define an interface procedure called "converse", and an
+inference engine called "respond". The interface procedure will need
+some subsidiary procedures
+
+    getname     (to ask for the user's name and read it int)
+
+    greet       (to print out a greeting)
+
+    getproblem  (to get a sentence typed by the user)
+
+    farewell    (to give a polite "closing" message when finished)
+
+The getproblem procedure will be used repeatedly in a "loop"
+instruction, and the sentence that is read in will repeatedly be given
+to the "inference engine" called respond.
+
+    respond     (take in a user's sentence and produce a reply)
+
+Defining these various procedures involves learning some pop-11 syntax,
+including the syntax for procedure definitions, for invoking a procedure
+with some input, for using the result of a procedure, for expressing
+"repeat" instructions (loops) and conditional instructions of the form:
+
+    if ... then ... elseif ... then ... ... ... else .... endif
+
+We'll start with the greet procedure, then go on to more complex things.
+
+
+-- A first program to print out a response ----------------------------
+
+A procedure definition follows, which you should put into a file called
+respond.p. If you don't know how to do that see TEACH VEDPOP.
+
+You will use your file respond.p to store various definitions of
+procedures. Initially they will be very simple, but as you read on you
+will learn how to make them more interesting. You will do this by
+repeatedly going back to them and editing them to extend what they can
+do. You can then test individual steps in the file and get the printout
+in a different file called output.p
+
+First define a procedure which takes no input, but produces a list as
+its result.
+
+    define greet() -> result;
+        lvars result;
+        [Hello - I am here to help you] -> result;
+    enddefine;
+
+Put that into your file called 'respond.p'. Later you will make it more
+complicated by editing it. In your own file, the word "define" should
+occur at the extreme left of the line, not indented as above.
+
+The first line says you are defining a procedure whose name is "greet"
+and which takes No input items when it runs, because there is nothing
+between the parentheses "()". The "-> result" bit says that the
+procedure has one "output local" variable whose name is "result", and
+which will be given a value whenever the procedure is run.
+
+The second line says that the output variable result is to be declared
+as a "local" variable for the procedure greet. Strictly the "lvars"
+means that it will be a "lexical local" variable. Later you will meet
+non-lexical variables, declared using "vars". In fact, because "result"
+is a variable in the header you don't need "lvars" (Since Poplog V15),
+and it will be omitted below.
+
+The semicolons at the end of each line are part of the POP-11 language
+and are essential (exceptions will be explained later). If you leave out
+semicolons, you may get syntactic error messages.
+
+Notice the square brackets, which used to make a list of words. (Pop-11
+can also handle lists of numbers, strings, and other objects, including
+lists of lists.) The arrow "->" in the second last line is used to
+assume the list of words to the variable "result". This use of the arrow
+is different from the use in the procedure heading, though they are
+related. In the heading "->" means that something needs to be assigned
+to the variable so that its value can be used as a result of the
+procedure. Inside the body of the procedure, "->" can be used to
+actually do the assignment. These ideas will gradually become clearer
+and more familiar.
+
+Note on indentation:
+Many programming examples in TEACH files, like the above definition,
+are *indented* to make them stand out from the main text.
+
+You are advised to ensure that procedure definitions in your own files
+start with "define" aligned to the left, not indented. I.e. if an
+example in a teach file, like the definition of "greet" above is not
+flush against the left margin, you should make it flush left in your
+file.
+
+I.e. if it is like this in a teach file
+
+    define greet() -> result;
+        [Hello - I am here to help you]-> result;
+    enddefine;
+
+it should be like this in your own file (in this case your file
+respond.p).
+
+define greet() -> result;
+    [Hello - I am here to help you]-> result;
+enddefine;
+
+That will make it much quicker to compile a procedure. Instead of
+marking and loading it you can put the VED cursor in the middle of the
+procedure and type
+    ENTER lcp
+(i.e. Load Current Procedure) which can be abbreviated to ESC c.
+
+You can then also use ENTER jcp (justify current procedure) to ask VED
+to format the procedure definition for clearer reading. It inserts
+indentation to show the structure of the procedure.
+
+-- Load and test the procedure -----------------------------------------
+
+Once you have typed in the definition of the procedure into your file
+called respond.p, you need to load it, i.e. to compile the definition.
+You can mark and load the procedure using the methods described in
+earlier teach files, or you can combine "mark procedure" and "load
+procedure" with the key sequence: ESC c. That will work provided that
+the Ved cursor is somewhere in the procedure definition.
+
+In order to check that it does what is intended, you should ask POP-11
+to run the procedure as follows.
+
+Put the following code (without indentation) into your file respond.p
+shortly after the 'enddefine' line:
+
+    /*
+    ;;; testing procedure greet
+    greet() =>
+    */
+
+The first and last lines use the comment brackets "/*" and "*/" to say
+that everything in between will be ignored if you compile the whole
+file. The second line is an "end of line" comment, which does nothing
+even if not between comment brackets. Pop-11 always ignores anything
+from ";;;" to the end of line.
+
+The third line is a test instruction which you can ask Pop-11 to obey
+even though it is inside a comment which will be ignored when the whole
+file is compiled. Get Pop-11 to load that line (the line testing greet)
+by using the LOADLINE command. Put the VED cursor on the line and press
+the loadline key (usually ESC D will do). (Or mark the line and do
+CTRL-D, for LMR).
+
+When Pop-11 obeys that command, it runs the procedure called "greet"
+(because of the "doit" brackets "()"). The procedure creates a list as
+its result, which is left on the Pop-11 stack. Then the print arrow "=>"
+prints out the result, thus:
+    ** [Hello - I am here to help you]
+
+Test greet a few times till you are bored with the conversation!
+
+If you get both your 'respond.p' and 'output.p' files onto the screen at
+once so that this teach file becomes invisible, and you are not using
+Xved you can restore it with the command
+    ENTER teach
+
+(Tips: You can use the "ENTER rb" (rotate buffer) command repeatedly in
+VED to get back to a previous file. Alternatively you can use "ESC e" to
+get a menu of files currently in VED and select one by typing its
+number.)
+
+Go back to your file respond.p, and edit your definition of the
+procedure to to make it create a different list of words. Then compile
+the procedure (ESC c) (or mark and load).
+
+Then redo the "greet() =>" command (put the Ved cursor on it, and use
+loadline (ESC d)) to see how the output changes.
+
+-- Reminder: Summary of load or compile commands in VED --------------
+
+    CTRL-d      shorthand for ENTER lmr     Load Marked Range
+    ESC d       loadline                    Load Current Line
+    ESC c       shorthand for ENTER lcp     Load Current Procedure
+            (Works only if procedure heading is left-aligned)
+    ENTER jcp   justify(format) current procedure.
+            (Works only if procedure heading is left-aligned)
+
+Memorise those if you have not already done so. You'll also know how to
+mark the Start of a range (Key F1 (or ESC m)), and the end of a range
+(Key F2 (or ESC M)). F1 and F2 may not work on all terminals.
+
+-- Making GREET's behaviour more varied ----------------------------
+
+You can make the greet procedure a little more flexible, by getting it
+to print out something which depends on its input. Suppose we want it to
+be told somebody's name each time it runs, and to print out a greeting
+for that person. For example, we might like the command
+
+    greet([sally squirrel]) =>
+
+to print out the following:
+
+    ** [Hello sally squirrel - I am here to help you]
+
+And similarly
+    greet([freddy fox]) =>
+    ** [Hello freddy fox - I am here to help you]
+
+
+In order to do this you need to change the definition of the procedure
+greet so that it has an input variable, to correspond to different
+possible inputs ([sally squirrel], or [freddy fox] for example).
+
+The list that greet creates should include the elements of the input
+list. For this we use the "double up arrow" symbol "^^" (sometimes
+described as "double hat") which means, roughly, "insert elements of
+list".
+
+So change your definition of the procedure greet in your file respond.p
+to read thus (but with "define" aligned left):
+
+    define greet(name) -> result;
+        [Hello ^^name - I am here to help you] -> result;
+    enddefine;
+
+If you have trouble finding the "^" symbol on your keyboard, try looking
+above the "6". It is often there.
+
+Notice the introduction of the new input variable "name" on the first
+line. The output variable "result" is as before. Pop-11 will
+automatically declare both the input variable and the output variable as
+lvars, i.e. local variables in the procedure greet.
+
+Note that "name" here is a local variable, accessible only within the
+procedure greet. There may be other variables called "name" used
+elsewhere in your program, but they will not interfere with this one
+because it is local.
+
+Notice how the following in a list
+
+    ^^name
+
+is used to mean
+    insert the elements of the list called "name" in a larger list
+
+The second line of greet creates a new list every time the procedure
+is run, using whatever value is associated with the variable name. Each
+time greet runs, the elements of the list called name are spliced into a
+bigger list which is "assigned to" the output local variable called
+result. Thus if different inputs are given, different lists will be
+created, which is what we required.
+
+-- Testing the new definition ------------------------------------------
+
+Now try the compiling the new procedure using ENTER lmr, or ESC c.
+
+Change the test for greet after your revised definition to something
+like this:
+
+    greet( [father christmas] ) =>
+
+Mark and load this, or use ESC d, to run vedloadline.
+
+Try again with different things between the square brackets, and see how
+it affects what is printed out. You could try including your own name.
+
+In other words, try giving the procedure "greet" different arguments.
+("argument" is just another name for the "input" to a procedure.)
+
+
+-- GREET explained a line at a time ---------------------------------
+
+Let us take the definition of greet a line at a time and work out what
+it is doing.
+
+The first line:
+
+    define greet(name) -> result;
+
+This is the procedure "heading". It tells the POP-11 system that you want
+to define a new procedure whose name is to be "greet". The fact that
+there is ONE symbol between the brackets says that the procedure takes
+ONE item as its input, or 'argument', whenever it is run. Since we don't
+know what the actual input will be we use a 'variable' called 'name' to
+refer to it.
+
+Similarly " -> result" says that the procedure will produce one output,
+which is whatever the value of "result" happens to be when the procedure
+finishes. "result" is an output local variable.
+
+The second line of the definition is:
+
+        [Hello ^^name - I am here to help you] -> result;
+
+This builds a list of words and assigns it to the output local
+variable, result.
+
+Notice that greet does not itself print out the list. It "returns" the
+list as its result, and whichever procedure invoked it can decide what
+to do with the result.
+
+The list contains: ^^name. This indicates that the 'value' of 'name'
+(i.e., the object it stands for) is inserted in the list at that point.
+Assuming that the value of 'name' is a list, then all the elements of
+the list called 'name' are included.
+
+So if 'name' stands for [father christmas], then doing:
+
+    [Hello ^^name - I am here to help you];
+
+will produce:
+
+    [Hello father christmas - I am here to help you]
+
+The last line of the procedure 'enddefine;' tells POP-11 that you have
+finished the definition. It will automatically add an instruction to
+ensure that value of the output local variable, result, is left on the
+stack when the procedure finishes.
+
+When you've written the procedure, load it (MARK and LMR, or ESC c),
+then, in your 'output.p' file (ENTER ved output) test it with various
+arguments of the form:
+
+    greet([ ...... ]) =>
+
+I.e. type different things in place of the dots.
+
+When you have tested greet you can save it in your respond.p file, as it
+will be useful later on as part of the complete Eliza program.
+
+
+-- Testing GREET with different sorts of inputs -----------------------
+
+Try running greet with different arguments, in your 'output.p' file.
+E.g. try your own name, or some phrase that is not a name:
+
+     greet( [ I loathe you, but ] ) =>
+
+It is important that you give greet a LIST as its input (or
+"argument"). That is why the square brackets are there. If you try to
+give it a number
+
+    greet( 999 ) =>
+
+or a word
+
+    greet( "joe" ) =>
+
+or an undeclared variable
+
+    greet( joe ) =>
+
+then you will get a mishap message. Try those in your 'output.p' file
+to see what the mishap messages look like. (If you learn how to read
+mishap messages, it will help you cope later with unintended mishaps.)
+
+A list of numbers will not produce a mishap, though what is printed out
+may look like nonsense. Try
+
+    greet([1 2 3]) =>
+
+-- Local variables can have their names changed -----------------------
+
+Notice that Pop-11 does not understand the word 'name', or the word
+'result' used in the definition of greet. Both are just used as
+arbitrary labels for locations in the computer memory where your program
+can store information. They are "local variables" used by the procedure
+greet. Thus you could replace both occurrences of "name" with "nom" or
+with "xxxx" and the procedure would still work. You could test that.
+
+However, it is advisable to use "meaningful" names for variables to help
+you remember what they are for when you come back to work on the program
+later on. So don't use short names like "n", or "x", and don't use
+gibberish names like "xxxx".
+
+
+-- Write your own version of GREET -----------------------------------
+
+Look back at your definition of greet. Imagine it is going to be used
+by an Eliza-like program to start off a conversation with a user whose
+name has just been typed in. Modify the instructions in greet so that
+when you test it it prints out a suitable message prior to the
+conversation. I it could include the user's name in more than one
+sentence. E.g. the printout when greet is given the name [fred bloggs]
+might be something like this.
+
+    ** [hello fred bloggs I am here to help you]
+    ** [you can ask me questions or tell me facts about yourself]
+    ** [I shall really do my best ]
+    ** [I am looking forward to our conversation, fred bloggs]
+
+Modify your program to suit yourself and then test it, with your name.
+
+-- Define respond -----------------------------------------------------
+
+Now let's consider how to define a procedure called "respond" which will
+work out what to say in response when a user types in a problem. This
+procedure is the "inference engine" in the architecture described above,
+though in this case it is a fairly simple inference engine.
+
+For now let us assume that we already have the user's problem statement
+in the form of a list of words, just as we previously assumed we had the
+user's name in the form of a list of words.
+
+See if you can define a procedure which is called "respond", and which,
+like greet, is given a list as input and produces a list as output. But
+The output list should be something suitable for a sympathetic therapist
+or counsellor to print out. E.g. if I give it the list
+
+    [I wish I could fly]
+
+then perhaps it should create a new list saying
+
+    [I am sorry to hear you say I wish I could fly]
+
+The format of the program, which you should type into your file
+respond.p, after the definition of procedure greet, could be something
+like the following. Notice that the second line is a comment, saying
+what the procedure does. Wherever possible you should insert comments in
+your programs, explaining what procedures are for. Wherever Pop-11 finds
+three semicolons in a row ";;;" it treats the rest of the line as a
+comment, which it ignores.
+
+define respond(input) -> result;
+    ;;; Create a response to the user's input list
+    [ ... ^^input ...] -> result;
+enddefine;
+
+Change this to have suitable words in the fourth line in addition to
+"^^input". I.e. the list created on line 4 should include the elements
+of the input list, plus some other suitable words.
+
+Now test your procedure by means of commands like:
+
+    respond([the weather is very poor today]) =>
+    respond([please tell me how to get rich]) =>
+
+At this stage the responses produced will not be very interesting or
+very varied. Later we shall extend the procedure respond to do better
+than this. But even in this form we can use it as a building block
+in a larger procedure. When all the components of the larger procedure
+are working, you can come back to respond and extend it, using the
+larger procedure as a testbed.
+
+
+-- Work still to be done ----------------------------------------------
+
+So far you have learnt how to create a procedure that takes a list as
+input and returns as a result another list that depends on the contents
+of the input. But this is only a small subset of the task of designing
+an eliza-like program.
+
+You might try writing down what tasks remain, and then compare your
+analysis with the suggestions in the next section.
+
+This is an example of the discipline required for software development:
+a. try to analyse requirements of a problem, then
+b. try to design a solution, then
+c. implement and
+d. test the solution,
+
+and possibly, in the process, modify the requirements and the design, in
+the light of what you learn.
+
+-- Outline of remaining tasks -----------------------------------------
+
+There are several subtasks that remain to be achieved in order to
+produce a working version of Eliza. Compare the following with your own
+list of remaining tasks.
+
+-- -- 1. Generalise respond ------------------------------------------
+
+If the procedure respond is to be given the input typed by the user, and
+must work out what should be said in reply, it will need a much more
+flexible structure. One such structure would be a sequence of
+conditional tests of the form:
+
+    if       the input is of type1   then   create a list .....
+    elseif   the input is of type2   then   create another list .....
+    elseif   ....                    then   ......
+        and so on ....
+    else
+        create a default response
+    endif
+
+We can fill in details later. The main point for now is that this is a
+"multi-branch conditional" instruction. This one shows only three tests,
+though in principle there could be more. A conditional can be as long as
+you think is needed to deal with all the different cases. We'll return
+to this later on, after listing the other main tasks to be done.
+
+-- -- 2. Design a controlling procedure (converse) ----------------
+
+It is not very pleasant repeatedly to have to type:
+
+    respond([ ..... ]) =>
+
+with some words in place of the dots. So we should define a controlling
+procedure, which, after an introduction, repeatedly asks the user to
+type in a list of words, and then, each time, uses respond to get a
+suitable answer to what the user has typed. That is roughly what enables
+the Eliza program to have an ongoing conversation once it has been
+started.
+
+The controlling procedure could be called "converse" and might do the
+following:
+
+    1. Find out the user's name. We could define a procedure called
+       "getname" to do this. The name can be stored in a global
+       variable so that it can be used by some of the programs which
+       work out responses to the user.
+    2. Print out some introductory message. You could use your procedure
+        called "greet" (defined above) to do this.
+    3. Repeatedly do the following steps:
+        a. ask the user to type in a comment or query
+            We'll define a procedure called "getproblem" to do this
+        b. read in and make a list of those words,
+            We'll use the built in Pop-11 procedure called "readline"
+            for this
+        c. give the input list to the procedure respond, and print
+           out the output from respond, using "=>"
+
+A minor complication is that any repetitive program has to know when to
+stop! We could agree that this repeat loop should stop if ever the
+user types simply "bye". So we can have a command of the form
+        quitif( input = [bye] );
+
+    4. Finally respond can print some sort of 'farewell' message.
+       We could define a procedure called "farewell" to do this.
+
+Thus the format for converse will be something like this, using English
+instead of Pop-11.
+
+    vars user_name; ;;; global variable available for all procedures
+
+    define converse();
+        1. declare local variable, input
+        2. use getname to get the user's name, and assign to user_name
+        3. use greet to give the user a greeting
+        4. repeat
+             use getproblem to invoke readline to get a list of input
+             check if user typed bye, and if so quit the loop
+             use respond to get a reply to the user, and print it
+          endrepeat;
+        5. print a farewell message
+    enddefine;
+
+
+-- A framework for converse -------------------------------------------
+
+In defining the procedure converse, it is useful to remember the
+architecture diagram given in an earlier section, showing the user, the
+interface and the inference engine. The interface and the instruction to
+invoke the inference engine will go into the procedure converse. The
+inference engine which works out what to say is the procedure respond.
+
+The Pop-11 version could look like this, though it uses procedures that
+we have not yet defined (namely getproblem, and farewell), so it cannot
+yet be tested. Notice that the procedure uses two "local" variables,
+called "name" and "input" that are declared using "lvars". They do not
+occur in the procedure header so they must be declared explicitly.
+
+
+    vars user_name;
+
+    define converse();
+        lvars input;
+
+        getname() -> user_name;     ;;; getname has not yet been defined
+
+        greet(user_name) =>
+
+        repeat
+            getproblem() -> input;       ;;; get input from user
+            quitif(input = [bye]);
+            respond(input) =>
+        endrepeat;
+
+        farewell(user_name) =>           ;;; print farewell message
+    enddefine;
+
+You may be able to think of ways in which this high level design might
+be elaborated. But for now this will suffice.
+
+
+-- Getting the user's name: defining GETNAME --------------------------
+
+The procedure getname will print out a message, and then read in a line
+typed by the user. The line of text can be read in by using the Pop-11
+built in procedure called "readline". You can test readline thus:
+
+    readline() =>
+
+ask Pop-11 to obey that (using LOADLINE, or ESC d). VED will switch to
+the output.p file and prompt you with "?". You can then type some words,
+and press return. readline will make a list of those words, and leave
+the list on the Pop-11 stack. The print arrow "=>" will print out the
+list. Try it.
+
+We can use that in a procedure called "getname", thus.
+
+define getname() -> name;
+    ;;; This prompts the user to type his/her name, returned as a list
+
+    ;;; Print out a string as a message:
+    'Good day. Please type your name, and finish with RETURN' =>
+
+    ;;; read in the user's name as a list of words
+    readline() -> name
+enddefine;
+
+Copy that (with a suitably modified message string, if you prefer) to
+your file 'respond.p'.
+
+-- Put test commands inside comment brackets --------------------------
+
+After the procedure definition, you can add a test command, inside the
+comment brackets "/*" and "*/", so that the test will not be run when
+you load the whole file, thus:
+
+/*
+    ;;; test getname
+    getname() =>
+
+*/
+
+Note that we have used two forms of Pop-11 comment:
+1. The "end of line" comment which starts with ";;;" and only lasts till
+the end of the line.
+
+2. Comments between "/* and */". These can go over as many lines as you
+like, as in the above example. You can put some test commands in such a
+comment and later use mark and load (or LOADLINE, or ESC d), to run that
+test. However if you later load the whole file the test command will not
+run because it is inside a comment. Test commands for individual
+procedures are needed only for development and testing, not for when the
+whole program is later loaded for use.
+
+You can test getname a few times. When it prints the message, followed
+by the readline() prompt "?", type in your full name, and press return.
+
+Your name will be printed in the form of a list of words, between square
+brackets.
+
+-- Combining getname and greet ----------------------------------------
+
+Make sure your procedure called greet has been compiled (put the cursor
+in it and type ESC c, or mark and load it). You can combine getname and
+greet in a piece of program, as follows:
+
+    vars user_name;
+    getname() -> user_name;
+    greet(user_name) =>
+
+Test that by marking and loading all three lines. (Mark the lines, then
+ENTER lmr, or CTRL d)
+
+Look back at the outline definition of the procedure converse. You
+should see that the combination of getname and greet enables the first
+part of converse to work, i.e. the bit of converse before the beginning
+of the "loop" with these brackets
+
+    repeat      ....
+    endrepeat
+
+But there are still some more procedures to be defined.
+
+
+-- Asking the user to state a problem or ask a question ---------------
+
+You now need to define a procedure, called "getproblem" which will be used
+repeatedly, inside the repeat loop, to ask the user to state a problem.
+
+It will print out a "message prompt" encouraging the user to type
+something, then use readline to read in the user's answer. The result of
+readline will be the result of getproblem.
+
+You should now know enough to define a procedure called getproblem with the
+following beginning and ending. Put the definition in the file respond.p
+Decide what to put in place of the two lines of dots.
+
+define getproblem() -> sentence;
+    .....
+    .....
+enddefine;
+
+1. All you have to do to replace the first line of dots is add some
+Pop-11 to print out an instruction for the user. The instruction
+could be the list of words
+    [Do go on]
+
+or the list
+    [Please state your problem]
+
+or something else. Don't try to make your list longer than one line.
+Avoid using the apostrophe "'" as in "don't". End your command with the
+print arrow "=>" as usual.
+
+2. To replace the second line of dots insert a call of readline(), and
+assign the result of readline to the local variable sentence.
+
+HINT: you can model your procedure getproblem on the procedure getname,
+defined above.
+
+When you have put a suitable definition of getproblem into your file
+respond.p you can test it thus:
+
+    getproblem() =>
+
+You could insert that test between comment brackets "/*" and "*/" in
+your file, as was suggested above for testing getname.
+
+Immediately after the procedure heading insert a comment explaining what
+the purpose of the procedure getproblem is. E.g. something like
+    ;;; Print out some encouragement and read in user's sentence
+
+-- Defining farewell --------------------------------------------------
+
+The final bit of your converse program will invoke the procedure called
+farewell, so you might as well define it now. Make it print a message
+suitable for terminating a conversation. It will be given a list
+containing the user's name. so it can use the double up-arrow "^^" to
+include the user's name in the farewell message.
+
+define farewell(name) -> result;
+    [ ....   ^^name   ... ] -> result;
+enddefine;
+
+Notice that the procedure farewell is given the user's name as input. It
+does not need to know that previously that name was a list of words held
+in the global variable "user_name". Once it has the list, it uses its
+own local variable "name" to refer to the list.
+
+You could get farewell to try to charge a fee for consultation!
+
+After putting a suitable definition of farewell into your respond.p
+file, you can test it:
+
+    farewell( [spice girls] ) =>
+
+-- Testing the whole of converse --------------------------------------
+
+You could now add the converse procedure defined above to the end of
+your respond.p file.
+
+vars user_name;
+
+define converse();
+    ;;; YOU SHOULD PUT A COMMENT HERE, SAYING BRIEFLY
+    ;;; WHAT CONVERSE IS INTENDED TO DO
+    lvars input;
+
+    ;;; Print a message and get user's name. Assign to global variable
+    getname() -> user_name;
+
+    ;;; Greet the user
+    greet(user_name) =>
+
+    ;;; Now repeatedly get input from the user, and print a
+    ;;; response to it.
+    repeat
+        getproblem() -> input;
+    quitif(input = [bye]);
+        respond(input) =>
+    endrepeat;
+
+    farewell(user_name) =>
+enddefine;
+
+You can then test this program by typing
+
+converse();
+
+The conversation will not yet be very interesting, mainly because the
+procedure respond has not yet been made flexible enough. But we can
+return to respond and remedy that, as suggested below.
+
+Note that that test command should not be in the same file as the
+procedure definitions, unless you put comment brackets "/*" and "*/"
+above and below the test.
+
+
+-- The control structure used in converse -----------------------------
+
+It is worth noting that the format of converse is useful for many
+interactive programs. We used the following structure to tell Pop-11
+to do the same action repeatedly:
+
+    repeat
+      <action>
+    endrepeat
+
+This will repeat the <action> forever. But we want to make it stop when
+the user types a special word ("bye").
+
+This was done using quitif in the following format:
+
+    repeat
+        <action 1>;
+
+        quitif( <condition> );
+
+        <action 2>;
+    endrepeat;
+
+This means
+
+    1. do action 1
+    2. test condition - if it is true then jump after endrepeat
+    3. do action 2
+    4. go back to 1
+
+Thus action 1 could ask you to type your problem. The condition for
+quitting can be that you have typed: bye, then action 2 can deal with
+all the other possible queries.
+
+In the procedure converse, as defined above, we made the stopping
+condition depend on the test
+
+    input = [bye]
+
+If this test has the result true, then the remaining actions in the
+loop will not be done, and the loop will terminate. If you wished
+the user to type something else to indicate termination you could
+change that instruction. Alternatively you could allow the user
+to give more than one "terminating" comment, as follows.
+
+    quitif(input = [bye] or input = [enough] or input = [quit]);
+
+Note that "or" can be used to join several conditions together. Pop-11
+will then test the first one, and if that comes out false will test
+the next one and if that comes out false will test the next one. If
+any of them comes out true the whole condition will be treated as
+true. If they are all false, the whole condition is treated as false,
+and in this case the following instruction is obeyed, namely
+
+       respond(input) =>
+
+-- Making RESPOND more interesting ------------------------------------
+
+Remember that respond takes in the list of words typed in by the user
+and produces a list of words to be used as the reply that will be
+printed out by converse.
+
+We want to cover a variety of possible inputs, and match them with
+suitable responses.
+
+We'll assume for now that the user will type in either
+
+    [i hate computers]
+or
+    [are you intelligent?]
+
+and in the first case the reply is to be
+
+    [perhaps you hate yourself]
+
+and in the second case
+
+    [do i seem intelligent?]
+
+If the procedure is given a query that it can't answer then we want to
+produce a 'default' reply like
+
+     [please go on]
+
+Note that we have used lower case letters throughout. POP-11
+distinguishes between upper and lower case letters, so the lists
+
+    [Father Christmas] and [father christmas]
+
+are not equivalent. This can cause problems when we come to recognising
+queries, so from now on all the words will be in lower case (a more
+sophisticated query answering program would recognise the two lists as
+equivalent). Also we will avoid apostrophes, such as the one in:
+shouldn't, since (unfortunately) POP-11 treats the apostrophe in a list
+as a special symbol.
+
+In order to distinguish between the two different queries we need to use
+a 'conditional' instruction. So go back to your respond.p file, search
+for the definition of respond, and change it to be something like this:
+
+define respond(input) -> result;
+    ;;; Create a response to the user's input list
+
+    if  input = [i hate computers] then
+        [perhaps you hate yourself] -> result;
+    elseif input = [are you intelligent?] then
+        [do i seem intelligent?] -> result;
+    else
+        [please go on] -> result;
+    endif;
+enddefine;
+
+The body of the procedure is a multi-branch conditional instruction:
+
+    if  input = [i hate computers] then
+        [perhaps you hate yourself] -> result;
+    elseif input = [are you intelligent?] then
+        [do i seem intelligent?] -> result;
+    else
+        [please go on] -> result;
+    endif;
+
+In this case there are only three branches. But we can add more.
+
+Note that this assignment instruction
+
+        [perhaps you hate yourself] -> result;
+
+is carried out ONLY if the condition
+
+         input = [i hate computers]
+
+is true. Otherwise, if the next condition is true
+
+         input = [are you intelligent?]
+
+then the following assignment instruction is carried out, namely
+
+        [do i seem intelligent?] -> result;
+
+If neither of the two conditions (preceding "then") are true, then
+the final default, or "else" instruction is obeyed, namely
+
+        [please go on] -> result;
+
+The 'value' that result has at the end of the procedure returned as the
+result of the whole procedure respond.
+
+You can also include the value of the global variable "user_name"
+in one or more of the responses, e.g.
+
+    [ ^^user_name please go on] -> result;
+
+
+-- Testing the 'respond' procedure ------------------------------------
+
+When you have the revised version of respond in your 'respond.p file,
+load it and try it out in your output file.
+
+   respond([i hate computers])=>
+   respond([are you intelligent?])=>
+   respond([can you help me?])=>
+
+Make sure that it produces the appropriate response each time.
+
+Then see what difference it makes to converse:
+
+    converse();
+
+Try typing in those sentences, without the list brackets, when you are
+prompted to type something in by converse.
+
+-- Extending respond -------------------------------------------------
+
+You can add as many other 'elseif ... then ....' clauses as you want.
+These should be placed before the final 'else' condition. For example,
+if you want the procedure to reply to the question [can you help me?]
+then you might insert the following two lines before the "else" line:
+
+        elseif input = [can you help me?] then
+            [i will try to help] -> result;
+
+Try adding these lines, and some others of your own choice, to extend
+the conditional instruction in the procedure respond.
+
+Then test your program in the 'output file', as before, by running
+    converse()
+
+Don't spend much time on this, as there are more interesting and general
+things to be done, described below.
+
+
+-- The structure of the conditional (if)  instruction ------------------
+
+You should make sure you understand what is happening between 'if' and
+'endif'. This is called a 'multi-branch' conditional instruction with a
+default at the end. The form can be represented diagrammatically thus
+(assuming you've added the [can you help me?] query):
+
+    [i hate computers] if so ->->->->->->--- [perhaps you hate yourself]
+       |                                                           |
+       | if not                                                    |
+       V                                                           |
+    [are you intelligent?] if so ->->->-- [do i seem intelligent?] V
+       |                                                 |         |
+       | if not                                          |         |
+       V                                                 |         |
+    [can you help me?] if so ->->->-[i will try to help] V         V
+       |                                    |            |         |
+       | if not                             |            |         |
+       |                                    |            |         |
+     (else)                                 |            |         |
+       V                                    |            V         |
+    [please go on] (DEFAULT)                V            |         V
+       |                                    |            |         |
+     (endif)                                |            |         |
+       |                                    |            |         |
+       *-----------<------------<-----------*--------<---*-----<---*
+       |
+    (end of procedure)
+
+In our example there are three branches to the right, but Pop-11 does
+not set an upper limit. Conditional instructions can have as many
+elseif...then clauses as required.
+
+Notice that all the different branches join up at the end, and the
+procedure comes to an end. The value of the output local variable
+"result" is then left on the stack. You have to make sure that by then
+it has a sensible value, otherwise a meaningless default result
+may be produced.
+
+
+-- Revision exercise --------------------------------------------------
+
+Try writing down down, in ENGLISH, with diagrams, an explanation of what
+the following format means to POP-11?
+
+    if     <condition1> then <action1>
+    elseif <condition2> then <action2>
+    else   <action3>
+    endif;
+
+Compare your answer with the above. Check your explanation with that
+produced by other students.
+
+-- Making respond even more flexible ----------------------------------
+
+There are two major problems with the procedure 'respond' as a basis for
+a conversation program. First, the form of input that can be answered is
+very rigidly determined. It will not give a useful answer to:
+
+           [i hate computers that pretend to understand]
+   or
+           [can you tell me if you are intelligent]
+   or even
+           [can you help me]
+
+It will not recognise the last query because it does not end with a
+question mark. The other, rather more difficult, problem is of course
+that the program does not understand the meaning of the question, it
+merely manipulates symbols. We could add lines of total nonsense to
+'respond', such as:
+
+    elseif input = [pibble bobble plt] then
+       [pssst wheeee] -> result;
+
+and it would respond to:
+
+    respond([pibble bobble plt])=>
+
+with
+
+    ** [pssst wheeee]
+
+We will avoid the question of how a program can represent the meanings
+of words, and instead consider how to make Eliza more flexible. Below is
+a reminder of the sort of thing we need to achieve. Later we'll consider
+how to achieve it. The more advanced teach files TEACH RIVER2 and TEACH
+RIVERCHAT explain some ways of giving a computer a primitive
+understanding of the meanings of simple commands and questions.
+
+-- How Eliza uses pattern matching ------------------------------------
+
+As you will have seen from playing with ELIZA, the program does not
+'understand' English, in the sense of building up a representation of
+the meaning of a sentence. Instead it relies on a range of 'tricks' to
+manipulate patterns of words. For instance, if you type in a very short
+statement, such as
+
+    no
+
+then ELIZA responds with a phrase like:
+
+    you are being somewhat short with me
+
+which is taken at random from a 'pool' of acceptable replies. So the
+first trick is to select an output randomly from a list of prepared
+sentences.
+
+Another trick is to check whether the user typed in a sentence using a
+particular sort of key word, e.g. "mother", or "money", and then respond
+with a previously prepared sentence, e.g.
+
+    tell me more about your family
+or
+    are you very rich
+
+In addition to recognising 'keywords', such as 'mother' or 'computer'
+contained in a sentence, Eliza has a more subtle trick which enables it
+to use some of the words typed in to build up its output sentence. It
+can match and respond to 'patterns' of words. For example, if you typed
+
+    AI students can program computers
+
+ELIZA might respond
+
+    suppose AI students could not program computers
+
+The program knows nothing about the programming abilities of students,
+it merely matches sentences of the form
+
+    <some words> can <some more words>
+
+and produces a response containing parts of the input, eg:
+
+    suppose <some words> could not <some more words>
+
+Thus, to the sentence:
+
+    mrs smiths cat can program computers
+
+It might reply
+
+    suppose mrs smiths cat could not program computers
+
+-- The role of the Pop-11 pattern matcher -----------------------------
+
+This type of conversation is fairly simple to program in POP-11, since
+the language has built-in facilities for 'pattern matching'. The pattern
+
+     <some words> can <some more words>
+
+might be written in POP-11 as:
+
+     [ ??thing can ??action ]
+
+and the response
+
+    suppose <some words> could not <some more words>
+
+might be written as
+
+    [ suppose ^^thing could not ^^action ]
+
+Notice how we used the symbol "??thing" to mean roughly
+    "Set the value of the variable thing to a list of items]
+
+and the symbol "^^thing" to mean roughly
+    "Replace this item with the value of the variable thing,
+        which should be a list of items."
+
+Thus if you were to match the list of words
+    [fat pink pigs can fly far]
+
+with the pattern
+     [ ??thing can ??action ]
+
+Then the variable thing would get the value [fat pink pigs] and the
+variable action would be given the value [fly far]
+
+Then the list expression
+    [ suppose ^^thing could not ^^action ]
+
+would cause Pop-11 to create the list:
+
+    [suppose fat pink pigs could not fly far]
+
+You can now learn how to write such patterns and incorporate them in a
+program.
+
+
+-- Using 'matches' ---------------------------------------------------
+
+It was suggested above that you extend the procedure respond to include
+this condition:
+
+        elseif  input = [can you help me?] then
+           [i will try to help] -> result;
+
+This uses a very rigid test, because it uses the operator "=" to
+compare the input list with the list in the condition. For that
+equality test to produce the result true, the list must have exactly
+these five elements in this order: the words
+    "can" "you" "help " "me" "?"
+Note that POP-11 splits "help" and "?" into two words even if they are
+not separated by a space. If the list has any other words, e.g.
+[can fred help me?] the condition will produce a false rather
+than a true result, and the command following "then" will not be
+carried out.
+
+The POP-11 matcher can be invoked by replacing the word "=" with the
+word "matches" which takes a list on its left and a pattern (which is a
+type of list) on the right, and produces a true or false result,
+depending on whether the list matches the pattern. The tests used by
+"matches" are more flexible than those used by "=". So you can construct
+a more flexible test, using a condition that accepts ANY input list
+containing the word "can" followed immediately by "you" as follows:
+
+        elseif input matches [== can you ==] then
+           [i will try to help] -> result;
+
+Note that each occurrence of the double equals symbol, i.e. "==", will
+match ZERO OR MORE elements in a list so [== can you ==] would match
+[please can you help] or [can you help me] or even just [can you]. Try
+changing the third condition of your respond procedure to
+
+        elseif input matches [== can you ==] then
+
+Having made this change, you can now test the procedure. Type in various
+lists containing the two words "can" and "you". What will happen if you
+test the procedure with
+
+        respond([can you play the tuba]) =>
+
+This shows up a general limitation of 'pattern matching' methods of
+language understanding. You either construct a too rigid pattern to be
+matched (as with the original respond procedure), in which case it will
+not respond to valid queries, or one which is too flexible (as with
+[== can you ==] above) in which case it will match queries that should
+be ignored. One solution is to write a large number of (fairly) rigid
+patterns like
+
+       [== can you help me ==]
+
+and develop a huge multi-branch conditional to deal with all of them.
+But this is tedious and may not catch all the possible forms of input.
+
+Another solution is to 'parse' the sentence to uncover its grammatical
+structure. This is a DIFFICULT problem, central to A.I. research on
+natural language processing. (If you are interested in finding out more
+about this then take a look at the (optional) file TEACH WHYSYNTAX.)
+
+For many applications, particularly ones where the user can be given a
+little training in types of query that are acceptable to a program, then
+pattern matching may be quite sufficient. Try altering some of the
+conditional tests in your respond procedure to match patterns, i.e.
+using "matches" rather than "=".
+
+The order of conditions is important because the input is matched
+against each pattern in turn. Thus if we have two conditions, of the
+form
+
+        if input matches [== can you ==] then
+            [possibly] -> result;
+        elseif input matches [can you help me] then
+            [i will try to help] -> result;
+
+then the second pattern will never be matched. This is because EVERY
+list containing the word "can" followed by "you" will match the first
+pattern, even the list [can you help me]. Thus, it is necessary to put
+the most rigid patterns first and more general 'catch all' patterns,
+like [== can you ==] later.
+
+Try altering the other conditions to use pattern matching, so as to make
+your procedure more general.
+
+
+-- Using some of the input to build the output: pattern variables -----
+
+Suppose the input is
+
+    [i want to turn green]
+
+and you'd like the response to be
+
+    [ i would not advise you to try to turn green]
+
+You could add the following clause using a pattern variable "??x":
+
+    elseif input matches [i want to ??x] then
+        [i would not advise you to try to ^^x] -> result
+
+If the match succeeds, then the matcher will assign to the pattern
+variable x a list containing all the words following
+
+    i want to
+
+in the 'input' list. Then the use of "^^x" to create an output list
+will cause those words to be inserted after "try to". E.g. if the input
+is the list
+
+    [i want to become prime minister]
+
+the variable x would get the list [become prime minister] as value, and
+the list assigned to result would be
+
+    [i would not advise you to try to become prime minister]
+
+-- Making a pattern variable work in a procedure: using "!" -----------
+
+Because a pattern variable preceded by "??" or "?", e.g. "x", is used as
+a variable it needs to be declared, and it should be made local to the
+procedure so that it cannot interact with other procedures using x as a
+global variable (which is not recommended anyway).
+
+However if you declare a pattern variable x using "lvars x" there is a
+problem. The occurrence of "??x" in the pattern and the "^^x" in the
+list created for the result will not be treated as referring to the same
+thing.
+
+That is because the pattern is INTERPRETED by the matches procedure, and
+if it finds a word after "??" or "?" it cannot link that word to the
+lexical variables declared using lvars in the procedure. The reasons are
+technical and will not be explained here (experts can look at the file
+HELP * LVARS).
+
+There are two solutions to the problem.
+
+(a) You can declare the variable x as of type "vars" by inserting, near
+the top of the procedure
+
+    vars x;
+
+and doing the same for all other pattern variables preceded by "??" or
+"?". Until Poplog Version 15.0 was released that was the only solution,
+and that is the solution you will find in many of the older teach files
+based on the matcher.
+
+(b) You can use the special pattern prefix "!" (available in Birmingham)
+before each pattern containing pattern variables. The above would then
+become:
+
+    elseif input matches ! [i want to ??x] then
+        [i would not advise you to try to ^^x] -> result
+
+The use of "!" before a pattern inside a procedure has two effects.
+First it ensures that all pattern variables are declared as lvars, if
+they have not already been declared in that procedure. Second, it
+changes the pattern so that instead of containing a word after "??" or
+"?" it contains the lvars identifier record corresponding to that word.
+This means that the matcher can change the value of the variable so that
+the can be used in other instructions in that procedure, like the
+occurrence of "^^x" in the instruction to build the result list.
+
+Try putting those two lines, including "!" into your procedure
+'respond', and and test it with different lists as input, including some
+which start "i want to".
+
+If you are short of time, skip the next section.
+
+-- Further options -----------------------------------------------------
+
+Here are some more variants you can put in. (A space has been left after
+"!" in these examples to make it more visible, though it is not strictly
+necessary):
+
+    elseif input matches ! [i ??x you] then
+           [perhaps in your fantasy we ^^x each other] -> result;
+
+    elseif input matches ! [??x is ??y] then
+        [what if ^^x were not ^^y ? ] -> result;
+
+If you use patterns prefixed by "!" then near the top of the procedure
+you must declare the pattern variables as lvars, i.e.
+
+    lvars x, y; ;;; pattern variables.
+
+Try your own variants and test them out.
+
+By now you might have a version of respond looking something like the
+following in your file respond.p:
+
+define respond(input) -> result;
+    ;;; Create a response to the user's input list
+
+    lvars x, y; ;;; local variables
+
+    if  input matches [i hate == ] then
+        [perhaps you hate yourself] -> result;
+    elseif input matches ! [are you ??x ] then
+        [do i seem ^^x] -> result;
+    elseif input matches ! [i ??x you] then
+        [perhaps in your fantasy we ^^x each other] -> result;
+    elseif input matches ! [??x is ??y] then
+        [what if ^^x were not ^^y ? ] -> result;
+
+    else
+        [please go on] -> result;
+    endif;
+enddefine;
+
+You should add some more "elseif ... then ... " lines checking out that
+you understand how to use "??" to save part of a list in a variable and
+how to use "^^" to insert a list into a bigger list.
+
+
+After the definition of respond you should have some tests between
+"/* ... */" comment brackets, e.g.
+
+    /*
+        respond([can you play the tuba]) =>
+        respond([do you hate your mother?]) =>
+        respond([i can climb higher than you]) =>
+        ... etc. ...
+    */
+
+Make sure you include at least one test example for each pattern you
+have included, to ensure that it produces the expected sort of output.
+
+TEACH * MATCHES (Birmingham version) will tell you more about the
+pattern matcher, and the prefix "!".
+
+HELP * MATCHES, gives a summary for more experienced programmers.
+
+-- Comment on how readline works --------------------------------------
+
+Readline doesn't take any argument, but it does produce a result, a
+list. It gets the list by waiting till you have typed something on the
+terminal, and pressed the RETURN button. When you have done that, it
+makes a list of all the words you typed, and that list is its result.
+
+If you use it inside VED, then it runs a special version of the
+procedure that allows you to do other things in VED (e.g. look at
+another file) before you finish typing in your response in the
+output.p file. This means that you can interleave actions in a way that
+is not always possible with dialogue systems.
+
+
+-- Coming back after logging out ---------------------------------------
+
+If you save your file (using ENTER bye or ENTER q) and then resume
+work on it at some later session you type 'ved' followed by the file
+name, eg:
+
+    ved respond.p
+
+This will open the file, but you then need to load the procedure again,
+by marking and loading it.
+
+If you have created more than one procedure you will need to mark and
+load them all. You can load all the procedures in the current file with
+the command:
+
+    ENTER l1
+
+(That's lower case "L" followed by the number "1")
+
+It is important when you do this that your file is not littered with
+test commands as they will then be run unnecessarily. So you can either
+put them in another file, or "blank them out" with comment brackets in
+this format
+
+    /*
+    test command 1
+    test command 2
+    test command 3
+        .....
+    */
+
+You should also now insert some comments at the top of your file
+stating what the file is about, and listing the main procedures,
+with a brief description of what each one does. You can use the command
+
+    ENTER fileheader
+
+to prepare a comment at the top of the file. You should complete the
+blanks in the header, and correct anything that is wrong.
+
+When you have done that show the file to a demonstrator, and show the
+demonstrator how your program works, by giving a test run.
+
+You can insert a comment before each procedure definition, explaining
+what the procedure does. To prepare a comment put the Ved cursor in the
+procedure definition and do
+    ENTER procheader
+
+That will start a comment describing the procedure. You should complete
+the blanks in the comment, and correct anything that is wrong.
+
+-- The structure of your file respond.p -------------------------------
+
+Your file should now have the following structure:
+
+    1. Header, saying what the file is about, who created it and
+       when.
+
+    2. A further comment saying briefly how the program works. E.g.
+       summarise the architecture.
+
+    3. If your program uses any libraries, then you can include "uses"
+       commands to ensure the libraries are loaded. In this case all
+       the libraries are autoloaded. Otherwise you would need this at
+       the beginning:
+
+        uses readpattern    ;;; ensure that "!" works with patterns.
+
+    4. A succession of procedure definitions, each preceded by a comment
+       saying what it does, and followed by or preceded by some test
+       commands also in comment brackets.
+
+    5. Some final test commands to run the whole program. In this
+       case a single command suffices:
+
+        /*
+        converse();
+        */
+
+If you use some procedures before they are defined, then at the top of
+the file you can declare their names, to prevent "DECLARING VARIABLE"
+warning messages, e.g. with something like this
+
+    vars respond;       ;;; procedure defined below
+
+Then if you define the procedure converse, which uses respond, before
+you define respond, the compiler will not be puzzled when it reads the
+definition of converse.
+
+
+-- What have you learnt ? ---------------------------------------------
+
+Here are some revision questions to think about. Some of them are
+explicitly or implicitly answered in this teach file. Others may require
+you to look back at other teach files. You may need to ask other
+students, or demonstrators, or your tutor, for help.
+
+    What is a variable?
+    What is a procedure?
+    What is the difference between a procedure and a procedure
+        definition?
+    What is the general form of a procedure definition?
+    What does it mean to say that a procedure takes an argument?
+    What does it mean to say that a procedure produces a result?
+    What is the difference between producing a result and printing
+        something out on the screen?
+    How does converse give inputs to and get results from other
+        procedures?
+    What does readline do?
+    What is a conditional instruction?
+    What is the general form of a conditional instruction?
+    What is the default case of a conditional instruction?
+    What does matches do?
+    How many arguments does matches require? How many results
+        does it produce?
+    What is "repeat" for?
+    What is the closing bracket for repeat?
+    How can you make a repeat loop stop?
+    What are pattern variables?
+    What is the difference between "??" and "^^" ?
+    Where can "!" occur?
+    What is the purpose of "!" ?
+    If you don't use "!" how should you declare pattern variables?
+    How should other local variables be declared in a procedure?
+    How do you get Ved to insert a header for your file.
+    How do you get Ved to insert a header above a procedure definition?
+
+Write down answers then search this file and other files to check them.
+
+-- Using trace ---------------------------------------------------
+
+The 'converse' procedure calls 'respond' and 'getproblem'. You can use the
+TRACE command to show the order in which the procedures are called (in
+this example the order is obvious, but it will not be so in later, more
+complicated, examples).
+
+Mark and load the following
+
+    trace greet respond getproblem converse farewell;
+
+This tells POP-11 that those five procedures are to be 'traced'
+whenever they run. Nothing visible happens immediately. The tracing only
+shows itself when you run the procedures. Try running:
+
+    converse();
+
+It should produce output showing when each procedure starts and when it
+finishes, and if it has any inputs or outputs those are shown also.
+
+The symbol used to show a procedure starting is ">", and the symbol used
+to show a procedure finishing is "<".
+
+Thus the interaction might look like this
+> converse
+** Good day. Please type your name, and finish with RETURN
+? fred bloggs
+!> greet [fred bloggs]
+!< greet [Hello fred bloggs - I am here to help you]
+** [Hello fred bloggs - I am here to help you]
+!> getproblem
+** [please state your problem]
+? can you help me?
+!< getproblem [can you help me ?]
+!> respond [can you help me ?]
+!< respond [please go on]
+** [please go on]
+!> getproblem
+** [please state your problem]
+? i hate computers
+!< getproblem [i hate computers]
+!> respond [i hate computers]
+!< respond [perhaps you hate yourself]
+** [perhaps you hate yourself]
+!> getproblem
+** [please state your problem]
+? bye
+!< getproblem [bye]
+!> farewell [fred bloggs]
+!< farewell [. . . . fred bloggs . . .]
+** [. . . . fred bloggs . . .]
+< converse
+
+Thus, the line
+    !> greet [fred bloggs]
+indicates that 'greet' is called with argument [joe bloggs]. The
+exclamation mark "!" indicates that it is already running another
+traced procedure (converse).
+
+The line
+!< greet [Hello fred bloggs - I am here to help you]
+
+indicates that the program is leaving greet, and that greet has produced
+as its result the list [Hello fred bloggs - I am here to help you].
+This is left on the stack. Another procedure can then do something with
+it, e.g. print it out.
+
+Try your own conversation with tracing switched on.
+
+-- Switching off tracing ----------------------------------------------
+
+You can switch off the tracing with untrace, i.e. give this command:
+
+    untrace greet respond getproblem converse farewell;
+
+Then test converse again.
+
+    converse( );
+
+This time, the trace printing will not occur because you have UNtraced
+the procedures.
+
+TRACE is very useful when you are developing a complex program. It helps
+you check that the sub-programs are doing what you want them to.
+
+NB. If your 'output.p' file is now very long you can delete unwanted
+portions by marking them, and using
+    ENTER d
+
+(see TEACH MARK)
+
+
+-- Further reading ----------------------------------------------------
+
+TEACH READLINE gives more practice in using readline, and shows how to
+build a toy interactive teaching program for arithmetic.
+
+TEACH DEFINE gives more information about defining procedures.
+
+TEACH MATCHES  explains the use of the matcher in more detail
+TEACH MATCHES2 gives more information about the matcher.
+HELP  MATCHES  gives a summary overview
+
+TEACH LISTS and TEACH ARROW  give exercises in list processing.
+
+TEACH WHYSYNTAX  explains why a grasp of syntax is required for
+    understanding natural language.
+
+TEACH GRAMMAR
+    Gives an introduction to formal grammars and programs that
+    analyse the structure of a sentence. This helps to explain
+    why the pattern matching approach used by Eliza is not adequate
+    in general.
+
+The Pop-11 primer gives a lot more information on lists and the matcher.
+You can browse it online with the command:
+    TEACH PRIMER
+Finding things in it requires you to use the editor search mechanism.
+In particular, Chapter 6 gives a lot of information about lists, and
+Chapter 7 about the Pop-11 pattern matcher and database.
+
+Depending on your installation, there may be a file called
+
+TEACH LOCALINDEX  giving a list of locally produced teach files
+TEACH INDEX summarises available teach files supplied with Poplog.
+
+TEACH TEACHFILES gives an annotated list of available teach files
+    supplied with Poplog
+
+See also the Computers and Thought book by Sharples et al. (MIT Press)
+You can learn from it how to go beyond Eliza to programs that use a
+grammar and have a deeper understanding.
+
+
+=======================================================================
+*/
+
+/*
+
+CONTENTS - (Use ENTER g to access required sections)
+
+ -- Running the Pop-11 Eliza Program
+ -- When you have eliza running
+ -- Things to try on Eliza
+ -- Prerequisites
+ -- The table of contents
+ -- More specific overview of objectives for this file
+ -- Planning the architecture of your program
+ -- A first program to print out a response
+ -- Load and test the procedure
+ -- Reminder: Summary of load or compile commands in VED
+ -- Making GREET's behaviour more varied
+ -- Testing the new definition
+ -- GREET explained a line at a time
+ -- Testing GREET with different sorts of inputs
+ -- Local variables can have their names changed
+ -- Write your own version of GREET
+ -- Define respond
+ -- Work still to be done
+ -- Outline of remaining tasks
+ -- -- 1. Generalise respond
+ -- -- 2. Design a controlling procedure (converse)
+ -- A framework for converse
+ -- Getting the user's name: defining GETNAME
+ -- Put test commands inside comment brackets
+ -- Combining getname and greet
+ -- Asking the user to state a problem or ask a question
+ -- Defining farewell
+ -- Testing the whole of converse
+ -- The control structure used in converse
+ -- Making RESPOND more interesting
+ -- Testing the 'respond' procedure
+ -- Extending respond
+ -- The structure of the conditional (if)  instruction
+ -- Revision exercise
+ -- Making respond even more flexible
+ -- How Eliza uses pattern matching
+ -- The role of the Pop-11 pattern matcher
+ -- Using 'matches'
+ -- Using some of the input to build the output: pattern variables
+ -- Making a pattern variable work in a procedure: using "!"
+ -- Further options
+ -- Comment on how readline works
+ -- Coming back after logging out
+ -- The structure of your file respond.p
+ -- What have you learnt ?
+ -- Using trace
+ -- Switching off tracing
+ -- Further reading
+
+*/
+
+
+/*
+--- $usepop/pop/teach/chat2
+--- Copyright University of Birmingham 2011. All rights reserved. ------
+*/

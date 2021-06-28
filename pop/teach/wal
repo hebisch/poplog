@@ -1,0 +1,389 @@
+TEACH WAL                                  Steve Hardy & Chris Mellish
+
+=== WHAT ARE LISTS? ==================================================
+
+This handout is intended to give you some idea  of  'what  lists  REALLY
+are`,  in  the  sense of 'how are they represented within the computer`.
+This will have to be a technical discussion - so don't worry if (a)  you
+don't  understand  it or (b) you find it boring.  I believe that just as
+one can drive a car without knowing how  they  work  so  one  can  write
+programs  without knowing how everything works - and the courses I teach
+are more akin to 'driving lessons` than 'vehicle maintenance classes` in
+that  they  aim  to  get  you  programming  rather  than  being computer
+scientists.  This handout is  more  computer  science  than  programming
+instruction.
+
+The computer's memory
+=====================
+
+Almost all modern computers have the same kind of main memory - a lot of
+numbered  'boxes`.   The  normal  term for these boxes is 'word`, so one
+says that a computer has so many 'words` of memory -  our  computer  has
+1 million (called 4 "megabytes", because a "byte" is a quarter of a word on
+this machine). I'll use the word 'boxes` to avoid confusion with POP11 words
+like NIL etc.
+
+These boxes contain numbers and a program can either examine  or  change
+the  contents  of  any  box.   These  numbers  are almost always used to
+represent something other than a simple number - for example:
+
+     (1) A number can be viewed as the ADDRESS of  another  box  in
+     the machine's memory.
+     (2) A number can be viewed as an instruction.
+     (3) A number can be viewed as a character, e.g A=1,  B=2,  C=3
+     etc.
+     (4) A number can be viewed as a number|
+
+When you type an instruction into  the  POP11  system  it  is  converted
+('compiled`)  into  a  series of numbers representing instructions; when
+you type in a character string:
+
+        : 'THE CAT SAT ON THE MAT'
+
+the POP11 system finds space to store the series of numbers representing
+the  characters  of the string.  A similar process happens when you type
+in a word, like "NIL".
+
+Most things in POP11 are represented  by the number of the box at  which
+they are stored, so that when you type:
+
+        : 'CAT' -> X;
+
+The POP11 system finds three unused boxes, puts the character  code  for
+'C'  in  the  first,  that for 'A' in the second and that for 'T' in the
+third.  The address (i.e number) of the first box is then stored in  the
+variable  X,  i.e.  in the box associated with the word X when you typed
+VARS X.
+
+The representation of lists
+===========================
+
+When you type in, say:
+
+        : [HOW NOW BROWN COW] -> L;
+
+the POP11 system assigns the address of the first of a pair of boxes  to
+L.  The first box contains the address of a series of boxes representing
+the word HOW, the second box contains the address of a  second  pair  of
+boxes.   This  second pair (of boxes) contains the address of (the boxes
+representing) the word NOW and the address of a third pair  whose  first
+component  contains (the address of) the word BROWN and the address of a
+fourth pair containing the address the word COW and the address  of  the
+word  NIL.   Let us suppose that the box representing the variable L was
+100, that of the first pair 101, that of the second  103,  that  of  the
+third  105  and  that  of  the  last  107.   If we could look inside the
+machine's memory we would see:
+
+        ADDRESS CONTENTS
+        100     101
+        101     Address of HOW
+        102     103
+        103     Address of NOW
+        104     105
+        105     Address of BROWN
+        106     107
+        107     Address of COW
+        108     Address of  NIL
+
+It  is  not  necessary  for  the  boxes representing  a  list  to be
+consecutive (as I have shown them here) and usually a list will be scattered
+over  the  computer's  memory.   For  a pictorial explanation of this see
+later in this demo.
+
+I have glossed over some problems in this account, in particular:
+
+     (1) If you type:
+
+             : [1 2 3 4] -> L;
+
+     how come the computer doesn't get confused  between  a  number
+     representing  itself  (e.g  1)  and  a number reprresenting an
+     address?  The solution adopted by the  POP11  system  to  this
+     problem  is  to add some huge number, say 10000000, to a number.
+     Since there isn't a box numbered 10000001 the POP11 system knows
+     that  10000001 must represent the number one and not the address
+     of a box.
+
+     (2) How does the computer tell the difference between a series
+     of boxes representing a pair, say, and a series representing a
+     character string?  A solution to this problem  is  to  reserve
+     one  box  in  every  series  to  say  what  type  of  thing it
+     represents.
+
+     Thus our list [HOW NOW BROWN COW] would look like:
+
+             ADDRESS CONTENTS
+             100     101
+             101     Address of PAIR
+             102     Address of HOW
+             103     104
+             104     Address of PAIR
+             105     Address of NOW
+             106     107
+             107     Address of PAIR
+             108     Address of BROWN
+             109     110
+             110     Address of PAIR
+             111     Address of COW
+             112     Address of NIL
+
+     There is a procedure in POP11 called  DATAWORD  which  returns
+     the contents of the first box in a series, so that:
+
+                     : DATAWORD("CAT")=>
+                     ** WORD
+
+                     : DATAWORD([HOW NOW BROWN COW])=>
+                     ** PAIR
+                     : DATAWORD(DATAWORD)=>
+                     ** PROCEDURE
+
+     For the sake of consistency DATAWORD 'cheats` if you give it a
+     number:
+                     : DATAWORD(3)=>
+                     ** INTEGER
+
+Its a bit tiresome to say 'a box contains the address of the first of  a
+series  of boxes representing the word ...' so I am going to say that 'a
+box contains the word ...'.
+Similarly, it is often clearer to say ' a box contains a pointer to ...'
+than  to  say  'a  box  contains the address of the first of a series of
+boxes representing ...'.  I will use these two  abbreviations  from  now
+on.
+
+Some of the list processing procedures built into POP11
+======================================================
+
+Let us suppose that there is a procedure, called CONTENTS, which given a
+number, N, and the address of the first of series of boxes, BOX, returns
+the contents of the N'th box in the series.
+Using this procedure we can define the procedure HD as:
+
+        : DEFINE HD(BOX);
+        :       IF      CONTENTS(0,BOX) = "PAIR"
+        :       THEN    CONTENTS(1,BOX)
+        :       ELSE    MISHAP('Finding HD of non-pair',[^BOX])
+        :       ENDIF
+        : ENDDEFINE;
+
+Similarly TL can be defined as:
+
+        : DEFINE TL(BOX);
+        :       IF      CONTENTS(0,BOX) = "PAIR"
+        :       THEN    CONTENTS(2,BOX)
+        :       ELSE    MISHAP('Finding TL of non-pair',[^BOX])
+        :       ENDIF
+        : ENDDEFINE;
+
+In addition to the CONTENTS procedure the POP11 system has  a  FINDBOXES
+procedure  available  to  it.   This  takes  a number and find an unused
+sequence of boxes the required size - it  returns  the  address  of  the
+first, thus:
+
+        : DEFINE 3 X :: Y -> RESULT;
+        :       FINDBOXES(3) -> RESULT;
+        :       "PAIR" -> CONTENTS(0,RESULT);
+        :       X -> CONTENTS(1,RESULT);
+        :       Y -> CONTENTS(2,RESULT)
+        : ENDDEFINE;
+
+The procedure DATAWORD is defined as:
+
+        : DEFINE DATAWORD(BOX);
+        :       IF      BOX > 10000000
+        :       THEN    "INTEGER"
+        :       ELSE    CONTENTS(0,BOX)
+        :       ENDIF
+        : ENDDEFINE;
+
+                   Lists represented by little boxes
+                   =================================
+
+It is sometimes easier to think about the internal representation of lists in
+terms of diagrams of "little boxes". A box represents one location ('word')
+in the memory of the computer. Whenever we declare a variable, the POP11
+system allocates an unused box somewhere to store that variable's value. So,
+for instance, if we type:
+
+    : VARS X;
+    : "A" -> X;
+
+then part of the computer's memory ends up looking a bit like this:
+
+     *---*
+  X: | A |
+     *---*
+
+I have put a label "X:" here to indicate that POP11 "knows" that this is the
+box holding the value of X. There is nothing attached to the box itself to
+indicate that it is holding the value of X. The POP11 system must keep track
+of it by putting the string of characters "X" together with the address of
+this box in one of its own datastructures (the DICTIONARY). This diagram
+also uses another convenient abbreviation. It assumes, in a way, that it is
+possible to store everything about the word "A" in this single box. In
+reality, the word "A" must be allocated several boxes, which indicate that it
+is a word, give the characters that make up the word and perhaps give the
+value of the variable called A, if such a variable has been declared. So the
+box for X must actually contain a pointer to (that is, the address of) the
+whole sequence of boxes describing "A". To be precise, then, our above
+diagram should really look more like:
+
+     *---*
+  X: | *-+-------> ..... some boxes representing "A"
+     *---*
+
+where the arrow indicates that the box holds the address of whatever the
+arrow points to. Since we are not interested here in the internal
+representation of words, we will stick to the shorter notation where we
+just put the name of the word in the box.
+
+Now for lists. What happens if we type the following:
+
+    : [A] -> X;
+
+Part of the memory now looks as follows:
+
+     *---*   *---*---*
+  X: | *-+-->| A |NIL|
+     *---*   *---*---*
+
+We still have the original box for X, but now there are two more
+(consecutive) boxes in use. These represent the HD and TL of the list that
+has been created. Here are some more examples:
+
+    :  [HOW NOW BROWN COW] -> L;
+
+     *---*   *---*---*   *---*---*   *-----*---*   *---*---*
+  L: | *-+-->|HOW| *-+-->|NOW| *-+-->|BROWN| *-+-->|COW|NIL|
+     *---*   *---*---*   *---*---*   *-----*---*   *---*---*
+
+This is the same example that was treated earlier (in terms of numbers). If
+you are uneasy about the diagrammatic representation, you might like to
+refer back to the other treatment. Note that in the diagrammatic
+representation it would clutter up the diagrams unnecessarily if we included
+the DATAWORD components for all these pairs.
+
+Here are more examples, with no commentary:
+
+    : [[A]] -> X;
+
+     *---*   *---*---*
+  X: | *-+-->| * |NIL|
+     *---*   *-+-*---*
+               |
+               V
+             *---*---*
+             | A |NIL|
+             *---*---*
+
+: [[THE MAN] KICKED [A DOG]] -> X;
+
+     *---*   *---*---*   *------*---*   *---*---*
+  X: | *-+-->| * | *-+-->|KICKED| *-+-->| * |NIL|
+     *---*   *-+-*---*   *------*---*   *-+-*---*
+               |                          |
+               V                          V
+             *---*---*   *---*---*      *---*---*   *---*---*
+             |THE| *-+-->|MAN|NIL|      | A | *-+-->|DOG|NIL|
+             *---*---*   *---*---*      *---*---*   *---*---*
+
+    : [A B] -> X; TL(X) -> Y;
+
+     *---*   *---*---*   *---*---*
+  X: | *-+-->| A | *-+-->| B |NIL|
+     *---*   *---*---*   *---*---*
+                           ^
+                           |
+     *---*                 |
+  Y: | *-+-----------------*
+     *---*
+
+    : [A B] -> X; [C D] -> Y; X <> Y -> Z;
+
+     *---*   *---*---*   *---*---*
+  X: | *-+-->| A | *-+-->| B |NIL|
+     *---*   *---*---*   *---*---*
+
+     *---*   *---*---*   *---*---*
+  Y: | *-+-->| C | *-+-->| D |NIL|
+     *---*   *---*---*   *---*---*
+               ^
+               |
+               *---------------*
+                               |
+     *---*   *---*---*   *---*-+-*
+  Z: | *-+-->| A | *-+-->| B | * |
+     *---*   *---*---*   *---*---*
+
+    : [A B] -> X; [C D] -> Y; Y -> TL(TL(X));
+
+     *---*   *---*---*   *---*---*
+  X: | *-+-->| A | *-+-->| B | * |
+     *---*   *---*---*   *---*-+-*
+                               |
+               *---------------*
+               |
+               V
+     *---*   *---*---*   *---*---*
+  Y: | *-+-->| C | *-+-->| D |NIL|
+     *---*   *---*---*   *---*---*
+
+EXERCISE:
+=========
+
+Write a POP-11 program that performs actions on a simulated computer memory.
+First of all, the memory can be represented by a large array, eg.
+
+   vars contents;
+   newarray([1 1000]) -> contents;
+
+The procedure CONTENTS can be used to either get the value at some particular
+address, or to put a value in some particular address. It is slightly
+different from the CONTENTS used in earlier examples in this file. Examples
+of its use:
+
+   34 -> contents(56);      ;;; Puts 34 into the location at address 56
+   contents(56) =>          ;;; Prints out the contents of location 56
+
+Given this basis, implement the following procedures. The word "address" here
+refers to a number that is representing a location in the CONTENTS array.
+You should try to restrict yourself to only putting numbers into the CONTENTS
+array (so start by only representing numbers and lists).
+
+   CONS - given an item and an address, returns the address of a new list
+          pair, whose HD is the first argument, and whose TL is the list whose
+          address is the second argument. (You may want to include a check
+          that it IS the address of a list, or some special address denoting
+          []).
+
+   CAR  - given the address of a list, returns the HD of the list. If the HD
+          is itself a list, then it should return the address of that list.
+
+   CDR  - similar to CAR, but returning the TL of the list.
+
+Write a short POP-11 program that uses these procedures instead of ::, HD and
+TL (examples: reversing a list, seeing whether something is in a list,
+"flattening" a list). To see what is going on, you may want to implement the
+following extra procedure:
+
+   SHOW - given an address, prints out what is there in a readable form. If
+          it is the address of a list, the whole list should be printed out
+          (perhaps in the POP-11 syntax).
+
+If you find all this too easy, think about implementing words (or strings) in
+this scheme, again restricting yourself to only putting numbers in the
+CONTENTS array. Or start thinking about how you would implement a GARBAGE
+COLLECTOR.
+
+FURTHER READING
+===============
+
+Foster, J.M., "List Processing", MacDonald/Elsevier, 1970.
+
+Winston, P.H. and Horn, B.K.P., "LISP", Addison Wesley, 1981.
+(Chapter 9)
+
+Allen, J., "Anatomy of LISP", McGraw Hill, 1978.
+
+
+See also TEACH BOXES

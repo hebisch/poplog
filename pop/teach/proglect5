@@ -1,0 +1,761 @@
+TEACH PROGLECT5                                    Aaron Sloman Oct 1998
+Revised: 31 May 2009
+
+Revision and more detail of previously presented information on Pop-11
+
+See
+TEACH * PROGLECT1
+TEACH * PROGLECT2
+TEACH * PROGLECT3
+TEACH * PROGLECT4
+
+CONTENTS
+
+ -- A few reminders first
+ -- What's involved in learning pop-11
+ -- Learn the syntax of Pop-11
+ -- Learn the semantics of Pop-11
+ -- -- Compile time meaning
+ -- -- Run time meaning
+ -- The Pop-11 "data stack" or "user stack"
+ -- Putting things on the stack
+ -- Removing things from the stack
+ -- "=>" and the stack
+ -- Using the stack to create structures
+ -- -- Uses of predicates
+ -- How procedures run
+ -- Packaging instructions into named procedures
+ -- The "little man with script" model of procedure invocation
+ -- Control jumps in a procedure
+ -- A procedure call and the stack
+ -- Infix operators
+ -- Variables and how they work
+ -- -- Different uses of the assignment arrow
+ -- -- Invoking updaters
+ -- Pop-11 data types
+ -- More on Pop11 control structures
+ -- -- General purpose loop formats:
+ -- -- Data related loop formats:
+
+-- A few reminders first ----------------------------------------------
+
+SPEEDING UP VED'S INITIALISATION
+
+If VED starts up too slowly for you
+    Get rid of the command to start up menus automatically,
+    in your vedinit.p
+
+define vedinit();
+  ;;; Comment this out if you don't want the menus (use "ENTER menu" instead)
+    vedinput(veddo(%'menu'%))
+enddefine;
+
+LATER
+You can get the menus going when you want them, with the command:
+
+        ENTER menu
+
+
+USING MAIL INSIDE VED.
+
+    See TEACH EMAIL if you need revision on the use of mail in VED.
+
+
+MINI PROJECTS. SEE TEACH POP11_PROJECT
+
+-- What's involved in learning pop-11 ---------------------------------
+
+-- Learn the syntax of Pop-11 -----------------------------------------
+
+Which forms of expression are "legal"
+
+What sorts of compile time errors occur because of wrong syntax
+
+Later: how you can extend the syntax by defining macros or
+syntax words.
+
+E.g.
+
+    define :form ....
+
+    See HELP * DEFINE_FORM
+
+-- Learn the semantics of Pop-11 --------------------------------------
+
+What the various formats mean
+
+-- -- Compile time meaning
+
+    Variable declarations
+        Different types of identifiers
+           (e.g. infix operators, macros, syntax words)
+
+    Procedure definitions
+
+    "Top level" Pop-11 commands
+
+    Use of word quotes, string quotes, list expressions,
+        vector expressions
+
+    For experts:
+
+    The use of sections can "protect" bits of code
+
+    global lvars can do this in the context of a file.
+
+    Compiler directives (compile_mode)
+
+
+-- -- Run time meaning
+
+  The Pop-11 virtual machine: the objects and processes
+
+-- The Pop-11 "data stack" or "user stack" ----------------------------
+
+The stack is both a source of power and a source of problems. Similar to
+the programming language Forth.
+
+Uses of the "data stack" ("user stack") for temporary storage and
+communication between sub-processes include the following:
+
+o   Arguments passed to procedures from other procedures or
+    "top level" commands
+
+
+o   Results produced by procedures when they finish are left on
+    the stack. They can then be used by the calling procedure,
+    or "top level" command, e.g. to print the result.
+
+o   Items stored temporarily for the purpose of building
+        a complex data-structure, e.g. list or vector or array
+
+    This uses syntax like the following in list and vector expressions:
+
+        [% .... %  ^... ^^...]
+        {% .... % ^... ^^...}
+
+Examples below. See TEACH * STACK for more details.
+
+-- Putting things on the stack
+
+When any Pop-11 instruction or expression is evaluated, if there is no
+result the stack is unchanged. If there are any results then they are
+all left on the stack, in an order that can be controlled by the header
+of a procedure with output local variables.
+
+E.g.
+
+    define foo(...) -> (r1, r2, r3);
+
+means that when foo finishes it puts three results on the stack, first
+r1, then r2, then r3. Those should be variables that are given values
+when the procedure runs. The "->" is NOT an assignment arrow.
+
+Most procedures return only one result, including most of the arithmetic
+procedures, e.g. "+", *". However the integer division operator "//"
+returns two results, the remainder and the divisor:
+
+    10//3 =>
+    ** 1 3
+
+Contrast
+
+    10/3.0 =>
+    ** 3.33333
+
+A collection of items can be put on the stack in a single expression
+made of sub-expressions separated by commas:
+
+    1, 2, 3+5, "cat", [a b] <> [c d] =>
+    ** 1 2 8 cat [a b c d]
+
+The same items in a different order:
+
+    "cat", [a b] <> [c d], 1, 2, 3+5 =>
+
+If a variable has a value, simply using that variable puts its value on
+the stack.
+
+    vars list3 = [silly example];
+
+    list3 =>
+
+Using it three times puts THE SAME THING on the stack three times
+
+    list3, list3, list3 =>
+
+Notice that the value of the variable is NOT COPIED each time it is
+used. If the value is a complex object, then the variable contains a
+"pointer" to that object and the pointer to that very object, not a
+copy, is put on the stack. The object remains in Pop-11's main
+re-usable memory space, known as "the heap" (which is different for each
+user, and which is destroyed every time you leave Pop-11).
+
+
+-- Removing things from the stack
+
+One common way of removing something from the stack is to use the
+assignment arrow to assign something to a variable.
+
+    vars x;
+
+NB the next three lines must be marked and loaded in one go, as VED
+removes stuff left on the stack between commands:
+
+    3;      ;;; puts three on the stack
+
+    -> x;   ;;; assigns it to x
+
+    =>      ;;; see what's left
+    **
+
+NB the next three lines must be marked and loaded in one go, as VED
+removes stuff left on the stack between commands:
+
+    "a", "b", 3, 4, 5;  ;;; put five things on the stack
+
+    -> x;   ;;; assign one to x: removes the last item
+
+    =>      ;;; see what's left
+    ** a b 3 4
+
+
+Try again with different things on the stack
+
+Another way to remove something from the stack is to run a procedure.
+Procedures take the arguments they need, i.e. the values for their input
+variables, off the stack, and put their results back. So procedures like
+"+", "-", "*", matches and issubstring take two things off the stack
+and return one thing:
+
+    1, 2, +() =>        ;;; actually "+" does not need "()"
+
+    ** 3
+
+    99, 55 * =>
+
+That is the same as
+
+    99 * 55 =>
+
+    issubstring("def", "define")=>      ;;; returns start of substring
+    ** 1
+
+    issubstring("fine", "define")=>
+    ** 3
+
+If there are not enough things on the stack you will get a mishap
+message, e.g. "*" needs two arguments:
+
+    3 * =>
+;;; MISHAP - ste: STACK EMPTY (missing argument? missing result?)
+;;; FILE     :  /bham/common/com/packages/poplog/local/teach/proglect5
+    LINE NUMBER:  244
+;;; DOING    :  mishap * ....
+
+
+So you can put five things on the stack, call a procedure that takes two
+and returns one, and end up with four
+
+    1, 2, 3, 4, 5, * =>
+    ** 1 2 3 20
+
+-- "=>" and the stack
+
+Warning: outside procedures "=>" prints everything on the stack.
+It also clears the stack.
+
+Inside procedures it prints only the top item on the stack, and removes
+it from the stack.
+
+If there's nothing on the stack, then outside a procedure "=>" prints
+just "**" followed by nothing
+
+    =>
+    **
+
+Inside a procedure
+
+define test();
+    =>
+enddefine;
+
+test() =>
+
+;;; MISHAP - ste: STACK EMPTY (missing argument? missing result?)
+
+NB: The pretty print arrow "==>" ALWAYS expects at least one thing to be
+on the stack, and it always prints exactly ONE thing, which it removes
+from the stack.
+
+[% repeat 5 times [% for x from 1 to 10 do 300*x endfor %] endrepeat %] ==>
+
+Explain all the things put on the stack and removed there. E.g. inside
+[% ... %] things can be put on the stack, then at the end of the list
+expression they are all removed and put in a list, and then the list
+(i.e. a pointer to the list) is put on the stack.
+
+How many stack operations were there in the above?
+
+    300 * x involves two additions, two removals, then one addition
+
+In the inner loop, that's done 10 times, creating 10 items.
+Then the enclosing list brackets remove all 10 items and put one back.
+
+That's done 5 times, putting 5 items on the stack.
+
+Etc.
+
+Finally ==> removes one item, and prints it, the list of lists.
+
+-- Using the stack to create structures -------------------------------
+
+You need to understand the uses of the stack to create structures, e.g.
+by having a loop inside list brackets, or by putting a procedure call
+inside list brackets.
+
+vars x;
+[% for x from 3 by 3 to 66 do x endfor %] =>
+
+vars list = [ cat dog 5 7 99 mouse elephant 4 2 1 pink];
+
+define stack_all_of(type, list);
+
+    lvars item;
+
+    for item in list do
+        if type(item) then item endif
+    endfor
+
+enddefine;
+
+stack_all_of(isword, list) =>
+stack_all_of(isnumber, list) =>
+
+[% stack_all_of(isword, list) %] =>
+[% stack_all_of(isnumber, list) %] =>
+
+define istiny(x);
+    isnumber(x) and x < 5
+enddefine;
+
+[% stack_all_of(istiny, list) %] =>
+
+The procedures istiny, isword, isnumber are PREDICATES. If applied to an
+object a predicate produces the result true or false.
+
+Some predicates are applied to two or more things, and are called
+RELATIONS, e.g.
+
+    =, >, <, matches
+
+These take two things, and produce a true or false result.
+
+-- -- Uses of predicates
+
+Predicates can be used to create conditions, i.e. expressions that
+evaluate to TRUE or FALSE. (In Pop-11 any non-false object counts as a
+TRUE value for a conditional).
+
+Occurrences of conditions include the following contexts.
+
+In conditional expressions:
+
+    if <condition> then
+
+    elseif <condition> then
+
+    unless <condition> then
+
+    elseunless <condition> then
+
+
+In loop headers:
+
+    between while and do
+        while <condition> do
+
+    between until and do
+        until <condition> do
+
+Inside loops, to control the loop behaviour:
+
+    quitif( <condition> )
+
+    quitunless( <condition> )
+
+    nextif( <condition> )
+
+    nextunless( <condition> )
+
+Anywhere:
+    returnif( <condition> )
+
+
+-- How procedures run -------------------------------------------------
+
+In order to understand Pop-11 you need to understand how procedures
+work. This includes knowing all of the following:
+
+What happens when a procedure starts up
+    including assignments to input local variables
+
+What happens when a procedure finishes
+    including saving values of output locals
+
+How local variables work: "vars" and "lvars"
+
+How the instructions in the procedure are obeyed, i.e. which ones are
+obeyed in which order. For instance where there are conditional
+expressions only a subset of the instructions will be obeyed, depending
+on the result of evaluating the condition.
+
+How a procedure invokes other procedures, including giving it arguments.
+
+What happens when the invoked procedure "returns", i.e. finishes,
+possibly leaving one or more results on the stack.
+
+How abnormal exits work (for experts only: see HELP * CONTROL)
+
+
+See TEACH * STACK, TEACH * DEFINE, TEACH * PRIMER
+
+For experts: REF * PROCEDURE
+
+
+-- Packaging instructions into named procedures -----------------------
+
+A procedure definition uses special syntax to express all the above
+ideas. In different languages different syntax may be used. Not all
+languages allow the same ideas to be expressed.
+
+In Pop-11 this is the basic procedure definition format.
+
+    define name(arg1, arg2 ...) -> (output1, output2...);
+
+        declarations (including nested procedure definitions)
+        actions
+
+    enddefine;
+
+The declarations and actions can be arbitrarily intermingled. Some of
+the actions will invoke other procedures. Some will use special syntax
+forms to control which actions are done and in which order.
+
+    See TEACH DEFINE, HELP DEFINE
+
+Procedure calls assume automatic "return" to caller
+
+    action1;
+    do_stuff(x,y,z);     ;;; automatically returns here
+    action2;
+
+-- The "little man with script" model of procedure invocation ---------
+
+Each procedure corresponds to a script, which can be copied. Each time a
+procedure is invoked a "little man" inside the computer is created (or
+fetched from a store room) given a copy of the script, and told to
+follow the instructions. If there's a call to another procedure the
+little man puts the arguments on the stack before calling the procedure,
+then waits for the next little man to finish. Just before
+each little man finishes, he puts any "results" (values of output
+locals) on the stack, gives a "wake up" signal to the little man who is
+waiting for him, and then goes back to the store room.
+Any lexical local variables are handled by using special spaces on the
+copy of the script. Other local variables ("vars" variables) use more
+complex processes.
+
+Thus at any one time there can be a "stack" of little men with half
+completed scripts, each waiting for the next one to finish, with the
+last little man actually doing something with his script. (Some people
+see this stack growing upwards, some downwards.)
+
+-- Control jumps in a procedure ---------------------------------------
+
+Various kinds of jumps and abnormal exits
+
+    goto label (not recommended)
+
+For experts:
+
+    go_on
+
+    switchon
+
+For exiting from or restarting loops. In each case the (N) is optional
+and defaults to 1. N must be a nonnegative integer, not an expression
+that evaluates to an intenger.
+
+    quitloop(N)
+        exit from the Nth enclosing loop
+    nextloop(N)
+        restart the Nth enclosing loop
+
+    quitif(<condition>)(N)
+        equivalent to
+            if <condition> then quitloop(N) endif
+    nextif(<condition>)(N)
+        equivalent to
+            if <condition> then nextloop(N) endif
+
+    quitunless(<condition>)(N)
+        equivalent to
+            unless <condition> then quitloop(N) endunless
+
+    nextunless(<condition>)(N)
+        equivalent to
+            unless <condition> then nextloop(N) endunless
+
+
+For exiting from the current procedure
+    return()
+
+    return(<values>)
+
+    returnif(<condition>) (<values>)
+        equivalent to
+            if <condition> then return(<values>) endif
+
+    returnunless(<condition>) (<values>)
+        equivalent to
+            unless <condition> then return(<values>) endunless
+
+When a procedure finishes:
+
+    What happens to local vars (dynamic "permanent" local variables)
+        Previous values restored
+    What happens to local lvars (lexical local variables)
+        Variable no longer exists on exit, unless a "closure"
+        is created (for experts only).
+
+Abnormal exits:
+    exitto(procedure)
+
+    exitfrom(procedure)
+
+and others, chain, chainto, chainfrom, catch, throw
+
+    etc.    See HELP * CONTROL
+
+also suspend, and resume, with processes
+    HELP * PROCESS
+
+Interrupt is equivalent to exitto(some top level procedure)
+
+(Use of Popready to control interrupts: HELP * POPREADY)
+
+-- A procedure call and the stack -------------------------------------
+
+    silly(x, sumsq(3,4), 99)
+
+Means:
+
+    1. push onto the stack all of the following
+
+        the value of "x",
+        the result of sumsq(3,4),
+        99
+
+    2. then run the procedure called SILLY
+
+Getting the  result of  SUMSQ(3,4)  itself can  be expanded  in  similar
+fashion, so the whole expression
+
+    silly(x, sumsq(3,4), 99)
+
+translates to
+
+    1. push the value of x onto the stack
+
+    2. push 3 onto the stack
+
+    3. push 4 onto the stack
+
+    4. call the procedure called "sumsq"
+        (It will take off two things and push its result onto the stack)
+
+    5. push 99 onto the stack
+
+    6. call the procedure called "silly"
+
+Notice that the thing mentioned first is actually invoked last.
+
+Compare the language FORTH
+
+Pop-11 allows a "dot" notation, which some people like to use
+
+    x, 3, 4 .sumsq, 99 .silly =>
+
+That is equivalent to:
+
+    silly(x, sumsq(3,4), 99) =>
+
+-- Infix operators ----------------------------------------------------
+
+Infix operators are just names for procedures.
+
+    3 + 4 =>
+
+This is equivalent to
+
+    +(3, 4)=>
+
+I.e.
+
+    push 3
+    push 4
+    call + (which removes 3, adn 4 and pushes its result)
+    call =>
+
+The precedence of an operator determines the sequence of operations.
+Parentheses can override precedence:
+
+Compare
+
+    3 + 4 * 5 =>
+
+    (3 + 4) * 5 =>
+
+Don't confuse use of parentheses to control precedence and use of
+parentheses to invoke procedures "doit brackets", with our without
+inputs.
+
+-- Variables and how they work ----------------------------------------
+
+TEACH * VARS, TEACH * VARS_AND_LVARS
+
+    words, identifiers and values
+
+    How assignment gives a word a value, via the stack
+        <expression> -> variable;
+
+    The Pop-11 dictionary and its role at compile time
+        and run time (valof, the matcher)
+
+-- -- Different uses of the assignment arrow
+
+Assigning to a variable
+
+    3 -> x;
+
+Multiple assignments:
+
+    3, 4, 5 -> (x, y, z);
+
+Initialised declarations include an assignment
+
+    vars x = 3;
+
+-- -- Invoking updaters
+
+The use of the assignment arrow to invoke updaters of procedures, e.g.
+
+    vars list = [a b c d]
+
+        "cat" -> hd(list);
+
+        list =>
+
+        [on a mat] -> tl(list);
+
+        list =>
+
+    vars vec = {1 2 3 [4 5] a cat};
+
+        vec =>
+
+        subscr(5, vec) =>
+
+        33 -> subscr(5, vec);
+        subscr(5, vec) =>
+
+        See HELP * UPDATER
+
+-- Pop-11 data types --------------------------------------------------
+
+The Primer gives an overview, and REF DATA gives a lot more detail.
+
+Pop-11 has many kinds of "data-structures" for storing
+information:
+
+o    provided by the user
+
+o    created by the program
+
+o    read in by the program while it is running, e.g. from
+        other programs, sensors, etc.
+
+Types of data include
+    numbers (various kinds), words, strings,
+    lists, vectors, properties, and many more
+
+Some data-types are primitive (built in to Pop-11 at a
+low level). Others are derived.
+
+E.g. lists are a derived datatype, created from pairs, which are
+two-element records.
+
+If lists had not been in Pop-11 we could have invented them, and
+defined the syntax.
+
+Pop-11 databases use a derived data type built on top of lists.
+
+Arrays are a derived datatype, created from procedures and vectors,
+though it would not be so easy for users to implement them.
+
+For this course a subset of data types will suffice.
+(See TEACH * POPCORE, TEACH * PRIMER)
+(Experts see REF DATA)
+
+
+-- More on Pop11 control structures -----------------------------------
+
+There are many sorts of "control structures"
+
+Sequences of instructions
+    action1;
+    action2;
+    ......
+
+Conditional instructions
+    if condition then action elseif
+
+Multi-branch conditionals
+    if condition1 then action1
+    elseif condition2 then action2
+    elseif ....
+    else ...
+    endif
+
+Loops of various kinds
+
+-- -- General purpose loop formats:
+
+repeat .... endrepeat
+
+while condition do action endwhile
+
+until condition do action enduntil
+
+
+-- -- Data related loop formats:
+
+for x from 1 to 75 do action(x) endfor
+
+for x in list do action(x) endfor
+
+foreach pattern in database do action endforeach
+
+forevery patternlist in database do action endforevery
+
+    ... and several more. See HELP * LOOPS, HELP * CONTROL
+
+    REF * using_subscriptor
+
+
+To be revised and continued.
+
+
+
+--- $poplocal/local/teach/proglect5
+--- Copyright University of Birmingham 1998. All rights reserved. ------

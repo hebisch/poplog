@@ -1,0 +1,667 @@
+TEACH STACK updated A.Sloman Oct 1997
+                                          Updated for V15.0 17 Oct 1996
+
+                          THE POP-11 USER STACK
+                          =====================
+
+This file explains the use of the "open" stack (sometimes called the
+"user stack") in Pop-11. The stack is a part of the memory of the
+computer used by Pop-11 for giving arguments to procedures and for
+procedures to produce their results. Every time a pop-11 procedure
+creates something, e.g. a number, a list, a string, a procedure, it is
+put on the top of the stack. From there it can be stored in a variable,
+stored somewhere else, or used as input to a procedure.
+
+This file assumes that you already know how to define and invoke
+procedures (see TEACH * DEFINE) how to declare variables and access or
+update their values (see TEACH * VARS, TEACH * VARS_AND_LVARS). It is
+also useful to be familiar with marked ranges and methods of compiling a
+marked range in the editor, as explained in TEACH * LMR.
+
+         CONTENTS
+
+ -- Procedures and the stack
+ -- How to interpret a procedure header
+ -- Input local variables and output local variables
+ -- Understanding the body of the procedure
+ -- Assigning the result of running sumsq to a variable
+ -- Assignment and the stack
+ -- Procedure calls and the stack
+ -- -- Translation Exercises:
+ -- Infix operations
+ -- Analysing a complex expression in terms of the stack
+ -- The stack and the print arrow
+ -- Mishaps and the stack
+ -- Multiple assignment
+ -- Further Reading
+
+POP-11 uses a portion of its memory known as 'the user stack',
+abbreviated usually as 'the stack', for procedures to store information
+temporarily when communicating with other procedures.
+
+(Besides the user stack, there is also a stack used by the
+procedure-calling mechanism, but most users don't need to know about
+that, unless you run out of stack space for recursive procedures. Expert
+programmers may wish to look at HELP pop_callstack_lim)
+
+The user stack is called a STACK, because, like a stack of plates, you
+can add things on the top, and you can take things off the top. The
+thing you take off will always be the LAST thing that was put on. So
+procedures communicate information with one another as follows. If
+procedure A wants to run procedure B giving it certain inputs
+(arguments), it puts the arguments on the stack and then just runs B,
+leaving it to B to take them off, as needed.
+
+If when B has finished it has any information for its caller, A, it
+should leave the information on the stack, and A can take it off as
+needed, e.g. by printing it, by assigning it to a variable declared in
+A, or by calling another procedure that will use the information left on
+the stack by B.
+
+-- Procedures and the stack -------------------------------------------
+
+Suppose you have a procedure which takes two numbers and produces the
+sum of their squares as a result:
+
+    define sumsq(x, y) -> r;
+        x*x + y*y -> r;
+    enddefine;
+
+Mark and load this, and test it as follows:
+
+    sumsq(3, 4) =>
+
+    sumsq(12,5) =>
+
+
+-- How to interpret a procedure header --------------------------------
+
+The Pop-11 compiler interprets the TOP two lines of the procedure
+definition as saying a number of things:
+
+    define sumsq(x,y) -> r;
+
+Means:
+
+    1. This is a definition of a procedure, whose name is "sumsq".
+
+    2. It has three local variables, called x, y and r, all of which
+       are "lexical" local variables (implicitly declared using
+       "lvars").
+
+    3. When sumsq runs, there should be AT LEAST two items on the user
+       stack.
+        (There might be more items on the stack, because other
+        procedures have stored information which is to be used later.)
+
+    4. When the procedure starts running, the top two items on the stack
+       should be removed from the stack, the top one being assigned to y
+       and the next one to x (i.e. the assignments are in reverse order
+       for "input" variables)
+
+    5. When the procedure finishes, the value of the variable r, whatever
+       it is, should be left on the stack.
+        (N.B. although the heading LOOKS like an assignment to r, in
+        fact the procedure heading does not state that anything will be
+        assigned to r. That has to be done inside the procedure.)
+
+ALL OF THAT is implied in just the first two lines of the procedure
+definition. Look at the procedure heading again and see how it gives all
+that information.
+
+Note that since Poplog Version 15.0 it is no longer necessary to
+use "lvars" to declare input locals and output locals as lexical
+variables.
+
+-- Input local variables and output local variables -------------------
+
+It may be useful to remember the following "symmetry" between the "input
+variables" x, and y, and the "output" variable r in the heading:
+
+    define sumsq(x,y) -> r;
+
+The input variables x, and y, are used without any assignment arrow, yet
+values are assigned to them from the stack when the procedure starts up.
+
+The output variable appears to be preceded by an assignment arrow, yet
+its value is copied to the stack when the procedure finishes: the
+reverse of an assignment.
+
+Thus, the procedure form:
+
+    define sumsq(x,y) -> r;
+        <instructions>
+    enddefine;
+
+can be thought of as roughly meaning
+
+    To do sumsq;
+        <make x, y and r local variables for the procedure sumsq>
+        then
+        -> y; ;;; assign top of stack to y
+        -> x; ;;; assign new top of stack to x
+        <do the procedure instructions>
+        <put value of r on stack>.
+
+
+-- Understanding the body of the procedure ----------------------------
+
+Everything between the header and "enddefine" is called the "body" of
+the procedure. In the case of sumsq there is only one line in the body:
+
+    define sumsq(x, y) -> r;
+
+        x*x + y*y -> r;
+
+    enddefine;
+
+I.e. the body is
+
+        x*x + y*y -> r;
+
+This says how the values given to x and y are to be used to work out
+what number to assign to r, so that it can be produced as the result at
+the end.
+
+Notice that in this case there is a REAL assignment to "r", unlike the
+use of "-> r" in the header, which merely says that when the procedure
+is finished the value of r must be put on the stack.
+
+
+-- Assigning the result of running sumsq to a variable ----------------
+
+Now suppose you ask sumsq to find the sum of the squares of 3 and 4, and
+assign the result to the variable "z";
+
+    vars z;
+
+    sumsq(3,4) -> z;
+
+Notice how this has the same general FORMAT as the procedure heading in
+the definition
+
+    define sumsq(x,y) -> r;
+
+I.e. the format of the procedure heading gives a "pattern" for using the
+procedure. (This is sometimes also referred to as "invoking" the
+procedure, or "calling" it.)
+
+The instruction:
+
+    sumsq(3,4) -> z;
+
+translates into the following:
+
+    1. push 3 onto the stack
+
+    2. push 4 onto the stack
+
+    3. call the procedure sumsq
+        (If defined as above, sumsq will "pop" two things off the stack,
+        and when it has finished will push one thing onto the stack)
+
+    4. remove the top item from the stack and store it in the variable
+        "z", (i.e. in the memory location associated with the name "z".)
+
+If you then type
+    z =>
+
+That says, push the value of "z" onto the stack, then run the "print
+arrow" procedure. The print arrow is defined in terms of instructions to
+print out (on the terminal) two asterisks, and then all the items on the
+stack.
+
+Notice that putting something on the STACK is not the same as printing
+something on the terminal. The computer cannot read what is on your
+screen, but it can examine and do things with items on the stack.
+
+
+-- Assignment and the stack -----------------------------------------
+
+As implied above, whenever you use the assignment arrow "->" (except in
+a procedure heading) this is an instruction to move the top of the stack
+to somewhere else, usually to a variable. This is often described as
+"popping" something off the stack. E.g.
+
+    -> item;
+
+means "pop" the top of the stack into the variable "item". The thing
+that was previously the second item on the stack will then become the
+new top of the stack.
+
+The assignment arrow "->" should not be confused with the print arrow
+"=>" which also uses things on the stack, but simply prints them on the
+screen, starting with the bottom item (i.e. the first item put on the
+stack). Try:
+
+    1, 2, "cat", 'a string' =>
+
+By contrast, the "pretty print" arrow "==>" only prints ONE item, the
+top item on the stack. Try this.
+
+    1, 2, "cat", 'a string' ==>
+
+
+(However, if you use "=>" INSIDE a procedure it will only print one item
+from the stack.)
+
+
+-- Procedure calls and the stack -----------------------------------------
+
+In general, if you call a procedure, by typing its name, followed by
+various expressions between 'doit' parentheses, then this means: push
+onto the stack the values of all the expressions (i.e. the things
+denoted by the expressions), then run the procedure. E.g.
+
+    silly(x, sumsq(3,4), 99)
+
+Means:
+
+    1. push onto the stack all of the following
+
+        the value of "x",
+        the result of sumsq(3,4),
+        the integer 99
+
+    2. then run the procedure called SILLY
+
+Getting the result of SUMSQ(3,4) itself can be expanded in similar
+fashion, so the whole expression
+
+    silly(x, sumsq(3,4), 99)
+
+translates to
+
+    1. push the value of x onto the stack
+
+    2. push 3 onto the stack
+
+    3. push 4 onto the stack
+
+    4. run the procedure called "sumsq"
+        (It will take off two things and push its result onto the stack)
+
+    5. push 99 onto the stack
+
+    6. run the procedure called "silly"
+
+Notice that the thing mentioned first is actually invoked last. For
+people who are used to the language Forth, or "reverse polish"
+calculators, it may be of interest to know that Pop-11 allows you to
+express the above as follows
+
+    x, 3, 4 sumsq(), 99 silly() =>
+
+which is is equivalent to this conventional "functional" expression:
+
+    silly(x, sumsq(3, 4), 99) =>
+
+Note that the outermost procedure in the functional notation comes last
+in the "reverse polish" notation.
+
+For ordinary procedures, but not infix operators like "+" and "<>" you
+can write a dot before the procedure name instead of "()" after it. I.e.
+the above is equivalent, in the "dot notation" to:
+
+    x, 3, 4 .sumsq, 99 .silly =>
+
+
+-- -- Translation Exercises:
+
+1. Translate the following expressions, which are in conventional
+functional notation into the reverse Polish notation.
+
+    1.a. sqrt(99) =>
+
+    1.b. sqrt(99 + x) =>
+
+    1.c. sqrt(99) + x =>
+
+    1.d. x + sqrt(99) =>
+
+    1.d. sqrt(sqrt(x + 99)) =>
+
+
+How to check your translation:
+    First give x a value, e.g.
+    vars x;
+    5 -> x;
+
+Then try out both the original version and your translation and see if
+Pop-11 gives the same result. Then try again with a different value for
+x. e.g. these two should give the same result no matter what the value
+of x:
+
+    sqrt(99 + sqrt(x)) =>
+
+    99, x, sqrt(), +(), sqrt() =>
+
+
+2. Translate the following from reverse Polish notation to
+conventional functional notation.
+
+    2.a. 3, 5, +() =>
+
+    2.b. 3, 5, +() 8, *() =>
+
+    2.c. 3, 5, +() 8, *(), sqrt() =>
+
+    2.d. x, 99, sqrt(), +() =>
+
+    2.e. x, 99, +(), sqrt() =>
+
+Check your results in the same way as before.
+
+
+-- Infix operations -------------------------------------------------
+
+Some procedures have names which are defined as 'infix operations':
+examples are "+" "*" "=" ">" "<" and others. So
+
+    x * y
+
+means:
+    push x onto the stack,
+    push y onto the stack,
+    run the multiplication procedure: *
+
+    x + y = z
+means:
+
+    1. push the result of x + y onto the stack
+        (by pushing, x, then y, then calling "+")
+    2. push the value of "z" onto the stack
+
+    3. call the procedure = (which takes two things off the stack,
+        compares them, then puts back TRUE or FALSE as its result.)
+
+
+-- Analysing a complex expression in terms of the stack ---------------
+
+We can understand the middle line of the definition of sumsq in terms of
+the stack:
+
+        x * x + y * y -> result;
+
+We assume as before that the addition procedure "+", and the
+multiplication procedure "*" both take two things off the stack and put
+back one thing. So the expression on the left
+
+        x * x + y * y
+
+can be understood as
+    push x onto the stack
+    push x onto the stack
+    run the procedure * (this takes two things off, and puts one back)
+    push y onto the stack
+    push y onto the stack (now there are three things onto the stack)
+    run the procedure * (this takes two things off, and puts one back,
+                             leaving two things altogether)
+    run the procedure + (this takes two things off and puts one back,
+                             leaving one thing on the stack)
+
+After that there is one thing on the stack. The second part of the line
+        -> result;
+
+says: remove the top thing on the stack and assign it to the variable
+"result". I.e. store it in the portion of memory associated with the
+name "result".
+
+The order in which things are put on the stack and procedures executed
+depends on the conventions about the 'precedence' of + and *, i.e. when
+it's ambiguous do the multiplication first. The order can be altered by
+means of parentheses. For example:
+
+        (x * x + y) * y
+
+translates to:
+        push x onto the stack
+        push x onto the stack
+        run the procedure * (multiply)
+        push y onto the stack (so far, exactly as before)
+        run the procedure + (instead of doing the second * )
+        push y onto the stack
+        run the procedure *
+
+In order to test your understanding, you should work out what each of
+the following means, and check your understanding by marking each line
+and executing it (or use "ESC d" to run vedloadline):
+
+    3 * 3 + 4 * 4 =>
+    (3 * 3 + 4) * 4 =>
+    3 * (3 + 4 * 4) =>
+    (3 * 3) + 4 * 4 =>
+    3 * (3 + 4) * 4 =>
+    3 * 3 + 4 * 4 =>
+    (3 * 3) + (4 * 4) =>
+    (3 * 3 + 4 * 4) =>
+
+Note: in some cases the parentheses don't make any difference because
+adding them does not alter the "conventional" grouping.
+
+
+-- The stack and the print arrow -----------------------------------------
+
+See TEACH * PRINTARROW for information on the use of "=>" to print out
+things on the stack.
+
+-- Mishaps and the stack -----------------------------------------------
+
+There is a very common mishap message associated with the stack
+
+    MISHAP - STACK EMPTY (missing argument? missing result?)
+
+This happens when a procedure, or the assignment arrow, is trying to
+take something off the stack when there is nothing left on the stack.
+
+Try to mark and load the following:
+
+    vars x;
+    -> x;
+
+Because "-> x" tries to take something off the stack when there's
+nothing there, you'll get the "STACK EMPTY" error message.
+
+The reason why the error message includes "(missing argument? missing
+result?)" is that these are two frequent causes of STACK EMPTY errors
+(sometimes called "stack underflow" errors, as contrasted with "stack
+overflow" errors.)
+
+We can illustrate this with the procedure sumsq, defined above (look
+back at the definition if you don't remember it). Suppose you give the
+following Pop-11 command (try it and look carefully at the error
+message, then read on):
+
+    sumsq(3) -> z;
+
+    This would push 3 onto the stack, then run sumsq.
+    sumsq would take the top of the stack (3) and assign it to y.
+    It would then try to assign the top of the stack to x and find
+    nothing left.
+
+You'd then get a stack error, with a message as above, except that the
+DOING line in the error message would be something like
+    ;;; DOING : sumsq compile ...
+
+I.e. it shows you that it is doing sumsq at the time the error occurs.
+Looking at the DOING line is often essential for finding out the source
+of your errors.
+
+"sumsq(3)" was an example of a missing argument.
+
+You can also have a procedure which fails to produce a result. E.g.
+suppose the definition had been:
+
+    define newsumsq(x,y);
+
+        x * x + y * y -> x;
+
+    enddefine;
+
+This is a bit subtle. If you type sumsq(3,4), x and y get the values 3
+and 4 respectively (via the stack). Then the result of the expression
+        x * x + y * y
+
+is assigned to x (which is local to sumsq so x will not have that value
+when sumsq is finished). At this stage, nothing is left on the stack.
+Moreover, the heading of the definition does not specify that x is an
+'output local' variable for sumsq, so the value of x is not left on the
+stack. Nor is anything else left on the stack. Compile the above
+procedure definition, then run the following and look carefully at the
+error message, including the DOING line:
+
+    vars z;
+    newsumsq(3, 4) -> z;
+
+When this is obeyed, newsumsq runs, using up the 3 and the 4, then
+finishes with nothing on the stack. But the assignment arrow '->' tries
+to take something off the stack to give to "z", and at this point finds
+the stack empty, producing another mishap message. This time the problem
+is the missing RESULT from newsumsq, so that there is nothing to assign
+to z.
+
+This time the DOING line of the mishap message will not mention
+newsumsq. This is because newsumsq has finished running when the error
+occurs. I.e. it is no longer active when the error is detected. This can
+sometimes make it difficult to track down errors due to procedures
+failing to return a result. Usually you can get clues by looking at
+which procedures WERE active at the time, or by tracing procedures (as
+explained in TEACH * TRACE.)
+
+If you type
+
+    newsumsq(3) -> z;
+
+You'll get the same mishap message, but this time the mishap is INSIDE
+sumsq, trying to take two things off the stack, for X and Y.
+
+You are advised to try all those examples, looking carefully at the
+error messages.
+
+-- Multiple assignment ------------------------------------------------
+
+Pop-11 allows you to assign to several variables at the same time, using
+a single assignment arrow. First we declare three variables, then we
+assign the numbers 111, 222, and 333 to them.
+
+    vars num1, num2, num3;
+    111, 222, 333 -> (num1, num2, num3);
+
+    num3 =>
+    ** 333
+
+The above multiple assignment expression is equivalent to the following
+
+    111, 222, 333 -> num3 -> num2 -> num1;
+
+The second form is closer to how the pop11 virtual machine actually
+works, i.e. by assigning the top element of the stack first, then tne
+next element then the bottom element. However the latter style is harder
+for most people to read, and has often led to programming errors. Using
+a multiple assignment expression does not require you to think
+"in reverse".
+
+Multiple assignments did not work in the earliest versions of Pop-11.
+
+You can use a multiple assignment to swap the values of two variables,
+e.g.
+
+    x, y -> (y, x);
+
+Here y is given the old value of x, and x is given the old value of y.
+
+You can use multiple assignment in connection with procedures which
+produce multiple results. E.g. here is a procedure which when given the
+dimensions of a rectangle returns its perimeter and its area. It has two
+arguments (input variables) and two output variables, all of which will
+have numbers as values.
+
+define perim_area(height, width) -> (perim, area);
+    ;;; given numbers representing height and width of a rectangle,
+    ;;; return two numbers representing perimeter and area
+
+    2 * (height + width) -> perim;
+    height * width -> area;
+
+enddefine;
+
+;;; test it
+perim_area(10, 10) =>
+** 40 100
+perim_area(2, 4) =>
+** 12 8
+
+If another procedure needed to use the two results, it could use two
+variables and use a multiple assignment to take the values off the
+stack.
+
+define report_info(height, width) -> infolist;
+    ;;; Given height and width of a rectangle create a list giving
+    ;;; information about its perimeter and area. This could be
+    ;;; printed out, or stored in a database, in another procedure.
+
+    lvars perim, area;
+    ;;; here we use a multiple assignment
+    perim_area(height, width) -> (perim, area);
+
+    ;;; Then build the list
+    [Rectangle with dimensions ^height ^width has perimeter ^perim
+        area ^area] -> infolist;
+enddefine;
+
+;;; test it
+report_info(10, 10) =>
+** [Rectangle with dimensions 10 10 has perimeter 40 area 100]
+
+report_info(2, 4) =>
+** [Rectangle with dimensions 2 4 has perimeter 12 area 8]
+
+
+Pop-11 also allows you to declare and initialise multiple variables
+at the same time, by grouping them with parentheses. E.g. these two
+lines in the above procedure definition
+
+    lvars perim, area;
+    perim_area(height, width) -> (perim, area);
+
+can be combined into one declaration+initialisation:
+
+    lvars (perim, area) = perim_area(height, width);
+
+This must be understood simply as a convenient short-hand for the longer
+version.
+
+-- Further Reading ----------------------------------------------------
+
+For more on the stack see TEACH * DEFINE.
+
+Advanced programmers will find more information on procedures which
+manipulate the stack in HELP * STACK and some more technical information
+in REF * STACK and REF * VMCODE.
+
+There is a lot more information in
+
+TEACH * PRIMER
+    This is available in printed form to buy or borrow from the Computer
+    Science Library at Birmingham. See especially Chapter 3.
+    It is also available via the Web:
+        http://www.cs.bham.ac.uk/research/poplog/primer/
+
+There is more material explaining the Pop-11 stack in the following
+books, which are partly out of date, but still useful.
+
+J. Laventhol
+    Programming in POP-11
+    Blackwell Scientific Publications Ltd., 1987
+
+R. Barrett, A Ramsay, A Sloman
+    POP-11: a Practical Language for Artificial Intelligence
+    Ellis Horwood and John Wiley,1985
+    (Out of print)
+
+See HELP * POPREFS for additional literature.
+
+--- Copyright University of Sussex 1990. All rights reserved. ----------
+
+--- $poplocal/local/teach/stack
+--- Copyright University of Birmingham 2000. All rights reserved. ------

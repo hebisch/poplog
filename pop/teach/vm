@@ -1,0 +1,193 @@
+TEACH VM                                    Allan Ramsay, 9 January 1984
+
+=== The POP-11 Virtual Machine =========================================
+
+For related discussions, see also TEACH * POPSYS, * GC. For full details
+on the POPLOG Virtual Machine, see REF * VMCODE.
+
+POP-11 is a high-level language, for which programs are written in terms
+of intelligible constructs such as conditional and iterative expressions,
+procedure calls, and variable access and assignment. These programs are
+generally translated into some other language which is more easily dealt
+with by the computer, e.g. assembler or machine code. However, the actual
+computational constructs underlying the language are most precisely
+described via the POP-11 "virtual machine", a mythical computer with the
+following abstract structure:-
+
+The machine has two stacks, the "user stack" and the "auxiliary stack".
+The user stack is used for argument and result passing and for variable
+access and assignment - all explicit data transfers are handled via this
+stack. The auxiliary stack is used for bookkeeping associated with
+procedure calls, i.e. for keeping saved values of local variables and
+return addresses. There are no registers.
+
+Data structures are implemented as contiguous vectors of storage, with the
+first entry of each such cell containing a pointer to another cell (its
+"key"), which in turn contains information relating to the type of the
+first structure. In particular, a procedure is embodied as a data
+structure which contains, apart from the pointer to the key, a sequence of
+virtual machine operations. When such a procedure is "called", the
+operations it contains are "executed". In general operations are executed
+in sequence, though some of them may specify otherwise. The following
+operations are available :-
+
+PUSH <ITEM>     if the item is a variable, its VALOF is pushed onto the
+                user stack, otherwise the item itself is. In most
+                implementations, it is in fact the address of the item
+                which is pushed, but this is not an intrinsic aspect of
+                the virtual machine.
+
+POP <VAR>       the top item on the user stack is popped, and becomes the
+                VALOF of the variable.
+
+SAVE <VAR>      the variable and its current VALOF are pushed onto the
+                auxiliary stack. This operation is used ONLY for saving
+                the values of local variables of procedures.
+
+CALL <PROC>     the (address of the) next instruction in the current
+                procedure is saved on top of the auxiliary stack (this is
+                known as "saving the return address"), and the first
+                instruction of the specified procedure is taken as the
+                next instruction to be executed. The procedure may be
+                given as a variable or as an actual procedure.
+
+EXIT            items are removed from the auxiliary stack until a return
+                address is encountered. Whenever a variable/value pair is
+                remove, the value is set as the VALOF of the variable.
+                When the return address is finally found, the instruction
+                at that address is executed.
+
+JUMP <INSTR>    the specified instruction is executed, and execution
+                continues from it.
+
+JUMPIF <INSTR>  the top item on the user stack is popped and inspected.  If
+                it is found to be the item <false>, then execution
+                continues with the next instruction, otherwise it
+                continues from the one which is specified.
+
+Thus the POP-11 procedure FACT, defined below
+
+    define fact (n);
+        if n == 0 then 1 else n * fact(n-1) endif;
+    enddefine;
+
+is a specification of the underlying set of operations
+
+    SAVE    N           save the current value of the local variable
+    POP     N           set its value for the procedure call
+    PUSH    N           {
+    PUSH    0           {   compare its value with 0
+    CALL    ==          {
+    JUMPIF  . + 8       go to 8th following instruction if value is <true>
+    PUSH    N           {
+    PUSH    N           {
+    PUSH    1           {   otherwise calculate n * fact(n-1)
+    CALL    -           {   (leaving result on stack)
+    CALL    FACT        {
+    CALL    *           {
+    JUMP    . + 2       and go to exit (2nd following instruction)
+    PUSH    1           if value was <true>, set result as 1
+    EXIT                unwind value of N and return to saved return address
+
+These instructions cannot be directly executed by any existing machine.
+There has to be a further stage in which a list of instructions in this
+form is translated into a sequence of instructions which can actually be
+executed on the machine you are using. It might appear odd that we
+translate POP-11 source code into a low level language and then
+immediately retranslate it into an even lower level one, but there are a
+number of advantages to proceeding like this, as follows: (i) it enables
+us to split the job of "compiling" POP-11 programs into two manageable
+parts, where we first get a very detailed specification of what the
+program is supposed to do and then tailor that specification to the
+machine we are working on. (ii) it makes it easy (???) to implement POP-11
+on a variety of machines, with some confidence that all our
+implementations will be compatible, since they can all be identical apart
+from the component which translates from virtual machine operations to
+real machine operations, and it should not be too difficult to show that
+this component behaves the way it ought to. (iii) it helps us write
+optimising compilers for the language, i.e. compilers which take advantage
+of special characteristics of the program or the computer to make the
+program run faster, since it is easier to write these for the low level
+operations of the virtual machine than for POP-11 source code. (iv) it
+enables the user to write sophisticated extensions to POP-11 without
+having to know about all the details of the underlying computer - the
+virtual machine is far down as s/he needs to go. We will not discuss how
+to derive actual executable code from virtual machine code here.
+
+LIB SHOWCODE can be used to keep a record of the actual VM instructions
+generated as the system compiles procedures - see the latter part of
+HELP *SHOWCODE for a sketch of how to do this.
+
+=== Exercises: =========================================================
+
+(1) Show the virtual machine form of the following POP-11 procedures.
+
+    define concat (l1, l2);
+        if null(l1) then l2 else hd(l1) :: concat(tl(l1), l2) endif;
+    enddefine;
+
+    define member(x,l);
+        if      null(l)
+        then    false
+        else    x = hd(l) or member(x, tl(l))
+        endif;
+    enddefine;
+
+    define union (l1, l2);
+        if      null(l1)
+        then    l2
+        elseif  member(hd(l1), l2)
+        then    union(tl(l1), l2)
+        else    hd(l1) :: union(tl(l1), l2)
+        endif;
+    enddefine;
+
+(2) Write a set of POP-11 procedures which, given a list of operations
+representing the underlying structure of a POP-11 procedure, will simulate the
+effect of applying the procedure. Thus
+
+my_apply([SAVE N POP N PUSH N PUSH 0 CALL == JUMPIF [. + 3] PUSH  1
+          JUMP [. + 7] PUSH N PUSH N PUSH 1 CALL - CALL FACT CALL * EXIT], 5)
+
+should return 120, and should leave the value of N unchanged. Your program
+should be able to cope with procedures which call other user-defined
+procedures represented as lists of instructions (e.g. the definition of
+UNION from question 1), and also with procedures which call system
+procedures such as HD, +, and ==.
+
+You may use any POP-11 procedures you like (including APPLY). You will
+need to find implementations for the two stacks. A good solution should
+check before executing an instruction to ensure that it is feasible (i.e.
+you shouldn't try to POP into a variable if the user stack is empty, you
+shouldn't CALL something which isn't a procedure, ...). You may find it
+makes life easier to pretend that EXIT takes a dummy argument, since this
+will help you walk down the list of instructions.
+
+(3) Write a set of POP-11 procedures which, given a piece of POP-11 source
+code in the form of a list of items, will generate the corresponding list
+of virtual machine instructions, e.g.
+
+    plant([if ==(n, 0) then 1 else *(n, -(n,1)) endif])
+
+should return
+
+    [PUSH N PUSH 0 CALL == JUMPIF [. + 3] PUSH  1
+          JUMP [. + 6] PUSH N PUSH N PUSH 1 CALL - CALL *]
+
+This is a difficult problem. To make it worth attempting, you should
+ignore the use of infix operators (so the input should use ==(n, 0)
+instead of the usual n == 0), and, at least initially, you should not
+worry about compiling procedure definitions. The usual approach involves
+recognising that keywords like IF and UNTIL have matching in-between and
+closing keywords, and that the meaning of such words requires you to plant
+JUMP's and JUMPIF's. Thus if you meet the word UNTIL, you should create a
+label to say where you are now (so you can plant a JUMP back to this point
+when you have read the corresponding ENDUNTIL), and you should plant a
+JUMPIF <some new label> here. When you read the ENDUNTIL, you should give
+the instruction after the backward JUMP the label <some new label> so that
+you know where to jump to when the condition of the UNTIL holds.
+
+
+
+--- C.all/teach/vm -----------------------------------------------------
+--- Copyright University of Sussex 1987. All rights reserved. ----------

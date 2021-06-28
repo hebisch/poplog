@@ -1,0 +1,378 @@
+TEACH HAIKU-EXAMPLES.TXT
+
+A Demo Using 'recordmydesktop' on 15 Nov 2011
+(The recording unfortunately had 'grammatical' mis-spellt as 'gramattical'!)
+
+Now available on Youtube, here:
+    http://www.youtube.com/watch?v=j0oaK59SSM0
+
+Aaron Sloman
+School of Computer Science
+University of Birmingham, UK
+http://www.cs.bham.ac.uk/~axs
+
+
+This is a sequel to the demo of linux, espeak and pop11 on 13th Nov 2011
+http://www.cs.bham.ac.uk/research/projects/cogaff/tutorials/pop-espeak1.ogv
+also on youtube:
+
+This new demo shows how the text to be generated, and given to
+espeak, can conform to a grammar.
+
+We use a loop construct similar to that demonstrated previously, but
+what goes on in the loop is far more interesting.
+
+Reminder: the linux espeak program can be invoked from pop11 using
+the 'sysobey' command.
+
+sysobey is given a string, containing a linux command, which it asks
+a linux shell to run.
+
+espeak -h
+espeak --voices
+
+espeak -s 120 -p 65 -v en/en-wm "hello is Mary there already"
+espeak -s 120 -p 65 -v+f4 "hello is Mary there already"
+
+We can ask Pop11 to ask linux to run espeak
+
+sysobey('espeak -s 120 -p 65 -v+f4 "Hello. Has Mary finished her programming."');
+
+Let's use that mechanism in combination with pop11's grammar package, described
+in the TEACH GRAMMAR file in the poplog system.
+
+
+    vars mygram =
+    [
+        ;;; start a list of grammatical rules
+        ;;; a sentence is a NP then a VP
+        [s [np vp]]
+
+
+        ;;; a noun phrase is a determiner followed by a noun
+        ;;; or a determiner + adjective + noun
+        [np [det noun] [det adj noun]]
+
+        ;;; verb phrase = verb followed by NP
+        [vp [verb np]]
+    ] ;
+
+
+    vars mylex =
+      [       ;;; start a list of lexical categories
+        ;;; nouns
+        [noun  man girl number computer cup battle room car garage]
+
+        ;;; verbs
+        [verb  hated stroked kissed teased married taught added]
+
+        ;;; adjectives
+        [adj  big blue lonely clever excellent angry]
+
+        ;;; determiners
+        [det   the a every each one some]
+     ];
+
+mygram ==>
+
+mylex ==>
+
+
+Load the pop11 grammar library:
+
+    uses grammar
+
+Use it to generate sentences:
+
+    generate(mygram, mylex) ==>
+
+
+    ;;; make a string out of a list
+
+    '"' >< generate(mygram, mylex) >< '"' ==>
+
+    ;;; that method leaves the square brackets in the string, which
+    ;;; espeak does not object to!
+
+    sysobey('espeak -s 120 -p 60 "' >< generate(mygram, mylex) >< '"');
+
+
+Let's generate some simple Haikus to be printed out and spoken.
+
+-- Generating Haikus --------------------------------------------------
+
+A haiku (A Japanese literary form) is a three line poem of a highly
+constrained form. Examples (from Margaret Boden's book on creativity) are
+
+    All green in the leaves
+    I smell dark pools in the trees
+    Crash moon has fled
+
+    Eons deep in the ice
+    I paint all time in a whorl
+    Bang the sludge has cracked
+
+These are of the form
+
+    All [1] in the [2]
+    I [3] [4] [5] in the [6]
+    [7] the [8] has [9]
+
+We specify a grammar, which is a set of templates, to generate haikus
+as follows
+
+    vars haiku_gram =
+        [
+
+            ;;; a haiku has three parts separated by newlines
+            [haiku [part1 . ^newline part2 . ^newline part3 . ]]
+
+            ;;; We now define the permitted forms for each part
+
+            [ part1 [start_word adj in np]]
+
+            ;;; Example: All green in the leaves
+
+
+            [ part2 [I verb1 adj noun in np]]
+
+            ;;; Example: I smell dark pools in the trees
+
+            ;;; part3 has two forms, one with a singular noun phrase
+            ;;; followed by "has" and the other with a plural noun
+            ;;; phrase followed by "have"
+
+            [ part3 [exclaim , sing_np has verb2]
+                    [exclaim , plural_np have verb2]]
+
+            ;;; Example: Crash moon has fled
+
+            ;;; different types of noun phrases, singular and plural
+
+            [np [sing_np][plural_np]]
+
+            [sing_np [sing_det sing_noun]]
+
+            [plural_np [plural_det plural_noun]]
+
+            ;;; Nouns can be singular or plural, defined in the
+            ;;; lexicon
+            [noun [sing_noun] [plural_noun]]
+        ];
+
+
+;;; An example lexicon, for use with the above grammar
+
+    vars haiku_lex =
+        [
+            ;;; adjectives
+            [adj abrupt acrid crass crazy dark deep
+                 flossy ghostly goulish greenish magenta
+                 poetic purest rapt smelly tinkling tiny
+                vicious welling white zany zealous
+            ]
+
+            ;;; Words to start part 1
+            [start_word All Many Most So What How Days But]
+
+            ;;; Singular and plural determiners
+
+            [sing_det the some one every each my her your our their this]
+
+            [plural_det the some all most many my your our his their
+                these those two three four]
+
+            ;;; Singular and plural nouns.
+
+            [sing_noun acorn age anchor angel anguish bridge
+                canopy cosmos dawn daylight death dew foal grass hatching
+                laughter moon night ocean power
+                heart spring sunset tiger winter zoo]
+
+            [plural_noun
+                ancestors autumns births collisions dancers devils
+                echoes evenings forms galaxies ghosts
+                heavens hosts poets raindrops rivers seas spirits
+                storms summers tangles tempests torments sheep
+                trees verses vessels waves watchers winters
+            ]
+
+            [verb1 abandon burn compose dangle detach
+                engage expect fetch grasp greet hug mourn
+                praise press sip slice spy stroke
+                taste tear twist urge watch wipe
+            ]
+
+            [verb2 aged arisen bloomed blinked burst
+                chimed come cracked drowned drooped eaten ended
+                faded fallen fetched floundered frozen
+                gone gripped gushed held hated loomed lost
+                missed nursed oiled opened oozed riddled ripped rode
+                sang slept smouldered swirled swarmed thawed unzipped
+            ]
+
+            ;;; words for an exclamation
+            [exclaim
+                Aha Alas Bang Crash Forever Ha Huh Joy Nay
+                No Ouch Oh See So Ugh Woe Yea Yes Yippee]
+        ];
+
+haiku_gram ==>
+haiku_lex ==>
+
+We make the library available using this command
+
+    uses grammar
+
+and compile an extension to allow us to generate other things than just
+individual sentences (the default):
+
+    uses generate_category
+
+    ;;; set the maximum recursion level for the generator
+    20 -> maxlevel;
+
+    ;;; Generate 3 haikus, using the above grammar and lexicon
+    repeat 3 times
+        generate_category("haiku", haiku_gram, haiku_lex) ==>
+    endrepeat;
+
+===================================================================
+Here are examples of what the program can print out
+
+** [All tinkling in some sheep .
+        I stroke crass forms in one dew .
+        Nay , our dew has riddled .]
+** [What zealous in some torments .
+         I stroke white rivers in our dancers .
+         Ugh , my heavens have held .]
+** [What purest in four tangles .
+         I grasp flossy age in each cosmos .
+         Alas , all poets have drowned .]
+
+Another run of the loop:
+
+** [Many crass in his vessels .
+         I spy tiny death in every foal .
+         Alas , one foal has fallen .]
+** [All zealous in my hosts .
+        I wipe tiny power in four forms .
+        So , her night has drooped .]
+** [So crazy in my collisions .
+       I spy ghostly hosts in most ghosts .
+       Ouch , the trees have frozen .]
+
+Can we turn the output, which is a list of words, including some newlines,
+into a string, to give to espeak?
+
+Save some output
+
+    vars output;
+
+    generate_category("haiku", haiku_gram, haiku_lex) -> output;
+
+    output ==>
+
+** [So magenta in every heart .
+       I dangle greenish hatching in three dancers .
+       Bang , our hatching has held .]
+
+    delete(newline, output) -> output;
+
+    output ==>
+
+;;; This how the haiku is printed out;
+** [So magenta in every heart . I dangle greenish hatching in three dancers . Bang , our
+    hatching has held .]
+
+
+-- A procedure to turn a list of words into a string
+
+define list_to_string( wordlist ) -> string;
+
+    lvars word;
+
+    ;;; start the string with double quotes, needed by espeak
+    '"' -> string;
+
+    for word in wordlist do
+
+        if word /= newline then
+
+            string >< ' ' >< word -> string
+
+        endif
+
+    endfor;
+
+    ;;; now add double quotes at the end
+
+    string >< '"' -> string;
+
+enddefine;
+
+list_to_string =>
+
+;;; test it:
+
+    list_to_string(output) =>
+
+;;; try giving that to espeak using female voice f2:
+
+    sysobey('espeak -s 120 -v+f2 ' >< list_to_string(output))
+
+-- The procedure that makes haikus
+
+So, now let's create procedure to generate, print out, then speak out
+a number of haikus, using a given grammar, lexicon, and the number of haikus
+desired.
+
+define make_haikus(gram, lex, num);
+
+    lvars output, string;
+
+    repeat num times
+
+        generate_category("haiku", gram, lex) -> output;
+
+        ;;; print out the output, including newlines
+
+        output ==>
+
+
+        ;;; before speaking make it pause until user presses RETURN key
+
+        readline() ->;
+
+        list_to_string(output) -> string;
+
+        ;;; speed 120, female voice f2, accentuate capital letters
+
+        sysobey('espeak -s 120 -k40 -v+f2 ' >< string);
+
+        ;;; short pause (10 hundredths of a second)
+
+        ;;; syssleep(10);
+
+    endrepeat;
+
+enddefine;
+
+make_haikus =>
+
+make_haikus(haiku_gram, haiku_lex, 1);
+
+
+make_haikus(haiku_gram, haiku_lex, 3);
+
+
+
+For more on this see these Pop11 teach files:
+
+    TEACH GRAMMAR
+
+    TEACH STORYGRAMMAR
+
+
+--- $usepop/pop/teach/haiku-examples.txt
+--- Copyright University of Birmingham 2011. All rights reserved.
