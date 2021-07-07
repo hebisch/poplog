@@ -1,0 +1,119 @@
+#!/bin/sh
+
+# setup local directory tree for poplog root
+# may be a symbolic link to something else
+
+poplogroot=@@USEPOP@@
+
+usepop=$poplogroot
+
+# set the poplocal variables
+poplocal=$poplogroot
+local=$poplocal/local
+
+# Run the initialisation files to set up additional environment
+# variables, extend $PATH, etc.
+
+# Host specific parts of POPLOG
+popsrc=$usepop/pop/src
+popsys=$usepop/target/pop
+popexternlib=@@POP_BIN_DIR@@/target/exlib
+popobjlib=@@POP_BIN_DIR@@/target/obj
+export popsrc popsys popexternlib popobjlib
+
+# Standard library directories
+popautolib=$usepop/pop/lib/auto
+popdatalib=$usepop/pop/lib/data
+popliblib=$usepop/pop/lib/lib
+poppwmlib=$usepop/pop/lib/pwm
+popsunlib=$usepop/pop/lib/sun
+popvedlib=$usepop/pop/lib/ved
+export popautolib popdatalib popliblib poppwmlib popsunlib popvedlib
+
+poppackages=$usepop/pop/packages
+export poppackages
+
+# Standard local directories
+poplocal=${poplocal=$usepop/..}
+poplocalauto=$poplocal/local/auto
+poplocalbin=$usepop/poplocalbin
+export poplocal poplocalauto poplocalbin
+
+# Contrib directory
+popcontrib=${popcontrib=$usepop/pop/packages/contrib}
+export popcontrib
+
+# For system startup
+poplib=${poplib=$HOME}
+popsavelib=@@POP_BIN_DIR@@/target/psv
+popcomppath=':$poplib:$poplocalauto:$popautolib:$popliblib'
+popsavepath=':$poplib:$poplocalbin:$popsavelib'
+export poplib popsavelib popsavepath popcomppath
+
+# Base file for external loading
+if [ -f $popsys/basepop11.stb ]; then
+	popexlinkbase=$popsys/basepop11.stb
+	export popexlinkbase
+fi
+
+# Commands for system compilation/linking etc (based on corepop)
+pop_popc=+$popsys/popc.psv
+pop_poplibr=+$popsys/poplibr.psv
+pop_poplink=+$popsys/poplink.psv
+export pop_popc pop_poplibr pop_poplink
+
+# --- SET UP STANDARD X ENVIRONMENT -----------------------------------------
+
+# Toolkit defaults
+XT_DIRS=
+XT_FILES="-lXt -lX11"
+XT_VER=5
+
+# Motif defaults
+if [ -n "$MOTIFHOME" ]; then
+	MotifHome=$MOTIFHOME
+elif [ -n "$IXIMOTIFHOME" ]; then
+	MotifHome=$IXIMOTIFHOME
+elif [ -d /usr/dt ]; then
+	MotifHome=/usr/dt
+fi
+XM_DIRS=${MotifHome+-L$MotifHome/lib}
+XM_FILES="-lXm -lXt -lX11"
+XM_VER=3000
+
+# Motif is the toolkit of choice
+XLINK=XM
+
+# System-specific configuration
+OS_NAME=`uname -s`
+OS_RELEASE=`uname -r`
+MACHINE=`uname -m`
+case $OS_NAME in
+	Linux)
+		XLINK=XT
+		;;
+
+esac
+
+# Variables used by pglink/poplink options -xm, -xol, -xt
+POP_XM_EXLIBS="x=motif/${XM_VER}: $XM_DIRS $XM_FILES"
+POP_XT_EXLIBS="x=mit/1100${XT_VER}: $XT_DIRS $XT_FILES"
+
+# Default for X link -- used by pglink/poplink option -xlink (or nothing)
+POP_XLINK_EXLIBS="==POP_${XLINK}_EXLIBS"
+
+export POP_XM_EXLIBS POP_XT_EXLIBS POP_XLINK_EXLIBS
+
+PATH=$popsys\:$PATH\:$popcom
+export PATH
+
+export poplocal poplib poplogroot local usepop
+
+pop_pop11="-$popsavelib/startup.psv"; export pop_pop11
+pop_prolog="$pop_pop11 -$popsavelib/prolog.psv"; export pop_prolog
+pop_clisp="$pop_pop11 -$popsavelib/clisp.psv"; export pop_clisp
+pop_pml="$pop_pop11 +$popsavelib/pml.psv"; export pop_pml
+pop_xved="$pop_pop11 +$popsavelib/xved.psv"; export pop_xved
+pop_ved="$pop_pop11 :sysinitcomp();ved"; export pop_ved
+
+exec "$@"

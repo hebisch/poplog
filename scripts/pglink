@@ -1,0 +1,386 @@
+#!/bin/sh
+# --- Copyright University of Sussex 2005. All rights reserved. ----------
+# File:             C.unix/pop/pglink
+# Purpose:          Link the full Poplog system
+# Author:           John Gibson, Jun 24 1988 (see revisions)
+# Documentation:    SYSDOC * POPC
+
+echo 'pglink' "$@"
+# echo 'printing environment'
+# printenv
+# echo ' --------------------------------------------------'
+
+# This contains Ctrl-A, used to separate args in $DEF
+CtrlA=""
+
+# Set NOFLAGS to be the appropriate first argument to "set" which will
+# allow "$*" to be reassigned without doing any harm:
+# "--" works for everything except the old ULTRIX shell, which needs "-"
+NOFLAGS=--
+if [ -f /usr/bin/uname ]; then
+	if [ `/usr/bin/uname` = ULTRIX ]; then
+		NOFLAGS=-
+	fi
+fi
+
+SRCRELDIR="../src"
+VEDRELDIR="../ved/src"
+XRELDIR="../x/src"
+
+PFLAG=-p
+QFLAG=
+MAPFLAG=
+RSVFLAG=
+PORTFLAG=
+VED=true
+XLINK=-xlink
+LF=
+LO=
+WLBS=
+DEF=
+EMB="-emb"
+NORSV=
+
+# Basic options for normal link:
+#   Image name newpop11
+#   Entry procedure $-Sys$-Poplog_Main
+#   Export $- (top level) and $-lisp sections
+NORM_ARGS="-o newpop11 -e \$-Sys\$-Poplog_Main -s ( \$-  \$-lisp )"
+
+# Command-line arguments:
+#	This message is printed for erroneous arguments,
+#	with `!` mapped to `\n`
+OPTIONS='pglink options:
+!	-a
+!	-ponly
+!	-q
+!	-map
+!	-rsv
+!	-port
+!	-core
+!	-noshare
+!	-noved
+!	-nox
+!	-xcomplete
+!	-L<dir>
+!	-L		<dir>
+!	-sunfp	<option>
+!	-lf		<arg list>
+!	-lo		<arg list>
+!	-def*	<pathname=expr list>
+!	-x*
+!	<wlb>	[{ -ex | -in } ( <wfile list> )]
+'
+# Take leading args from environment variable PGLINK_OPTIONS
+#	NB: some older shells (e.g. Ultrix) will replace "$@" with the
+#	null string if the arg list is empty, hence this test
+if [ $# -eq 0 ]; then
+	set $NOFLAGS $PGLINK_OPTIONS
+else
+	set $NOFLAGS $PGLINK_OPTIONS "$@"
+fi
+
+while [ $# -ne 0 ]; do
+	case "$1" in
+		-a | -ponly)
+			NORSV=true
+			PFLAG="$1";;
+		-q)
+			QFLAG="$1";;
+		-map)
+			MAPFLAG="$1";;
+		-rsv)
+			RSVFLAG="$1";;
+		-port)
+			PORTFLAG="$1";;
+		-sunfp)
+			NORM_ARGS="$1 $2 $NORM_ARGS"
+			shift;;
+		-noshare)
+			NORM_ARGS="$1 $NORM_ARGS";;
+		-noved)
+			VED=;;
+		-nox)
+			XLINK=;;
+		-core | -safe)			# same as -noshare -noved -nox
+			NORM_ARGS="-noshare $NORM_ARGS"; VED=; XLINK=
+			EMB=
+			RSVFLAG=;;
+		-L)
+			LO="$LO $1 $2"
+			shift;;
+		-L*)
+			LO="$LO $1";;
+		-lf)
+			shift
+			if [ "x$1" = "x(" ]; then
+				shift
+				while [ "$1" != ")" ]; do
+					LF="$LF $1"
+					shift
+				done
+			else
+				LF="$LF $1"
+			fi;;
+		-lo)
+			shift
+			if [ "x$1" = "x(" ]; then
+				shift
+				while [ "$1" != ")" ]; do
+					LO="$LO $1"
+					shift
+				done
+			else
+				LO="$LO $1"
+			fi;;
+		*.wlb)
+			WLBS="$WLBS $1";
+			if [ "x$2" = "x-ex" -o "x$2" = "x-in" ]; then
+				flag=$2
+				shift 3
+				WLBS="$WLBS $flag ("
+				while [ "$1" != ")" ]; do
+					WLBS="$WLBS $1"
+					shift
+				done
+				WLBS="$WLBS )"
+			fi;;
+		-x*)
+			XLINK="$1";;
+		-def*)
+			DEF="$DEF$CtrlA$1$CtrlA$2"
+			shift
+			if [ "x$1" = "x(" ]; then
+				shift
+				while [ "$1" != ")" ]; do
+					DEF="$DEF$CtrlA$1"
+					shift
+				done
+				DEF="$DEF$CtrlA)"
+			fi;;
+		*)
+			echo $OPTIONS | tr '!' '\012' | sed -e 's/^  */    /'
+			exit 1;;
+	esac
+	shift
+done
+
+
+if [ -n "$DEF" ]; then
+	# The only way to allow the args in $DEF to contain whitespace is to
+	# pass them as positional parameters via "$@". At the moment, they're
+	# all separated by Ctrl-As; so we redefine IFS to be Ctrl-A only and
+	# then transfer DEF to the positional parameters. (All this mucking
+	# around wouldn't be necessary in the cshell, since that has proper
+	# lists of words.)
+	saveIFS=$IFS; IFS="$CtrlA"
+	set $NOFLAGS $DEF
+	IFS=$saveIFS
+	set $NOFLAGS $NORM_ARGS "$@"
+else
+	set $NOFLAGS $NORM_ARGS
+fi
+
+
+if [ -n "$PORTFLAG" ]; then
+	# produce poplink_*.a and poplink_cmnd for porting using *.w
+	poplink $PORTFLAG -ident 0 -noshare "$@" *.w
+	exit
+
+elif [ -n "$QFLAG" ]; then
+	# just relink object modules using existing poplink_?.o and poplink_cmnd
+	poplink $QFLAG $EMB -ident 0 -o newpop11
+	if [ $? -ne 0 ]; then exit 1; fi
+
+else
+	# do full link using library src*.wlb and separate w-files given
+	# in W_FILES (leaving poplink_?.o and poplink_cmnd for later -q,
+	# indicated by -p flag to poplink)
+
+	DATE=`date`
+	WFILES=
+	SRCWFILES=
+	if [ -r $SRCRELDIR/W_FILES ]; then
+		WFILES="`cat $SRCRELDIR/W_FILES | sed -e s%\^%$SRCRELDIR/%g`"
+		SRCWFILES="`cat $SRCRELDIR/W_FILES`"
+	fi
+	SRCWLBS="\$popobjlib/src.wlb -ex ( $SRCWFILES )"
+	if [ -n "$VED" ]; then
+		VEDWFILES=
+		if [ -r $VEDRELDIR/W_FILES ]; then
+			WFILES="`cat $VEDRELDIR/W_FILES | sed -e s%\^%$VEDRELDIR/%g` $WFILES"
+			VEDWFILES="`cat $VEDRELDIR/W_FILES`"
+		fi
+		SRCWLBS="\$popobjlib/vedsrc.wlb -ex ( $VEDWFILES ) $SRCWLBS"
+	fi
+
+	if [ -n "$XLINK" ]; then
+		XWFILES=
+		if [ -r $XRELDIR/W_FILES ]; then
+			WFILES="`cat $XRELDIR/W_FILES | sed -e s%\^%$XRELDIR/%g` $WFILES"
+			XWFILES="`cat $XRELDIR/W_FILES`"
+		fi
+		SRCWLBS="\$popobjlib/xsrc.wlb -ex ( $XWFILES ) $SRCWLBS"
+	fi
+
+	if [ -n "$LF" ]; then
+		LF="-lf ( $LF )"
+	fi
+
+	if [ -n "$LO" ]; then
+		LO="-lo ( $LO )"
+	fi
+
+        echo '@--- poplink command line'
+        echo poplink $PFLAG $EMB -date "$DATE" -ident 0 -x_complete \
+                        $LF $LO $XLINK "$@" \
+                        $WFILES $SRCWLBS $WLBS
+
+	poplink $PFLAG $EMB -date "$DATE" -ident 0 -x_complete \
+			$LF $LO $XLINK "$@" \
+			$WFILES $SRCWLBS $WLBS
+	if [ $? -ne 0 ]; then exit 1; fi
+
+	if [ -n "$RSVFLAG" -a -z "$NORSV" ]; then
+		mv poplink_dat.o tmp.o			# save poplink_dat.o with -ident 0
+		poplink -q $EMB -date "$DATE" -ident 1 -x_complete -o rsvpop11
+		if [ $? -ne 0 ]; then exit 1; fi
+		mv tmp.o poplink_dat.o			# keep the original one
+		if [ -f /usr/ccs/bin/strip ]; then
+			/usr/ccs/bin/strip rsvpop11
+		else
+			strip rsvpop11
+		fi
+	fi
+fi
+
+if [ -f newpop11 ]; then
+	if [ -n "$MAPFLAG" ]; then
+		if [ "`uname -s`" = "OSF1" ]; then
+			nm -B -v newpop11 > newpop11.map
+		elif [ "`uname -s`" = "AIX" ]; then
+			nm -B -v -x newpop11 > newpop11.map
+		elif [ -f /usr/ccs/bin/nm ]; then
+			/usr/ccs/bin/nm -p -v -x newpop11 > newpop11.map	# SVR4
+		else
+			nm -n newpop11 > newpop11.map
+		fi
+	fi
+fi
+
+exit 0
+
+
+# --- Revision History ---------------------------------------------------
+# --- Aaron Sloman, 4 Jan 2005  Added '\' to prevent expansion of $popobjlib
+#		to enable the script poplink_cmnd to be location independent
+#		This required changes using pop_translate_envvars in some files in
+#		$popsrc and $popsrc/syscomp
+# --- John Gibson, Apr 14 1998  Added AIX case for newpop11.map
+# --- John Gibson, Mar 12 1996  Made it restore original poplink_dat after RSV
+# --- John Gibson, Jul 26 1995  Ensured all links except RSV have -ident 0
+# --- John Gibson, Dec  2 1993  Added -ponly option
+# --- John Gibson, Nov  2 1993  Made it use /usr/ccs/bin/nm for SVR4
+# --- John Gibson, Jul 14 1993  Made -rsv use /usr/ccs/bin/strip if it exists
+# --- John Gibson, Jul 13 1993  Made -core do -rsv as well
+# --- John Gibson, Jul  8 1993
+#		Moved to $popsys.
+#		All w-libraries now specified as files in $popobjlib. Got rid of
+#		all options setting dirs; these are now assumed set correctly,
+#		and "poplink" defined as a command. Also, poplink now handles
+#		creating the .stb files.
+# --- John Gibson, May 14 1993
+#		Removed -xlibs and -xcomplete options, added -x_complete and -x*
+#       options to poplink instead (with default -xlink).
+# --- John Gibson, May  6 1993
+#		Removed XtP*oplog.obj from link (now part of $popexternlib/libpop.olb)
+# --- John Gibson, Mar 27 1993
+#		Added -xcomplete option, which both sets XLINK_COMPLETE true and
+#		sets XLINK_LIBS to [].
+# --- John Gibson, Nov 27 1992
+#		Made *.wlb arg accept -in option as well as -ex
+# --- John Gibson, Jul 13 1992
+#		Added -noshare to command for porting
+# --- Simon Nichols, Jul  6 1992
+#		Added exit 0 at the end
+# --- John Gibson, Apr 15 1992
+#		Made W_FILES in x and ved dirs be picked up relative to the
+#		current directory
+# --- John Gibson, Apr  2 1992
+#		Now links with VED files from ved/src. Added -noved and
+#		-safe options (-safe = -noshare -noved -nox)
+# --- Robert John Duncan, Jan 10 1992
+#		Changed always to use safepop11; removed any newpop11.stb backup
+# --- Robert John Duncan, Nov 13 1991
+#		Corrected stupidity in last fix
+# --- Robert John Duncan, Nov  7 1991
+#		Fixed uses of "set" to work on all our current systems
+# --- Robert John Duncan, Jun  4 1991
+#		Changed definition of XLINK_LIBS to be a list of strings.
+#		Tidied up.
+# --- Robert John Duncan, May 31 1991
+#		Tested for presence of arguments before initial use of $@
+# --- Robert John Duncan, May 28 1991
+#		Fixed to allow multiple -def* arguments
+# --- Robert John Duncan, May 24 1991
+#       Added definition of pop variable XLINK_LIBS
+# --- Robert John Duncan, May 23 1991
+#		Moved test of $? which stopped the .stb/.map files from being made
+# --- John Gibson, May  6 1991
+#		Added -def* options
+# --- John Gibson, Feb 14 1991
+#		Added copy for newpop11.stb to rsvpop11.stb
+# --- John Gibson, Jan 29 1991
+#		Added test for newpop11 around Extern_make_base
+# --- John Gibson, Jan 21 1991
+#		Added -noshare option
+# --- Simon Nichols, Jan 15 1991
+#		Fixed test in argument processing, where -xlibs is followed by a
+#		bracketed list.
+# --- John Gibson, Nov 13 1990
+#		Added setting of popexternlib
+# --- Simon Nichols, Nov 12 1990
+#		Changed to cope with multiple src*.wlb files, because of limit on
+#		the number of files accepted by the HP-UX version of ld.
+# --- John Gibson, Oct  8 1990
+#		Changed line to make newpop11.stb to use same pop11 image as poplink
+#		uses (rather than using the newpop11 just linked, which may not work
+#		if it has bugs etc).
+# --- Simon Nichols, Oct  5 1990
+#		Reformatted usage message and added missing options to it.
+# --- Simon Nichols, Sep 30 1990
+#       Now links in X files by default.
+#       Added -nox option to leave out X, -L option for ld, -xsrd option
+#       for alternate X source directory and -xlibs for alternative X
+#       libraries.
+#       Added environment variable PGLINK_OPTIONS, which specifies default
+#       options.
+#       Fixed to allow multiple -lo and -lf options.
+#       Added code to create external link base.
+# --- John Gibson, May 21 1990
+#       $PORT now uses -port option to poplink (implies -a)
+# --- John Gibson, Mar  8 1990
+#       Added -sunfp option
+# --- Ian Rogers, Jan 15 1990
+#       Made it work for case where there are no parentheses around the
+#       arguments to the -lf -lo -wlb flags. Ie. just like poplink
+# --- Aaron Sloman, Jan 14 1990
+#       Made it work again with no arguments by changing the mechanisms
+#       used for -lf, -lo, and -lwb arguments.
+# --- Ian Rogers, Jan 12 1990
+#       Added -lf -lo -wlb arguments
+# --- John Gibson, Jul 17 1989
+#       Removed </dev/null (now unnecessary)
+# --- John Gibson, May 24 1989
+#       Changed tests on $? to use -ne instead of !=
+# --- John Gibson, May  5 1989
+#       Added -e argument to (normal) poplink commands to specify entry
+#       procedure $-Sys$-Poplog_Main, define in poplog_main.p. Since
+#       poplog_main.p therefore no longer defines the default entry
+#       procedure $-Pop$-Main, poplog_main.w/.o can now be part of the
+#       src.wlb/.olb library.
+# --- John Gibson, Sep  1 1988
+#       Allowed -a flag to get poplink_*.a assembler output
+# --- John Gibson, Jul 10 1988
+#       Added -port option.
+# --- John Williams, Jun 24 1988    Exports section $-lisp too

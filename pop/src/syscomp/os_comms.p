@@ -50,6 +50,11 @@ lconstant unix_as_options = [];
 ;;; unix_ld_crt_objects:
 ;;;     location of crt*.o files for linking: may be defined in "asmout.p"
 
+#_IF (DEF cc_link_options)
+constant cc_link_command_header = '$POP__cc ' <> cc_link_options <>
+             ' -o $IM \\\n';
+#_ENDIF
+
 #_IF not(DEF cc_link_command_header or DEF unix_ld_crt_objects)
 lconstant
     unix_ld_crt_objects =

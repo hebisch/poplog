@@ -1,0 +1,49 @@
+#!/bin/sh
+# --- Copyright University of Sussex 1993. All rights reserved. ----------
+# File:             C.unix/src/mksyscomp
+# Purpose:          Build saved images for POPC, POPLINK and POPLIBR
+# Author:           John Gibson, Jun 24 1988 (see revisions)
+
+DEBUG=false
+POP_ARCH=""
+while true ; do
+    opt=$1
+    echo "opt=$opt"
+    case "$opt" in
+
+        -a=*)
+                POP_ARCH=`echo ${opt} | sed 's,-a=,,'`
+                shift
+                ;;
+	-d)	DEBUG=true
+		shift
+		;;
+        *)
+                break
+                ;;
+    esac
+done
+
+for IMAGE
+do
+
+echo "IMAGE=$IMAGE"
+
+corepop %nort %noinit << ****
+	lvars savedir = current_directory;
+        vars pop_architecture = '$POP_ARCH';
+        global vars cc_link_options = '$CC_LINK_OPTIONS';
+        printf(pop_architecture, 'pop_architecture = %p\n');
+        printf(cc_link_options, 'cc_link_options = %p\n');
+	'./syscomp' -> current_directory;
+	$DEBUG -> pop_debugging;
+        printf('calling pop11_compile\n');
+	pop11_compile("make_$IMAGE");
+        printf('pop11_compile done\n');
+	savedir -> current_directory;
+	make_saved_image('$popsys/$IMAGE.psv');
+	sysexit();
+****
+
+done
+

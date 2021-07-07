@@ -365,17 +365,7 @@ define global extern_name_translate(lang, symbol, type) -> symbol;
 enddefine;
 
 
-#_IF DEF LINUX
-
-    ;;; Use C compiler to link
-    ;;; Altered A.S 19 Feb 2012 to insert --no-as-needed (override new Ubuntu default)
-    ;;; Altered A.S. 4 May 2012 to insert -m32-bit for 32 bit system.
-    ;;; Altered A.S 15 May 2012 to insert -m32 for 32 bit system.
-constant
-    cc_link_command_header = '$POP__cc -m32 -Wl,-x,-export-dynamic,--no-as-needed -o $IM \\\n'
-;
-
-#_ELSE
+#_IF not(DEF LINUX)
 
     /*  String for first line of Unix "ld" command -- used in os_comms.p
         (Image name is in the environment variable "IM")

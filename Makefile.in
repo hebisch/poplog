@@ -1,0 +1,199 @@
+usepop = @@USEPOP@@
+ABS_BUILD = @@ABS_BUILD@@
+popsys = ${ABS_BUILD}/target/pop
+popliblib = ${usepop}/pop/lib/lib
+popsavelib = ${ABS_BUILD}/target/psv
+popobjlib = ${ABS_BUILD}/target/obj
+popcobj = ${ABS_BUILD}/target
+popexlib = target/exlib
+DO_COMMAND = ${ABS_BUILD}/poplog
+MK_CROSS = ${usepop}/scripts/mk_cross
+PGLINK = ${usepop}/scripts/pglink
+CC_LINK_OPTIONS = @@CC_LINK_OPTIONS@@
+HASH_STYLE_OPT = @@HASH_STYLE_OPT@@
+NO_PIE_OPT = @@NO_PIE_OPT@@
+
+X_CONF = @@X_CONF@@
+POP_arch = @@POP_arch@@
+
+ifeq (${X_CONF},no)
+XL_FLAG=-nox
+else
+XT_OBJECT=${popexlib}/XtPoplog.o
+XPW_TARGETS=${popexlib}/libXpw.so stamp_xlib
+XVED_TARGET=stamp_xved
+ifeq (${X_CONF},xt)
+XL_FLAG=-xt
+else
+XL_FLAG=-xm
+endif
+endif
+
+all: stamp_images stamp_indexes
+
+stamp_dirs_and_symlinks:
+	-(cd ${popsys}; ln -s corepop popc ; \
+	  ln -s corepop poplibr; ln -s corepop poplink)
+	mkdir -p ${popsavelib} ${popexlib} ${popobjlib}
+	mkdir -p ${popcobj}/src ${popcobj}/ved/src ${popcobj}/x/src
+	mkdir -p pop/ref/doc_index
+	mkdir -p pop/lib/objectclass/ref/doc_index
+	mkdir -p pop/lisp/ref/doc_index
+	mkdir -p pop/x/ved/ref/doc_index
+	touch stamp_dirs_and_symlinks
+
+SYSCOMP_SRC = $(wildcard pop/src/syscomp/*.p) \
+              $(wildcard pop/src/syscomp/*.ph) \
+              $(wildcard pop/src/syscomp/${POP_arch}/*.p)
+
+stamp_popc: ${popsys}/corepop stamp_dirs_and_symlinks ${SYSCOMP_SRC}
+	(cd pop/src; CC_LINK_OPTIONS="${CC_LINK_OPTIONS}" ; \
+	   export CC_LINK_OPTIONS; ${DO_COMMAND} ${MK_CROSS} \
+	   -d -a=${POP_arch} popc poplibr poplink)
+	touch stamp_popc
+
+stamp_new_corepop: stamp_popc stamp_srclib ${popexlib}/libpop.a
+	(cd ${popsys} && POP__cc="cc ${NO_PIE_OPT} ${HASH_STYLE_OPT}"; \
+	    export POP__cc && \
+	    ${DO_COMMAND} ${PGLINK} -core && \
+	    mv newpop11 new_corepop )
+	touch stamp_new_corepop
+
+SRC_PSRC = $(wildcard pop/src/*.p) $(wildcard pop/src/${POP_arch}/*.[ps])
+SRC_SRC = ${SRC_PSRC} \
+          $(wildcard pop/src/*.ph) pop/lib/include/ast.ph \
+          pop/lib/include/doc_index.ph pop/lib/include/itemise.ph \
+          pop/lib/include/pop11_flags.ph pop/lib/include/sigdefs.ph \
+          pop/lib/include/subsystem.ph pop/lib/include/sysdefs.ph \
+          pop/lib/include/unix_errno.ph pop/lib/include/vedfile_struct.ph \
+          pop/lib/include/vedscreendefs.ph pop/lib/include/vm_flags.ph
+SRC_W := $(addsuffix .w, $(basename \
+           $(patsubst termcap.p,, $(notdir ${SRC_PSRC}))))
+
+stamp_srclib: stamp_popc ${SRC_SRC}
+	-rm ${popobjlib}/src.wlb ${popobjlib}/termcap.wlb
+	-rm ${popcobj}/src/*.[ow]
+	(cd pop/src && \
+	    ${DO_COMMAND} popc -c -nosys -od ${popcobj}/src \
+	       ${POP_arch}/*.[ps] *.p)
+	(cd ${popcobj}/src && \
+	    ${DO_COMMAND} poplibr -c ${popobjlib}/src.wlb ${SRC_W} && \
+	    ${DO_COMMAND} poplibr -c ${popobjlib}/termcap.wlb termcap.w )
+	touch stamp_srclib
+
+VED_SRC = $(wildcard pop/ved/src/*.p) $(wildcard pop/ved/src/*.ph) \
+          pop/src/syspop.ph pop/lib/include/ved_declare.ph \
+          pop/lib/include/vedfile_struct.ph \
+          pop/lib/include/vedscreendefs.ph
+
+stamp_vedlib: stamp_srclib ${popcobj}/src/termcap.w
+	-rm ${popobjlib}/vedsrc.wlb
+	-rm ${popcobj}/ved/src/*.[ow]
+	(cd pop/ved/src && \
+	    ${DO_COMMAND} popc -c -nosys -od ${popcobj}/ved/src \
+	       -wlib \( ../../src/ ${popobjlib}/termcap.wlb \) *.p)
+	(cd ${popcobj}/ved/src && \
+	    ${DO_COMMAND} poplibr -c ${popobjlib}/vedsrc.wlb *.w \
+	       ${popcobj}/src/termcap.w )
+	touch stamp_vedlib
+
+stamp_xlib: stamp_srclib
+	-rm ${popobjlib}/xsrc.wlb
+	-rm ${popcobj}/x/src/*.[ow]
+	(cd pop/x/src && \
+	    ${DO_COMMAND} popc -c -nosys -od ${popcobj}/x/src \
+	       -wlib \( ../../src/ \) *.p )
+	(cd ${popcobj}/x/src && \
+	    ${DO_COMMAND} poplibr -c ${popobjlib}/xsrc.wlb *.w )
+	touch stamp_xlib
+
+stamp_newpop: stamp_popc
+	(cd ${popsys} && \
+	    ${DO_COMMAND} ./corepop %nort ${popliblib}/mkimage.p \
+               -entrymain ./newpop.psv ${popliblib}/newpop.p )
+	touch stamp_newpop
+
+LIBPOP_CSRC = c_bignum c_callback c_core c_sysinit ext_arm \
+              pop_encoding pop_poll pop_stat pop_timer
+
+LIBPOP_OBJS = $(addprefix ${popexlib}/, $(addsuffix .o, \
+                $(basename $(notdir ${LIBPOP_CSRC})))) ${XT_OBJECT}
+
+${LIBPOP_OBJS}: ${popexlib}/%.o: pop/extern/lib/%.c stamp_dirs_and_symlinks
+	$(CC) -c -g -Wall -O $< -o $@
+
+${popexlib}/libpop.a: ${LIBPOP_OBJS}
+	ar rc $@ $^
+
+XPW_CSRC = $(wildcard pop/x/Xpw/*.c)
+XPW_OBJS = $(addprefix ${popexlib}/,$(addsuffix .o, \
+             $(basename $(notdir ${XPW_CSRC}))))
+
+XPW_HSRC = $(wildcard pop/x/Xpw/*.h)
+
+${XPW_OBJS}: ${popexlib}/%.o: pop/x/Xpw/%.c ${XPW_HSRC} stamp_dirs_and_symlinks
+	$(CC) -c -g -Wall -fPIC $(X_INCLUDES) $< -o $@
+
+${popexlib}/libXpw.so: ${XPW_OBJS}
+	$(CC) -g -shared -o $@ $^
+
+${popsys}/basepop11: ${popexlib}/libpop.a ${XPW_TARGETS} \
+                     stamp_popc stamp_vedlib
+	(cd ${popsys} && \
+	   rm -f basepop11 clisp pml pop11 prolog ved xved && \
+	   ${DO_COMMAND} ${PGLINK} ${XL_FLAG} -map && \
+	   mv newpop11 basepop11 && ln basepop11 pop11 && \
+	   mv newpop11.map basepop11.map && \
+	   mv newpop11.stb basepop11.stb )
+
+${popsavelib}/startup.psv: ${popsys}/basepop11
+	${DO_COMMAND} ${popsys}/basepop11 %nort %noinit \
+	  ${popliblib}/mkimage.p -nodebug -nonwriteable -install \
+	  ${popsavelib}/startup.psv startup
+
+BIN_START = ${popsavelib}/startup.psv ${popsys}/basepop11
+
+MK_IMAGE = ${DO_COMMAND} ${popsys}/pop11 %nort %noinit ${popliblib}/mkimage.p
+
+stamp_clisp: ${BIN_START}
+	${MK_IMAGE} -install -subsystem lisp \
+	  ${popsavelib}/clisp.psv ${usepop}/pop/lisp/src/clisp.p
+	touch stamp_clisp
+
+stamp_plog: ${BIN_START}
+	${MK_IMAGE} -nodebug -install -flags prolog \( \) \
+	  ${popsavelib}/prolog.psv ${usepop}/pop/plog/src/prolog.p
+	touch stamp_plog
+
+stamp_pml: ${BIN_START}
+	${MK_IMAGE} -nodebug -install -flags ml \( \) \
+	  ${popsavelib}/pml.psv ${usepop}/pop/pml/src/ml.p
+	touch stamp_pml
+
+stamp_xved: ${BIN_START}
+	${MK_IMAGE} -nodebug -nonwriteable -install \
+	  -entry xved_standalone_setup \
+	  ${popsavelib}/xved.psv mkxved
+	touch stamp_xved
+
+stamp_images: stamp_clisp stamp_plog stamp_pml ${XVED_TARGET}
+	(cd ${popsys} && \
+	  for A in clisp pml prolog ved xved; do \
+	     ln basepop11 $$A || true ; \
+	  done)
+	touch stamp_images
+
+stamp_indexes: ${BIN_START}
+	${DO_COMMAND} ${popsys}/basepop11 make_indexes ${usepop}/pop
+	touch stamp_indexes
+
+clean:
+	(cd ${popsys} && \
+	  rm -f basepop11 clisp newpop11 oldpop11 pml pop11 prolog \
+	     ved xved ref teach im doc help basepop11.map \
+	     *.map *.stb )
+	rm -f stamp_* ${popexlib}/libpop.a ${popexlib}/libXpw.so \
+	   ${popsys}/*.psv* ${popsys}/poplink_* ${popsavelib}/* ${popobjlib}/*
+	rm -f ${LIBPOP_OBJS} ${XPW_OBJS}
+	rm -f ${popcobj}/src/*.[ow]
+	rm -f ${popcobj}/ved/src/*.[ow] ${popcobj}/x/src/*.[ow]

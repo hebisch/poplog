@@ -341,11 +341,5 @@ define global extern_name_translate(lang, symbol, type) -> symbol;
     if lang = 'FORTRAN' then uppertolower(symbol) <> '_' -> symbol endif
 enddefine;
 
-
-    ;;; Use C compiler to link
-constant
-    cc_link_command_header = '$POP__cc -Wl,-export-dynamic -o $IM \\\n'
-;
-
 endsection;     /* $-Popas */
 

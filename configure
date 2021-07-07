@@ -1,0 +1,142 @@
+#!/bin/sh
+
+HOST_ARCH=`arch`
+
+CC_LINK_OPTIONS="-Wl,-export-dynamic -Wl,--no-as-needed"
+case "$HOST_ARCH" in
+  i[3-6]86*)
+      CC_LINK_OPTIONS="-m32 -Wl,-x $CC_LINK_OPTIONS"
+      POP_arch=i386
+        ;;
+  arm*)
+      POP_arch=arm
+        ;;
+  x86_64)
+      POP_arch="$HOST_ARCH"
+        ;;
+  *)
+      echo "Unrecognised or unsupportd architecture $HOST_ARCH";
+      exit 1
+      ;;
+esac
+echo "Configuring for $POP_arch"
+
+
+cat > conftest.c <<\EOF
+
+int main(void) {
+    return 0;
+}
+EOF
+
+echo -n "Testing if compiler recognizes -no-pie"
+NO_PIE_OPT=-no-pie
+comp_cmd="cc $NO_PIE_OPT conftest.c -o conftest.exe"
+if (eval "$comp_cmd") 2> contest.err; then
+    HAS_NOPIE=yes
+    CC_LINK_OPTIONS="$NO_PIE_OPT $CC_LINK_OPTIONS"
+else
+    HAS_NOPIE=no
+    NO_PIE_OPT=""
+fi
+rm -f conftest.exe
+echo "   "$HAS_NOPIE
+
+echo -n "Testing if compiler recognizes -Wl,--hash-style=both"
+HASH_STYLE_OPT='-Wl,--hash-style=both'
+comp_cmd="cc $NO_PIE_OPT $HAS_STYLE_OPT conftest.c -o conftest.exe"
+if (eval "$comp_cmd") 2> contest.err; then
+    HAS_HASH_STYLE=yes
+else
+    HAS_HASH_STYLE=no
+    HASH_STYLE_OPT=""
+fi
+rm -f conftest.exe
+echo "   "$HAS_HASH_STYLE
+
+X_CONF=no
+
+echo -n "Testing linking with Xt"
+XT_OPT="-lXt -lX11"
+comp_cmd="cc conftest.c -o conftest.exe $XT_OPT"
+if (eval "$comp_cmd") 2> contest.err; then
+    HAS_XT=yes
+    X_CONF=xt
+else
+    HAS_XT=no
+    XT_OPT=""
+fi
+rm -f conftest.exe
+echo "   "$HAS_XT
+
+if test "$HAS_XT" = "yes" ; then
+  MOTIF_OPT="-lXm"
+  echo -n "Testing linking with Motif"
+  comp_cmd="cc conftest.c -o conftest.exe $MOTIF_OPT $XT_OPT"
+  if (eval "$comp_cmd") 2> contest.err; then
+      HAS_MOTIF=yes
+      X_CONF=xm
+  else
+      HAS_MOTIF=no
+  fi
+  rm -f conftest.exe
+  echo "   "$HAS_MOTIF
+else
+  HAS_MOTIF=no
+  MOTIF_OPT=""
+fi
+
+cat > conftest.c <<\EOF
+#include <X11/IntrinsicP.h>
+#include <X11/StringDefs.h>
+#include <X11/ShellP.h>
+#include <X11/Xatom.h>
+#include <X11/CoreP.h>
+#include <X11/Xlib.h>
+#include <X11/ObjectP.h>
+#include <X11/CompositeP.h>
+
+int main(void) {
+    return 0;
+}
+EOF
+
+if test "$X_CONF" != "no" ; then
+echo -n "Testing for X11 headers"
+comp_cmd="cc -c conftest.c -o conftest.o"
+if (eval "$comp_cmd") 2> contest.err; then
+    HAS_X11HEADERS=yes
+else
+    HAS_X11HEADERS=no
+    X_CONF=no
+fi
+rm -f conftest.o
+echo "   "$HAS_X11HEADERS
+fi
+
+USEPOP=`pwd`
+ABS_BUILD=$USEPOP
+POP_BIN_DIR=$ABS_BUILD
+POPSYS=$USEPOP/target/pop
+POPEXTERNLIB=$USEPOP/target/exlib
+POPOBJLIB=$USEPOP/target/obj
+
+SUBSTS="s,@@USEPOP@@,$USEPOP,"
+for A in POPSYS POPEXTERNLIB POPOBJLIB X_CONF ABS_BUILD POP_BIN_DIR \
+    POP_arch NO_PIE_OPT ;
+do
+    VAL=$(eval echo '$'"$A")
+    SUBSTS="$SUBSTS;s,@@$A@@,$VAL,"
+done
+O_sub1="s:@@CC_LINK_OPTIONS@@:$CC_LINK_OPTIONS:"
+O_sub2="s:@@HASH_STYLE_OPT@@:$HASH_STYLE_OPT:"
+SUBSTS="$SUBSTS;$O_sub1;$O_sub2"
+
+for A in Makefile.in scripts/poplog.in ; do
+   B=`basename ${A%.in}`
+   sed "$SUBSTS" $USEPOP/$A > $B
+done
+
+chmod 755 poplog
+
+rm -f conftest.c contest.err conftest.exe conftest.o

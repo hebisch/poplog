@@ -134,7 +134,7 @@ global constant macro (
     $- ASM_BYTE_STR = '\t.byte\t',
     $- ASM_SHORT_STR= '\t.value\t',
     $- ASM_INT_STR  = '\t.long\t',
-        $- ASM_DOUBLE_STR  = '\t.quad\t',
+    $- ASM_DOUBLE_STR  = '\t.quad\t',
     $- ASM_WORD_STR = ASM_DOUBLE_STR,
 );
 
@@ -163,22 +163,8 @@ constant procedure (
 );
 
 global constant procedure (
-    asm_align_word =
-             #_IF true
-                        outcode(% '.align\t8' %)           
-             #_ELSE    
-        #_IF DEF LINUX and not(DEF LINUX_ELF)
-            outcode(% '.align\t2' %)
-        #_ELSE
-            outcode(% '.align\t4' %)
-                #_ENDIF
-             #_ENDIF,
-asm_align_double = 
-#_IF false
-       identfn
-#_ELSE
-       outcode(% '.align\t8' %)
-#_ENDIF,
+    asm_align_word = outcode(% '.align\t8' %),
+    asm_align_double = outcode(% '.align\t8' %),
     ;;; asm_align_file -- end-of-file alignment
     ;;; (don't define if not needed)
     ;;; asm_align_file = identfn,
@@ -227,7 +213,7 @@ global constant procedure (
     asm_outshort    = outdatum(% ASM_SHORT_STR %),
     asm_outint      = outdatum(% ASM_INT_STR %),
     asm_outword     = outdatum(% ASM_WORD_STR %),
-        asm_outdouble = outdatum(% ASM_DOUBLE_STR %), 
+    asm_outdouble = outdatum(% ASM_DOUBLE_STR %), 
 );
 
 define asm_out_dfloat(hipart, lopart);
@@ -371,142 +357,9 @@ enddefine;
 define global extern_name_translate(lang, symbol, type) -> symbol;
     lvars lang, symbol, type;
     returnif(lang = 'ASM');
-#_IF DEF LINUX and not(DEF LINUX_ELF)
-    '_' <> symbol -> symbol;
-#_ENDIF
     if lang = 'FORTRAN' then uppertolower(symbol) <> '_' -> symbol endif
 enddefine;
 
-
-#_IF DEF LINUX
-
-    ;;; Use C compiler to link
-constant
-    cc_link_command_header = '$POP__cc -v -Wl,-export-dynamic -Wl,-no-as-needed -o $IM \\\n'
-;
-
-#_ELSE
-
-    /*  String for first line of Unix "ld" command -- used in os_comms.p
-        (Image name is in the environment variable "IM")
-    */
-constant
-    unix_ld_command_header =
-#_IF DEFV SYSTEM_V >= 4.0
-        '/usr/ccs/bin/ld -o $IM -e _start \\\n'
-    #_IF DEF NCR or DEF DGUX
-        ;;; export global symbols for external load
-        <> '-B export \\\n'
-    #_ENDIF
-#_ELSEIF DEF LINUX_ELF
-        '/usr/bin/ld -S -x -o $IM -m elf_i386 -L/lib \\\n' <>
-        '-export-dynamic -dynamic-linker /lib/ld-linux.so.1 \\\n'
-#_ELSEIF DEF LINUX
-        '/usr/bin/ld -S -x -static -o $IM \\\n'
-#_ELSEIF DEF SCO
-        '/bin/ld -x -o $IM -e _start \\\n'
-#_ELSE
-        '/bin/ld -x -o $IM -e start \\\n'
-#_ENDIF
-    ;
-
-    /*  Location of crt*.o files used by "ld"
-    */
-define active unix_ld_crt_objects;
-
-        ;;; Search a lib directory for crt{1,i,n}.o or crt0.o
-    define SearchLib(dir) -> found;
-        if sys_file_exists(dir dir_>< 'crt1.o') then
-            dir dir_>< 'crt{1,i,n}.o' -> found;
-        elseif sys_file_exists(dir dir_>< 'crt0.o') then
-            dir dir_>< 'crt0.o' -> found;
-        else
-            false -> found;
-        endif;
-    enddefine;
-
-        ;;; Use 'gcc -v' to locate GCC CRTs
-    define TryGCC(cc) -> found;
-        false -> found;
-        if cc and sys_fname_path(cc) = nullstring then
-            sys_search_unix_path(cc, systranslate('PATH')) -> cc;
-        endif;
-        returnunless(cc);
-        lvars (_, dev, _, _, pid) =
-            run_unix_program(cc, ['-v'], false, true, 1, true);
-        lvars linerep = line_repeater(dev, 512);
-        lvars line = linerep();
-        syskill(pid) -> ;
-        sysclose(dev);
-        sys_wait(pid) -> (,);
-        ;;; we expect the first line of output to read
-        ;;;     Reading specs from <path>/specs
-        ;;; where <path> is what we're looking for
-        lconstant INTRO = 'Reading specs from ';
-        lconstant FNAME = 'specs';
-        returnunless(isstring(line) and isstartstring(INTRO, line));
-        lvars specfile = allbutfirst(length(INTRO), line);
-        returnunless(sys_fname_name(specfile) = FNAME);
-        lvars gcclib = sys_fname_path(specfile);
-        SearchLib(gcclib) -> found;
-    enddefine;
-
-        ;;; Look in the standard locations for SunPro CC
-    define TrySunPro(cc) -> found;
-        false -> found;
-        if cc and sys_fname_path(cc) = nullstring then
-            sys_search_unix_path(cc, systranslate('PATH')) -> cc;
-        endif;
-        returnunless(cc);
-        ;;; we're expecting: <installdir>/bin/cc
-        returnunless(isendstring('/bin/cc', cc));
-        lvars installdir = allbutlast(6, cc);   ;;; includes trailing '/'
-        lvars dir, procedure version_p =
-            sys_file_match(installdir dir_>< 'SC*', nullstring, false, false);
-        until (version_p() ->> dir) == termin do
-            returnif(SearchLib(dir dir_>< 'lib/') ->> found);
-            returnif(SearchLib(dir) ->> found);
-        enduntil;
-    enddefine;
-
-        ;;; Not found
-    define Fail();
-        mishap(0, 'CANNOT FIND C RUNTIME STARTUP OBJECT FILES')
-    enddefine;
-
-        ;;; The C compiler to use
-    lvars cc;
-    unless systranslate('POP__cc') ->> cc then
-        'cc' -> cc;
-    endunless;
-
-        ;;; Might it be a GNU compiler?
-    lvars try_gcc =
-        if sys_fname_nam(cc) = 'gcc' then
-            true
-        elseif DEF LINUX then
-            true
-        else
-            false
-        endif;
-
-        ;;; Might it be a SunPro compiler?
-    lvars try_sunpro =
-        if DEF SUNOS then
-            not(try_gcc)
-        else
-            false
-        endif;
-
-        ;;; Do the search
-    try_gcc and TryGCC(cc) or
-    try_sunpro and TrySunPro(cc) or
-    SearchLib('/usr/ccs/lib/') or
-    SearchLib('/usr/lib/') or
-    Fail();
-enddefine;
-
-#_ENDIF
 
 endsection;     /* $-Popas */
 
