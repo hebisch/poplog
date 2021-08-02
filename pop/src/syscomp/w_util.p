@@ -94,7 +94,7 @@ enddefine;
 define open_w_input(file_name, nonexist_err, kind);
     lvars magicnum, kind, dev, file_name, nonexist_err, version;
     get_wlib_name(file_name) -> file_name;
-    if sysopen(file_name, 0, true) ->> dev then
+    if sysopen(file_name, 0, true, `D`) ->> dev then
         ;;; read magic number
         read_next_int(dev, true) -> magicnum;
         if kind == "w" then
