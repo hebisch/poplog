@@ -69,7 +69,7 @@ lconstant pop11_assoc = [
         normal {%               0,               -1 &&~~ POP11_OLD_VARS %}
 
         ;;; 'macro' mode (- negates all options)
-        strict  [ +varsch +defpdr +defcon -lprops +constr +global
+        strict  [ +varsch +defpdr +defcon +lprops +constr +global
                   :vm +prmfix
                   :popc -wrdflt -wrclos]
 
