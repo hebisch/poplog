@@ -16,6 +16,7 @@ constant
     sys_os_type         = OPERATING_SYSTEM,
     sys_processor_type  = PROCESSOR,
     sys_machine_type    = MACHINE,
+    sys_architecture    = SYS_ARCHITECTURE,
     ;
 
 
