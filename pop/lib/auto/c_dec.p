@@ -11,7 +11,7 @@ compile_mode :pop11 +strict;
 
 uses external;
 
-section $-external => c_dec;
+section $-external => c_dec, oldc_dec;
 
 lvars vars_types, variable_name, procedure_header; ;;; used non-locally
 
@@ -209,6 +209,8 @@ dlocal  % item_chartype(`*`) % = 5,
 
     enduntil;
 enddefine;
+
+vars oldc_dec = c_dec;
 
 endsection;     /* $-external */
 
