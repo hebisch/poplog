@@ -112,5 +112,5 @@ endsection;		/* $-objectclass */
 
 /* --- Revision History ---------------------------------------------------
 --- Robert John Duncan, Dec  7 1995
-		Changed CHATTY to check for uses_lib_idents
+		Changed CHATTY to check for uses_lib_idents
  */
