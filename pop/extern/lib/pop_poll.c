@@ -113,12 +113,14 @@ static int (*poll_handlers[2])();
 
 #define SET_POLL_TIMER()  OS_SET_POLL_TIMER(poll_time_curve[poll_index])
 
-#define DO_HANDLER(n)   (p = poll_handlers[n], (p) ? (*p)() : 0)
+#define DO_HANDLER(n)   ((p = poll_handlers[n]) ? (*p)() : 0)
 
 static void async_poll()
-  { register int (*p)();
-    register int activity_level = DO_HANDLER(0) | DO_HANDLER(1);
-    register int n = poll_index-9;
+{ 
+    int (*p)();
+    int activity_level = DO_HANDLER(0);
+    activity_level |= DO_HANDLER(1);
+    int n = poll_index-9;
     if (poll_index_base < n)
         poll_index_base = n;
     else if ((activity_level&2) && poll_index_base > n && poll_index_base != 0)
@@ -132,7 +134,7 @@ static void async_poll()
 
         SET_POLL_TIMER();
       }
-  }
+}
 
 void _pop_stop_polling(which)
 register int which;
@@ -155,10 +157,12 @@ register int (*handler)();
   }
 
 static caddr_t poll_other()
-  { register int (*p)();
-    register int activity_level = DO_HANDLER(0) | DO_HANDLER(1);
+{
+    int (*p)();
+    int activity_level = DO_HANDLER(0);
+    activity_level |= DO_HANDLER(1);
     return(num_polling != 0 ? (caddr_t) poll_other : NULL);
-  }
+}
 
 /*
  *  Turn normal polling off/back on during X toolkit waits
