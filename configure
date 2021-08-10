@@ -1,5 +1,63 @@
 #!/bin/sh
 
+POP_target=target
+
+usage() {
+  echo "Usage:"
+  echo "  configure [options]"
+  echo
+  echo "The following options are recognized."
+  echo "  --help            this help"
+  echo "  --target_subdir=subdir   use named subdir as place for"
+  echo "                           generated binaries"
+  echo "  --with_motif      fail if no Motif"
+  echo "  --with_xt         use X toolkit instead of Motif"
+  echo "  --with_no_x       do not use X"
+  echo "  --with_packages   fail if package tree is missing"
+}
+
+while [ "$*" != "" ] ; do
+    opt="$1"
+    case "$1" in
+        --help)
+            usage
+            exit 0
+            ;;
+        --target_subdir=*)
+           POP_target=`echo "${opt}" | sed 's,--target_subdir=,,'`
+             ;;
+        --with_motif)
+           X_CONF=xm
+             ;;
+        --with_xt)
+           X_CONF=xt
+             ;;
+        --with_no_x)
+           X_CONF=no
+             ;;
+        --with_packages)
+           PACK_CONF=yes
+             ;;
+        *)
+           echo "Unrecognized option ${opt}"
+           usage
+           exit 1
+             ;;
+    esac
+    shift
+done
+
+if [ -d pop/packages -a -d pop/packages/neural -a \
+     -d pop/packages/popvision ] ; then
+        PACK_CONF=yes
+else
+    if [ x"$PACK_CONF" = "xyes" ] ; then
+        echo "incomplete or missing package tree, but --with_packages given"
+        exit 1
+    fi
+    PACK_CONF=no
+fi
+
 HOST_ARCH=`uname -m`
 
 CC_LINK_OPTIONS="-Wl,-export-dynamic -Wl,--no-as-needed"
@@ -20,6 +78,8 @@ case "$HOST_ARCH" in
       ;;
 esac
 echo "Configuring for $POP_arch"
+echo "Target subdir: $POP_target"
+echo "With packages: $PACK_CONF"
 
 
 cat > conftest.c <<\EOF
@@ -54,36 +114,51 @@ fi
 rm -f conftest.exe
 echo "   "$HAS_HASH_STYLE
 
-X_CONF=no
+if [ x"$X_CONF" != "xno" ] ; then
 
-echo -n "Testing linking with Xt"
-XT_OPT="-lXt -lX11"
-comp_cmd="cc conftest.c -o conftest.exe $XT_OPT"
-if (eval "$comp_cmd") 2> contest.err; then
-    HAS_XT=yes
-    X_CONF=xt
-else
-    HAS_XT=no
-    XT_OPT=""
-fi
-rm -f conftest.exe
-echo "   "$HAS_XT
-
-if test "$HAS_XT" = "yes" ; then
-  MOTIF_OPT="-lXm"
-  echo -n "Testing linking with Motif"
-  comp_cmd="cc conftest.c -o conftest.exe $MOTIF_OPT $XT_OPT"
+  echo -n "Testing linking with Xt"
+  XT_OPT="-lXt -lX11"
+  comp_cmd="cc conftest.c -o conftest.exe $XT_OPT"
   if (eval "$comp_cmd") 2> contest.err; then
-      HAS_MOTIF=yes
-      X_CONF=xm
+      HAS_XT=yes
   else
-      HAS_MOTIF=no
+      if [ -n "$X_CONF" ] ; then
+          echo
+          echo "X reqested but Xt not detected"
+          exit 1
+      fi
+      HAS_XT=no
+      XT_OPT=""
   fi
   rm -f conftest.exe
-  echo "   "$HAS_MOTIF
-else
-  HAS_MOTIF=no
-  MOTIF_OPT=""
+  echo "   "$HAS_XT
+
+  if [ x"$X_CONF" != "xxt" -a x"$HAS_XT" = "xyes" ] ; then
+    MOTIF_OPT="-lXm"
+    echo -n "Testing linking with Motif"
+    comp_cmd="cc conftest.c -o conftest.exe $MOTIF_OPT $XT_OPT"
+    if (eval "$comp_cmd") 2> contest.err; then
+        HAS_MOTIF=yes
+        X_CONF=xm
+    else
+        if [ x"$X_CONF" = "xxm" ] ; then
+            echo
+            echo "Motif not detected but --with_motif given"
+            exit 1
+        fi
+        HAS_MOTIF=no
+    fi
+    rm -f conftest.exe
+    echo "   "$HAS_MOTIF
+  else
+    HAS_MOTIF=no
+    MOTIF_OPT=""
+    if [ x"$HAS_XT" = "xyes" ] ; then
+        X_CONF=xt
+    else
+        X_CONF=no
+    fi
+  fi
 fi
 
 cat > conftest.c <<\EOF
@@ -117,13 +192,13 @@ fi
 USEPOP=`pwd`
 ABS_BUILD=$USEPOP
 POP_BIN_DIR=$ABS_BUILD
-POPSYS=$USEPOP/target/pop
-POPEXTERNLIB=$USEPOP/target/exlib
-POPOBJLIB=$USEPOP/target/obj
+POPSYS=$USEPOP/$POP_target/pop
+POPEXTERNLIB=$USEPOP/$POP_target/exlib
+POPOBJLIB=$USEPOP/$POP_target/obj
 
 SUBSTS="s,@@USEPOP@@,$USEPOP,"
 for A in POPSYS POPEXTERNLIB POPOBJLIB X_CONF ABS_BUILD POP_BIN_DIR \
-    POP_arch NO_PIE_OPT ;
+    POP_arch NO_PIE_OPT POP_target PACK_CONF ;
 do
     VAL=$(eval echo '$'"$A")
     SUBSTS="$SUBSTS;s,@@$A@@,$VAL,"

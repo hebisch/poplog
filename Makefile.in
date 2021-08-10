@@ -1,11 +1,12 @@
 usepop = @@USEPOP@@
 ABS_BUILD = @@ABS_BUILD@@
-popsys = ${ABS_BUILD}/target/pop
+poptarget = ${ABS_BUILD}/@@POP_target@@
+popsys = ${poptarget}/pop
 popliblib = ${usepop}/pop/lib/lib
-popsavelib = ${ABS_BUILD}/target/psv
-popobjlib = ${ABS_BUILD}/target/obj
-popcobj = ${ABS_BUILD}/target
-popexlib = target/exlib
+popsavelib = ${poptarget}/psv
+popobjlib = ${poptarget}/obj
+popcobj = ${poptarget}
+popexlib = ${poptarget}/exlib
 DO_COMMAND = ${ABS_BUILD}/poplog
 MK_CROSS = ${usepop}/scripts/mk_cross
 PGLINK = ${usepop}/scripts/pglink
@@ -29,11 +30,19 @@ XL_FLAG=-xm
 endif
 endif
 
-all: stamp_images stamp_indexes
+PACK_CONF = @@PACK_CONF@@
 
-stamp_dirs_and_symlinks:
-	-(cd ${popsys}; ln -s corepop popc ; \
-	  ln -s corepop poplibr; ln -s corepop poplink)
+ifeq (${PACK_CONF},yes)
+PACKAGES_DIR_TARGET = stamp_package_dirs_and_symlinks
+PACKAGES_LIB_TARGET = stamp_packages
+PACKAGES_CLEAN_TARGET = clean_packages
+endif
+
+all: stamp_images stamp_indexes ${PACKAGES_LIB_TARGET}
+
+stamp_dirs_and_symlinks: ${PACKAGES_DIR_TARGET}
+	-(cd ${popsys} && { ln -s corepop popc ; \
+	  ln -s corepop poplibr ; ln -s corepop poplink ; } )
 	mkdir -p ${popsavelib} ${popexlib} ${popobjlib}
 	mkdir -p ${popcobj}/src ${popcobj}/ved/src ${popcobj}/x/src
 	mkdir -p pop/ref/doc_index
@@ -86,7 +95,7 @@ VED_SRC = $(wildcard pop/ved/src/*.p) $(wildcard pop/ved/src/*.ph) \
           pop/lib/include/vedfile_struct.ph \
           pop/lib/include/vedscreendefs.ph
 
-stamp_vedlib: stamp_srclib ${popcobj}/src/termcap.w
+stamp_vedlib: stamp_srclib
 	-rm ${popobjlib}/vedsrc.wlb
 	-rm ${popcobj}/ved/src/*.[ow]
 	(cd pop/ved/src && \
@@ -183,17 +192,77 @@ stamp_images: stamp_clisp stamp_plog stamp_pml ${XVED_TARGET}
 	  done)
 	touch stamp_images
 
+# support for packages
+
+PACKAGES_SRC_DIR = ${usepop}/pop/packages
+
+# neural libraries
+
+NEURAL_LIB_NAMES = backprop  complearn ranvecs
+
+NEURAL_DIR = ${poptarget}/packages/neural/bin/${POP_arch}
+
+NEURAL_LIBS = $(addprefix ${NEURAL_DIR}/, \
+                          $(addsuffix .so, ${NEURAL_LIB_NAMES}))
+
+NEURAL_CSRC = ${PACKAGES_SRC_DIR}/neural/src/c
+
+${NEURAL_LIBS}: ${NEURAL_DIR}/%.so: ${NEURAL_CSRC}/%.c \
+                ${NEURAL_CSRC}/neural.h stamp_dirs_and_symlinks
+	$(CC) -g -O2 -Wall -fPIC -shared -I${NEURAL_CSRC} $< -o $@
+
+# popvision libraries
+
+VISION_DIR = ${poptarget}/packages/popvision/bin/${POP_arch}
+
+VISION_CSRC = ${PACKAGES_SRC_DIR}/popvision/lib
+
+VISION_LIB_NAMES = $(basename $(notdir \
+                     $(wildcard ${VISION_CSRC}/*.c)))
+
+VISION_LIBS = $(addprefix ${VISION_DIR}/, \
+                          $(addsuffix .so, ${VISION_LIB_NAMES}))
+
+${VISION_LIBS}: ${VISION_DIR}/%.so: ${VISION_CSRC}/%.c \
+                 ${VISION_CSRC}/arrpack.h ${VISION_CSRC}/arrscan.h \
+                 stamp_dirs_and_symlinks
+	$(CC) -g -O2 -Wall -fPIC -shared -I${VISION_CSRC} $< -o $@
+
+stamp_packages: ${NEURAL_LIBS} ${VISION_LIBS}
+	touch stamp_packages
+
+stamp_package_dirs_and_symlinks:
+	-mkdir -p ${VISION_DIR} ${NEURAL_DIR}
+	-mkdir -p ${PACKAGES_SRC_DIR}/lib
+	-(cd ${PACKAGES_SRC_DIR}/lib; \
+	  for A in $$(ls ..) ; do \
+	    if [ -f "../$$A/$$A.p" ] ; then \
+	        ln -s ../$$A/$$A.p . ; \
+	    fi \
+	  done)
+	-mkdir -p ${PACKAGES_SRC_DIR}/neural/ref/doc_index
+	-mkdir -p ${PACKAGES_SRC_DIR}/newkit/prb/ref/doc_index
+	-mkdir -p ${PACKAGES_SRC_DIR}/newkit/sim/ref/doc_index
+	-mkdir -p ${PACKAGES_SRC_DIR}/rclib/ref/doc_index
+	touch stamp_package_dirs_and_symlinks
+
+clean_packages:
+	rm -f ${NEURAL_LIBS} ${VISION_LIBS}
+
 stamp_indexes: ${BIN_START}
 	${DO_COMMAND} ${popsys}/basepop11 make_indexes ${usepop}/pop
 	touch stamp_indexes
 
-clean:
+buildclean:
+	rm -f stamp_*
+	rm -f ${LIBPOP_OBJS} ${XPW_OBJS}
+	rm -f ${popcobj}/src/*.[ow]
+	rm -f ${popcobj}/ved/src/*.[ow] ${popcobj}/x/src/*.[ow]
+
+clean: buildclean ${PACKAGES_CLEAN_TARGET}
 	(cd ${popsys} && \
 	  rm -f basepop11 clisp newpop11 oldpop11 pml pop11 prolog \
 	     ved xved ref teach im doc help basepop11.map \
 	     *.map *.stb )
-	rm -f stamp_* ${popexlib}/libpop.a ${popexlib}/libXpw.so \
+	rm -f ${popexlib}/libpop.a ${popexlib}/libXpw.so \
 	   ${popsys}/*.psv* ${popsys}/poplink_* ${popsavelib}/* ${popobjlib}/*
-	rm -f ${LIBPOP_OBJS} ${XPW_OBJS}
-	rm -f ${popcobj}/src/*.[ow]
-	rm -f ${popcobj}/ved/src/*.[ow] ${popcobj}/x/src/*.[ow]
