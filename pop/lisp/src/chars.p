@@ -106,8 +106,8 @@ enddefine;
 /* Character conversions */
 
 define character(item);
-        if ischaracter(item) then
-                item
+    if ischaracter(item) then
+        item
     elseif isintegral(item) then
         conscharacter(item)
     else

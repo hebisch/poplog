@@ -252,9 +252,9 @@ define multiple_escape();
             true -> lex_eof_error;          ;;; force an error
             eof()
         endif;
-                if read_suppress == nil then
+        if read_suppress == nil then
             lexchar
-                endif
+        endif
     enduntil;
     false ->> lex_redo -> lexnum
 enddefine;
@@ -266,14 +266,14 @@ define skipform();
         lextype()
     else
         repeat
-                   if lextype == multiple_escape then
-                       multiple_escape()
-                   elseif lextype == single_escape then
-                       lexget()
-                   endif;
-                   lexget();
-                   quitif(AT_TOKEN_END);
-                endrepeat, lexput();
+            if lextype == multiple_escape then
+                multiple_escape()
+            elseif lextype == single_escape then
+                lexget()
+            endif;
+            lexget();
+            quitif(AT_TOKEN_END);
+        endrepeat, lexput();
         nil
     endif
 enddefine;

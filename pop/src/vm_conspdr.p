@@ -387,9 +387,9 @@ define lconstant Optimise_clist_tl(clist, is_not);
     enduntil;
     instr!INST_OP -> _op;
     if _op == I_NOT then
-                ;;; Check for double negation, we could do better but
-                ;;; this is very rare.
-                returnif(is_not)(false);
+        ;;; Check for double negation, we could do better but
+        ;;; this is very rare.
+        returnif(is_not)(false);
         Optimise_clist_tl(next_clist, true)
     else
         if IS_UNOPT_JUMP(_op) ->> _op then
