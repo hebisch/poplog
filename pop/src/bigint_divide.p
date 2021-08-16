@@ -50,7 +50,6 @@ define lconstant Long_divide(dividend, divisor, _negrem, _want_quot);
     ;
     lstackmem struct LONG_DIVIDE_HELPER _ldh;
 
-    dividend@BGI_SLICES -> _Dstart;
     dividend!BGI_LENGTH -> _Dlim;
     divisor@BGI_SLICES -> _DRstart;
     divisor!BGI_LENGTH -> _DRlen;
@@ -67,6 +66,10 @@ define lconstant Long_divide(dividend, divisor, _negrem, _want_quot);
         Get_bigint(_Dlim _sub _DRlen) ->> quot; ;;; leave on stack as result
         quot@BGI_SLICES[quot!BGI_LENGTH] -> _Qlim
     endif;
+
+    dividend@BGI_SLICES -> _Dstart;
+    ;;; Need to recompute in case of GC
+    divisor@BGI_SLICES -> _DRstart;
 
     ;;; To get good estimates of quotient we want higest bit in
     ;;; divisor to be 1.  So we shift both divisor and dividend.
