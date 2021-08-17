@@ -52,8 +52,6 @@ unless islist(popindexlist) do
         '$usepop/pop/lib/objectclass/.../*.p',
 
         ;;; should these be included?
-        '$usepop/pop/lib/obsolete/.../*.p',
-        '$usepop/pop/lib/obsolete/.../*.ph',
         ' $usepop/pop/lib/turtle/*.p',
 
         /* Subsystem library directories */
@@ -62,9 +60,6 @@ unless islist(popindexlist) do
         '$usepop/pop/plog/auto/*.p',
         '$usepop/pop/plog/lib/*.p',
 
-        /* files in proto directories ??? */
-        '$usepop/pop/lib/proto/*.p',
-        '$usepop/pop/lib/proto/go/*/*.p',
         /* X directories not covered by popxlib */
 
         '$usepop/pop/x/pop/lib/X11/*.p',
@@ -87,16 +82,12 @@ unless islist(popindexlist) do
 ;;;     '$usepop/pop/packages/contrib/.../*.p',
 ;;;     '$usepop/pop/packages/contrib/.../*.ph',
 
-        '$usepop/pop/packages/bhamlib/.../*.p',
-        '$usepop/pop/packages/bhamlib/.../*.ph',
+;;;     '$usepop/pop/packages/bhamlib/.../*.p',
+;;;     '$usepop/pop/packages/bhamlib/.../*.ph',
         '$usepop/pop/packages/brait/.../*.p',
         '$usepop/pop/packages/brait/.../*.ph',
         '$usepop/pop/packages/lib/.../*.p',
         '$usepop/pop/packages/lib/.../*.ph',
-        '$usepop/pop/packages/lockfile/.../*.p',
-        '$usepop/pop/packages/lockfile/.../*.ph',
-        '$usepop/pop/packages/master/.../*.p',
-        '$usepop/pop/packages/master/.../*.ph',
         '$usepop/pop/packages/neural/.../*.p',
         '$usepop/pop/packages/neural/.../*.ph',
         '$usepop/pop/packages/newkit/.../*.p',
