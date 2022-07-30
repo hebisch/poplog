@@ -366,14 +366,15 @@ define lconstant Bgi_*(x, y);
         _bgi_mult_add(_Yaddr!(SL)++ -> _Yaddr, _Xstart, _Xlen, _Raddr);
     endwhile;
 
+    if need_neg then
+        Bigint_negate_range(result@BGI_SLICES, result!BGI_LENGTH,
+                            result@BGI_SLICES)
+    endif;
+
     ;;; end of NO GC section
 
-    Bigint_return(result) -> Get_store() -> result;
-    if need_neg then
-        Bgi_negate(result);
-    else
-        result;
-    endif;
+    Bigint_return(result) -> Get_store();
+
 enddefine;
 
 
