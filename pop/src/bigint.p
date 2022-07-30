@@ -144,7 +144,9 @@ define Bigint_return(bint);
             ;;; single must fit
             return(_pint(_x), bint)
         endif;
-        _shift(_x, _:SLICE_BITS) _biset (_addr--!(SL) -> _addr) -> _x;
+        bint@BGI_SLICES -> _addr;
+        _shift(_addr!(-SL)[_1], _:SLICE_BITS)
+            _biset (_addr!(SL)[_0]) -> _x;
 #_ENDIF
         ;;; see whether the resulting int fits into a popint
         if _pint_testovf(_x) then
