@@ -184,7 +184,7 @@ define lconstant Bgi_qrem(dd, dr, _want_quot);
             -> rm
         else
             Get_bigint(_1) -> rm;
-            _x -> rm!BGI_SLICES[_0]  
+            _x -> rm!BGI_SLICES[_0]
         endif;
         return(rm, if _want_quot then quot endif);
     elseif _drlen _sub _1 _gr _ddlen then

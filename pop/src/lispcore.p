@@ -1409,9 +1409,9 @@ define lconstant App_package(pkg, procedure pdr, _do_internals, check_access);
     while _offs _lt _lim do
         pkg!(w){_offs} -> entry;
         while iscompound(entry) do
-            if (_do_internals or 
+            if (_do_internals or
                              (entry!KEY == package_external_entry_key))
-                           and (not(check_access) 
+                           and (not(check_access)
                                 or check_access(entry!PGE_SYM)) then
                 _CHECKUSER;
                 lisp_apply(Return_symbol(entry!PGE_SYM), pdr, 1, 0)

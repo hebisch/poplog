@@ -79,7 +79,7 @@ undochattylist(C, [H|T]) :-
     undochatty(C/H), dochattylist(C, T).
 
 chattymishap(A) :-
-   write('Can\'t do:  '),write(A),nl.                    
+   write('Can\'t do:  '),write(A),nl.
 
 /* ------------------------------------------------------------------------ */
 
@@ -133,7 +133,7 @@ define chatty_toplevel_trap(prolog_toplevel_trap);
 enddefine;
 
 define chattyup; chatty_indent+1 -> chatty_indent; enddefine;
-define chattydown; max(chatty_indent-1,0) -> chatty_indent; enddefine;                                         
+define chattydown; max(chatty_indent-1,0) -> chatty_indent; enddefine;
 
 
 unless isclosure(prolog_toplevel_trap) and
@@ -174,7 +174,7 @@ ch_nomore(A) :-
         chattydown,chattymark,
         write(' No more clauses for '),write(A),nl,!.
 
-sayclause(C,F):- write(' clause '),write(C),write(' of '),write(F),!.                    
+sayclause(C,F):- write(' clause '),write(C),write(' of '),write(F),!.
 
 /*  --- Revision History ---------------------------------------------------
 --- Simon Nichols, Dec 14 1987 - Changed precedence and fixity of chatty/1

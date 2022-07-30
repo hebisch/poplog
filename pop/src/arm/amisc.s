@@ -31,14 +31,14 @@ lconstant macro (
     _RF_CONT        = @@RF_CONT,
     _SF_OWNER       = @@SF_OWNER,
     _V_BYTES        = @@V_BYTES,
-    
+
 );
 
 section $-Sys;
 
 constant
         procedure (Async_raise_signal, Call_overflow, Conspair,
-                   Plog$-Area_overflow, User_overflow, 
+                   Plog$-Area_overflow, User_overflow,
                    dummy_procedure_callback_helper),
 ;
 
@@ -356,7 +356,7 @@ DEF_C_LAB (_haskey)
     ldrne r0, .L.false
     str r0, [USP]
     bx lr
- 
+
 .L7.1:
     .word C_LAB(integer_key)
 .L7.2:
@@ -374,7 +374,7 @@ DEF_C_LAB (_datakey)
     ldreq r0, .L7.2
     str r0, [USP, #-4]!
     bx lr
-    
+
 .L8.1:
     .word I_LAB(Sys$- _free_pairs)
 DEF_C_LAB (_conspair)
@@ -493,7 +493,7 @@ DEF_C_LAB (_checkall)
     tst r1, #2
     beq XC_LAB(Sys$-User_overflow)
     b .L11.check_interrupt
-    
+
 DEF_C_LAB (_checkinterrupt)
     ldr  r1, .L11.trap
     ldr  r1, [r1]

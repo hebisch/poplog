@@ -59,8 +59,8 @@ define Array$-Cons(_tabsize) -> _arrayp;
     ;;; (picks up parameters from PD_ARRAY_TABLE, stacks computed
     ;;; subscript and PD_ARRAY_VECTOR, and then chains PD_ARRAY_SUBSCR_PDR)
     ;;; movl $[_array_sub], %eax
-    _16:48 -> BYTE; 
-        _16:B8 -> BYTE, 
+    _16:48 -> BYTE;
+        _16:B8 -> BYTE,
         _array_sub -> QUAD; ;;; 10 bytes
     ;;; call *%rax
     _16:D0FF -> SHORT;                              ;;; 2 bytes
@@ -74,7 +74,7 @@ define Array$-Cons(_tabsize) -> _arrayp;
     ;;; movl 8(%rsp), %PB
         _16:48 -> BYTE;
     _16:6C8B -> SHORT,
-        _16:24 -> BYTE, 
+        _16:24 -> BYTE,
         _8 -> BYTE; ;;; 5 bytes
     ;;; ret
     _16:C3 -> BYTE;                                 ;;; 1 bytes

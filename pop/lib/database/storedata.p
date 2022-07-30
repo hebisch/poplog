@@ -77,7 +77,7 @@ define storedata(filename);
     ;;; print each item in the database separately, each starting on
     ;;; a new line
     for item in database do
-        pr(item);       
+        pr(item);
         cucharout(`\n`);
     endfor;
 

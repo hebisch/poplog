@@ -22,7 +22,7 @@ weak constant
     _pfsgr
     _pfabs
 ;
-    
+
 
 lconstant macro (
 
@@ -199,7 +199,7 @@ L.ret_false:
     ldreq r3, L.false
     streq r3, [USP]
     bx LR
-    
+
 DEF_C_LAB (_pf_intof)
     ldr r3, [USP]
     fldd    d7, [r3]
@@ -228,8 +228,8 @@ L.minint:
     .word   2097152
     .word   -1042284544
 L.maxuint:
-    .word   0 
-    .word   1106247680  
+    .word   0
+    .word   1106247680
 
 DEF_C_LAB (_pf_uintof)
     ldr r3, [USP]

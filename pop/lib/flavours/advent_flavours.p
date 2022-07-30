@@ -43,7 +43,7 @@ ivars
     ;
 
     defmethod before initialise;
-        self :: rooms -> rooms;  
+        self :: rooms -> rooms;
     enddefmethod;
     defmethod displayself;
         [^name inhabitants ^inhabitants objects ^local_objects] ==>
@@ -85,7 +85,7 @@ endflavour;
 ;;; -- PLAYERS -------------------------------------------------------------
 ;;; The class for the Players.
 
-vars players play possessions;         
+vars players play possessions;
 
 ;;; find the object in -objectlist- whose name is -name-
 define namemember(name, objectlist);
@@ -98,7 +98,7 @@ lvars objectlist name object;
     false;
 enddefine;
 
-;;; special one for finding the named object in the list called possessions.          
+;;; special one for finding the named object in the list called possessions.
 define get_object(object_name);
 lvars object_name;
     namemember(object_name, possessions);

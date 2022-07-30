@@ -324,7 +324,7 @@ define vedscreendown();
         unless vedscrollscreen then
             ;;; Not scrolling, so put previous bottom line at top
             ;;; and refresh
-            
+
             ;;; set new visible region to start from current last visible line
             windowbottom fi_- 1 -> vedlineoffset;
 

@@ -13,7 +13,7 @@
 ;;; the first form is quicker, and works with predicates of zero arity, and
 ;;; where one of the arguments is a term with comma as functor.
 
-:- clause('DEC10', true) -> op(800, xfy, $); op(100, xfy, $).    
+:- clause('DEC10', true) -> op(800, xfy, $); op(100, xfy, $).
 
 Functor$[] :-
     !,

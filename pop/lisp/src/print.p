@@ -355,7 +355,7 @@ enddefine;
 
 define lconstant Escape_pr(s);
     cucharout(`|`);
-    appdata(s, 
+    appdata(s,
                 procedure(c);
                     if c = `\\` or c = `|` then
                         cucharout(`\\`);

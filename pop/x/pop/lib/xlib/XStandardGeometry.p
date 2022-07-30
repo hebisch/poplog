@@ -43,7 +43,7 @@ int *x, *y, *width, *height;    ;;; RETURN
 
 int XParseGeometry(parsestring, x, y, width, height)
 char *parsestring;
-int *x, *y;                     ;;; RETURN                   
+int *x, *y;                     ;;; RETURN
 unsigned int *width, *height;   ;;; RETURN
 {}
 
@@ -53,7 +53,7 @@ Display *display;
 Window src_w, dest_w;
 int src_x, src_y;
 int *dest_x, *dest_y;          ;;; RETURN
-Window *child;                 ;;; RETURN                   
+Window *child;                 ;;; RETURN
 {}
 
 

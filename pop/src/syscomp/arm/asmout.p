@@ -63,7 +63,7 @@ define lconstant asm_label(word, prefix_char);
                 a a a a a a a a a a s s s s c c     ;;;   q    -- \(128)
             else c;
                         u:          ;;; underscore
-                              `_` ;   ;;;      
+                              `_` ;   ;;;
             A: a: d:        ;;; alpha, digit, underscore
                 nextloop;
 
@@ -150,7 +150,7 @@ constant procedure (
 global constant procedure (
     asm_align_word =
             outcode(% '.align\t2' %),
-    asm_align_double = 
+    asm_align_double =
             outcode(% '.align\t3' %)
     ;;; asm_align_file -- end-of-file alignment
     ;;; (don't define if not needed)

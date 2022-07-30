@@ -10,5 +10,5 @@ uses vedendwordright;
 /* --- Revision History ---------------------------------------------------
 --- Robert Duncan, Jun 26 1987
     moved everything to C.all/lib/ved/vedendwordright.p because of
-    14-character file name clash.   
+    14-character file name clash.
 */

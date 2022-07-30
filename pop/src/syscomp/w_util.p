@@ -198,14 +198,14 @@ define word_dict_cell(word);
 #_ELSE
     lvars res = len, i = 1;
     while len fi_> 3 do
-        (f_subs(i, string) fi_+ (f_subs(i fi_+ 1, string) fi_<< 8) 
+        (f_subs(i, string) fi_+ (f_subs(i fi_+ 1, string) fi_<< 8)
            fi_+ (f_subs(i fi_+ 2, string) fi_<< 16))
            + (f_subs(i fi_+ 3, string) << 24) + res -> res;
         len fi_- 4 -> len;
         i fi_+ 4 -> i;
     endwhile;
     if len == 3 then
-        (f_subs(i, string) fi_+ (f_subs(i fi_+ 1, string) fi_<< 8) 
+        (f_subs(i, string) fi_+ (f_subs(i fi_+ 1, string) fi_<< 8)
            fi_+ (f_subs(i fi_+ 2, string) fi_<< 16))
              + res -> res;
     elseif len == 2 then

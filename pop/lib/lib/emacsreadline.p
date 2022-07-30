@@ -32,7 +32,7 @@ define emacsreadline() -> list;
         procedure rep = incharitem(charin);     ;;; item repeater
 
     dlocal popnewline = true, popprompt = pop_readline_prompt;
-    
+
     ;;; Make a list items to next newline
     [% until (rep() ->> item) == newline do item enduntil %] -> list;
 

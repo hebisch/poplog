@@ -132,7 +132,7 @@ define lconstant copy_from_disk(newfile);
     ;;; but as this is already a backup, reduce total number of backups to be
     ;;; created by this process.
 
-    if pop_file_versions < vedautosave_max then 
+    if pop_file_versions < vedautosave_max then
         vedautosave_max - pop_file_versions + 1 -> pop_file_versions
     endif;
 

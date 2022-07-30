@@ -9,7 +9,7 @@
 section;
 
 define global ved_pwd;
-    vedputmessage(current_directory)                  
+    vedputmessage(current_directory)
 enddefine;
 
 endsection;

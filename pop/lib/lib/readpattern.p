@@ -122,7 +122,7 @@ vars v1,v2,v3;
 lvars lv1, lv2, lv3;
 ! [lv1 ?lv1 {lv2 ?lv2 [?lv2]} [lv3 ?lv3]] =>
 ** [lv1 ? <ID lv1 <undef>> {lv2 ? lv2 [? lv2]} [lv3 ? <ID lv3 <undef>>]]
-    
+
 ;;; Use of "!" in a pattern embedded in a vector expression works.
 lvars lv1, lv2, lv3;
 ![{% ![?lv1] % ?lv2 } ?lv3] =>
@@ -164,14 +164,14 @@ section;
 ;;; A variable to control whether pattern variables default to lexical
 global vars pop_pattern_lvars;
 if isundef(pop_pattern_lvars) then
-    true -> pop_pattern_lvars;  
+    true -> pop_pattern_lvars;
 endif;
 
 ;;; A variable to control whether automatic declarations are notified
 global vars pop_lvars_warning;
 if isundef(pop_lvars_warning) then
     ;;; assign default value.
-    true -> pop_lvars_warning;  
+    true -> pop_lvars_warning;
 endif;
 
 ;;; Stuff to control printing of identifiers
@@ -192,7 +192,7 @@ define global vars pr_patt_var_warning(word);
         printf(poplinenum, ';;; LINE %p\n');
     endif
 enddefine;
-    
+
 
 define vars print_ident(id);
     ;;; User definable procedure for printing identifiers. Can be changed

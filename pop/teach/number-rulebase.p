@@ -8,7 +8,7 @@ http://www.cs.bham.ac.uk/research/projects/poplog/teach/number-rulebase.p
 This teach file is the subject of a video tutorial available on the CogAff
 web site and on YouTube
 
-    http://www.cs.bham.ac.uk/research/projects/cogaff/tutorials/number-rulebase.ogv 
+    http://www.cs.bham.ac.uk/research/projects/cogaff/tutorials/number-rulebase.ogv
 
     http://www.youtube.com/aaronsloman#p/a/u/0/9TAQoRpvLFE
 
@@ -654,7 +654,7 @@ RULE countitems
         ;;; or equivalently items /= [] (items is not the empty list).
 
         if items /= [] then
-            
+
             [I counted ^lastnum items -- but] =>
             [I dont know enough number words to continue] =>
         else

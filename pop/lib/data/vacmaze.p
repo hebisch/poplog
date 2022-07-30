@@ -88,5 +88,5 @@ database ==>
 
 /* --- Revision History ---------------------------------------------------
 --- Aaron Sloman, Jul 12 2010
-        Fixed bug in getchoices: now needs "!" before pattern.      
+        Fixed bug in getchoices: now needs "!" before pattern.
  */

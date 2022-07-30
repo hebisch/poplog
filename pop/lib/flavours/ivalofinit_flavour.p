@@ -21,6 +21,6 @@ flavour ivalofinit a mixin;
             value -> ivalof(self, slot);        ;;; no daemons
         enduntil;
     enddefmethod;
-endflavour;           
+endflavour;
 
 endsection;

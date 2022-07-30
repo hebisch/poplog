@@ -49,7 +49,7 @@ EXTERN_NAME(main):
     ;;; To keep stack aligned need to store even number of
     ;;; registers
     stmfd sp!, {r4, r9, r11, lr}
-        
+
     ;;; Save pointer to argument vector (argv)
     ldr r3, L1.1
     str r1, [r3]
@@ -81,7 +81,7 @@ EXTERN_NAME(main):
     ;;; mov    $3, %r13
     ;;; mov    $3, %r14
     ;;; mov    $3, %r15
-        
+
     ;;; Start the system
     bl  XC_LAB(setpop)
 

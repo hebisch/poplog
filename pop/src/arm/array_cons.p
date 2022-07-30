@@ -40,7 +40,7 @@ define Array$-Cons(_tabsize) -> _arrayp;
     ;;; Start of code
     @@PD_ARRAY_TABLE{_tabsize} -> _drop_ptr;
     _arrayp@(w){_drop_ptr} -> _arrayp!PD_EXECUTE;
-    
+
 
     ;;; Compute offset of array to pc in words.
     ;;; We subtract 9 for code and 2 for words before

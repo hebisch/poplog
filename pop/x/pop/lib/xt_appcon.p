@@ -69,7 +69,7 @@ global vars xt_appcon= true;
 endsection;
 
 /* --- Revision History ---------------------------------------------------
---- John Gibson, Nov  3 1991 
+--- John Gibson, Nov  3 1991
         includes xpt_generaltypes.ph
 --- Adrian Howard, Sep 10 1991 : Added check for null terminated string list
 --- Adrian Howard, Aug 23 1991 : -XtAppSetFallbackResources- now allows

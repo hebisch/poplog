@@ -1221,7 +1221,7 @@ define lconstant gen_op_2(src1, src2, dst, asm_op);
                 R9 -> tmp;
 #_ENDIF
         if asm_op == asmADDL and not(set_flags)
-        and not(ismem(src1)) and not(ismem(src2)) 
+        and not(ismem(src1)) and not(ismem(src2))
                 and not(is_large_int(src2))
         then
             /* {~mem(src1) & ~mem(src2) & reg(tmp)} */
@@ -1261,7 +1261,7 @@ define lconstant gen_sub(src1, src2, dst);
 ;;;        _print_addr(dst) -> _;
     if src2 = dst then
 ;;;                printf('src2 = dst\n');
-        if ismem(src1) and ismem(dst) or 
+        if ismem(src1) and ismem(dst) or
                     is_large_int(src1) then
 ;;;                        printf('asmMOVL(src1, EAX ->> src1);\n');
             asmMOVL(src1, EAX ->> src1);
@@ -1290,7 +1290,7 @@ define lconstant gen_sub(src1, src2, dst);
 ;;;                        printf('else: altwkreg(src1) -> tmp;\n');
             altwkreg(src1) -> tmp;
         endif;
-                if is_large_int(src1) then 
+                if is_large_int(src1) then
 ;;;                   printf('asmMOVL(src1, R9 ->> src1);');
                    asmMOVL(src1, R9 ->> src1);
                 endif;

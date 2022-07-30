@@ -112,7 +112,7 @@ lconstant
     _CMP    = _16:E1500000,
               ;;; e154000a        cmp     r4, sl
               ;;; e3530000        cmp     r3, #0
-              ;;; 
+              ;;;
     _LDMFD  = _16:E8BD0000,
     _LDR    = _16:E4100000,
               ;;;    e5bcf4f0        ldr     pc, [ip, #1264]!
@@ -786,7 +786,7 @@ define load_field_addr(type, structure, _size, offset, exptr);
         elseif _nonzero(try_encode_imm(_negate(_disp)) ->> _tmp) then
             drop_op3(_SUB, _R0, _reg, _tmp);
         else
-*/            
+*/
     else
         if not(offset) then
             drop_pop_reg(_R1, _USP);
@@ -880,7 +880,7 @@ define I_PUSH_FIELD();
         do_bit_field(type, _size, structure, offset, false, exptr);
     else
         lvars _reg = load_field_addr(type, structure, _size, offset, exptr);
-        drop_op3(_int(access_op(type)) _biset _cond_all_bits 
+        drop_op3(_int(access_op(type)) _biset _cond_all_bits
                  _biset _load_bit, _R0, _reg, _0);
     endif;
     if cvt then
@@ -1142,7 +1142,7 @@ define I_IF_TAG();
     lvars _mod, _rm, _disp;
     ;;; printf('I_IF_TAG\n');
     lvars _reg1 = load_fsrc_to_reg(_1, _R1);
-    drop_op_imm(_TST, _R0, _reg1, 
+    drop_op_imm(_TST, _R0, _reg1,
         if asm_instr!INST_ARGS[_0] == _issimple then _2:01 else _2:10 endif);
     drop_BR_cond(_cc_NE, _cc_EQ, asm_instr!INST_ARGS[_2]);
 enddefine;
@@ -1164,7 +1164,7 @@ define I_SWITCH();
     ;;; Compare the argument with the number of cases (both popints)
     load_literal(_R1, _ncases);
     drop_op3(_CMP, _R0, _reg, _R1);
-    
+
     ;;; Compute the offset from the start of the procedure code to the end
     ;;; of the jump offset table: the _16 is the length of the four
     ;;; instructions between here and the first entry in the table,
@@ -1406,7 +1406,7 @@ define I_CREATE_SF();
             drop_push_reg(_tmp,  _SP);
         endrepeat;
     endif;
-   
+
     ;;; Allocate non-Pop on-stack lvars
     if _Nstkvars _gr _Npopstkvars then
         drop_op_imm(_SUB, _SP, _SP, @@(w)[_Nstkvars _sub _Npopstkvars]);
@@ -1433,7 +1433,7 @@ define I_UNWIND_SF();
         drop_pop_reg(_R0,  _SP);
         drop_mem_imm_off(_STR, _R0, _R1, _0);
     endrepeat;
-    
+
     ;;; restore registers
     drop_w(_LDMFD _biset _regmask _biset _shift(_1, _LR));
 
@@ -1597,7 +1597,7 @@ define Do_consprocedure(codelist, reg_locals) -> pdr;
         do_drop_w(lit_buff!(i)[_n]);
         _n _add _1 -> _n;
     endwhile;
-   
+
 ;;;
 ;;;     Helper to show location of planted code (allow disassembling).
 ;;;

@@ -67,7 +67,7 @@ getout(man) :-
           assert(at(Place,man)),
           retract(at(boat,man)).
 
-crossriver(boat) :-                    
+crossriver(boat) :-
           (at(boat,man); mishap ("Boat is not self propelling!")),!,
           at(Place1,boat),
           checkeat,

@@ -26,10 +26,10 @@ define do_class_construct( key, ind_proc ) -> c;
 enddefine;
 
 define Memo_class_construct =
-    memofn( 
+    memofn(
         procedure( oc ) -> p;
             newindirect( apply ) -> p;
-            do_class_construct( oc, p ) -> indirect_pdpart( p ); 
+            do_class_construct( oc, p ) -> indirect_pdpart( p );
         endprocedure
     )
 enddefine;

@@ -60,7 +60,7 @@ section Genproc =>
         ;;; M_MOVEb
         M_MOVEbit
         ;;; No longer needed
-        ;;; M_MOVEi    
+        ;;; M_MOVEi
         ;;; M_MOVEs
         ;;; M_MOVEsb
         M_MOVEsbit
@@ -159,7 +159,7 @@ lconstant
     R1 = "r1",    ;;; principal work reg/arg_reg_1
     R2 = "r2",    ;;; CHAIN_REG/arg_reg_2
     R3 = "r3",    ;;; WK_ADDR_REG_1
-    R4 = "r4",    ;;; 
+    R4 = "r4",    ;;;
     R5 = "r5",    ;;; secondary work reg
     R9  = "r9",
     R10 = "r10",  ;;; USP
@@ -432,7 +432,7 @@ define lconstant get_addressable_op(opd, tmp);
                     endif -> tmp;
                 endif;
                 if disp then
-                    '[' >< opd1 >< '], #' >< tmp 
+                    '[' >< opd1 >< '], #' >< tmp
                 else
                     '[' >< opd1 >< ', #-' >< tmp >< ']!'
                 endif -> opd1;
@@ -445,7 +445,7 @@ define lconstant get_addressable_op(opd, tmp);
                 mishap(opd, 1, 'Unhandled operand in get_addressable_op');
             endif;
             return('[' >< opd1 >< ']');
-        endif;            
+        endif;
         mishap(opd, 1, 'Unhandled operand in get_addressable_op');
     endif;
     if isinteger(opd) or isbiginteger(opd) then
@@ -722,7 +722,7 @@ define lconstant gen_op_commute(src1, src2, dst, opcode);
     gen_op_3(src1, src2, dst, opcode);
 enddefine;
 
-;;; m_op_*: 
+;;; m_op_*:
 ;;;     translate 2- and 3-operand M-code arithmetic/logical instructions
 ;;;     on machine integers;  calls corresponding gen_... operation.
 
@@ -1234,7 +1234,7 @@ define M_CREATE_SF();
     if Npopregs > 0 then
         for n from 12 by -1 to 0 do
             if regmask &&/=_0 (1 << n) then
-                if tmp then 
+                if tmp then
                     gen_move(tmp, reglabel(n));
                 else
                     reglabel(n) -> tmp;
@@ -1268,7 +1268,7 @@ define M_UNWIND_SF();
     gen_op_3((Nstkvars + 1) * 4, SP, SP, "add");
     ;;; Pop dynamic locals
     applist(rev(dlocal_labs), pop_operand);
-        
+
     ;;; restore registers
     asm_emit("ldmfd", 'sp!', reg_spec, 3);
     ;;; Restore procedure base register from previous owner address

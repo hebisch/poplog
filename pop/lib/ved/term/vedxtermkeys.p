@@ -46,7 +46,7 @@
     and other numeric keypad keys that default to the same settings as
     central keypad keys are now given different strings to transmit,
     modelled on vt100 keys.
-    
+
     Delete will transmit the delete character.
 
 Invoke the following with
@@ -286,7 +286,7 @@ define global vedxtermkeys();
 
     vedsetkey('\^L', "vedxrefresh");
     vedsetkey('\^H', "vedchardelete");
-    
+
     ;;; this is used by ENTER hkeys
     'vedxterm' -> vedkeymapname;
 enddefine;

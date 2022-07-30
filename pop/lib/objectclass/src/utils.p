@@ -354,7 +354,7 @@ define set_pdnargs_mode( n, p, mode );
     elseif mode == UCALL_MODE then
         set_pdnargs_raw( n, p.updater )
     else
-        internal_error()        
+        internal_error()
     endif
 enddefine;
 

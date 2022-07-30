@@ -100,7 +100,7 @@ define vars veddefaultxvedkeys();
 
         ;;; Top row of numeric keypad
         "redokey"           =   (KP_Subtract)         ;;; KP -
-    
+
         ;;; Help key may not exist
         "helpkey"           =   (Help)                ;;; Help
         "ENTER hkey"        =   esc (Help)            ;;; ESC Help

@@ -129,7 +129,7 @@ lconstant canceled_ivar = sysnvariable();
     defmethod cancelcomponent(icomp);
     lvars each icomp comp clist = conspair(false, f_supers(flavour_record));
         if isword(icomp) then
-            flavourrecord_of(icomp) -> comp; 
+            flavourrecord_of(icomp) -> comp;
         elseif isflavour_instance(icomp) then
             I_frecord(icomp) -> comp;
         else
@@ -164,7 +164,7 @@ lconstant canceled_ivar = sysnvariable();
         endif
     enddefmethod;
     ;;; set the default value for an instance varable.  UNDEF means delete
-    ;;; any existing default value at this flavour.             
+    ;;; any existing default value at this flavour.
     defmethod updaterof default_value_for(newvalue, ivname);
     lvars ivname p newvalue;
         unless lmember(ivname, ^instance_variables) do

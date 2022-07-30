@@ -30,6 +30,6 @@ define ved_readmime();
         ;;; delete the termin produced at the end
     endif;
     chain(vedrefresh);
-enddefine;  
+enddefine;
 
 endsection;

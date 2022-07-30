@@ -12,7 +12,7 @@
 lconstant macro (
 
     USP   = "r10",
-    LR    = "lr", 
+    LR    = "lr",
     PB    = "r11",
 
     _PD_EXECUTE             = @@PD_EXECUTE,

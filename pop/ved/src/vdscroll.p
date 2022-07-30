@@ -35,13 +35,13 @@ vars
 ;;; Added 8 Nov 2011 terminal_can_scroll is used in vdscreen.p
 
 define active:1 ved_terminal_can_scroll();
-    
+
     terminal_can_scroll
 
 enddefine;
 
 define updaterof active:1 ved_terminal_can_scroll();
-    
+
     -> terminal_can_scroll
 
 enddefine;
@@ -409,7 +409,7 @@ endsection;     /* $-Sys$-Ved */
     to control the previously hidden variable:
         terminal_can_scroll
     whose default value is now set false in vdinitseq.p
-        
+
 --- John Gibson, Aug 15 1997
         Changes for XVed variable-width mode
 --- John Gibson, Dec 13 1996

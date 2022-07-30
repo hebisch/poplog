@@ -117,7 +117,7 @@ endsection;     /* $- */
 
 
 constant macro MAX_STACK_FRAME_SIZE =
-  #_IF DEF FRAME_LEN_16BIT 
+  #_IF DEF FRAME_LEN_16BIT
           16:FFFF
   #_ELSEIF DEF FRAME_LEN_32BIT
           16:FFFFFFFF

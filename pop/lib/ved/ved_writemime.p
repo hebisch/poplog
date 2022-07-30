@@ -30,6 +30,6 @@ define ved_writemime();
         mimencode(vedrangerepeater(vvedmarklo, vvedmarkhi), vedargument);
         ;;; delete the termin produced at the end
     endif;
-enddefine;  
+enddefine;
 
 endsection;

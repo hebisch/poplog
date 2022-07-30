@@ -68,9 +68,9 @@ define Check_arity( action, mode, classes, generic ); lvars action, mode, classe
     lvars field = check_mode( mode ) == UCALL_MODE and uArityMethodTable or cArityMethodTable;
     lvars a = generic.method_table.field;
     lvars nargs = action.part_pdnargs;
-    
+
     ;;; [ check_arity: a = ^a, nargs = ^nargs, mode = ^mode ] =>
-    
+
     if a == "unbound" then
         ;;; No checking required.  We will force the arity of the generic
         ;;; to the new value.

@@ -42,6 +42,6 @@ flavour vanilla;
     enddefmethod;
 endflavour;
 
-sysprotect("myflavour");                   
+sysprotect("myflavour");
 
 endsection;

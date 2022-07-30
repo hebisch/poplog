@@ -12,7 +12,7 @@ section temporary => fsystrace;
 vars ftrindent = 0;                     ;;; current trace indentation
 
 define lvars ftrace_pr(props, inoutword, args);
-lvars props inoutword args;                   
+lvars props inoutword args;
 vars tracing = false;
     repeat ftrindent - 1 times cucharout(`!`) endrepeat;
     printf('%p%p<-%p ', [% inoutword, self, props %]); appdata(args,spr);
@@ -35,7 +35,7 @@ lvars pdr props num args;
         explode(args); nil -> args;
     endif;
     pdr();
-    if tracing then 
+    if tracing then
         stacklength() fi_- num -> num;
         if num fi_< 0 then {} else consvector(num) endif -> args;
         ftrace_pr(props, "<", args);
@@ -49,7 +49,7 @@ endsection;                             ;;; temporary
 flavour metaflavour a metaflavour novanilla;
     defmethod ftrace(methname);
     lvars methname pdr upd = false;
-        true -> tracing; 
+        true -> tracing;
         if islist(methname) then
             for pdr in methname do self <- ftrace(pdr) endfor;
             return;

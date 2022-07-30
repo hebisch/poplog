@@ -942,7 +942,7 @@ endsection;     /* $-Sys$-Ved */
 /* --- Revision History ---------------------------------------------------
 --- Aaron Sloman, Feb  6 2008
         In Searchlist*_name(name) -> name;
-    
+
         altered
                 datalength(dir) fi_+ datalength(file) -> totlen;
         to

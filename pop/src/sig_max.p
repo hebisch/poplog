@@ -13,7 +13,7 @@
 
 ;;; -------------------------------------------------------------------
 
-section $-Sys => sys_max_signal;           
+section $-Sys => sys_max_signal;
 
 define active sys_max_signal;
     Sys_max_signal;

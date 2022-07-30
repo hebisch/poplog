@@ -78,7 +78,7 @@ define lconstant asm_label(word, prefix_char);
                 a a a a a a a a a a s s s s c c     ;;;   q    -- \(128)
             else c;
                         u:          ;;; underscore
-                              `_` ;   ;;;      
+                              `_` ;   ;;;
             A: a: d:        ;;; alpha, digit, underscore
                 nextloop;
 
@@ -213,7 +213,7 @@ global constant procedure (
     asm_outshort    = outdatum(% ASM_SHORT_STR %),
     asm_outint      = outdatum(% ASM_INT_STR %),
     asm_outword     = outdatum(% ASM_WORD_STR %),
-    asm_outdouble = outdatum(% ASM_DOUBLE_STR %), 
+    asm_outdouble = outdatum(% ASM_DOUBLE_STR %),
 );
 
 define asm_out_dfloat(hipart, lopart);

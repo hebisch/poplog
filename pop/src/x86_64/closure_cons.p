@@ -63,7 +63,7 @@ define Cons_closure(_nfroz) -> _clos;
         _16:0389 -> SHORT;  ;;; 3 bytes
         ;;; movl $[Exec_closure!PD_EXECUTE], %eax
                 _16:48 -> BYTE,
-        _16:B8 -> BYTE, 
+        _16:B8 -> BYTE,
                 Exec_closure!PD_EXECUTE -> QUAD;    ;;; 10 bytes
         ;;; jmp *%eax
         _16:E0FF -> SHORT;                                  ;;; 2 bytes

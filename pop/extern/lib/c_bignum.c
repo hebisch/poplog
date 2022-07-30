@@ -24,12 +24,12 @@ do_bgi_mult_add(unsigned int * dst, int len, unsigned int * xp,
      unsigned int m) {
     unsigned int c = 0;
     int i = 0;
-    while(i < len) { 
+    while(i < len) {
         unsigned long long pp = (unsigned long long)(xp[i])*
                                (unsigned long long)m +
                                (unsigned long long)(dst[i]) +
                                (unsigned long long)c;
-        dst[i] = pp; 
+        dst[i] = pp;
         c = (pp >> (32ULL));
         i++;
     }
@@ -177,7 +177,7 @@ do_bgi_div(unsigned int * dst, int len, unsigned int * xp,
         unsigned long long pp =
             (((unsigned long long)rem)<<(32ULL)) +
             (unsigned long long)(xp[len]);
-        unsigned long long q = 
+        unsigned long long q =
             pp / (unsigned long long)divisor;
         unsigned long long r =
             pp % (unsigned long long)divisor;
@@ -275,5 +275,5 @@ do_quotient_estimate(struct ldh_str * ldh, unsigned int lo,
         }
     } else {
         return (lo >= ldh->div_hi)?1:0;
-    }        
+    }
 }

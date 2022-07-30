@@ -58,7 +58,7 @@ DEF_C_LAB (_call_external)
     ;;; Save caller's stack pointer for interrupt/callback
     ldr r0, saved_sp.lab
     str SP, [r0]
-    
+
     ;;; save registers.  Caller should save Pop registers
     ;;; to avoid problems with garbage collection, so
     ;;; we do not store them

@@ -139,11 +139,11 @@ constant macro PD_FRAME_SPARE = [ short PD_FRAME_SPARE_S ; ] ;
 #_IF DEF FRAME_LEN_32BIT
 deftype
   stk_off_t = int;
-constant macro PD_FRAME_SPARE = [ 
+constant macro PD_FRAME_SPARE = [
         short PD_FRAME_SPARE_S ;
         int PD_FRAME_SPARE_I;
 ] ;
-#_ELSE 
+#_ELSE
 deftype
   stk_off_t = byte;
 constant macro PD_FRAME_SPARE = [] ;

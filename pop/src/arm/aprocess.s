@@ -28,7 +28,7 @@ lconstant macro (
     _PS_FLAGS               = @@PS_FLAGS,
     _PS_PARTIAL_RETURN      = @@PS_PARTIAL_RETURN,
     _PS_STATE               = @@PS_STATE,
-    
+
     BRANCH_std              = '4',
 );
 
@@ -112,7 +112,7 @@ perm_reg_save:
 
     ldr   lr, [SP], #4
     ldr   PB, [SP]
-    
+
 so_test_finished:
     ldr   r0, [USP]
     ldr   r1, [r0, #_PS_STATE]
@@ -155,7 +155,7 @@ si_loop:
     add   r3, r1, asl #2
     str   r3, [r0, #_PS_CALLSTACK_PARTIAL]
     sub   r3, #4
-    
+
     ;;; Restore registers from process record and store values
     ;;; to stack
 
@@ -206,7 +206,7 @@ si_lvars_done:
 
 si_cont:
     add   lr, lr, PB
-    
+
 si_test_finished:
     ldr   r0, [USP]
     ldr   r1, [r0, #_PS_CALLSTACK_LIM]
@@ -226,7 +226,7 @@ si_do_dlexpr:
     ldr   r0, [PB, #_PD_EXIT]
     sub   pc, r0, #BRANCH_std
 
- 
+
     ;;; Continue swap in after runnig procedure init code
 DEF_C_LAB (_swap_in_continue)
     ldr   r0, [USP]

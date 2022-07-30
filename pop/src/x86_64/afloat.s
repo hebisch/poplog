@@ -140,7 +140,7 @@ DEF_C_LAB (_pf_dfloat_int)
     .align  16
 
 DEF_C_LAB (_pf_dfloat_uint)
-    movq   (%USP), %rsi    
+    movq   (%USP), %rsi
     movq    8(%USP), %rdi
     addq    $16, %USP
     testq   %rdi, %rdi

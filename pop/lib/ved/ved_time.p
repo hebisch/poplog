@@ -9,7 +9,7 @@
 section;
 
 define global ved_time();
-    vedputmessage(sysdaytime())      
+    vedputmessage(sysdaytime())
 enddefine;
 
 endsection;

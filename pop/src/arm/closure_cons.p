@@ -60,7 +60,7 @@ define Cons_closure(_nfroz) -> _clos;
         _16:E51F000C -> _clos!PD_CLOS_FROZVALS[_drop_ptr];
         _drop_ptr _add _1 -> _drop_ptr;
         ;;; compute closure address in r0
-        ;;; sub    r0, pc, r0, lsl #2 
+        ;;; sub    r0, pc, r0, lsl #2
         _16:E04F0100 -> _clos!PD_CLOS_FROZVALS[_drop_ptr];
         _drop_ptr _add _1 -> _drop_ptr;
         ;;; push closure address on user stack

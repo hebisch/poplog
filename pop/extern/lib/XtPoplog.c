@@ -572,7 +572,7 @@ XtAppContext appcon;
     return(NULL);   /* not in table */
   }
 
-int 
+int
 _pop_set_async_appcon(XtAppContext appcon, POPOBJ clos, Boolean normaction)
 {
     register AppEntry *curr;

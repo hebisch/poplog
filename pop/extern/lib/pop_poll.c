@@ -116,7 +116,7 @@ static int (*poll_handlers[2])();
 #define DO_HANDLER(n)   ((p = poll_handlers[n]) ? (*p)() : 0)
 
 static void async_poll()
-{ 
+{
     int (*p)();
     int activity_level = DO_HANDLER(0);
     activity_level |= DO_HANDLER(1);

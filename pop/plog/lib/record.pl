@@ -22,7 +22,7 @@ define new_record(size);
 enddefine;
 
 ;;; keyof:
-;;;     maps a prolog term to a key into the property.             
+;;;     maps a prolog term to a key into the property.
 
 define keyof(term);
     lvars term;

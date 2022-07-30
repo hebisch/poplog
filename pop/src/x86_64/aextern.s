@@ -75,7 +75,7 @@ Ldata_start:
 ;;;             (on systems without mprotect) remembers the current
 ;;;             break in case the external routine allocates extra store
 
-;;;    Registers: 
+;;;    Registers:
 ;;;       %rdi, %rsi, %rdx, %rcx, %r8, %r9   -- integer arguments
 ;;;       %xmm0 to %xmm5                     -- floating point arguments
 ;;;
@@ -204,7 +204,7 @@ DEF_C_LAB (_call_external)
     testq   %r15, %r15
     jz      do_call1
 
-;;;     We need 4 words on stack as a workplace     
+;;;     We need 4 words on stack as a workplace
 ;;;     In the worst case, when we have one argument (which always
 ;;;     fits into a register this gives 3+nargs, push allocate 1
 ;;;     so we put another two into alignment code
@@ -213,13 +213,13 @@ DEF_C_LAB (_call_external)
     movq    %rsp, %rbp
     xorq    %r14, %r14
     subq    %r15, %rsp       ;;; allocate space for arguments
-    subq    $0x16, %rsp        ;;; 
+    subq    $0x16, %rsp        ;;;
     andq    $-0x10, %rsp       ;;; align the stack
     movl    $0, -16(%rbp)
     movq   %r15, -24(%rbp)
 
     movq   $int_arg0,   %r13
-    movq   $float_arg0, %r11  
+    movq   $float_arg0, %r11
 
     ;;; Transfer (and convert) any arguments
 
@@ -246,7 +246,7 @@ L1.1:
     subq    $1, %rax
     movq    %rax, -8(%rbp)
     ;;;  call conversion & store
-    jmp     *%r11        
+    jmp     *%r11
 
 L2.1:   ;;; Pop structure: get extern type from key into ESI
 
@@ -410,7 +410,7 @@ DEF_C_LAB(Sys$- _exfunc_clos_action)
 EXTERN_NAME(_pop_external_callback):
     ;;; for indirect weak reference
 DEF_C_LAB(Sys$- _external_callback_func)
-    ;;; Save call-preserved C registers      
+    ;;; Save call-preserved C registers
     pushq   %rbx
     pushq   %rbp
     pushq   %r12
@@ -512,7 +512,7 @@ EXTERN_NAME(pop_print):
 #_IF CHECK_BREAK
 
     ;;; Save the current break so that callback code has correct
-    ;;; info 
+    ;;; info
 
     movq    EXTERN_NAME(___brk_addr), %rax
     movq    %rax, save_curbrk

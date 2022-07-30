@@ -15,7 +15,7 @@ enddefine;
 define ved_plandemo();
 vars pr vedargument vederror;
     syspr -> pr;
-repeat                
+repeat
     vedscreenclear();
     rawcharout(0);
     pr('\n\^[H');

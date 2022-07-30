@@ -119,7 +119,7 @@ define Sys_open(file, accmode, arg3, open_p, _iscreate);
         endif
     endif;
 
-        if _nonneg(open_p(file, fullname, accmode, 0) ->> _fd) 
+        if _nonneg(open_p(file, fullname, accmode, 0) ->> _fd)
         then
 ;;;          _extern printf('doing Sys_cons_device\n') -> _ ;
 ;;;          _extern fflush(_0) -> _ ;

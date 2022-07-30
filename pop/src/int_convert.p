@@ -36,7 +36,7 @@ define Uint_->_pint(_n);
     SAVEWORKBGI(_work, _save1, _save2);
     BGWEAK Bigint_<< (
         BGWEAK Pint_to_bigint(
-            _pint( _shift(_n, _negate(_ICVT_SHIFT)) 
+            _pint( _shift(_n, _negate(_ICVT_SHIFT))
                                   _bimask _ICVT_HIMASK),
             _work),
         _ICVT_SHIFT) -> res;

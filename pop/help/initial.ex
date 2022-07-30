@@ -935,7 +935,7 @@ vedendmac -> vedmacprops("end");
 define vedbigswap();
 ;;; swaps files, but goes to larger window
     vedswapfiles();
-    vedsetwindow()        
+    vedsetwindow()
 enddefine;
 
 define ved_auto();

@@ -40,7 +40,7 @@ define Call_sys_nointr(_nargs, _routine) -> _res;
         enduntil;
         ;;; do the call and loop if EINTR
         ;;; FIXME: can we have negative long result ???
-        unless (_call_sys((), _nargs, _routine) ->> _res) 
+        unless (_call_sys((), _nargs, _routine) ->> _res)
                   _gr _2147483647 and _ERRNO == _:EINTR then
             _useras(@@(w)[_nargs]);         ;;; remove args
             return
