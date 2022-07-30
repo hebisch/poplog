@@ -197,18 +197,12 @@ define lconstant Bgi_qrem(dd, dr, _want_quot);
     dd -> org_dd;                   ;;; save orginal dividend
     dd!BGI_LENGTH _add _1 -> _ddlen;
     if Bigint_neg(dd) then          ;;; dividend with extra 0 slice
-        Get_bigint(_ddlen _add _1) -> dd;       ;;; allow 1 more for overflow
+        Get_bigint(_ddlen) -> dd;
         org_dd@BGI_SLICES -> _addr;
         Bigint_negate_range(_addr, _ddlen _sub _1, dd@BGI_SLICES);
-        if dd!BGI_SLICES[_ddlen _sub _1] /== _0 then
-            ;;; overflowed, extend by 0
-            _0 -> dd!BGI_SLICES[_ddlen];
-            _ddlen _add _1 -> _ddlen
-        else
-            ;;; didn't overflow, can truncate
-            _ddlen -> dd!BGI_LENGTH;
-            dd@V_WORDS[_ddlen|SL.r]@~POPBASE -> Get_store()
-        endif;
+        ;;; extend by 0.  Due to added zero slice we can ignore
+        ;;; possible overflow
+        _0 -> dd!BGI_SLICES[_ddlen _sub _1];
         true ->> _negrem -> _negquot
     else
         Bigint_copy_len(dd, _ddlen) -> dd;
