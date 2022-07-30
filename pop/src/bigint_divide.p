@@ -217,8 +217,10 @@ define lconstant Bgi_qrem(dd, dr, _want_quot);
     endif;
     dr!BGI_LENGTH -> _drlen;
 
-    ;;; unless divisor now shorter than dividend, quotient is 0
-    if _drlen _greq _ddlen then
+    ;;; if dividend is smaller than divisor, quotient is 0
+    if _drlen _greq _ddlen or (_ddlen _sub _1 _eq _drlen
+          and (dd@BGI_SLICES)!(SL)[_ddlen _sub _2]
+               _lt dr!BGI_SLICES[_drlen _sub _1]) then
         ;;; remainder=dividend, quotient=0
         Clawback(0) -> ;            ;;; dummy to reclaim space used by copies
         return(Bigint_return(org_dd) ->, if _want_quot then 0 endif)
