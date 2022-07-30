@@ -53,7 +53,7 @@ define Bigint_<<(x, _nbits);
     _0 -> left_carry;                       ;;; initial left carry is 0
 
     repeat
-        _Xaddr!(SL)++ -> _Xaddr -> x;
+        _Xaddr!(-SL)++ -> _Xaddr -> x;
         _shift(x, _nbits) _biset left_carry
                                 -> _Raddr!(SL)++ -> _Raddr;
         quitunless(_Xaddr <@(SL) _Xlim);
