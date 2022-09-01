@@ -30,11 +30,6 @@ endsection;
 
 section $-Sys;
 
-lconstant macro (
-    MOST_POSITIVE       = SLICE_MASK,
-    MOST_POSITIVE_BIT   = 2 ** (SLICE_BITS-1),
-    );
-
 struct LONG_DIVIDE_HELPER {
     dfloat LONG_DIVIDE_HELPER_FLOAT;
     ;;; FIXME: popc allocates only 4 bytes for dfloat,
