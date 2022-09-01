@@ -15,7 +15,8 @@ programming languages, notably:
 * Standard ML
     A powerful, strongly typed, polymorphic, functional language.
 
-Poplog provides support for multi-paradigm software development in a            rapid prototyping environment, because of the use of (fast) incremental
+Poplog provides support for multi-paradigm software development in a
+rapid prototyping environment, because of the use of (fast) incremental
 compilers for all the languages.  There is substantial AI and teaching
 material using Poplog, some included in this repository, some
 in separate packages repository, some available on the net.
