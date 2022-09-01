@@ -204,12 +204,11 @@ global vars syntax endforall_match ;
 
 define global syntax forall_match;
     lvars FORALL_ENDLAB FORALL_LAB FORALL_VAR ;
-    sysnlabel() -> FORALL_LAB; sysloop(FORALL_LAB);
-    sysnlabel() -> FORALL_ENDLAB; sysloopend(FORALL_ENDLAB);
-    sysnvariable() -> FORALL_VAR;
-    sysVARS(FORALL_VAR,0);
-    erase(systxcomp([in]));
-    erase(systxcomp([do]));
+    sysNEW_LABEL() -> FORALL_LAB; pop11_loop_start(FORALL_LAB);
+    sysNEW_LABEL() -> FORALL_ENDLAB; pop11_loop_end(FORALL_ENDLAB);
+    sysNEW_LVAR() -> FORALL_VAR;
+    erase(pop11_comp_expr_to([in]));
+    erase(pop11_comp_expr_to([do]));
     sysCALL("startfindall");
     sysPOP(FORALL_VAR);
     sysLABEL(FORALL_LAB);
@@ -217,7 +216,7 @@ define global syntax forall_match;
     sysPUSH(FORALL_VAR);
     sysCALL("runproc");
     sysIFNOT(FORALL_ENDLAB);
-    erase(systxsqcomp([endforall_match]));
+    erase(pop11_comp_stmnt_seq_to([endforall_match]));
     sysGOTO(FORALL_LAB);
     sysLABEL(FORALL_ENDLAB)
 enddefine;
