@@ -13,27 +13,30 @@ section $-lisp;
 
 /* User variables */
 
+
+define lconstant Convert_sys_item(item);
+    if isword(item) then
+        word_to_sym(item, keyword_package)
+    elseif isinteger(item) then
+        item
+    elseif isdecimal(item) then
+        number_coerce(item, decimal_0)
+    endif
+enddefine;
+
 define lconstant Convert_sys_list(list);
     lvars item;
     for item in list do
-        if isword(item) then
-            word_to_sym(item, keyword_package)
-        elseif isinteger(item) then
-            item
-        elseif isdecimal(item) then
-            number_coerce(item, decimal_0)
-        endif
+        Convert_sys_item(item)
     endfor
 enddefine;
-
 
 vars
     features
         =   [% @:POPLOG,
                @:COMMON,
                @:CLOS,
-               Convert_sys_list(sys_machine_type),
-               Convert_sys_list(sys_processor_type),
+               Convert_sys_item(sys_architecture),
                Convert_sys_list(sys_os_type),
             %],
     read_eval
