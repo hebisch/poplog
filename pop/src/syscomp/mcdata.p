@@ -23,7 +23,7 @@ enddefine;
 
 ;;; ------------- These values can be overridden in sysdefs.p -------------
 
-defcm(SYS_ARCHITECTURE, pop_architecture);
+defcm(SYS_ARCHITECTURE, [consword(pop_architecture)]);
 
     /*
      *  Bit sizes of standard types byte, short, int, double.
