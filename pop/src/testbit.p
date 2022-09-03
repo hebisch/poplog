@@ -36,7 +36,7 @@ define testbit(x, _bitpos);
             _bitpos _div _:SLICE_BITS -> _sln -> _bitpos;
             if _sln _greq x!BGI_LENGTH then
                 x!BGI_LENGTH _sub _1 -> _sln;
-                _:SLICE_BITS -> _bitpos     ;;; test sign bit
+                _:SLICE_BITS _sub _1 -> _bitpos     ;;; test sign bit
             endif;
             x!BGI_SLICES[_sln] -> x
         endif;
@@ -47,7 +47,8 @@ define testbit(x, _bitpos);
 enddefine;
 
 define updaterof testbit(setit, x, _bitpos);
-    lvars x, setit, _slice, _sln, _new, _bitpos, _op, _work = _NULL;
+    lvars x, setit, _slice, _sln, _new, _bitpos, _op, _work = _NULL,
+          _n_len;
     Check_integral(x);
     Check_integer(_bitpos, 0);
     _int(_bitpos) -> _bitpos;
@@ -71,17 +72,19 @@ define updaterof testbit(setit, x, _bitpos);
     ;;; x now a biginteger
     _bitpos _div _:SLICE_BITS -> _sln -> _bitpos;
     if _sln _greq x!BGI_LENGTH then
-        if BGWEAK Bigint_neg(x) then _-1 -> _slice else _0 -> _slice endif
+        if BGWEAK Bigint_neg(x) then _-1 -> _slice else _0 -> _slice endif;
+        _sln _add _1 -> _n_len;
     else
-        x!BGI_SLICES[_sln] -> _slice
+        x!BGI_SLICES[_sln] -> _slice;
+        x!BGI_LENGTH -> _n_len;
+    endif;
+    if _sln _greq x!BGI_LENGTH _sub _1 and
+       _bitpos _eq _:SLICE_BITS _sub _1 then
+        _n_len _add _1 -> _n_len
     endif;
     _shift(_1, _bitpos) -> _bitpos;
     if (_op(_slice, _bitpos) ->> _new) == _slice then return(x) endif;
-    BGWEAK Bigint_copy_len(x,if _sln _greq x!BGI_LENGTH then
-                                _sln _add _1
-                             else
-                                x!BGI_LENGTH
-                             endif) -> x;
+    BGWEAK Bigint_copy_len(x, _n_len) -> x;
     if _work /== _NULL then RESTWORKBGI(_work, _save1, _save2) endif;
     _new -> x!BGI_SLICES[_sln];     ;;; assign new slice
     BGWEAK Bigint_return(x) -> Get_store()
