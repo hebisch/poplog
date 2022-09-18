@@ -60,12 +60,11 @@ DEF_C_LAB (_call_external)
     str SP, [r0]
 
     ;;; save registers.  Caller should save Pop registers
-    ;;; to avoid problems with garbage collection, so
-    ;;; we do not store them
+    ;;; to avoid problems with garbage collection.  We
+    ;;; do not store them (and do not use them).
     ;;;
-    ;;; ATM we do not support register variables, but we store some
-    stmfd SP!, {r4, r5, r9, lr}
-
+    ;;; Store register variables
+    stmfd SP!, {r7, r8, r9, lr}
     ;;; Load fixed arguments
 
     ldr    r5, [USP], #4    ;;; fltsingle
@@ -135,14 +134,10 @@ do_args:
     sub SP, r0, #16
 
     ;;; Restore registers
-    ldmfd SP!, {r4, r5, r9, lr}
+    ldmfd SP!, {r7, r8, r9, lr}
 
     ;;; restore PB
     ldr PB, [SP]
-    ;;; Zero registers
-    mov r8, #3
-    mov r7, r8
-    mov r6, r8
 
     ;;; Zero saved SP to indicates external call over
     mov r1, #0
@@ -163,11 +158,6 @@ EXTERN_NAME(_pop_external_callback):
 DEF_C_LAB(Sys$- _external_callback_func)
     ;;; Save call-preserved C registers and return address
     stmfd SP!, {r4, r5, r6, r7, r8, r9, r10, r11, lr}
-
-    ;;; Zero pop registers
-    mov r4, #0
-    mov r5, r4
-    mov r6, r4
 
     ;;; Save __pop_in_user_extern
     ldr r8, pop_in_extern.lab
@@ -193,7 +183,16 @@ DEF_C_LAB(Sys$- _external_callback_func)
     str r0, [USP, #-4]!
 
     ;;; Dummy for change in break addr
+    mov r4, #0
     str r4, [USP, #-4]!
+
+    ;;; Put Pop11 zero in registers
+    mov r4, #3
+    mov r5, r4
+    mov r6, r4
+    mov r7, r4
+    mov r8, r4
+    mov r9, r4
 
     bl XC_LAB(Sys$-Extern$-Callback)
 

@@ -61,7 +61,7 @@ L0.saved_sp:
 DEF_C_LAB (_call_sys)
     ldr r1, L0.saved_sp
     str sp, [r1]
-    stmfd sp!, {PB, lr}
+    stmfd sp!, {r4, r6, r7, r8, r9, lr}
     ;;; Get the system call address in r12 and the argument count in r9
     ldr r12, [USP], #4
     ldr r9, [USP], #4
@@ -92,6 +92,6 @@ L1.2:
     ldr r0, [r1]
     str r2, [r1]
     ;;; ldr PB, [r0]
-    sub sp, r0, #8
-    ldmfd sp!, {PB, lr}
+    sub sp, r0, #24
+    ldmfd sp!, {r4, r6, r7, r8, r9, lr}
     bx lr

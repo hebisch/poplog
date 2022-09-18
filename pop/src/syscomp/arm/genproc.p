@@ -142,9 +142,9 @@ constant macro USE_NEW_M_OPERANDS = true;
 /*
    r0  - work/arg            r1 - work/arg
    r2  - work/arg            r3 - work/arg/chain
-   r4  - non pop lvar        r5 - non pop lvar ??? work ???
-   r6  - non pop lvar        r7 - non pop lvar
-   r8  - non pop lvar        r9  - pop lvar
+   r4  - pop lvar            r5 - ATM work (would like pop lvar)
+   r6  - pop lvar            r7 - non pop lvar
+   r8  - non pop lvar        r9  - non pop lvar
    r10 - user stack pointer  r11 - base
    r12 - work                r13 - stack pointer
    r14 - link register/work  r15 - program counter
@@ -215,10 +215,10 @@ constant
 
     ;;; Lists of pop/non-pop registers for register locals
 
-    ;;; pop_registers = [[] 9 10],
-    pop_registers = [[]],
-    ;;; nonpop_registers = [[] 6 7 8],
-    nonpop_registers = [[]],
+    pop_registers = [[] 4 6],
+    ;;; pop_registers = [[]],
+    nonpop_registers = [[] 7 8 9],
+    ;;; nonpop_registers = [[]],
 ;
 
 ;;; regnumber:
@@ -812,7 +812,7 @@ define M_MULT();
     endif;
     /* NOTE: ARM v5 theoretically can not produce result of
        multiplication in one of source registers.  But
-       this is OK in v6 and probaly also in existing v5 */
+       this is OK in v6 and probably also in existing v5 */
     if dreg == src1 then
         (src1, src2) -> (src2, src1)
     endif;
@@ -1203,13 +1203,12 @@ define M_CREATE_SF();
     explode(m_instr) -> reg_spec_id -> dlocal_labs -> Npopstkvars
         -> Nstkvars -> Npopregs -> reg_locals -> ;
 
-    ;;; FIXME: compute sensible value
-    0 -> idval(reg_spec_id);
-
     listlength(reg_locals) -> Nregs;
 
     0 -> regmask;
     fast_for n in reg_locals do regmask || (1 << n) -> regmask endfast_for;
+
+    regmask -> idval(reg_spec_id);
 
     ;;; Save registers
     '{' -> reg_spec;
@@ -1232,7 +1231,7 @@ define M_CREATE_SF();
     false -> tmp;
     1 -> j;
     if Npopregs > 0 then
-        for n from 12 by -1 to 0 do
+        for n from 4 to 12 do
             if regmask &&/=_0 (1 << n) then
                 if tmp then
                     gen_move(tmp, reglabel(n));

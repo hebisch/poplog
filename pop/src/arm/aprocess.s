@@ -22,6 +22,7 @@ lconstant macro (
     _PD_FRAME_LEN           = @@PD_FRAME_LEN,
     _PD_NLOCALS             = @@PD_NLOCALS,
     _PD_NUM_STK_VARS        = @@PD_NUM_STK_VARS,
+    _PD_REGMASK             = @@PD_REGMASK,
     _PD_TABLE               = @@PD_TABLE,
     _PS_CALLSTACK_LIM       = @@PS_CALLSTACK_LIM,
     _PS_CALLSTACK_PARTIAL   = @@PS_CALLSTACK_PARTIAL,
@@ -108,7 +109,33 @@ perm_reg_save:
     ;;; Save permanent registers to process struct, restore
     ;;; previous values from stack frame
 
-    ;;; FIXME: implement
+    ldrh   r0, [PB, #_PD_REGMASK]
+
+    and    r12, r0, #512
+    cmp    r12, #0
+    strne  r9, [r3], #4
+    ldrne  r9, [SP], #4
+
+    tst    r0, #256
+    strne  r8, [r3], #4
+    ldrne  r8, [SP], #4
+
+    tst    r0, #128
+    strne  r7, [r3], #4
+    ldrne  r7, [SP], #4
+
+    tst    r0, #64
+    strne  r6, [r3], #4
+    ldrne  r6, [SP], #4
+
+    ;;; Currently not needed
+    ;;; tst    r0, #32
+    ;;; strne  r5, [r3], #4
+    ;;; ldrne  r5, [SP], #4
+
+    tst    r0, #16
+    strne  r4, [r3], #4
+    ldrne  r4, [SP], #4
 
     ldr   lr, [SP], #4
     ldr   PB, [SP]
@@ -159,7 +186,33 @@ si_loop:
     ;;; Restore registers from process record and store values
     ;;; to stack
 
-    ;;; FIXME: implement
+    ldrh   r0, [PB, #_PD_REGMASK]
+
+    tst    r0, #16
+    strne  r4, [SP, #-4]!
+    ldrne  r4, [r3], #-4
+
+    ;;; Not currently not needed
+    ;;; tst    r0, #32
+    ;;; strne  r5, [SP, #-4]!
+    ;;; ldrne  r5, [r3], #-4
+
+    tst    r0, #64
+    strne  r6, [SP, #-4]!
+    ldrne  r6, [r3], #-4
+
+    tst    r0, #128
+    strne  r7, [SP, #-4]!
+    ldrne  r7, [r3], #-4
+
+    tst    r0, #256
+    strne  r8, [SP, #-4]!
+    ldrne  r8, [r3], #-4
+
+    and    r12, r0, #512
+    cmp    r12, #0
+    strne  r9, [SP, #-4]!
+    ldrne  r9, [r3], #-4
 
     ;;; Restore dynamic locals
 

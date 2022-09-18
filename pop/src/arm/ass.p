@@ -224,34 +224,22 @@ protected register constant
 
     chain_reg   = _pint(_CHAIN_REG) << 1,       ;;; R2
 
-/*
-        pop_reg_A     = _pint(_R13) <<1 || 1,
-        pop_reg_B     = _pint(_R14) <<1 || 1,
-        pop_reg_C     = _pint(_R15) <<1 || 1,
-        nonpop_reg_A = _pint(_R8) <<1,
-        nonpop_reg_B = _pint(_R10) <<1,
-        nonpop_reg_C = _pint(_R11) <<1,
-        nonpop_reg_D = _pint(_R12) <<1,
-*/
+    pop_reg_A    = _pint(_R4) << 1 || 1,
+    pop_reg_B    = _pint(_R6) << 1 || 1,
+    nonpop_reg_A = _pint(_R7) << 1,
+    nonpop_reg_B = _pint(_R8) << 1,
+    nonpop_reg_C = _pint(_R9) << 1,
 ;
 
 constant
 
     ;;; REGISTER LVARS
 
-        asm_pop_registers = [[]],
-
-        asm_nonpop_registers = [[]],
-
-/*
-
-        asm_pop_registers = [%[], ident pop_reg_A, ident pop_reg_B,
-                                  ident pop_reg_C %],
-        asm_nonpop_registers = [%[], ident nonpop_reg_A, ident nonpop_reg_B,
-                                 ident nonpop_reg_C, ident nonpop_reg_D %],
-
-        asm_nonpop_registers = [%[], ident nonpop_reg_A, ident nonpop_reg_D %],
-*/
+    asm_pop_registers = [[]],
+    ;;; asm_pop_registers = [%[], ident pop_reg_A, ident pop_reg_B %],
+    asm_nonpop_registers = [[]],
+    ;;; asm_nonpop_registers = [%[], ident nonpop_reg_A, ident pop_reg_B,
+    ;;;                             ident nonpop_reg_C %],
 ;
 
 
@@ -773,7 +761,8 @@ enddefine;
 
 define load_field_addr(type, structure, _size, offset, exptr);
     lvars type, structure, _size, offset, exptr;
-    lvars _reg = load_structure_addr(structure, exptr), _disp;
+    lvars _reg = load_structure_addr(structure, exptr), _disp,
+          _tmp_reg;
 
     if isinteger(offset) then
         ;;; mishap(0, 'isinteger(offset) in load_field_addr');
@@ -792,10 +781,8 @@ define load_field_addr(type, structure, _size, offset, exptr);
             drop_pop_reg(_R1, _USP);
         elseif stack_offset(offset) ->> _disp then
             drop_mem_imm_off(_LDR, _R1, _SP, _disp);
-/*
         elseif Is_register(Trans_structure(offset)) ->> _tmp_reg then
-            _int(_tmp_reg) -> _tmp_reg;
-*/
+            drop_op3(_MOV, _int(_tmp_reg), _R0, _R1);
         else
             mishap(offset, 1, 'SYSTEM ERROR 2 IN load_field_addr');
         endif;
@@ -833,7 +820,8 @@ define load_field_addr(type, structure, _size, offset, exptr);
 enddefine;
 
 define lconstant do_bit_field(type, _size, structure, offset, upd, exptr);
-    lvars _reg = load_structure_addr(structure, exptr), _disp;
+    lvars _reg = load_structure_addr(structure, exptr), _disp,
+         _tmp_reg;
     ;;; mishap(0, 'do_bit_field unimplemented');
     if _reg /== _R2 then
         drop_op3(_MOV, _R2, _R0, _reg);
@@ -845,10 +833,8 @@ define lconstant do_bit_field(type, _size, structure, offset, upd, exptr);
             drop_pop_reg(_R1, _USP);
         elseif stack_offset(offset) ->> _disp then
             drop_mem_imm_off(_LDR, _R1, _SP, _disp);
-/*
         elseif Is_register(Trans_structure(offset)) ->> _tmp_reg then
-            _int(_tmp_reg) -> _tmp_reg;
-*/
+            drop_op3(_MOV, _int(_tmp_reg), _R0, _R1);
         else
             mishap(0, 'SYSTEM ERROR do_bit_field');
         endif;

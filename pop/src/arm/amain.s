@@ -48,7 +48,7 @@ DEF_C_LAB (Sys$- _entry_point)
 EXTERN_NAME(main):
     ;;; To keep stack aligned need to store even number of
     ;;; registers
-    stmfd sp!, {r4, r9, r11, lr}
+    stmfd sp!, {r4, r6, r11, lr}
 
     ;;; Save pointer to argument vector (argv)
     ldr r3, L1.1
@@ -78,9 +78,8 @@ EXTERN_NAME(main):
     ldr USP, [USP]
 
     ;;; clear Pop registers
-    ;;; mov    $3, %r13
-    ;;; mov    $3, %r14
-    ;;; mov    $3, %r15
+    mov    r4, #3
+    mov    r6, r4
 
     ;;; Start the system
     bl  XC_LAB(setpop)

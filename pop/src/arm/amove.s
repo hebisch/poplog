@@ -167,23 +167,23 @@ DEF_C_LAB(_sbfield)
     bx      LR
 
 DEF_C_LAB (_ubfield)
-    mvn     r4, #0
-    mvn     r4, r4, asl r0
+    mvn     r5, #0
+    mvn     r5, r5, asl r0
     mov     r3, r1, asr #5
     add     r2, r2, r3, asl #2
     ldr     r12, [r2]
     ldr     r3, [USP], #4
     and     r1, r1, #31
-    bic     r12, r12, r4, asl r1
-    and     r3, r3, r4
+    bic     r12, r12, r5, asl r1
+    and     r3, r3, r5
     add     r0, r1, r0
     orr     r12, r12, r3, asl r1
     cmp     r0, #32
     str     r12, [r2]
     ldrhi   r0, [r2, #4]
     rsbhi   r1, r1, #32
-    bichi   r4, r0, r4, lsr r1
-    orrhi   r1, r4, r3, lsr r1
+    bichi   r5, r0, r5, lsr r1
+    orrhi   r1, r5, r3, lsr r1
     strhi   r1, [r2, #4]
     bx      LR
 
