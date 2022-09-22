@@ -499,34 +499,44 @@ define constant Drop_imm(_opcode, _ttt, _imm, _mod, _rm, _disp);
     endif;
 enddefine;
 
-;;; define Drop_imm_to_r9(_imm);
-;;;    lvars _imm;
-;;;                Drop_b(_16:49);
-;;;                Drop_b(_16:B9);
-;;;                Drop_d(_imm);
-;;; enddefine;
-
 ;;; Drop_move_imm:
 ;;;     plant an immediate move, which doesn't fit the above format!
 
 define constant Drop_move_imm(_imm, _mod, _rm, _disp);
     lvars _imm, _mod, _rm, _disp;
     if _mod == _REG then
-        ;;; use a short form of MOV
-        Drop_short(_MOVIs, _rm);
-                Drop_d(_imm);
-    else if _-2147483648 _slteq _imm and _imm _slteq _2147483647 then
+        if _0 _slteq _imm and _imm _slteq _4294967295 then
+            ;;; just use 32-bit mov, it will be 0 extended
+            if _rm _greq _R8 then
+                _rm _bimask _7 -> _rm;
+                ;;; Just _REX_B, without operand size)
+                Drop_b(_16:41);
+            endif;
+            Drop_b(_MOVIs _add _rm);
+            Drop_l(_imm);
+        elseif _-2147483648 _slteq _imm and _imm _slteq _0 then
+            ;;; signed move, needs operand size
+            if _rm _greq _R8 then
+                _rm _bimask _7 -> _rm;
+                Drop_b(_REX_W _add _REX_B);
+            else
+                Drop_b(_REX_W);
+            endif;
+            Drop_b(_MOVI);
+            Drop_b(_REG _add _rm);
+            Drop_l(_imm);
+        else
+            ;;; use moveabs
+            Drop_short(_MOVIs, _rm);
+            Drop_d(_imm);
+        endif;
+    elseif _-2147483648 _slteq _imm and _imm _slteq _2147483647 then
         Drop_std(_MOVI, _0, _mod, _rm, _disp);
                 Drop_l(_imm);
-             else
-                ;;; moveq imm, %r9
-                Drop_move_imm(_imm, _REG, _R9, false);
-;;;                Drop_b(_16:49);
-;;;                Drop_b(_16:B9);
-;;;                Drop_d(_imm);
-                Drop_std(_MOV, _R9, _mod, _rm, _disp);
-                ;;; mishap(0, 'IMMEDIATE TOO BIG FOR 32-BISTS');
-             endif;
+    else
+        ;;; moveq imm, %r9
+        Drop_move_imm(_imm, _REG, _R9, false);
+        Drop_std(_MOV, _R9, _mod, _rm, _disp);
     endif;
 enddefine;
 
