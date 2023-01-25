@@ -85,7 +85,7 @@ define lconstant datafwrite(x);
     elseif isarray(x) then
     arrayvector_bounds(x) -> (, lo);
     pr("za");
-    datafwrite(isarray_by_row(x));
+    datafwrite(isarray_by_column(x));
     datafwrite(lo - 1);
     datafwrite(boundslist(x));
     datafwrite(arrayvector(x))
@@ -131,7 +131,7 @@ define lconstant datafread -> x;
     elseif x == "za" then
     datafread() -> b;
     if isboolean(b) then
-        ;;; new format - this is the by_row flag,
+        ;;; new format - this is the by_column flag,
         ;;; offset, bounds & arrayvector follow.
         datafread() -> n;
         newanyarray(datafread(), datafread(), n, b) -> x;

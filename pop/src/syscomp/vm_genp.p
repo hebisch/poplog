@@ -87,7 +87,7 @@ define generate_pcomposite(p);
 enddefine;
 
 define generate_array(array);
-    lvars   array, fixed, vec, subscrp, min_sub, max_sub, by_row,
+    lvars   array, fixed, vec, subscrp, min_sub, max_sub, by_column,
             revbounds, scale_facts, boundslst, array_params;
 
     ;;; mark this used to force inclusion of run-time array procedures
@@ -97,7 +97,7 @@ define generate_array(array);
     arrayvector(array) -> vec;
     array_subscrp(array) -> subscrp;
     arrayvector_bounds(array) -> min_sub -> max_sub;
-    isarray_by_row(array) -> by_row;
+    isarray_by_column(array) -> by_column;
 
     lblock
         lvars f = 1, l, pair, bounds, lo, hi;
@@ -107,12 +107,12 @@ define generate_array(array);
         rev(l) -> revbounds;
         ;;; compute scale factors for each dimension
         [] -> scale_facts;
-        unless by_row then revbounds -> l endunless;
+        unless by_column then revbounds -> l endunless;
         fast_for pair in l do
             f :: scale_facts -> scale_facts;
             f * (1 - nonop -(destpair(pair))) -> f
         endfor;
-        unless by_row then rev(scale_facts) -> scale_facts endunless;
+        unless by_column then rev(scale_facts) -> scale_facts endunless;
 
         ;;; compute parameter table for _array_sub
         [%  min_sub,
@@ -135,7 +135,7 @@ define generate_array(array);
             make_gen_p( [],
                         [% call_path([\^_array_sub]) %],
                         flags,
-                        [^vec ^sub_p ^boundslst ^min_sub ^max_sub ^by_row]
+                        [^vec ^sub_p ^boundslst ^min_sub ^max_sub ^by_column]
                             <> array_params,
                         p);
 

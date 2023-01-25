@@ -125,7 +125,7 @@ enddefine;
 
 define make_array(dims, type, init, contents, adjust, fp, disp, offset) -> a;
     lvars bounds, len, rank, key;
-    dlocal poparray_by_row = false;
+    dlocal poparray_by_column = false;
 
     Checkr_bounds(dims) -> (bounds, len, rank);
 
@@ -523,7 +523,7 @@ enddefine;
 
 define vector_push_extend(item, a, more) -> fp;
     lvars lo, hi, len;
-    dlocal poparray_by_row = false;
+    dlocal poparray_by_column = false;
 
     fill_pointer(a) -> fp;
     arrayvector_bounds(a) -> lo -> hi;
@@ -574,7 +574,7 @@ enddefine;
 define adjust_array(a, dims, type, init, contents, fp, disp, offset) -> a;
     lvars key, bounds, rank, new;
     dlvars init;
-    dlocal poparray_by_row = false;
+    dlocal poparray_by_column = false;
 
     array_key(a) -> key;
     Checkr_bounds(dims) -> (bounds, /* len */, rank);

@@ -17,7 +17,7 @@ global constant
 
 ;;; ------------------------------------------------------------------
 
-section $-Sys$-Array => isarray, isarray_by_row, boundslist, arrayvector,
+section $-Sys$-Array => isarray, isarray_by_column, boundslist, arrayvector,
                         arrayvector_bounds, array_subscrp,
                         popc_is_array_upd;
 
@@ -43,8 +43,8 @@ define lconstant Checkr_array(item) -> a;
     endunless
 enddefine;
 
-define isarray_by_row() with_nargs 1;
-    Checkr_array()!PD_ARRAY_BY_ROW
+define isarray_by_column() with_nargs 1;
+    Checkr_array()!PD_ARRAY_BY_COLUMN
 enddefine;
 
 define boundslist() with_nargs 1;
@@ -150,12 +150,12 @@ enddefine;
 
     /*  Allocate raw array procedure, with most of the header filled in
     */
-define Get(bounds, offset, by_row) -> _arrayp;
-    lvars   bounds, offset, by_row, rev_blst = rev(bounds), sfact_list,
+define Get(bounds, offset, by_column) -> _arrayp;
+    lvars   bounds, offset, by_column, rev_blst = rev(bounds), sfact_list,
             save1 = rev_blst, save2,
             _ptr, _arrayp, _hi, _lo, _len = 1, _sfact, _tabsize, _ndims;
 
-    if by_row then
+    if by_column then
         [] -> sfact_list;
         until bounds = [] do
             fast_destpair(fast_destpair(bounds)) -> (_lo, _hi, bounds);
@@ -223,7 +223,7 @@ define Copy(old) -> new;
     if old <@(w) _system_end then
         ;;; system procedure -- recreate from scratch
         Get(old!PD_ARRAY_BOUNDSLIST, old!PD_ARRAY_MIN_SUBSCR fi_- 1,
-            old!PD_ARRAY_BY_ROW) -> new;
+            old!PD_ARRAY_BY_COLUMN) -> new;
         ;;; fill in rest of header
         old!PD_PROPS            -> new!PD_PROPS;
         old!PD_ARRAY_VECTOR     -> new!PD_ARRAY_VECTOR;
@@ -231,7 +231,7 @@ define Copy(old) -> new;
         old!PD_ARRAY_BOUNDSLIST -> new!PD_ARRAY_BOUNDSLIST;
         old!PD_ARRAY_MIN_SUBSCR -> new!PD_ARRAY_MIN_SUBSCR;
         old!PD_ARRAY_MAX_SUBSCR -> new!PD_ARRAY_MAX_SUBSCR;
-        old!PD_ARRAY_BY_ROW     -> new!PD_ARRAY_BY_ROW;
+        old!PD_ARRAY_BY_COLUMN  -> new!PD_ARRAY_BY_COLUMN;
 
         ;;; create updater (new not yet marked as array)
         copy(new) -> new!PD_UPDATER;

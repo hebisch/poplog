@@ -74,7 +74,7 @@ define arrayvec_index(/* coords, */ arr) /* -> index */;
     ;;; column and has more than one dimension.
     lvars arr;
     lvars n = pdnargs(arr);
-    if arr.isarray_by_row or n == 1 then
+    if isarray_by_column(arr) or n == 1 then
         lvars d, x, x0, x1,
             m = 1,          ;;; multiplier for current coord
             ( , i) = arrayvector_bounds(arr),

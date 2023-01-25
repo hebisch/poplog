@@ -201,7 +201,7 @@ struct ARRAY_PROCEDURE
             PD_ARRAY_BOUNDSLIST,    ;;; array boundslist
             PD_ARRAY_MIN_SUBSCR,    ;;; minimum subscript within array vector
             PD_ARRAY_MAX_SUBSCR,    ;;; maximum subscript within array vector
-            PD_ARRAY_BY_ROW,        ;;; true if by row, false if not
+            PD_ARRAY_BY_COLUMN,     ;;; true if by column, false if not
             PD_ARRAY_TABLE[];       ;;; structure/literal table (code follows)
   };
 

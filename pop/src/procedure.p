@@ -257,7 +257,7 @@ define lconstant Eq__Pdr(item, p);
             endif
         elseif p!PD_FLAGS _bitst _:M_PD_ARRAY then
             if not(_work _bitst _:M_PD_CLOSURE) and _work _bitst _:M_PD_ARRAY
-            and p!PD_ARRAY_BY_ROW == item!PD_ARRAY_BY_ROW
+            and p!PD_ARRAY_BY_COLUMN == item!PD_ARRAY_BY_COLUMN
             then
                 ;;; compare the array vectors
                 CHAIN_EQ(p!PD_ARRAY_VECTOR, item!PD_ARRAY_VECTOR)

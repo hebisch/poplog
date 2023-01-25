@@ -22,7 +22,7 @@ lconstant Infoblk = inits(512);
 
 define global arrayfile(file) -> array;
     lvars array = false, file;
-    lvars dev bounds by_row key min_sub procedure (Numread) type vec;
+    lvars dev bounds by_column key min_sub procedure (Numread) type vec;
 
     ;;; allow optional second (array) argument so that it can read into
     ;;; an existing array
@@ -48,20 +48,21 @@ define global arrayfile(file) -> array;
         mishap(type, 1, 'Unknown vectorclass')
     endunless;
 
-    /* Get array_by_row */
-    Numread() -> by_row;
-    if by_row = 0 then
+    /* Get array_by_column */
+    Numread() -> by_column;
+    if by_column = 0 then
         false
     else
-        ;;; covers by_row = 1 or by_row = termin (i.e. not specified in file)
+        ;;; covers by_column = 1 or by_column = termin
+        ;;; (i.e. not specified in file)
         true
-    endif -> by_row;
+    endif -> by_column;
 
     /* Create (or check) array */
     if array then
         unless boundslist(array) = bounds
         and datakey(arrayvector(array)) == key
-        and isarray_by_row(array) == by_row
+        and isarray_by_column(array) == by_column
         do
             mishap(file, array, 2, 'Array not compatible with file data')
         endunless;
@@ -70,7 +71,7 @@ define global arrayfile(file) -> array;
             mishap(array, 1, 'Array must not be offset in arrayvector')
         endunless
     else
-        newanyarray(bounds, key, by_row) -> array
+        newanyarray(bounds, key, by_column) -> array
     endif;
 
     /* Read data from file into -arrayvector- of the array */
@@ -93,13 +94,13 @@ define updaterof arrayfile(array, file);
         endprocedure
      enddefine;
 
-    /* Write array bounds, type, and by_row into Infoblk */
+    /* Write array bounds, type, and by_column into Infoblk */
     Stringout(Infoblk) -> cucharout;
     spr(length(boundslist(array)) div 2);
     applist(boundslist(array), spr);
     arrayvector(array) -> vec;
     spr(dataword(vec));
-    spr(if isarray_by_row(array) then 1 else 0 endif);
+    spr(if isarray_by_column(array) then 1 else 0 endif);
     cucharout(0);   ;;; in case of overlap with previous use of Infoblk
 
     /* Write Infoblk and -arrayvector- of array to file */

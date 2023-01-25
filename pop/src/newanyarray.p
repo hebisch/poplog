@@ -22,10 +22,10 @@ vars
 
 ;;; ------------------------------------------------------------------
 
-section $-Sys$-Array => poparray_by_row, newanyarray, newarray;
+section $-Sys$-Array => poparray_by_column, newanyarray, newarray;
 
 vars
-    poparray_by_row = true;
+    poparray_by_column = true;
 
 
     /* Construct an array - possible arguments are:
@@ -39,7 +39,7 @@ vars
                 required if 3 is a vector init pdr
                 defaulted from key, vectorclass, or array otherwise
         5   <optional integer offset into vector or array>
-        6   <optional boolean value for -poparray_by_row->
+        6   <optional boolean value for -poparray_by_column->
     */
 
 define newanyarray(arg) -> arraypdr with_nargs 2;
@@ -48,13 +48,13 @@ define newanyarray(arg) -> arraypdr with_nargs 2;
             _lo, _hi, _len, _rank,
         ;
     dlvars array_init, array_upd;
-    dlocal poparray_by_row;
+    dlocal poparray_by_column;
 
     ;;; ----------- get arguments
     false ->> arraypdr ->> arraydata -> subscrpdr;
     0 -> offset;
     if isboolean(arg) then              ;;; array ordering flag
-        arg -> poparray_by_row;
+        arg -> poparray_by_column;
         -> arg;
     endif;
     if isinteger(arg) then              ;;; index offset
@@ -131,7 +131,7 @@ define newanyarray(arg) -> arraypdr with_nargs 2;
     endif;
 
     ;;; -- produce basic array procedure
-    Get(bounds, offset, poparray_by_row) -> arraypdr;
+    Get(bounds, offset, poparray_by_column) -> arraypdr;
 
     ;;; mustn't create any garbage until rest of fields safely filled in ...
     ;;; (no of dimensions is filled in PD_NARGS)
@@ -140,7 +140,7 @@ define newanyarray(arg) -> arraypdr with_nargs 2;
     bounds      -> arraypdr!PD_ARRAY_BOUNDSLIST;
     _lo         -> arraypdr!PD_ARRAY_MIN_SUBSCR;
     _hi         -> arraypdr!PD_ARRAY_MAX_SUBSCR;
-    poparray_by_row -> arraypdr!PD_ARRAY_BY_ROW;
+    poparray_by_column -> arraypdr!PD_ARRAY_BY_COLUMN;
     ;;; now OK
 
 #_IF DEF CACHEFLUSH

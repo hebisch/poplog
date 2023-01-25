@@ -83,7 +83,7 @@ define lconstant datafwrite(x);
     elseif isarray(x) then
         arrayvector_bounds(x) -> (, lo);
         pr("za");
-        datafwrite(isarray_by_row(x));
+        datafwrite(isarray_by_column(x));
         datafwrite(lo - 1);
         datafwrite(boundslist(x));
         datafwrite(arrayvector(x))
@@ -107,7 +107,7 @@ enddefine;
 
 
 define lconstant datafread -> x;
-    lvars x, y, n, key, by_row = false;
+    lvars x, y, n, key, by_column = false;
     rditem() -> x;
     if x == "zl" then
         rditem() -> n;
@@ -129,14 +129,14 @@ define lconstant datafread -> x;
     elseif x == "za" then
         datafread() -> n;
         if isboolean(n) then
-            true -> by_row;
+            true -> by_column;
             datafread() -> n;
         endif;
         if isinteger(n) then
             ;;; quite new format - this is the offset, bounds & arrayvector follow
             datafread() -> x;
             datafread() -> y;
-            newanyarray(x, y, n, by_row) -> x
+            newanyarray(x, y, n, by_column) -> x
         else
             ;;; old format - this is the boundslist, data follows
             newarray(n) -> x;
