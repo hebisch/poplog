@@ -713,7 +713,7 @@ define sys_exception_handler(count, message, idstring, severity);
             _CHECKINTERRUPT
         endunless;
 
-        if pop_exit_ok then
+        if pop_exit_ok == true then
             testdef popdevin and isdevice(weakref popdevin)
                 and systrmdev(weakref popdevin) == true -> pop_exit_ok;
         endif;

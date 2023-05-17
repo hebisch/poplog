@@ -161,8 +161,11 @@ define lconstant Get_popargs();
     Get_arg_list(_init_args)
 enddefine;
 
-define Opsys_exit() with_nargs 1;
-    _extern _exit(if () then _0 else _1 endif) ->
+define Opsys_exit(status);
+    _extern _exit(
+        if isnumber(status) and status >= 0 and status < 255 then
+            _int(status)
+        elseif status == true then _0 else _1 endif) ->
 enddefine;
 
 
