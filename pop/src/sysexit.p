@@ -59,7 +59,7 @@ define lconstant Closefile_continue = exitto(%Close_filetab_files%) enddefine;
 sysexit -> pdprops(Closefile_continue);
 
 
-define sysexit();
+define sysexit1(exit_val);
 
 #_IF DEF UNIX
     if _vfork_child then Opsys_exit(true) endif;
@@ -76,9 +76,9 @@ define sysexit();
         endif
     enddefine;
 
-    if iscaller(sysexit, 1) then
+    if iscaller(sysexit1, 1) then
         ;;; if already in sysexit, continue with the previous one
-        chain(sysexit, exitto)
+        chain(sysexit1, exitto)
     endif;
 
     if testdef sys_wait and iscaller(weakref sys_wait)
@@ -123,7 +123,11 @@ define sysexit();
     set_process_entry_term();
 #_ENDIF
 
-    Opsys_exit(pop_exit_ok) ->
+    Opsys_exit(exit_val) ->
+enddefine;
+
+define sysexit();
+    chain(pop_exit_ok, sysexit1);
 enddefine;
 
 define Abnormal_sysexit();

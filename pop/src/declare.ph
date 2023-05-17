@@ -188,7 +188,7 @@ weak constant
             sysclose,
             sysconslist, sysconslist_onto,
             syscreate,
-            sysexit
+            sysexit, sysexit1,
             sysfileok
             sysflush
             sysgarbage
