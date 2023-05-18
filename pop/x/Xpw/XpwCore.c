@@ -382,7 +382,6 @@ XFontStruct * _XpwFont8OfFontSet(w, font_set, iso_latin_1)
   { XFontStruct **font_struct_list, **lim, *font;
     char **font_name_list, *name;
     int nfonts = XFontsOfFontSet(font_set, &font_struct_list, &font_name_list);
-    Display *dpy;
     XrmValue from_val, to_val;
 
     name = *font_name_list;
@@ -390,7 +389,6 @@ XFontStruct * _XpwFont8OfFontSet(w, font_set, iso_latin_1)
     while (font_struct_list < lim)
       { char *nm = *font_name_list++;
         XFontStruct *f = *font_struct_list++;
-        int n;
         if (f->min_byte1 != 0 || f->max_byte1 != 0) continue;
         name = nm;
         if (!iso_latin_1 || is_iso_latin_1_font(nm))
@@ -409,9 +407,6 @@ static void Initialize (request, new)
 Widget request, new;
 {
     XpwCoreWidget w = (XpwCoreWidget)new;
-    XtGCMask        valuemask;
-    XGCValues       myXGCV;
-    Pixmap pixmap;
 
     if (w->xpwcore.font_set)
         w->xpwcore.font = _XpwFont8OfFontSet(w, w->xpwcore.font_set, False);
@@ -518,18 +513,16 @@ static void Realize (gw, valueMask, attrs)
     XtValueMask *valueMask;
     XSetWindowAttributes *attrs;
 {       XpwCoreWidget w=(XpwCoreWidget)gw;
-    if (attrs->cursor = w->xpwcore.pointer_shape)
-      { *valueMask |= CWCursor; _XpwRecolorPointer(w); }
-
+    if ((attrs->cursor = w->xpwcore.pointer_shape)) {
+        *valueMask |= CWCursor; _XpwRecolorPointer(w);
+    }
     XtCreateWindow( gw, InputOutput, (Visual *)CopyFromParent,
              *valueMask, attrs);
 
 }
 
 
-static void Resize (gw)
-    Widget gw;
-{
+static void Resize (Widget gw) {
     /* don't do this computation if window hasn't been realized yet. */
     if (XtIsRealized(gw)) {
         XtCallCallbacks(gw,XtNxpwCallback, (caddr_t)ConfigureNotify);
@@ -645,15 +638,14 @@ XpwCoreWidget w;
 char *string;
 int fg, bg, depth;
 {
-    int width_ret, height_ret, num;
     Pixmap new;
     Screen *screen = XtScreen(w);
     if (!depth) depth = w->core.depth;
     if (bg == -1) bg = w->core.background_pixel;
     if (fg == -1) fg = w->xpwcore.foreground_pixel;
 
-    if (new = XpwLocateBitmapFile(screen, string, NULL,0,NULL,NULL,NULL,NULL))
-       {
+    if ((new = XpwLocateBitmapFile(screen, string,
+                                   NULL,0,NULL,NULL,NULL,NULL))) {
         /* unless the bitmap has the correct depth, foreground and
            background, recolor it.
         */
@@ -662,14 +654,11 @@ int fg, bg, depth;
             new = XpwRecolorPixmap(screen, new, 1, 0,
                 fg, bg, depth, TRUE);
         return((XpwMethodRet)new);
-       }
+    }
     return((XpwMethodRet)None);
 }
 
-static void FreePixmap(w, pixmap)
-Widget w;
-Pixmap pixmap;
-{
+static void FreePixmap(Widget w, Pixmap pixmap) {
     XFreePixmap(XtDisplay(w), pixmap);
 }
 

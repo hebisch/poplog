@@ -16,21 +16,27 @@
 
 #define max(a,b) ((int)(a) > (int)(b) ? (a) : (b))
 
-void _XpwSyntheticExposeEvent(widget, x, y, width, height)
-Widget widget;
-int x, y, width, height;
+void
+_XpwSyntheticExposeEvent(Widget widget, int x, int y, int width, int height)
 {
     XExposeEvent    event;
 
-    if (x > (int)widget->core.width || y > (int)widget->core.height)
+    if (x > (int)widget->core.width || y > (int)widget->core.height) {
         return;
+    }
 
     /* zero width/height extends to right/bottom of widget */
-    if (!width)  width = widget->core.width - x;
-    else width = max(widget->core.width - x, width);
+    if (!width) {
+        width = widget->core.width - x;
+    } else {
+        width = max(widget->core.width - x, width);
+    }
 
-    if (!height) height = widget->core.height - y;
-    else max(widget->core.height-y, height);
+    if (!height) {
+        height = widget->core.height - y;
+    } else {
+        max(widget->core.height-y, height);
+    }
 
     /* build exposure event structure */
 
@@ -44,7 +50,7 @@ int x, y, width, height;
     event.height = height;
     event.count = 0; /* no more exposure events to come */
 
-    XSendEvent(     XtDisplay(widget),      /* display */
+    XSendEvent(XtDisplay(widget),      /* display */
             XtWindow(widget),       /* window to send event to */
             True,                   /* propagate */
             ExposureMask,

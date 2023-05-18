@@ -279,30 +279,33 @@ int len;
     }
 }
 
-static void NotifyKeyboardEvent (gw, event, params, num_params)
-Widget gw;
-XEvent *event;
-String *params;
-Cardinal *num_params;
-{   /* converts keycode to keysym */
-    KeySym key; unsigned int modifiers_return, count = 14;
+static void
+NotifyKeyboardEvent(Widget gw, XEvent * event, String * params,
+                    Cardinal *num_params)
+{
+    /* converts keycode to keysym */
+    KeySym key; unsigned int count = 14;
     XComposeStatus compose;
     XpwTransparentWidget w = (XpwTransparentWidget) gw;
     ExtractPosition( event, (int *)&(w->xpwtransparent.mouse_x),
          (int *)&(w->xpwtransparent.mouse_y));
 
-    count = XLookupString((XKeyEvent *)event, w->xpwtransparent.key, 15, &key, &compose);
+    count = XLookupString((XKeyEvent *)event, w->xpwtransparent.key,
+                          15, &key, &compose);
 
     /* ensure it is null terminated */
     w->xpwtransparent.key[count] = 0;
 
-    if (*num_params == 1)
+    if (*num_params == 1) {
         process_string(params[0], w->xpwtransparent.key, 15);
+    }
 
     /* get keysym */
 
     w->xpwtransparent.modifiers = event->xkey.state;
-    if (event->type == KeyRelease) key *=(int)-1;
+    if (event->type == KeyRelease) {
+        key *= (int)-1;
+    }
 
     /* notify the clients of the event: */
     XtCallCallbacks(gw, XtNkeyboardEvent, (XtPointer)key);

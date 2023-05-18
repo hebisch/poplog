@@ -257,7 +257,7 @@ externalref XpwScrollTextClassRec xpwScrollTextClassRec;
 #define max(a, b) ((int)(a) > (int)(b) ? (a) : (b))
 #define min(a, b) ((int)(a) < (int)(b) ? (a) : (b))
 
-extern Boolean _XpwTextCursorOn();
+extern Boolean _XpwTextCursorOn(XpwScrollTextWidget w, Boolean on);
 
 #endif /* _XpwScrollTextP_h */
 

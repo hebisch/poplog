@@ -120,40 +120,40 @@ static MethodNameList methodNameList = {
 
 */
 
-void _XpwMethodWarning(widget, id, name, type, message)
-Widget widget;
-XpwMethodID id;
-String name, type, message;
+void
+_XpwMethodWarning(Widget widget, XpwMethodID id, String name,
+                  String type, String message)
 {
     int i;
     static char idstring[4];
     char err_message[500];
     static String params[] = {idstring, NULL};
     Cardinal num_params = 1;
-    if (id == 0)
+    if (id == 0) {
         num_params = 0;
-    else {
+    } else {
         sprintf(idstring, "%i",id); /* turn id into string */
-        for (i=0; i < XtNumber(methodNameList); i++)
+        for (i=0; i < XtNumber(methodNameList); i++) {
             if (methodNameList[i].id == id) {
                 params[1] = methodNameList[i].name;
                 num_params++; break;
-            };
+            }
+        }
     }
-    if (num_params == 0)
+    if (num_params == 0) {
         /* not printing out method ID */
         strcpy(message, err_message);
-    else if (num_params == 1)
+    } else if (num_params == 1) {
         /* could not find name of method in table */
         sprintf(err_message, "%s, method ID: %%s", message);
-    else
+    } else {
         /* found name, so print it in message */
         sprintf(err_message, "%s, method ID: %%s (%%s)", message);
+    }
 
     XtAppErrorMsg(XtWidgetToApplicationContext(widget),
             name, type, XtCXpwMethodError, err_message,
             params, &num_params);
-
 }
 
 
@@ -168,14 +168,12 @@ String name, type, message;
    do for now.
 */
 
-XpwMethodRet _XpwMakeCall(proc, args)
-XpwMethodProc proc;
-XpwMethodArg args[];
+XpwMethodRet
+_XpwMakeCall(XpwMethodProc proc, XpwMethodArg args[])
 {
     /* ASSUME TEN ARGS OR LESS ! */
     return((XpwMethodRet)proc(args[0],args[1],args[2],args[3],args[4],
                 args[5],args[6],args[7],args[8],args[9]));
-
 }
 
 /****************************************************************
@@ -193,7 +191,8 @@ XpwMethodID method_id;
 
 /* procedure to call Methods of a xpw Widget */
 /* Inserted A.S. 8 Nov 2003, advised by Andreas Eder */
-XpwMethodRet XpwCallMethod(XpwCoreWidget gw, XpwMethodID method_id, ...)
+XpwMethodRet
+XpwCallMethod(XpwCoreWidget gw, XpwMethodID method_id, ...)
 {
     XpwCoreWidget w=(XpwCoreWidget)gw;
     XpwCoreWidgetClass class =(XpwCoreWidgetClass)XtClass(w);
@@ -202,7 +201,6 @@ XpwMethodRet XpwCallMethod(XpwCoreWidget gw, XpwMethodID method_id, ...)
     XpwApplyProc apply_proc;
     XpwMethodRet ret_val=0;
     Boolean ret_set = FALSE;
-    int num_methods;
     char str[100], *class_name;
     va_list ap;
 
@@ -210,7 +208,7 @@ XpwMethodRet XpwCallMethod(XpwCoreWidget gw, XpwMethodID method_id, ...)
 
     if (! XtIsSubclass((Widget)w, xpwCoreWidgetClass)) {
         sprintf(str,"%s widgets do not have any methods", class_name);
-        _XpwMethodWarning(w, 0, "invalidClass", "xpwCallMethod",str);
+        _XpwMethodWarning((Widget)w, 0, "invalidClass", "xpwCallMethod",str);
         return(0);
     }
 
@@ -246,7 +244,7 @@ XpwMethodRet XpwCallMethod(XpwCoreWidget gw, XpwMethodID method_id, ...)
         /* no method found - issue warning */
         sprintf(str, "%s widgets don't respond to specified method",
                 class_name);
-        _XpwMethodWarning(w, method_id,
+        _XpwMethodWarning((Widget)w, method_id,
                 "invalidMethod", "xpwCallMethod",str);
     }
 }

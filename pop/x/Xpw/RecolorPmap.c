@@ -42,23 +42,22 @@ or
 
 */
 
-static unsigned long choose_plane(pixel_value)
-unsigned long pixel_value;
+static unsigned long
+choose_plane(unsigned long pixel_value)
 {
     /* choose first bit that is set in pixel_value */
     unsigned long plane_mask = 1;
-    while (! (plane_mask & (unsigned long)pixel_value)) plane_mask <<=1;
+    while (! (plane_mask & (unsigned long)pixel_value)) {
+        plane_mask <<=1;
+    }
     return(plane_mask);
 }
 
-Pixmap XpwRecolorPixmap(screen,src_pix,
-            src_fg,src_bg,
-            dst_fg,dst_bg, dst_depth, free)
-Screen *screen;
-Pixmap src_pix;
-unsigned long src_fg, src_bg, dst_fg,dst_bg;
-unsigned long dst_depth;
-int free;
+Pixmap
+XpwRecolorPixmap(Screen * screen, Pixmap src_pix,
+            unsigned long src_fg, unsigned long src_bg,
+            unsigned long dst_fg, unsigned long dst_bg,
+            unsigned long dst_depth, int free)
 {
     register Display *dpy = DisplayOfScreen(screen);
     Pixmap dst_pix;
@@ -70,7 +69,9 @@ int free;
     if (!XGetGeometry(dpy, src_pix, (Window*)&dummy,
             (int*)&dummy, (int*)&dummy,
             &width, &height,
-            &dummy, &src_depth)) return(0);
+            &dummy, &src_depth)) {
+        return(0);
+    }
 
 
     dst_pix = XCreatePixmap(dpy, drawable, width, height, dst_depth);
@@ -119,6 +120,8 @@ int free;
                      width, height, 0,0,plane);
         XFreeGC(dpy, gc);
     }
-    if (free) XFreePixmap(dpy, src_pix);
+    if (free) {
+        XFreePixmap(dpy, src_pix);
+    }
     return(dst_pix);
 }

@@ -330,11 +330,6 @@ static QuarkList fillStyleQuarks [] = {
 static void CvtStringToFillRule();
 static XrmQuark XrmQExtdefaultfillrule;
 static XpwAssocTable *fillRuleQuarkTable = NULL;
-static QuarkList fillRuleQuarks [] = {
-        {XtDefaultFillRule, NULLQUARK, EvenOddRule},
-        {"evenoddrule",NULLQUARK,EvenOddRule},
-        {"windingrule",NULLQUARK,WindingRule},
-};
 
 /* Subwindow Mode */
 static void CvtStringToSubwindow();
@@ -484,10 +479,6 @@ int num_quarks;
 /* CLASS INITIALIZE - Add new resource converters */
 static void ClassInit ()
 {
-    static XtConvertArgRec screenConvertArg[] = {
-        {XtBaseOffset, (caddr_t) XtOffset(Widget, core.screen),
-            sizeof(Screen *)}
-    };
 
     /* make lookup tables for GC resource converters */
     functionQuarkTable = MakeQuarkTable(functionQuarks,
@@ -930,22 +921,6 @@ XrmValuePtr fromVal, toVal;
         toVal->size = sizeof(type);             \
         return True;                    \
     }
-
-static Boolean CvtFromInt(dpy, args, num_args, fromVal, toVal, closure_ret)
-    Display*    dpy;
-    XrmValuePtr args;
-    Cardinal    *num_args;
-    XrmValuePtr fromVal;
-    XrmValuePtr toVal;
-    Opaque  *closure_ret;
-{
-    if (*num_args != 0)
-    XtAppWarningMsg(XtDisplayToApplicationContext(dpy),
-          "wrongParameters","cvtFromInt","XpwError",
-          "Integer conversion needs no extra arguments",
-           (String *) NULL, (Cardinal *)NULL);
-    done(int, *(int*)fromVal->addr);
-}
 
 
 static XpwMethodRet ApplyMethod(w, method, args)

@@ -55,8 +55,8 @@ static void  /* methods private to pixmap widgets*/
 #define getgc(w) (XtIsSubclass((Widget)w,xpwGraphicWidgetClass) ? \
             w->xpwgraphic.my_gc : w->xpwpixmap.private_gc)
 
-static void ClearPixmap(w)
-XpwGraphicWidget w;
+static void
+ClearPixmap(XpwGraphicWidget w)
 {
     GC gc;
     Pixmap pm = w->xpwpixmap.pixmap;
@@ -67,9 +67,8 @@ XpwGraphicWidget w;
     XSetForeground(dpy,gc,w->xpwcore.foreground_pixel);
 }
 
-static void ClearPixmapArea(w, x,y,width,height)
-XpwPixmapWidget w;
-int x,y,width,height;
+static void
+ClearPixmapArea(XpwPixmapWidget w, int x, int y, int width, int height)
 {
     GC gc = w->xpwpixmap.private_gc;
     Pixmap pm = w->xpwpixmap.pixmap;
@@ -81,54 +80,64 @@ int x,y,width,height;
     XSetForeground(dpy,gc,w->xpwcore.foreground_pixel);
 }
 
-static void CopyFrom(w,dest_win,source_widget, x,y,dx,dy,ex,ey)
-XpwGraphicWidget w;
-Widget source_widget;
-Drawable dest_win;
-int x,y,dx,dy,ex,ey;
+static void
+CopyFrom(XpwGraphicWidget w, Drawable dest_win, Widget source_widget,
+         int x, int y, int dx, int dy, int ex, int ey)
 {
     Display *dpy = XtDisplay(w);
     GC gc;
     Drawable source_win = XtWindow(source_widget);
     gc = getgc(w);
-    if (!source_widget) source_widget = (Widget)w;
-    if (!dx) dx = source_widget->core.width - x;
-    if (!dy) dy = source_widget->core.height - y;
+    if (!source_widget) {
+        source_widget = (Widget)w;
+    }
+    if (!dx) {
+        dx = source_widget->core.width - x;
+    }
+    if (!dy) {
+        dy = source_widget->core.height - y;
+    }
 
     if (XtIsSubclass(source_widget, xpwPixmapWidgetClass)) {
         XpwPixmapWidget s = (XpwPixmapWidget)source_widget;
-        if (HasPixmap(s))
+        if (HasPixmap(s)) {
             source_win = (Drawable)s->xpwpixmap.pixmap;
+        }
     }
 
-    if (source_win && dest_win)
+    if (source_win && dest_win) {
         XCopyArea(dpy, source_win, dest_win, gc, x,y,dx,dy,ex,ey);
+    }
 }
 
 
-static void CopyTo(w,dest_widget,x,y,dx,dy,ex,ey)
-XpwGraphicWidget w;
-Widget dest_widget;
-int x,y,dx,dy,ex,ey;
+static void
+CopyTo(XpwGraphicWidget w, Widget dest_widget, int x, int y,
+       int dx, int dy, int ex, int ey)
 {
     Display *dpy = XtDisplay(w);
-    GC gc;
+    GC gc = getgc(w);
     Drawable dest_win, source_win;
 
-    gc = getgc(w);
-
-    if (HasPixmap(w))
+    if (HasPixmap(w)) {
         source_win = w->xpwpixmap.pixmap;
-    else
+    } else {
         source_win = XtWindow(w);
-
-    if (!dest_widget) dest_widget = (Widget)w;
+    }
+    if (!dest_widget) {
+        dest_widget = (Widget)w;
+    }
     dest_win = XtWindow(dest_widget);
 
-    if (!dx) dx = w->core.width - x;
-    if (!dy) dy = w->core.height - y;
-    if (source_win && dest_win)
+    if (!dx) {
+        dx = w->core.width - x;
+    }
+    if (!dy) {
+        dy = w->core.height - y;
+    }
+    if (source_win && dest_win) {
         XCopyArea(dpy, source_win, dest_win, gc, x,y,dx,dy,ex,ey);
+    }
     if (XtIsSubclass(dest_widget, xpwPixmapWidgetClass) &&
             XtClass(dest_widget) != xpwPixmapWidgetClass) {
         XpwPixmapWidget d = (XpwPixmapWidget)dest_widget;
@@ -141,68 +150,63 @@ int x,y,dx,dy,ex,ey;
 }
 
 
-static XpwMethodRet GetImage(w, x, y, width, height, mask, format)
-XpwPixmapWidget w;
-int x,y,width,height, format;
-unsigned long mask;
+static XpwMethodRet
+GetImage(XpwPixmapWidget w, int x, int y, int width, int height,
+         unsigned long mask, int format)
 {
-    Drawable src;
     XpwMethodRet res = 0;
     if (!mask) mask = AllPlanes;
     if (!format) {
-        if (w->core.depth > 1) format = ZPixmap;
-        else format = XYPixmap;
+        if (w->core.depth > 1) {
+            format = ZPixmap;
+        } else {
+            format = XYPixmap;
+        }
     }
-    if (HasPixmap(w))
+    if (HasPixmap(w)) {
         res=(XpwMethodRet)XGetImage(XtDisplay(w),w->xpwpixmap.pixmap,
         x,y,width,height,mask,format);
-    else
+    } else {
         res=(XpwMethodRet)XGetImage(XtDisplay(w),XtWindow(w),
         x,y,width,height,mask,format);
+    }
     return(res);
 }
 
-static XpwMethodRet CreateImage(w,width, height, depth, image_array)
-XpwPixmapWidget w;
-unsigned int width, height, depth;
-char *image_array;
+static XpwMethodRet
+CreateImage(XpwPixmapWidget w, unsigned int width, unsigned int  height,
+            unsigned int depth, char * image_array)
 {
     register Screen *screen = XtScreen(w);
     register Display *dpy = XtDisplay(w);
-    XImage *image;
-    GC gc = w->xpwcore.users_gc;
-    image = XCreateImage(dpy, DefaultVisualOfScreen(screen),
+    XImage *image = XCreateImage(dpy, DefaultVisualOfScreen(screen),
                  depth, (depth == 1) ? XYBitmap : ZPixmap,
                  0, image_array,
                  width, height,8,0);
     return((XpwMethodRet)image);
 }
 
-static void PutImage(w, image, x,y, dst_x, dst_y, width, height)
-XpwPixmapWidget w;
-unsigned int width, height;
-int x,y, dst_x, dst_y;
-XImage *image;
+static void
+PutImage(XpwPixmapWidget w, XImage * image, int x, int y,
+         int dst_x, int dst_y, unsigned int width, unsigned int height)
 {
-    register Screen *screen = XtScreen(w);
-    register Display *dpy = XtDisplay(w);
+    Display *dpy = XtDisplay(w);
     GC gc = w->xpwcore.users_gc;
     if (HasPixmap(w)) {
         XPutImage(dpy, w->xpwpixmap.pixmap, gc, image,
                 x,y,dst_x, dst_y, width, height);
-        if (XtClass(w) != xpwPixmapWidgetClass)
+        if (XtClass(w) != xpwPixmapWidgetClass) {
             _XpwSyntheticExposeEvent(w, dst_x, dst_y, width, height);
-    } else if (XtClass(w) != xpwPixmapWidgetClass)
+        }
+    } else if (XtClass(w) != xpwPixmapWidgetClass) {
         XPutImage(dpy, XtWindow(w), gc, image,
                 x,y, dst_x, dst_y, width, height);
-
+    }
 }
 
-static void CreatePutImage(w,width, height, x,y,image_array,depth)
-XpwPixmapWidget w;
-unsigned int width, height;
-int x,y, depth;
-char *image_array;
+static void
+CreatePutImage(XpwPixmapWidget w, unsigned int width, unsigned int height,
+               int x, int y, char * image_array, int depth)
 {
     XImage *image;
     image = (XImage*)CreateImage(w, width, height, depth,image_array);
@@ -213,15 +217,16 @@ char *image_array;
 /* TAKEN FROM Xmu Code */
 
 static XArc arcs[8];
-static void DrawRoundedRect (dpy, draw, gc, x, y, w, h, ew, eh)
-    Display     *dpy;
-    Drawable        draw;
-    GC          gc;
-    int         x, y, w, h, ew, eh;
+static void
+DrawRoundedRect(Display * dpy, Drawable draw, GC gc,
+                int x, int y, int w, int h, int ew, int eh)
 {
-
-    if (ew*2 > w) ew = w / 2;
-    if (eh*2 > h) eh = h / 2;
+    if (ew*2 > w) {
+        ew = w / 2;
+    }
+    if (eh*2 > h) {
+        eh = h / 2;
+    }
 
     arcs[0].x = x;
     arcs[0].y = y;
@@ -278,23 +283,27 @@ static void DrawRoundedRect (dpy, draw, gc, x, y, w, h, ew, eh)
     arcs[7].height = h - eh*2;
     arcs[7].angle1 = 270*64;
     arcs[7].angle2 = -180*64;
-    XDrawArcs (dpy, draw, gc, arcs, 8);
+    XDrawArcs(dpy, draw, gc, arcs, 8);
 }
 
-static void FillRoundedRect (dpy, draw, gc, x, y, w, h, ew, eh)
-    Display     *dpy;
-    Drawable        draw;
-    GC          gc;
-    int         x, y, w, h, ew, eh;
+static void
+FillRoundedRect(Display * dpy, Drawable draw, GC gc,
+                int x, int y, int w, int h, int ew, int eh)
 {
     XRectangle rects[3];
     XGCValues vals;
 
     XGetGCValues(dpy, gc, GCArcMode, &vals);
-    if (vals.arc_mode != ArcPieSlice) XSetArcMode(dpy, gc, ArcPieSlice);
+    if (vals.arc_mode != ArcPieSlice) {
+        XSetArcMode(dpy, gc, ArcPieSlice);
+    }
 
-    if (ew*2 > w) ew = w / 2;
-    if (eh*2 > h) eh = h / 2;
+    if (ew*2 > w) {
+        ew = w / 2;
+    }
+    if (eh*2 > h) {
+        eh = h / 2;
+    }
 
     arcs[0].x = x;
     arcs[0].y = y;
@@ -343,29 +352,26 @@ static void FillRoundedRect (dpy, draw, gc, x, y, w, h, ew, eh)
 
     XFillRectangles (dpy, draw, gc, rects, 3);
 
-    if (vals.arc_mode != ArcPieSlice) XSetArcMode(dpy, gc, vals.arc_mode);
+    if (vals.arc_mode != ArcPieSlice) {
+        XSetArcMode(dpy, gc, vals.arc_mode);
+    }
 }
 
 #define DEF_DRAWSTRING(Name, XDrawP, XmbDrawP)                              \
-static void Name(dpy, d, font_set, gc, x, y, string, num_bytes)             \
-  Display *dpy;                                                             \
-  Drawable d;                                                               \
-  XFontSet font_set;                                                        \
-  GC gc;                                                                    \
-  int x, y;                                                                 \
-  char *string;                                                             \
-  int num_bytes;                                                            \
-  { XFontStruct **font_struct_list;                                         \
+static void Name(Display * dpy, Drawable d, XFontSet font_set, GC gc,       \
+                 int x, int y, char * string, int num_bytes)                \
+{   XFontStruct **font_struct_list;                                         \
     char **font_name_list;                                                  \
-    if (XFontsOfFontSet(font_set, &font_struct_list, &font_name_list) == 1) \
+    if (XFontsOfFontSet(font_set, &font_struct_list, &font_name_list) == 1) { \
         /* If there's only one font, assume straightforward 8-bit working   \
          * and use XDrawString etc (the font is already in the gc).         \
          * Gets around a bug in Nutcracker XmbDrawString which apparently   \
          * truncates chars to 7 bits in the standard locale.                \
          */                                                                 \
         XDrawP(dpy, d, gc, x, y, string, num_bytes);                        \
-    else                                                                    \
+    } else {                                                                \
         XmbDrawP(dpy, d, font_set, gc, x, y, string, num_bytes);            \
+    }                                                                       \
   }
 
 DEF_DRAWSTRING(DrawString,      XDrawString,      XmbDrawString)
@@ -435,24 +441,28 @@ static void /* basic methods */
  *
  ****************************************************************/
 
-static void ClearGraphic(w)
-XpwPixmapWidget w;
+static void
+ClearGraphic(XpwPixmapWidget w)
 {
-    if (XtWindow(w))
+    if (XtWindow(w)) {
         XClearArea(XtDisplay(w), XtWindow(w), 0,0,0,0, TRUE);
+    }
     /* need to generate exposures so that the (possibly tiled)
     pixmap is repainted */
 }
 
-static void ClearGraphicArea(w,x,y,width,height)
-XpwGraphicWidget w;
-int x,y,width,height;
+static void
+ClearGraphicArea(XpwGraphicWidget w, int x, int y, int width, int height)
 {
     register Display *dpy = XtDisplay(w);
     register Window win = XtWindow(w);
 
-    if (!width) width=w->core.width;
-    if (!height) height=w->core.height;
+    if (!width) {
+        width=w->core.width;
+    }
+    if (!height) {
+        height=w->core.height;
+    }
 
     XClearArea(dpy, win,  x,y, width, height, TRUE);
     /* exposures needed so pixmaps background tiling is copied to
@@ -465,15 +475,16 @@ int x,y,width,height;
 
 #define XtColormap(widget) ((widget)->core.colormap)
 
-static void CreateColormap(w)
-XpwGraphicWidget w;
+static void
+CreateColormap(XpwGraphicWidget w)
 {
     register Screen *screen = XtScreen(w);
     register Display *dpy = XtDisplay(w);
     Window win = XtWindow(w);
     /* free any existing colormap */
-    if (XtColormap(w) && XtColormap(w) != DefaultColormapOfScreen(screen))
+    if (XtColormap(w) && XtColormap(w) != DefaultColormapOfScreen(screen)) {
         _XpwFreeColormap(w);
+    }
 
     /* get new colormap */
     XtColormap(w) = XCreateColormap(dpy, win,
@@ -483,24 +494,25 @@ XpwGraphicWidget w;
     /* install it for window */
     XSetWindowColormap(dpy, win, XtColormap(w));
 
-    if (XtIsShell(w->core.parent))
+    if (XtIsShell(w->core.parent)) {
         XSetWindowColormap(dpy, XtWindow(w->core.parent),
             XtColormap(w));
-    else {
+    } else {
         Widget parent=w->core.parent;
         Atom colormapProp;
         /* find top shell */
-        while (!XtIsShell(parent)) parent=(Widget)parent->core.parent;
+        while (!XtIsShell(parent)) {
+            parent=(Widget)parent->core.parent;
+        }
         /* add colormap to list of colormaps for shell */
         colormapProp = XInternAtom(dpy,"WM_COLORMAP_WINDOWS",False);
         XChangeProperty(dpy, XtWindow(parent), XA_WINDOW,
             colormapProp, 32, PropModeAppend, (unsigned char*)&win,1);
     }
-
 }
 
-void _XpwFreeColormap(w)
-XpwGraphicWidget w;
+void
+_XpwFreeColormap(XpwGraphicWidget w)
 {
     register Display *dpy = XtDisplay(w);
     Screen *screen = XtScreen(w);
@@ -513,25 +525,30 @@ XpwGraphicWidget w;
     */
     while (clist) {
         XpwColorList *next =clist->next;
-        if (clist->cmap == cmap && clist->colors)
+        if (clist->cmap == cmap && clist->colors) {
             _XpwFreeColors(w, clist);
+        }
         clist = next;
     }
 
-    if (cmap == 0 || cmap == DefaultColormapOfScreen(screen)) return;
+    if (cmap == 0 || cmap == DefaultColormapOfScreen(screen)) {
+        return;
+    }
     /* free colormap */
     XFreeColormap(dpy, XtColormap(w));
     /* set colormap and window attributes to default colormap */
     XtColormap(w) = DefaultColormapOfScreen(screen);
     XSetWindowColormap(dpy, win, XtColormap(w));
-    if (XtIsShell(w->core.parent))
+    if (XtIsShell(w->core.parent)) {
         XSetWindowColormap(dpy, XtWindow(w->core.parent),
             XtColormap(w));
-    else {
+    } else {
         Widget parent=w->core.parent;
         Atom colormapProp;
         /* find top shell */
-        while (!XtIsShell(parent)) parent=(Widget)parent->core.parent;
+        while (!XtIsShell(parent)) {
+            parent=(Widget)parent->core.parent;
+        }
         /* add colormap to list of colormaps for shell */
         colormapProp = XInternAtom(dpy,"WM_COLORMAP_WINDOWS",False);
         XChangeProperty(dpy, XtWindow(parent), XA_WINDOW,
@@ -548,18 +565,16 @@ XpwGraphicWidget w;
 */
 
 
-static XpwColorList *AddColors(w, colors, num_colors, exact, read_only)
-XpwGraphicWidget w;
-XColor *colors;
-Cardinal num_colors;
-Boolean exact, read_only;
+static XpwColorList *
+AddColors(XpwGraphicWidget w, XColor * colors, Cardinal num_colors,
+          Boolean exact, Boolean read_only)
 {
-    XpwColorList  *allocated_colors = w->xpwgraphic.allocated_colors,
-                    *next;
+    XpwColorList * allocated_colors = w->xpwgraphic.allocated_colors;
+    XpwColorList * next;
 
-    while (allocated_colors->next)
+    while (allocated_colors->next) {
         allocated_colors =allocated_colors->next;
-
+    }
     next = (XpwColorList *)XtNew(XpwColorList);
     next->colors = colors;
     next->num_colors = num_colors;
@@ -572,16 +587,14 @@ Boolean exact, read_only;
 }
 
 /* Free a range of colors */
-static void FreeColors(w, colorlist)
-XpwGraphicWidget w;
-XpwColorList *colorlist;
+static void
+FreeColors(XpwGraphicWidget w, XpwColorList * colorlist)
 {
     _XpwFreeColors(w,colorlist);
 }
 
-void _XpwFreeColors(w, colorlist)
-XpwGraphicWidget w;
-XpwColorList *colorlist;
+void
+_XpwFreeColors(XpwGraphicWidget w, XpwColorList * colorlist)
 {
     register Display *dpy = XtDisplay(w);
     Colormap cmap;
@@ -595,14 +608,17 @@ XpwColorList *colorlist;
     if (allocated_colors == colorlist && colorlist->colors) {
         colors = colorlist->colors;
         cmap = colorlist->cmap;
-        for(i=0;i<colorlist->num_colors;i++)
-            if (colors[i].pixel != 0)
+        for(i=0;i<colorlist->num_colors;i++) {
+            if (colors[i].pixel != 0) {
                 XFreeColors(dpy, cmap, &colors[i].pixel,1,0);
+            }
+        }
         prev->next = allocated_colors->next;
         XtFree((char *)colorlist);
-    } else
+    } else {
         _XpwMethodWarning(w, XpwMFreeColor, "invalidColors", "",
             "The widget does not own the specified colour(s)");
+    }
 }
 
 /* Allocate num_cells of colours in the colourmap, determining their
@@ -610,18 +626,17 @@ XpwColorList *colorlist;
    r2,g2,b2
 */
 #define mfac 256
-static XpwMethodRet AllocColorRange(w,num_cells, r1,g1,b1,r2,g2,b2)
-XpwGraphicWidget w;
-int num_cells, r1, g1, b1, r2, g2, b2;
+static XpwMethodRet
+AllocColorRange(XpwGraphicWidget w, int num_cells, int r1, int g1, int b1,
+                int r2, int g2, int b2)
 {
     register Display *dpy = XtDisplay(w);
     Colormap cmap = XtColormap(w);
     XColor *colors;
-    Pixel *pixels, pixel;
     int i, dr, dg, db, found_colors = False;
     unsigned long plane_masks[1];
 
-    pixels = (Pixel *)XtCalloc(num_cells, (Cardinal)sizeof(Pixel));
+    Pixel * pixels = (Pixel *)XtCalloc(num_cells, (Cardinal)sizeof(Pixel));
 
     /* we must set the rgb values in a colors array: */
     /* try to allocate read/write color cells */
@@ -646,24 +661,25 @@ int num_cells, r1, g1, b1, r2, g2, b2;
     }
     XtFree((char *)pixels);
 
-    if (!found_colors) return((XpwMethodRet)NULL);
-    else return((XpwMethodRet)AddColors(w, colors, num_cells,TRUE,TRUE));
+    if (!found_colors) {
+        return((XpwMethodRet)NULL);
+    } else {
+        return((XpwMethodRet)AddColors(w, colors, num_cells,TRUE,TRUE));
+    }
 }
 
 
-static XpwMethodRet AllocStoreColor(w, r, g, b)
-XpwGraphicWidget w;
-int r,g,b;
+static XpwMethodRet
+AllocStoreColor(XpwGraphicWidget w, int r, int g, int b)
 {
-    register Screen *screen = XtScreen(w);
     register Display *dpy = XtDisplay(w);
-    register Window win = XtWindow(w);
     Colormap cmap = XtColormap(w);
     XColor aColor;
     unsigned long plane_masks[1], carray[1];
 
-    if (!XAllocColorCells(dpy, cmap, 1, plane_masks, 0, carray,1))
+    if (!XAllocColorCells(dpy, cmap, 1, plane_masks, 0, carray,1)) {
         return (XpwMethodRet)-1;
+    }
 
     aColor.red = r << 8;
     aColor.green= g << 8;
@@ -675,14 +691,11 @@ int r,g,b;
     return((XpwMethodRet)carray[0]);
 }
 
-static void SetPixelColor(w, i, r, g, b)
-XpwGraphicWidget w;
-int i,r,g,b;
+static void
+SetPixelColor(XpwGraphicWidget w, int i, int r, int g, int b)
 {
-/* this one need some error checking. */
-    register Screen *screen = XtScreen(w);
+    /* this one need some error checking. */
     register Display *dpy = XtDisplay(w);
-    register Window win = XtWindow(w);
     Colormap cmap = XtColormap(w);
     XColor aColor;
 

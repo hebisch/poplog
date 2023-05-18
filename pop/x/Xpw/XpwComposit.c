@@ -110,9 +110,7 @@ externaldef(xpwcompositewidgetclass)
 
 #define max(a,b) ((int)(a) > (int)(b) ? (a) : (b))
 
-static void SetToMaxSize(composite)
-XpwCompositeWidget composite;
-{
+static void SetToMaxSize(XpwCompositeWidget composite) {
     Widget child, parent;
     WidgetList children = composite->composite.children;
     int num_children = composite->composite.num_children;
@@ -185,13 +183,10 @@ static XtGeometryResult GeometryManager(wid, request, reply)
 }
 
 #define RESIZE 0
-static void CompositeResize(gw)
-Widget gw;
-  {
+static void CompositeResize(Widget gw) {
     XpwCompositeWidget w = (XpwCompositeWidget)gw;
     Widget work_area;
-    if (work_area = w->xpwcomposite.work_area)
-      {
+    if ((work_area = w->xpwcomposite.work_area)) {
         static XtWidgetGeometry intended, preferred;
         int bw = work_area->core.border_width;
         intended.request_mode = CWWidth | CWHeight;
@@ -203,10 +198,10 @@ Widget gw;
         XtConfigureWidget(work_area, 0,0,
             preferred.width, preferred.height,
             preferred.border_width);
-      }
+    }
     if (XtIsRealized(gw))
         XtCallCallbacks(gw, XtNxpwCallback, (caddr_t)RESIZE);
-  }
+}
 
 static XtGeometryResult CompositeQueryGeometry(w, req, reply)
 XpwCompositeWidget w;
@@ -234,23 +229,19 @@ XtWidgetGeometry *req, *reply;
       }
 
     return(result);
-  }
+}
 
-static void ChangeManaged(gw)
-Widget gw;
-{
+static void ChangeManaged(Widget gw) {
     XpwCompositeWidget w = (XpwCompositeWidget)gw;
-    if (w->xpwcomposite.resize) SetToMaxSize(w);
+    if (w->xpwcomposite.resize) {
+        SetToMaxSize(w);
+    }
 }
 
 #define CONFIGURE 1
-static void NotifyConfigureEvent(gw, event, params, num_params)
-Widget gw;
-XEvent *event;
-String *params;
-Cardinal *num_params;
+static void NotifyConfigureEvent(Widget gw, XEvent * event,
+           String * params, Cardinal * num_params)
 {
-    XpwCompositeWidget w = (XpwCompositeWidget)gw;
     /* notify the clients of the event: */
     XtCallCallbacks(gw, XtNxpwCallback, (XtPointer)CONFIGURE);
 /*  if (w->xpwcomposite.resize) SetToMaxSize(w);*/

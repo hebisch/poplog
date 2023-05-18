@@ -615,55 +615,47 @@ static void SetupFonts(w)
         draw_modes |= (draw_mode << (fontnum<<1));                          \
       }
 
-    if (CharMode(w) < XpwICMUnicode)
-      { XFontStruct *mainfont = FontStruct(w,NORMAL_FONT), *font, *dfont,
+    if (CharMode(w) < XpwICMUnicode) {
+        XFontStruct *mainfont = FontStruct(w,NORMAL_FONT), *font, *dfont,
                     **fontp;
-        XRectangle rect;
         SETUP_FONTS(FontFieldPtr, FontStruct, ExtentOfFont, IsFixedFont);
-      }
-    else
-      { XFontSet mainfont = FontSet(w,NORMAL_FONT), font, dfont, *fontp;
+    } else {
+        XFontSet mainfont = FontSet(w,NORMAL_FONT), font, dfont, *fontp;
         SETUP_FONTS(FontSetFieldPtr, FontSet, ExtentOfFontSet, IsFixedFontSet);
-      }
+    }
 
     w->xpwscrolltext.font_draw_modes = draw_modes;
 
     sp_char = SPACECHAR;
     w->xpwscrolltext.space_width
         = XwcTextEscapement(FontSet(w,NORMAL_FONT), &sp_char, 1);
-  }
+}
 
 
-
-static int HMargin(w)
-XpwScrollTextWidget w;
-  { int hm = w->xpwscrolltext.h_margin;
+static int HMargin(XpwScrollTextWidget w) {
+    int hm = w->xpwscrolltext.h_margin;
     return( hm >= 0 ? hm : ((-hm)*FontAverageWidth(w))/1000 );
-  }
+}
 
-static int HExcess(w)
-XpwScrollTextWidget w;
-  { int hm = HMargin(w);
+static int HExcess(XpwScrollTextWidget w) {
+    int hm = HMargin(w);
     if (StatusStyle(w) != 0) hm += min(max(6-hm,0), 2);
     return(hm * 2);
-  }
+}
 
-static int VMargin(w)
-XpwScrollTextWidget w;
-  { int vm = w->xpwscrolltext.v_margin;
+static int VMargin(XpwScrollTextWidget w) {
+    int vm = w->xpwscrolltext.v_margin;
     return( vm >= 0 ? vm : ((-vm)*FontHeight(w))/100 );
-  }
+}
 
-static int StatusVExcess(vm)
-  int vm;
-  { return( vm + min(max(8-vm,0), 4) );
-  }
+static int StatusVExcess(int vm) {
+    return( vm + min(max(8-vm,0), 4) );
+}
 
-static int VExcess(w)
-XpwScrollTextWidget w;
-  { int vm = VMargin(w);
+static int VExcess(XpwScrollTextWidget w) {
+    int vm = VMargin(w);
     return( vm*2 + (StatusStyle(w)==0 ? 0 : StatusVExcess(vm)) );
-  }
+}
 
 static void TextRecalc(w, set_width, set_height)
   XpwScrollTextWidget w;
@@ -892,11 +884,9 @@ void _XpwSetTextCursor(w, cchar)
         SetTextAttributes(w);
   }
 
-XpwMethodRet _XpwGetTextCursor(w)
-XpwScrollTextWidget w;
-  { unsigned cchar;
+XpwMethodRet _XpwGetTextCursor(XpwScrollTextWidget w) {
     return(w->xpwscrolltext.cursor_status ? w->xpwscrolltext.cursor_char : 0);
-  }
+}
 
 
 /*  Allocate space for text in window, etc
@@ -1092,7 +1082,6 @@ XtWidgetGeometry *preferred;
 static void ScrollTextInitialize(request, w)
 XpwScrollTextWidget request, w;
   { unsigned i, fontnum, vclass = XDefaultVisualOfScreen(XtScreen(w))->class;
-    XGCValues values;
 
     debug_msg("Initialize start");
 
@@ -1398,12 +1387,14 @@ static void ScrollTextRealize(w, valueMask, attrs)
 XpwScrollTextWidget w;
 XtValueMask *valueMask;
 XSetWindowAttributes *attrs;
-  { Display *dpy = XtDisplay(w);
+  {
 
     *valueMask |= CWBitGravity;
     attrs->bit_gravity = ForgetGravity;
-    if (attrs->cursor = w->xpwcore.pointer_shape)
-     { *valueMask |= CWCursor; _XpwRecolorPointer(w); }
+    if ((attrs->cursor = w->xpwcore.pointer_shape)) {
+        *valueMask |= CWCursor;
+        _XpwRecolorPointer(w);
+    }
     RecolorPointer2(w);
 
     /* calculate NumRows and NumCols */
@@ -1433,30 +1424,25 @@ static void ScrollTextResize(w)
   }
 
 
-static void ScrollTextRedisplay(w, event, region)
-XpwScrollTextWidget w;
-XEvent *event;
-Region region;
-  { Position x, y, xl, yl;
-    int split = SplitOffset(w), count;
+static void
+ScrollTextRedisplay(XpwScrollTextWidget w, XEvent * event, Region region) {
+    Position x, y, xl, yl;
+    int split = SplitOffset(w);
     Boolean sattop = (StatusStyle(w) != 2);
 
-    if (event->type == GraphicsExpose)
-      { xl = (x = event->xgraphicsexpose.x) + event->xgraphicsexpose.width;
+    if (event->type == GraphicsExpose) {
+        xl = (x = event->xgraphicsexpose.x) + event->xgraphicsexpose.width;
         yl = (y = event->xgraphicsexpose.y) + event->xgraphicsexpose.height;
-        count = event->xgraphicsexpose.count;
-      }
-    else if (event->type == Expose)
-      { xl = (x = event->xexpose.x) + event->xexpose.width;
+    } else if (event->type == Expose) {
+        xl = (x = event->xexpose.x) + event->xexpose.width;
         yl = (y = event->xexpose.y) + event->xexpose.height;
-        count = event->xexpose.count;
-      }
-    else
+    } else {
         return;
+    }
 
     if (y < split)  _XpwTextExpose(w, x, y,     xl, min(yl,split), sattop);
     if (split < yl) _XpwTextExpose(w, x, split, xl, yl,            !sattop);
-  }
+}
 
 
 static void ScrollTextDestroy(w)
@@ -1718,7 +1704,7 @@ XEvent *event;
 String *params;
 Cardinal *num_params;
   {
-    KeySym key; unsigned int modifiers_return, count = 14;
+    KeySym key; unsigned int count = 14;
     XpwScrollTextWidget w = (XpwScrollTextWidget) gw;
     if (!gw->core.visible) return;
 

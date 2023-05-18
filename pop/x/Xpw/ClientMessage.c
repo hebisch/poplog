@@ -12,49 +12,47 @@
 #include <X11/ShellP.h>
 #include <X11/Xatom.h>
 
-static void DecodeDrop(widget, event, is_load)
-Widget widget;
-XClientMessageEvent *event;
-Bool is_load;
+static void
+DecodeDrop(Widget widget, XClientMessageEvent * event, Bool is_load)
 {
     Atom    actual_type;
-    int actual_format, return_value;
+    int actual_format;
     unsigned long bytes_after, nitems;
     char    *data;
     Display *display = XtDisplay(widget);
 
-    if (is_load && event->data.l[4] && XGetWindowProperty(display, event->data.l[3],
-            event->data.l[4], 0L, 0xfffffff,
-            True, XA_STRING, &actual_type,
-            &actual_format, &nitems, &bytes_after,
-            (unsigned char **)&data) == Success) {
+    if (is_load && event->data.l[4]
+        && XGetWindowProperty(display, event->data.l[3],
+              event->data.l[4], 0L, 0xfffffff,
+              True, XA_STRING, &actual_type,
+              &actual_format, &nitems, &bytes_after,
+              (unsigned char **)&data) == Success) {
         /* simple Load */
         XtCallActionProc((Widget)widget, "XpwDoDragLoad",
                 (XEvent*)event, (char**)&data, 1);
         XFree(data);
     } else {
         /* Not a simple transfer - probably a selection */
-        if (is_load)
+        if (is_load) {
             XtCallActionProc((Widget)widget, "XpwDoDragLoad",
                 (XEvent*)event, NULL, 0);
-        else
+        } else {
             XtCallActionProc((Widget)widget, "XpwDoDragMove",
                 (XEvent*)event, NULL, 0);
+        }
     }
 }
 
 static int dummy_handler() { return(0); }
 
-static void TakeClientMessage(w, client, event, continue_to_dispatch)
-Widget w;
-Opaque client;
-XEvent *event;
-Boolean *continue_to_dispatch;
+static void
+TakeClientMessage(Widget w, Opaque client, XEvent * event,
+                  Boolean * continue_to_dispatch)
 {
     XWindowAttributes win_attribs;
     if (event->type == ClientMessage) {
         Display *dpy = XtDisplay(w);
-        Atom *ptr, protocols, message_type, atom;
+        Atom protocols, message_type, atom;
         protocols = XInternAtom(dpy, "WM_PROTOCOLS", FALSE);
         message_type = event->xclient.message_type;
         *continue_to_dispatch = FALSE;
@@ -63,15 +61,15 @@ Boolean *continue_to_dispatch;
         atom = XInternAtom(dpy, "WM_TAKE_FOCUS", FALSE);
         if (message_type == protocols &&
                 (event->xclient.data.l[0] == atom ||
-                    event->xclient.data.s[0] == atom))
-          { Window win = XtWindow(w);
+                    event->xclient.data.s[0] == atom)) {
+            Window win = XtWindow(w);
             XGetWindowAttributes(dpy, win, &win_attribs);
             /* Only take the focus if the window is mapped in the first
                 place -- unfortunately, the WM may unmap the window before the
                 request is processed, so we redefine the error handler to
                 ignore errors */
-            if (win_attribs.map_state == IsViewable)
-              { int (*old)() = XSetErrorHandler((XErrorHandler)dummy_handler);
+            if (win_attribs.map_state == IsViewable) {
+                int (*old)() = XSetErrorHandler((XErrorHandler)dummy_handler);
                 if (event->xclient.data.l[0] == atom)
                     XSetInputFocus(dpy, win, RevertToParent,
                                                     event->xclient.data.l[1]);
@@ -79,7 +77,7 @@ Boolean *continue_to_dispatch;
                     XSetInputFocus(dpy, win, RevertToParent, CurrentTime);
                 XSync(dpy, FALSE);
                 XSetErrorHandler(old);
-              }
+            }
             return;
         }
 
@@ -101,15 +99,14 @@ Boolean *continue_to_dispatch;
         /* XV_DO_DRAG_LOAD action */
         atom = XInternAtom(dpy, "XV_DO_DRAG_LOAD", True);
         if (atom != None && message_type == atom) {
-            DecodeDrop(client, event, True);
+            DecodeDrop(client, (XClientMessageEvent *)event, True);
             return;
         }
-
 
         /* XV_DO_DRAG_MOVE action */
         atom = XInternAtom(dpy, "XV_DO_DRAG_MOVE", True);
         if (atom != None && message_type == atom) {
-            DecodeDrop(client, event, False);
+            DecodeDrop(client, (XClientMessageEvent *) event, False);
             return;
         }
 
@@ -127,34 +124,28 @@ Boolean *continue_to_dispatch;
     }
 }
 
-static void XpwDoDragLoadAction(w, event, params, num_params)
-Widget w;
-XEvent *event;
-String *params;
-Cardinal *num_params;
+static void
+XpwDoDragLoadAction(Widget w, XEvent * event, String * params,
+                    Cardinal * num_params)
 {   /* ignore */
 }
 
-static void XpwDoDragMoveAction(w, event, params, num_params)
-Widget w;
-XEvent *event;
-String *params;
-Cardinal *num_params;
+static void
+XpwDoDragMoveAction(Widget w, XEvent * event, String * params,
+                    Cardinal * num_params)
 {   /* ignore */
 }
 
-static void MapAction(w, event, params, num_params)
-Widget w;
-XEvent *event;
-String *params;
-Cardinal *num_params;
+static void
+MapAction(Widget w, XEvent * event, String * params,
+                      Cardinal * num_params)
 {
     TopLevelShellWidget sw = (TopLevelShellWidget)w;
-    if (XtIsSubclass(w, topLevelShellWidgetClass))
+    if (XtIsSubclass(w, topLevelShellWidgetClass)) {
             sw->topLevel.iconic = (Boolean)*num_params;
+    }
 }
 
-static Bool appcon_set = FALSE;
 static XtActionsRec actions[] = {
     {"XpwDoDragLoad", XpwDoDragLoadAction},
     {"XpwDoDragMove", XpwDoDragMoveAction},
@@ -167,22 +158,24 @@ static String trans = "\
 
 static XtTranslations transtable;
 
-void XpwSetWMProtocolActions(appcontext)
-XtAppContext appcontext;
+void
+XpwSetWMProtocolActions(XtAppContext appcontext)
 {
     XtAppAddActions(appcontext, actions, XtNumber(actions));
     transtable = XtParseTranslationTable(trans);
 }
 
 
-void XpwSetWMProtocols (w)
-Widget w;
+void
+XpwSetWMProtocols(Widget w)
 {
     Widget tmp, parent = XtParent(w);
     Atom atoms[2];
     Display *dpy = XtDisplay(w);
     /* only works for a single appcon */
-    while (tmp=XtParent(parent)) parent = tmp;
+    while ((tmp=XtParent(parent))) {
+        parent = tmp;
+    }
     /* SET WM_PROTOCOLS */
     atoms[0] = XInternAtom(dpy, "WM_TAKE_FOCUS", FALSE);
     atoms[1] = XInternAtom(dpy, "WM_DELETE_WINDOW", FALSE);

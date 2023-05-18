@@ -36,9 +36,9 @@
 #include <X11/Intrinsic.h>
 #include "Assoc.h"
 
-
-XpwAssocTable *XpwCreateAssocTable(size)
-    register int size;      /* Desired size of the table. */
+/* Arguments: size is desired size of the table. */
+XpwAssocTable *
+XpwCreateAssocTable(int size)
 {
     register XpwAssocTable *table;  /* XpwAssocTable to be initialized. */
     register XpwAssoc *buckets; /* pointer to the first bucket in */
@@ -64,19 +64,19 @@ XpwAssocTable *XpwCreateAssocTable(size)
 }
 
 static void
-insert(elem, pred)
-XpwAssoc *elem, *pred;
-{   XpwAssoc *succ = pred->next;
+insert(XpwAssoc * elem, XpwAssoc * pred)
+{
+    XpwAssoc *succ = pred->next;
     pred->next = elem;
     elem->prev = pred;
     elem->next = succ;
-    if (succ) succ->prev = elem;
+    if (succ) {
+        succ->prev = elem;
+    }
 }
 
-void XpwMakeAssoc(table, id, data)
-    register XpwAssocTable *table;
-    register XpwAssocID id;
-    register caddr_t data;
+void
+XpwMakeAssoc(XpwAssocTable * table, XpwAssocID id, caddr_t data)
 {
     int hash;
     register XpwAssoc *bucket;
@@ -108,7 +108,7 @@ void XpwMakeAssoc(table, id, data)
             /* be inserted. */
             if (Entry->id > id) break;
         }
-        }
+    }
 
     /* If we are here then the new entry should be inserted just */
     /* before the current value of "Entry". */
@@ -122,9 +122,12 @@ void XpwMakeAssoc(table, id, data)
     insert(new_entry, Entry->prev);
 }
 
-caddr_t XpwLookupAssoc(table, id)
-    register XpwAssocTable *table;  /* XpwAssocTable to search in. */
-    register XpwAssocID id;         /* XId to search for. */
+/* Arguments:
+    table   XpwAssocTable to search in
+    id      XId to search for.
+*/
+caddr_t
+XpwLookupAssoc(XpwAssocTable * table, XpwAssocID id)
 {
     int hash;
     register XpwAssoc *bucket;
@@ -154,9 +157,8 @@ caddr_t XpwLookupAssoc(table, id)
 }
 
 /* copy one XpwAssocTable's entries into anothers */
-
-void XpwCopyAssoc(src_table, dest_table)
-    register XpwAssocTable *src_table, *dest_table;
+void
+XpwCopyAssoc(XpwAssocTable * src_table, XpwAssocTable * dest_table)
 {
     int s = src_table->size;
     register XpwAssoc *buckets = src_table->buckets;
@@ -164,9 +166,12 @@ void XpwCopyAssoc(src_table, dest_table)
 
     /* must use XpwMakeAssoc since dest_table may have Assoc's in it */
 
-    while (--s >=0  )
-        for (Entry=buckets[s].next; Entry != &buckets[s]; Entry = Entry->next)
+    while (--s >=0 ) {
+        for (Entry=buckets[s].next; Entry != &buckets[s];
+               Entry = Entry->next) {
             XpwMakeAssoc(dest_table, Entry->id, (caddr_t)Entry->data);
+        }
+    }
 }
 
 

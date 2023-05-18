@@ -193,8 +193,7 @@ externaldef(xpwgraphicwidgetclass)
  ****************************************************************/
 
 #ifdef DEBUG
-static void debug_msg(m)
-char *m;
+static void debug_msg(char * m)
 {
     printf("XpwGraphic: %s\n",m);
 }
@@ -208,12 +207,9 @@ static void ClassInit ()
     xpwGraphicClassRec.xpwcore_class.num_methods = _num_xpwGraphicMethods;
 }
 
-static void Initialize (request, new)
-    Widget request, new;
-    {
+static void Initialize(Widget request, Widget new) {
     XpwGraphicWidget w = (XpwGraphicWidget)new;
     XpwColorList *colors;
-    Screen *screen = XtScreen(w);
     w->core.mapped_when_managed = TRUE; /* important - set to false by
                            xpwpixmap */
 
@@ -232,12 +228,9 @@ static void Initialize (request, new)
     debug_msg("Initialize End");
 }
 
-static Boolean SetValues (gcurrent, grequest, gnew)
-    Widget gcurrent, grequest, gnew;
-{
+static Boolean SetValues(Widget gcurrent, Widget grequest, Widget gnew) {
     XpwGraphicWidget current = (XpwGraphicWidget) gcurrent,
                      new = (XpwGraphicWidget) gnew;
-    GC oldGC = current->xpwcore.users_gc, newGC = new->xpwcore.users_gc;
     Boolean redisplay = FALSE;
     register Display *dpy = XtDisplay(current);
     register Window win = XtWindow(current);
@@ -391,20 +384,19 @@ Cardinal *num_params;
     XtCallCallbacks(gw, XtNresizeEvent, (caddr_t)call_data);
 }
 
-static void CheckSwitchCmaps (w, type)
-XpwGraphicWidget w;
-int type;
-{
+static void CheckSwitchCmaps(XpwGraphicWidget w, int type) {
     Display *dpy=XtDisplay(w);
     Screen *screen=XtScreen(w);
     Colormap cmap = XtColormap(w);
 
     if ((Boolean)w->xpwgraphic.switch_cmaps) {
-        if (type == EnterNotify)
-            if (XtColormap(w) != DefaultColormapOfScreen(screen))
+        if (type == EnterNotify) {
+            if (XtColormap(w) != DefaultColormapOfScreen(screen)) {
                 XInstallColormap(dpy, cmap);
-        else if (type == LeaveNotify)
+            }
+        } else if (type == LeaveNotify) {
             XInstallColormap(dpy, DefaultColormapOfScreen(screen));
+        }
         XFlush(dpy);
     }
 }
@@ -462,7 +454,7 @@ XEvent *event;
 String *params;
 Cardinal *num_params;
 {   /* converts keycode to keysym */
-    KeySym key; unsigned int modifiers_return, count = 14;
+    KeySym key; unsigned int count = 14;
     XComposeStatus compose;
     XpwGraphicWidget w = (XpwGraphicWidget) gw;
     ExtractPosition( event, (int *)&(w->xpwgraphic.mouse_x),

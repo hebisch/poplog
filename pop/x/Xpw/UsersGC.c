@@ -32,29 +32,51 @@ externaldef (_xpwgcvaluemask) XtGCMask  _xpwGCvaluemask;
 /* DEBUGGING */
 
 #ifdef DEBUG
-static void debug_msg(m)
-char *m;
+static void debug_msg(char * m)
 {
     printf("xpwCore: %s\n",m);
 }
-static void printgc(valuemask, values)
-XtGCMask valuemask;
-XGCValues *values;
-{
-    if (valuemask & GCBackground) printf("GC:background%i\n",values->background );
-    if (valuemask & GCForeground) printf("GC:foreground%i\n",values->foreground );
-    if (valuemask & GCFunction) printf("GC:function %i\n",values->function);
-    if (valuemask & GCLineWidth) printf("GC:line_width%i\n",values->line_width) ;
-    if (valuemask & GCLineStyle) printf("GC:line_style%i\n",values->line_style) ;
-    if (valuemask & GCCapStyle) printf("GC:cap_style%i\n",values->cap_style);
-    if (valuemask & GCJoinStyle) printf("GC:join_style%i\n",values->join_style) ;
-    if (valuemask & GCFont) printf("GC:fid%i\n",values->font);
-    if (valuemask & GCSubwindowMode) printf("GC:subwin%i\n",values->subwindow_mode);
-    if (valuemask & GCFillStyle) printf("GC:fill style %i\n",values->fill_style);
-    if (valuemask & GCArcMode) printf("GC: arc mode %i\n",values->arc_mode);
-    if (valuemask & GCDashList) printf("GC: dashelist %i\n",values->dashes);
-    if (valuemask & GCDashOffset) printf("GC: dash offset %i\n",values->dash_offset);
-
+static void 
+printgc(XtGCMask valuemask, XGCValues * values) {
+    if (valuemask & GCBackground) {
+        printf("GC:background%i\n", values->background );
+    }
+    if (valuemask & GCForeground) { 
+        printf("GC:foreground%i\n", values->foreground );
+    }
+    if (valuemask & GCFunction) {
+        printf("GC:function %i\n", values->function);
+    }
+    if (valuemask & GCLineWidth) {
+        printf("GC:line_width%i\n", values->line_width);
+    }
+    if (valuemask & GCLineStyle) {
+        printf("GC:line_style%i\n", values->line_style);
+    }
+    if (valuemask & GCCapStyle) {
+        printf("GC:cap_style%i\n", values->cap_style);
+    }
+    if (valuemask & GCJoinStyle) {
+        printf("GC:join_style%i\n", values->join_style);
+    }
+    if (valuemask & GCFont) {
+        printf("GC:fid%i\n", values->font);
+    }
+    if (valuemask & GCSubwindowMode) {
+        printf("GC:subwin%i\n", values->subwindow_mode);
+    }
+    if (valuemask & GCFillStyle) {
+        printf("GC:fill style %i\n", values->fill_style);
+    }
+    if (valuemask & GCArcMode) {
+        printf("GC: arc mode %i\n", values->arc_mode);
+    }
+    if (valuemask & GCDashList) {
+        printf("GC: dashelist %i\n", values->dashes);
+    }
+    if (valuemask & GCDashOffset) {
+        printf("GC: dash offset %i\n", values->dash_offset);
+    }
 }
 #else
 #define debug_msg(a)
@@ -75,10 +97,8 @@ XGCValues *values;
 */
 
 
-void _XpwUpdateUsersGC(w, valuemask, values)
-XpwCoreWidget w;
-XGCValues *values;
-unsigned long valuemask;
+void 
+_XpwUpdateUsersGC(XpwCoreWidget w, unsigned long valuemask, XGCValues * values)
 {
     register Display *dpy = XtDisplay(w);
     GC newGC;
@@ -87,22 +107,28 @@ unsigned long valuemask;
 #ifdef DEBUG
     debug_msg("_XpwUpdateUsersGC start");
     printf("_XpwUpdateUsersGC: shared=");
-    if (w->xpwcore.shared_gc) printf("TRUE\n");
-    else printf("FALSE");
+    if (w->xpwcore.shared_gc) {
+        printf("TRUE\n");
+    } else {
+        printf("FALSE");
+    }
     printf("valuemask = %u\n",valuemask);
-    if (w->xpwcore.users_gc) printf("_XpwUpdateUsersGC: usersGC=%i\n",w->xpwcore.users_gc);
+    if (w->xpwcore.users_gc) {
+        printf("_XpwUpdateUsersGC: usersGC=%i\n",w->xpwcore.users_gc);
+    }
 #endif
     if (w->xpwcore.users_gc == NULL) {
-      w->xpwcore.users_gc = XtGetGC((Widget)w, valuemask, values);
-      w->xpwcore.shared_gc = TRUE;
+        w->xpwcore.users_gc = XtGetGC((Widget)w, valuemask, values);
+        w->xpwcore.shared_gc = TRUE;
     } else if (w->xpwcore.shared_gc) {
         /*  we used to have a shared GC. Now we must create a non-shared
             GC, copy accross the values from the shared GC, and
             release the shared GC. */
         if (!XtIsRealized((Widget)w)) {
-          newGC = XCreateGC(dpy, RootWindowOfScreen(screen),valuemask, values);
+            newGC = XCreateGC(dpy, RootWindowOfScreen(screen),
+                              valuemask, values);
         } else {
-          newGC = XCreateGC(dpy, win, valuemask, values);
+            newGC = XCreateGC(dpy, win, valuemask, values);
         }
         /* copy fields of GC not specified in valuemask from old GC */
         XCopyGC(dpy, w->xpwcore.users_gc, ~valuemask, newGC);
@@ -116,7 +142,6 @@ unsigned long valuemask;
     debug_msg("not valuemask:");
     printgc(~valuemask, &(w->xpwcore.users_gc->values));
     debug_msg("updateGC end\n");
-
 }
 
 /* _XpwCondUpdateUsersGC - conditionally updates UsersGC
@@ -131,12 +156,10 @@ unsigned long valuemask;
 */
 
 
-void _XpwCondUpdateUsersGC(wc,w)
-Widget w;
-WidgetClass wc;
-{
+void
+_XpwCondUpdateUsersGC(WidgetClass wc, Widget w) {
     if (XtClass(w)==wc && _xpwGCvaluemask)
-    _XpwUpdateUsersGC(w, _xpwGCvaluemask, &_xpwGCvalues);
+    _XpwUpdateUsersGC((XpwCoreWidget)w, _xpwGCvaluemask, &_xpwGCvalues);
 }
 
 /* --- Revision History ---------------------------------------------------

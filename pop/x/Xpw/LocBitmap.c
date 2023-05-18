@@ -29,46 +29,52 @@
  * parts; to release, free list[0] and list.
  */
 
-static char **split_path_string (src)
-    register char *src;
-  {
+static char **
+split_path_string (char * src)
+{
     int nelems = 1;
-    register char *dst;
+    char *dst;
     char **elemlist, **elem;
 
     /* count the number of elements */
-    for (dst = src; *dst; dst++) if (*dst == ':') nelems++;
+    for (dst = src; *dst; dst++) {
+        if (*dst == ':') {
+            nelems++;
+        }
+    }
 
     /* get memory for everything */
     dst = (char *) malloc (dst - src + 1);
-    if (!dst) return NULL;
-    elemlist = (char **) calloc ((nelems + 1), sizeof (char *));
-    if (!elemlist)
-      { free (dst);
+    if (!dst) {
         return NULL;
-      }
+    }
+    elemlist = (char **) calloc ((nelems + 1), sizeof (char *));
+    if (!elemlist) {
+        free (dst);
+        return NULL;
+    }
 
     /* copy to new list and walk up nulling colons and setting list pointers */
     strcpy (dst, src);
-    for (elem = elemlist, src = dst; *src; src++)
-      { if (*src == ':')
-          { *elem++ = dst;
+    for (elem = elemlist, src = dst; *src; src++) {
+        if (*src == ':') {
+            *elem++ = dst;
             *src = '\0';
             dst = src + 1;
-          }
-      }
+        }
+    }
     *elem = dst;
 
     return elemlist;
-  }
+}
 
 /*
  * lookup_file_paths - gets bitmapFilePath resource value and turns it into
  * list of file paths
  */
 
-static char **lookup_file_paths(dpy)
-Display *dpy;
+static char **
+lookup_file_paths(Display * dpy)
 {
     /* Look for bitmapFilePath resource */
     XrmName xrm_name[2];
@@ -80,32 +86,36 @@ Display *dpy;
     xrm_class[0] = XrmStringToClass ("BitmapFilePath");
     xrm_class[1] = (XrmClass) 0;
     /* need to initialize display database */
-    if (!XtDatabase(dpy)) (void) XGetDefault (dpy, "", "");
-    if (XrmQGetResource(XtDatabase(dpy), xrm_name, xrm_class, &rep_type, &value)
-    && rep_type == XrmStringToQuark(XtRString))
+    if (!XtDatabase(dpy)) {
+        (void) XGetDefault (dpy, "", "");
+    }
+    if (XrmQGetResource(XtDatabase(dpy),
+                        xrm_name, xrm_class, &rep_type, &value)
+            && rep_type == XrmStringToQuark(XtRString)) {
         return split_path_string (value.addr);
-    else
+    } else {
         return NULL;
+    }
 }
 
 /* Frees list returned by lookup_file_paths */
 
-static void free_file_paths(file_paths)
-char **file_paths;
-  { if (file_paths)
-      { if (file_paths[0]) free (file_paths[0]);
+static void
+free_file_paths(char ** file_paths)
+{
+    if (file_paths) {
+        if (file_paths[0]) free (file_paths[0]);
         free ((char *) (file_paths));
-      }
-  }
+    }
+}
 
-Pixmap XpwLocateBitmapFile (screen, name, srcname, srcnamelen,
-                widthp, heightp, xhotp, yhotp)
-    Screen *screen;
-    char *name;
-    char *srcname;          /* RETURN */
-    int srcnamelen;
-    int *widthp, *heightp, *xhotp, *yhotp;  /* RETURN */
-  {
+/* srcname, widthp, heightp, xhotp, yhotp are used to return
+   values */
+Pixmap
+XpwLocateBitmapFile(Screen * screen, char * name, char * srcname,
+                    int srcnamelen, int * widthp, int * heightp,
+                    int * xhotp, int * yhotp)
+{
     Display *dpy = DisplayOfScreen (screen);
     Window root = RootWindowOfScreen (screen);
 
@@ -130,57 +140,71 @@ Pixmap XpwLocateBitmapFile (screen, name, srcname, srcnamelen,
 #define BITMAPDIR "/usr/include/X11/bitmaps"
 #endif
 
-    for (i = 1; i <= 4; i++)
-      { char *fn = filename;
+    for (i = 1; i <= 4; i++) {
+        char *fn = filename;
         Pixmap pixmap;
 
-        switch (i)
-          { case 1:
-                if (!(name[0] == '/' || (name[0] == '.') && name[1] == '/'))
-                  continue;
+        switch (i) {
+            case 1:
+                if (!(name[0] == '/' || (name[0] == '.') && name[1] == '/')) {
+                    continue;
+                }
                 fn = name;
                 try_plain_name = False;
                 break;
             case 2:
-                if (!got_file_paths)
-                  { file_paths = fpaths = lookup_file_paths(dpy);
+                if (!got_file_paths) {
+                    file_paths = fpaths = lookup_file_paths(dpy);
                     got_file_paths = True;
-                  }
-                if (fpaths && *fpaths)
-                  { sprintf (filename, "%s/%s", *fpaths, name);
+                }
+                if (fpaths && *fpaths) {
+                    sprintf (filename, "%s/%s", *fpaths, name);
                     fpaths++;
                     i--;
                     break;
-                  }
+                }
                 continue;
             case 3:
                 sprintf (filename, "%s/%s", BITMAPDIR, name);
                 break;
             case 4:
-                if (!try_plain_name) continue;
+                if (!try_plain_name) {
+                    continue;
+                }
                 fn = name;
                 break;
-          }
+        }
 
         if (XReadBitmapFile (dpy, root, fn, &width, &height,
-                     &pixmap, &xhot, &yhot) == BitmapSuccess)
-          {
-            if (widthp) *widthp = (int)width;
-            if (heightp) *heightp = (int)height;
-            if (xhotp) *xhotp = xhot;
-            if (yhotp) *yhotp = yhot;
-            if (got_file_paths) free_file_paths(file_paths);
-            if (srcname && srcnamelen > 0)
-              { strncpy (srcname, fn, srcnamelen - 1);
+                     &pixmap, &xhot, &yhot) == BitmapSuccess) {
+            if (widthp) {
+                *widthp = (int)width;
+            }
+            if (heightp) {
+                *heightp = (int)height;
+            }
+            if (xhotp) {
+                *xhotp = xhot;
+            }
+            if (yhotp) {
+                *yhotp = yhot;
+            }
+            if (got_file_paths) {
+                free_file_paths(file_paths);
+            }
+            if (srcname && srcnamelen > 0) {
+                strncpy (srcname, fn, srcnamelen - 1);
                 srcname[srcnamelen - 1] = '\0';
-              }
+            }
             return pixmap;
-          }
-      }
+        }
+    }
 
-    if (got_file_paths) free_file_paths(file_paths);
+    if (got_file_paths) {
+        free_file_paths(file_paths);
+    }
     return None;
-  }
+}
 
 
 /* --- Revision History ---------------------------------------------------
