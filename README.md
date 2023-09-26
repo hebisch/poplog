@@ -22,7 +22,7 @@ material using Poplog, some included in this repository, some
 in separate packages repository, some available on the net.
 
 This is cleaned up version of Poplog sources, currently only
-core part.  It misses binary needed for boostrap and extentions
+core part.  It misses binary needed for bootstrap and extensions
 (packages).  Packages are in separate repository:
 
   https://github.com/hebisch/poplog_packages
@@ -30,8 +30,8 @@ core part.  It misses binary needed for boostrap and extentions
 You can find link to bootstrap binary and buildable tarball for
 Intel/AMD 64-bit Linux at
 
-  http://www.math.uni.wroc.pl/~hebisch/poplog
+  http://fricas.org/~hebisch/poplog
 
 (this build version closely corresponding to repository).
 
-For more detailed installation istruction see INSTALL.
+For more detailed installation instructions see INSTALL.
