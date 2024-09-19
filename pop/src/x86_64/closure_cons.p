@@ -33,7 +33,7 @@ define Cons_closure(_nfroz) -> _clos;
     ;;; Compute size of closure code
     if _zero(_nfroz) then
         _6
-    elseif _nfroz _gr _16 then
+    elseif _nfroz _gr _12 then
         _19
     else
         _nfroz _mult _8 _add _10
@@ -53,7 +53,7 @@ define Cons_closure(_nfroz) -> _clos;
     _clos@PD_CLOS_FROZVALS[_nfroz] ->> _drop_ptr -> _clos!PD_EXECUTE;
 
     ;;; On entry, closure address should be in ARG_REG_0 (EAX)
-    if _nfroz _gr _16 then
+    if _nfroz _gr _12 then
         ;;; Call via -Exec_closure-
         ;;; subq $8, %USP
                 _16:48 -> BYTE,
