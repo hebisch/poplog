@@ -64,12 +64,6 @@ global constant macro (
     ;;; LOWEST_ADDRESS:
     ;;; LOWEST_ADDRESS = 0,
 
-    ;;; UNIX_USRSTACK:
-    ;;;     Fake, on Linux we need to estimate stack locaction at
-    ;;;     runtime.
-
-    UNIX_USRSTACK  = 16:FC000000,
-
     ;;; Procedures to get and set the memory break and return the REAL end of
     ;;; memory. (We always need the real end to ensure that the end of the
     ;;; user stack is always at the true end of memory, so that user stack

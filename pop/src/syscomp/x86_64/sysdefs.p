@@ -31,7 +31,6 @@ global constant macro (
 
     WORD_BITS       = 64,
 
-;;; POPINT_BITS     = 62,
     POPINT_BITS     = 61,
 
     SHORT_ALIGN_BITS = 8,       ;;; alignment in bits for short access
@@ -70,11 +69,6 @@ global constant macro (
 
     ;;; LOWEST_ADDRESS:
     LOWEST_ADDRESS = 0,
-
-    ;;; UNIX_USRSTACK:
-    ;;;     ????
-
-    UNIX_USRSTACK  = 16:FC0000000,
 
     ;;; Procedures to get and set the memory break and return the REAL end of
     ;;; memory. (We always need the real end to ensure that the end of the
