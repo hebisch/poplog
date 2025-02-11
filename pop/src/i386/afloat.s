@@ -146,7 +146,7 @@ DEF_C_LAB (_pf_dfloat_uint)
     movl    4(%USP), %eax
     pushl   $0
     pushl   %eax
-    fildq   (%SP)
+    fildll  (%SP)
     addl    $8, %SP
     addl    $8, %USP
     fstpl   (%edi)
