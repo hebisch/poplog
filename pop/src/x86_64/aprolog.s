@@ -170,7 +170,7 @@ DEF_C_LAB (_prolog_restore)
     ;;; ... and uninstantiate the variables on it
 
     cld
-L1.3:   slodq               ;;; plogvar in EAX
+L1.3:   lodsq               ;;; plogvar in EAX
     movq    %rax, _PGV_CONT(%rax)   ;;; assigned to its own PGV_CONT
     cmpq    %rcx, %rsi
     jne L1.3

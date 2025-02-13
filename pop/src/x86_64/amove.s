@@ -64,7 +64,8 @@ DEF_C_LAB (_bcmp)
     ;;; Compare the regions
 
     repz
-    scmpb
+    cmpsb
+
 
     ;;; If the last bytes compared equal return <true>,
     ;;; otherwise return <false>
@@ -108,7 +109,7 @@ DEF_C_LAB (_scmp)
     ;;; Compare the word regions
 
     repz
-    scmpw
+    cmpsw
 
     ;;; If the last words compared equal return <true>,
     ;;; otherwise return <false>
@@ -154,7 +155,7 @@ DEF_C_LAB (_cmp)
     ;;; Compare the longword regions
 
     repz
-    scmpl
+    cmpsl
 
     ;;; If the last longwords compared equal return <true>,
     ;;; otherwise return <false>
@@ -415,7 +416,7 @@ DEF_C_LAB (_bfill)
 
     cld
     rep
-    sstob
+    stosb
     ret
 
     .align  16
@@ -445,7 +446,7 @@ DEF_C_LAB (_ifill)
     cld
     sarq    $2, %rcx
     rep
-    sstol
+    stosl
     ret
 
     .align  16
@@ -463,7 +464,7 @@ DEF_C_LAB (_fill)
     cld
     sarq    $3, %rcx
     rep
-    sstoq
+    stosq
     ret
 
     .align  4

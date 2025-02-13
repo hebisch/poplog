@@ -2094,7 +2094,7 @@ define lconstant outinst(instr);
 #_IF DEF MASM
     lconstant COMMENT = `;`;
 #_ELSE
-    lconstant COMMENT = `/`;
+    lconstant COMMENT = `#`;
 #_ENDIF
     lvars opcode = f_subv(1, instr);
     if opcode == "label" then

@@ -853,7 +853,7 @@ DEF_C_LAB (_locc)
     ;;; Scan for byte AL in EDI for maximum length ECX
 
     repnz
-    sscab
+    scasb
 
     ;;; If the last byte comparison was non-zero, it was never found:
     ;;; return -1
@@ -914,7 +914,7 @@ DEF_C_LAB (_skpc)
     ;;; Scan for byte not matching AL in EDI for maximum length ECX
 
     repz
-    sscab
+    scasb
 
     ;;; If the last byte comparison was zero, everything matched AL:
     ;;; return -1

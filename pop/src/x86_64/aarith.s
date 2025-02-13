@@ -698,7 +698,7 @@ DEF_C_LAB (_array_sub)
     ;;; Load first dimension to EAX: may be zero already for a
     ;;; 0-dimensional array
 
-    slodq
+    lodsq
     testq   %rax, %rax
     jz  L1.10
 
@@ -724,7 +724,7 @@ L1.8:   ;;; Start of loop:
     ;;; Get the dimension scaling factor in EAX and use it to scale
     ;;; the index (NB: 0 means 1, so don't multiply!)
 
-    slodq
+    lodsq
     testq   %rax, %rax
     jz  L1.9
     imulq   %rax, %rdx
@@ -735,7 +735,7 @@ L1.9:   ;;; Add to the running total
 
     ;;; Get the next dimension in EAX and loop if non-zero
 
-    slodq
+    lodsq
     testq   %rax, %rax
     jnz L1.8
 

@@ -151,7 +151,7 @@ socont:
 L1.1:                           ;;; Loop:
     movq    (%rsi), %rdx    ;;; ident to EDX
     movq    _ID_VALOF(%rdx), %rax   ;;; idval to EAX
-    sstoq                   ;;; save idval in process record
+    stosq                   ;;; save idval in process record
     popq    _ID_VALOF(%rdx) ;;; restore previous idval from stack
     subq    $8, %rsi        ;;; decrement ESI
     loop    L1.1
@@ -166,49 +166,49 @@ L2.1:
     bt  $15, %rcx
     jnc L2.14
     movq %r15, %rax
-    sstoq
+    stosq
     popq %r15
 L2.14:
     bt  $14, %rcx
     jnc L2.13
     movq %r14, %rax
-    sstoq
+    stosq
     popq %r14
 L2.13:
     bt  $13, %rcx
     jnc L2.12
     movq %r13, %rax
-    sstoq
+    stosq
     popq %r13
 L2.12:
     bt  $12, %rcx
     jnc L2.11
     movq %r12, %rax
-    sstoq
+    stosq
     popq %r12
 L2.11:
     bt  $11, %rcx
     jnc L2.10
     movq %r11, %rax
-    sstoq
+    stosq
     popq %r11
 L2.10:
     bt  $10, %rcx
     jnc L2.9
     movq %r10, %rax
-    sstoq
+    stosq
     popq %r10
 L2.9:
     bt  $9, %rcx
     jnc L2.8
     movq %r9, %rax
-    sstoq
+    stosq
     popq %r9
 L2.8:
     bt  $8, %rcx
     jnc L2.7
     movq %r8, %rax
-    sstoq
+    stosq
     popq %r8
 L2.7:
 
@@ -330,49 +330,49 @@ siloop:
     bt $8, %rcx
     jnc L1.9
     push %r8
-    slodq
+    lodsq
     movq %rax, %r8
 L1.9:
     bt $9, %rcx
     jnc L1.10
     push %r9
-    slodq
+    lodsq
     movq %rax, %r9
 L1.10:
     bt $10, %rcx
     jnc L1.11
     push %r10
-    slodq
+    lodsq
     movq %rax, %r10
 L1.11:
     bt $11, %rcx
     jnc L1.12
     push %r11
-    slodq
+    lodsq
     movq %rax, %r11
 L1.12:
     bt $12, %rcx
     jnc L1.13
     push %r12
-    slodq
+    lodsq
     movq %rax, %r12
 L1.13:
     bt $13, %rcx
     jnc L1.14
     push %r13
-    slodq
+    lodsq
     movq %rax, %r13
 L1.14:
     bt $14, %rcx
     jnc L1.15
     push %r14
-    slodq
+    lodsq
     movq %rax, %r14
 L1.15:
     bt $15, %rcx
     jnc L1.16
     push %r15
-    slodq
+    lodsq
     movq %rax, %r15
 
 L1.16:
@@ -393,7 +393,7 @@ L1.16:
 L1.2:                           ;;; Loop:
     movq    (%rdi), %rdx    ;;; ident to EDX
     pushq   _ID_VALOF(%rdx) ;;; push the idval
-    slodq                   ;;; new idval from process record to EAX
+    lodsq                   ;;; new idval from process record to EAX
     movq    %rax, _ID_VALOF(%rdx)   ;;; set new idval
     addq    $8, %rdi        ;;; increment EDI
     loop    L1.2
