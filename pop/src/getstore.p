@@ -295,14 +295,13 @@ lconstant macro (
 
 define Set_userhi_to(_addr, freeold);
     lvars freeold, _addr;
-    if freeold then FREE_LIM_PAGE endif;
     ;;; set the new break
     if (Set_user_break(_addr, _0) ->> _addr) /== _-1 then
+        if freeold then Set_mem_prot(_userhi, _addr, _M_PROT_ALL) -> endif;
         _addr -> _userhi;
         LOCK_LIM_PAGE;
         true
     else
-        if freeold then LOCK_LIM_PAGE endif;
         false
     endif
 enddefine;
@@ -419,14 +418,13 @@ define Expand_open_seg(_nwords, _minwords);
     ;;; and can't leapfrog
     returnif(Open_seg_blocked(false)) (_zero(_minwords));
     ;;; else try expansion
-    ;;; free the limit page
-    FREE_LIM_PAGE;
     ;;; set the new break
     Set_user_break(_userhi@(w)[_nwords], @@(w)[_minwords _sub _nwords])
                                                         -> _break;
     if _break == _-1 then
         false
     else
+        Set_mem_prot(_userhi, _break, _M_PROT_ALL) -> ;
         ;;; shift userstack up by actual expansion amount
         _move_userstack(@@(w){_break, _userhi});
         true

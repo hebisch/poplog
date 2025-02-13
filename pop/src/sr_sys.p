@@ -915,9 +915,13 @@ define lconstant Do_Restore(file, _layering, _sframe, _retaddr_ptr);
 
     ;;; If restore requires expanded memory, check it's available
     Read_idval(ident _nuserhi);         ;;; new userhi
-    if _nuserhi >@(w) _userhi and not(Set_userhi_to(_nuserhi, true)) then
-        mishap(0, 'INSUFFICIENT MEMORY TO RESTORE SAVED IMAGE');
-        interrupt()
+    if _nuserhi >@(w) _userhi then
+        lvars _ouserhi = _userhi;
+        if not(Set_userhi_to(_nuserhi, true)) then
+            mishap(0, 'INSUFFICIENT MEMORY TO RESTORE SAVED IMAGE');
+            interrupt()
+        endif;
+        Set_mem_prot(_ouserhi, _nuserhi, _M_PROT_ALL) -> ;
     endif;
 
     ;;; committed

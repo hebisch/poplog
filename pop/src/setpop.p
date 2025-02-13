@@ -659,6 +659,7 @@ define Setup_system(_cs_hi, _plog_nwords);
     unless Set_userhi_to(_base@(w){_USER_SAFEGAP}, false) then
         setpop()    ;;; exit
     endunless;
+    Set_mem_prot(_user_base, _userhi, _M_PROT_ALL) -> ;
     _userhi -> _user_sp();
     Clear_open_seg();
     ;;; Expand to initial size
