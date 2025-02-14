@@ -42,7 +42,7 @@ globalref POPWORD
     _pop_external_flags;    /* pop Sys$- _external_flags */
 globalref POPOBJ
     pop_exfunc_arg;
-extern int _pop_external_callback();
+extern int _pop_external_callback(void *);
 
 
 /*
@@ -66,12 +66,12 @@ globalref POPOBJ *pop_exfunc_closure_arg;
  *  C Interface functions -- all except pop_get_ident return 1 on
  *  normal exit, and all return 0 on abnormal exit
  */
-extern int pop_mishap();
-extern int pop_call();
-extern POPOBJ pop_get_ident();
-extern int pop_free_fixed_hold();
+extern int pop_mishap(char * message);
+extern int pop_call(POPOBJ obj, void * argp);
+extern POPOBJ pop_get_ident(char * idname);
+extern int pop_free_fixed_hold(POPOBJ obj);
 extern int pop_check_interrupt();
-extern int pop_sys_init();
+extern int pop_sys_init(POPWORD plog_nwords, POPWORD unused);
 
 
 /*

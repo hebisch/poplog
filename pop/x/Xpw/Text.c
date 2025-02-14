@@ -2508,7 +2508,7 @@ WriteAtCursor(XpwScrollTextWidget w, uchar * string, int len)
                                                 string, True, WS_WRITE);
         draw_text_write_spaces = False;
         _XpwTextCursorOn(w, save_cursor);
-        return;
+        return 0;
     }
 
     /* computing width of chars etc */
@@ -2994,7 +2994,7 @@ XpwSetSelection(Widget w, String location, String string, int nbytes,
         context->client = client;
 
         if (context->widget != NULL) {
-            return; /* already own the selection */
+            return 0 ; /* already own the selection */
         }
 
         /* n.b. the selection data must be set up before calling

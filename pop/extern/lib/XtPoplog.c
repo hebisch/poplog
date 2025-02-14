@@ -82,10 +82,10 @@ va_dcl
         if (do_pop_print)
             prmessage = pop_get_ident("Xpt_sys_pr_message");
 
-        if (fmt)
-        {   /* get a temporary buffer to print into */
+        if (fmt) {
+            /* get a temporary buffer to print into */
             char string[ERRSTRINGSIZE], c;
-            register int i, j, slength;
+            int i, j, slength;
             /* call the C print formatter */
             vsprintf(string, fmt, args);
             /* test and remove any newline chars from string */
@@ -95,17 +95,18 @@ va_dcl
             /* null terminate string */
             string[j] = 0;
             /* print it */
-            if (do_pop_print)
+            if (do_pop_print) {
                 pop_call(prmessage, string);
-            else
+            } else {
                 printf(";;; %s\n", string);
-        }
-        else
-        {   /* print a newline */
-            if (do_pop_print)
+            }
+        } else {
+            /* print a newline */
+            if (do_pop_print) {
                 pop_call(prmessage, NULL);
-            else
+            } else {
                 printf("\n");
+            }
         }
     }
 
@@ -116,18 +117,15 @@ va_dcl
 static char err_buff[512];
 
 /*  Toolkit Error: mishap with the message supplied */
-void PopXtError(message)
-String message;
-{   (void) sprintf(err_buff, "xte: X TOOLKIT ERROR (%s)", message);
+void PopXtError(String message) {
+    (void) sprintf(err_buff, "xte: X TOOLKIT ERROR (%s)", message);
     pop_mishap(err_buff);
 }
 
 
 
 /* Toolkit Warning: just print the message */
-void PopXtWarning(message)
-String message;
-{
+void PopXtWarning(String message) {
     (void) X_printf("WARNING - xtw: X TOOLKIT WARNING (%s)", message);
     (void) X_printf(NULL);
 }
@@ -135,9 +133,7 @@ String message;
 
 #ifndef VMS
 #if defined(sun) && !(defined(SVR4) || defined(linux))
-static char *_SysErrorMsg (n)
-    int n;
-{
+static char *_SysErrorMsg(int n) {
     globalref char *sys_errlist[];
     globalref int sys_nerr;
     char *s = ((n >= 0 && n < sys_nerr) ? sys_errlist[n] : "unknown error");
@@ -156,21 +152,14 @@ static char *_SysErrorMsg (n)
 
 #define XTFORMATSTR "%s: %s -- %s"
 
-static void Err_msg(name,type,class,defaultp,params,num_params, err_p)
-    String name,type,class,defaultp;
-    String* params;
-    Cardinal* num_params;
-    void (*err_p)();
-{
+static void Err_msg(String name, String type, String class, String defaultp,
+                    String* params, Cardinal* num_params, void (*err_p)()) {
     char buffer[1000], message[1000];
     XtGetErrorDatabaseText(name, type, class, defaultp, buffer, 1000);
-    if (params == NULL || num_params == NULL || *num_params == 0)
-    {
+    if (params == NULL || num_params == NULL || *num_params == 0) {
         sprintf(message, XTFORMATSTR, type, name, buffer);
         err_p(message);
-    }
-    else
-    {
+    } else {
         String par[10];
         int i, npar = *num_params < 10 ? *num_params : 10;
         for (i = 0; i < npar; i++)
@@ -186,19 +175,13 @@ static void Err_msg(name,type,class,defaultp,params,num_params, err_p)
     }
 }
 
-void PopXtWarningMsg(name,type,class,defaultp,params,num_params)
-    String name,type,class,defaultp;
-    String* params;
-    Cardinal* num_params;
-{
+void PopXtWarningMsg(String name, String type, String class, String defaultp,
+                     String* params, Cardinal* num_params) {
     Err_msg(name, type, class, defaultp, params, num_params, XtWarning);
 }
 
-void PopXtErrorMsg(name,type,class,defaultp,params,num_params)
-    String name,type,class,defaultp;
-    String* params;
-    Cardinal* num_params;
-{
+void PopXtErrorMsg(String name, String type, String class, String defaultp,
+                   String* params, Cardinal* num_params) {
     Err_msg(name, type, class, defaultp, params, num_params, XtError);
 }
 
@@ -207,9 +190,7 @@ void PopXtErrorMsg(name,type,class,defaultp,params,num_params)
 #define XIOESTRING "xioe: XLIB IO ERROR -- see above"
 
 /* Xlib 'fatal' error: mishap with a helpful message and close the display */
-void PopXIOError(dpy)
-    Display *dpy;
-{
+void PopXIOError(Display * dpy) {
     POPOBJ xio_error_handler;
 
     (void) X_printf(NULL);
@@ -238,10 +219,7 @@ void PopXIOError(dpy)
     sprintf(buffer, "--- %s", mesg); (void) X_printf(buffer, arg);
 
 /* Xlib recoverable error - copied from default handler */
-int PopXError(dpy, event)
-    Display *dpy;
-    XErrorEvent *event;
-{
+int PopXError(Display * dpy, XErrorEvent * event) {
     char buffer[BUFSIZ];
     char mesg[BUFSIZ];
     char number[32];
@@ -283,25 +261,22 @@ int PopXError(dpy, event)
 }
 
 /* Copied from default language proc */
-String PopXtDefaultLanguageProc(dpy, xnl, closure)
-    Display   *dpy; /* unused */
-    String     xnl;
-    XtPointer  closure; /* unused */
-  {
+String PopXtDefaultLanguageProc(Display * dpy, String xnl, XtPointer closure)
+{
     /* We assume the locale is already set
     if (! setlocale(LC_ALL, xnl))
         XtWarning("locale not supported by C library, locale unchanged");
     */
 
-    if (! XSupportsLocale())
-      { XtWarning("locale not supported by Xlib, locale set to C");
+    if (! XSupportsLocale()) {
+        XtWarning("locale not supported by Xlib, locale set to C");
         setlocale(LC_ALL, "C");
-      }
+    }
     if (! XSetLocaleModifiers(""))
         XtWarning("X locale modifiers not supported, using default");
 
     return setlocale(LC_ALL, NULL); /* re-query in case overwritten */
-  }
+}
 
 
 
@@ -336,11 +311,8 @@ typedef struct _OlListToken *OlListToken;   /* opaque item token */
 
 #define XtNapplAddItem "applAddItem"
 
-OlListToken XpolAddListItem(widget, parent, reference, item)
-Widget widget;
-OlListToken parent, reference;
-OlListItem *item;
-{
+OlListToken XpolAddListItem(Widget widget, OlListToken parent,
+                            OlListToken reference, OlListItem * item) {
     OlListToken  (*Addfn)();
 
     /* Get the add procedure */
@@ -358,12 +330,8 @@ OlListItem *item;
 #define PROTOCOL_ACTION "XptWMProtocol"
 
 /* Protocol message  handling procedure */
-static void ProtoHandler(w, client_data, event, continue_to_dispatch)
-Widget w;
-Opaque client_data;
-XEvent *event;
-Boolean *continue_to_dispatch;
-{
+static void ProtoHandler(Widget w, Opaque client_data, XEvent * event,
+                        Boolean * continue_to_dispatch) {
     Atom protocols;
     Display *dpy;
     String protocol_name;
@@ -392,11 +360,7 @@ Boolean *continue_to_dispatch;
 /*  add protocol handler as event filter for specified widget
     (run on all shell widgets created by Poplog)
 */
-void XptAddProtoHandler(w,pcols,pcols_len)
-Widget w;
-char **pcols;
-int pcols_len;
-{
+void XptAddProtoHandler(Widget w, char ** pcols, int pcols_len) {
     Atom pcol_atoms[MAX_WM_PROTOCOLS];
     Display *dpy = XtDisplay(w);
     Boolean sv = w->core.mapped_when_managed;
@@ -432,12 +396,8 @@ int pcols_len;
     XtDestroyWidget on widgets that are application shells.
     Ignore everything else.
 */
-static void XptWMProtocol(w,event,params,num_params)
-Widget w;
-XEvent *event;
-String *params;
-Cardinal *num_params;
-{
+static void XptWMProtocol(Widget w, XEvent * event, String * params,
+                          Cardinal * num_params) {
     if (*num_params == 1 && strcmp(*params,"WM_DELETE_WINDOW") == 0) {
         if (XtParent(w)) {
             XtPopdown(w);
@@ -453,12 +413,8 @@ Cardinal *num_params;
 */
 XtInputMask XptAppTryEvents();
 
-static void XptGarbageFeedback(w,event,params,num_params)
-Widget w;
-XEvent *event;
-String *params;
-Cardinal *num_params;
-{
+static void XptGarbageFeedback(Widget w, XEvent * event, String * params,
+                               Cardinal * num_params) {
     if (*num_params == 1)
         XtSetSensitive(w,False);
     else
@@ -479,9 +435,7 @@ static XtActionsRec XptDefaultActions[] = {
 };
 #define NumXptDefaultActions 2
 
-void XptAddAppconActions(appcon)
-XtAppContext appcon;
-{
+void XptAddAppconActions(XtAppContext appcon) {
     XtAppAddActions(appcon,XptDefaultActions,NumXptDefaultActions);
 }
 
@@ -490,10 +444,10 @@ XtAppContext appcon;
 
 #define INT_NBITS sizeof(int)*8
 
-typedef struct
-  { XtAppContext appcon;
+typedef struct {
+    XtAppContext appcon;
     POPOBJ       clos;
-  } AppEntry;
+} AppEntry;
 
 globaldef AppEntry
     appcon_tab[INT_NBITS],
@@ -508,74 +462,71 @@ static unsigned int appcons_enabled;
    to be waited on */
 globaldef unsigned int __pop_appcons_normal;
 
-static int poll_appcons()
-  { register AppEntry *entp = appcon_tab;
-    register unsigned int mask = appcons_enabled, newmask = mask;
+static int poll_appcons() {
+    AppEntry *entp = appcon_tab;
+    unsigned int mask = appcons_enabled, newmask = mask;
     POPWORD save_external_flags = _pop_external_flags;
     globalref int (*_pop_Xt_poll_deferred)();
 
     if (mask == 0) return(0);
-    if (_pop_in_X_call)
-      { _pop_stop_polling(XT_POLL_NUM);
+    if (_pop_in_X_call) {
+        _pop_stop_polling(XT_POLL_NUM);
         /*  setting this nonzero causes the external apply mechanism
          *  to call _pop_retry_Xt_poll when _pop_in_X_call reverts to zero
          */
         _pop_Xt_poll_deferred = poll_appcons;
         return(1);
-      }
+    }
 
     /* ensure malloc won't take mem from the popsys area */
     _pop_external_flags |= PEF_DO_USER_MALLOC;
 
-    for (; mask != 0; mask >>= 1, entp++)
-        if ((mask&1) && XtAppPending(entp->appcon))
-          { _pop_add_ast(AST_APP_PENDING, entp->clos);
+    for (; mask != 0; mask >>= 1, entp++) {
+        if ((mask&1) && XtAppPending(entp->appcon)) {
+            _pop_add_ast(AST_APP_PENDING, entp->clos);
             newmask &= ~BITOF(entp);    /* disable it */
-          };
-
+        }
+     } 
     _pop_external_flags = save_external_flags;
 
     mask = appcons_enabled;
     if (!(appcons_enabled = newmask)) _pop_stop_polling(XT_POLL_NUM);
-    if (newmask != mask)
-      { _pop_do_interrupt();
+    if (newmask != mask) {
+        _pop_do_interrupt();
         return(2);
-      }
-    else
+    } else {
         return(0);
-  }
+    }
+}
 
-static AppEntry *set_async_appcon(on, appcon)
-Boolean on;
-XtAppContext appcon;
-  { register AppEntry *entp = appcon_tab, *tabend = appcon_tab_end;
-    register unsigned int mask;
+static AppEntry *set_async_appcon(Boolean on, XtAppContext appcon) {
+    AppEntry *entp = appcon_tab, *tabend = appcon_tab_end;
+    unsigned int mask;
 
-    for (mask = 1; entp < tabend; mask <<= 1)
-        if ((entp++)->appcon == appcon)
-          { register unsigned int enabled = appcons_enabled;
-            if (enabled & mask)
+    for (mask = 1; entp < tabend; mask <<= 1) {
+        if ((entp++)->appcon == appcon) {
+            unsigned int enabled = appcons_enabled;
+            if (enabled & mask) {
                 /* currently enabled */
-              { if (!on && !(enabled &= ~mask))
+                if (!on && !(enabled &= ~mask))
                     _pop_set_poll_state(XT_POLL_NUM, NULL);
-              }
-            else
+            } else {
                 /* currently disabled */
-              { if (on && ((enabled |= mask) == mask))
+                if (on && ((enabled |= mask) == mask))
                     _pop_set_poll_state(XT_POLL_NUM, poll_appcons);
-              }
+            }
 
             appcons_enabled = enabled;
             return(--entp); /* entry addr in table for deleting */
-          }
-
+        }
+    }
     return(NULL);   /* not in table */
-  }
+}
 
 int
 _pop_set_async_appcon(XtAppContext appcon, POPOBJ clos, Boolean normaction)
 {
-    register AppEntry *curr;
+    AppEntry *curr;
     sigsave_t savesig;
     unsigned int m;
 
@@ -602,7 +553,7 @@ _pop_set_async_appcon(XtAppContext appcon, POPOBJ clos, Boolean normaction)
     } else {
         /* clearing */
         if (curr != NULL) {
-            register AppEntry *p;
+            AppEntry *p;
 #define REMOVE_BIT(v)   v = ((v>>1) &~ m) | (v & m)
             m = BITOF(curr)-1;  /* bits below this one */
             REMOVE_BIT(appcons_enabled);
@@ -610,8 +561,9 @@ _pop_set_async_appcon(XtAppContext appcon, POPOBJ clos, Boolean normaction)
 
             /* remove existing entry by shifting down */
             appcon_tab_end--;
-            for (p = curr+1; curr < appcon_tab_end; curr++, p++)
-              { curr->appcon = p->appcon;  curr->clos = p->clos; };
+            for (p = curr+1; curr < appcon_tab_end; curr++, p++) {
+                curr->appcon = p->appcon;  curr->clos = p->clos;
+            }
         }
     }
 
@@ -619,9 +571,9 @@ _pop_set_async_appcon(XtAppContext appcon, POPOBJ clos, Boolean normaction)
     return(0);
 }
 
-POPOBJ _pop_async_appcon_clos()
-  { return(appcon_tab_end == appcon_tab ? (POPOBJ)NULL : appcon_tab[0].clos);
-  }
+POPOBJ _pop_async_appcon_clos() {
+    return(appcon_tab_end == appcon_tab ? (POPOBJ)NULL : appcon_tab[0].clos);
+}
 
 
 /* == Event Handling ============================================ */
@@ -656,71 +608,68 @@ static XtAppContext last_event_appcon;
     firing timers)
 */
 
-static XtInputMask XptAppPending(appcon)
-register XtAppContext appcon;
-  { register XtInputMask m = XtAppPending(appcon);
+static XtInputMask XptAppPending(XtAppContext appcon) {
+    XtInputMask m = XtAppPending(appcon);
     if (m & XtIMXEvent) m = XtIMXEvent;
     return(m);
-  }
+}
 
 /* input callback for input on xt wakeup device etc - flag interrupt */
-void _XptDummyInput()
-  { _pop_set_xt_wakeup(FALSE);
+void _XptDummyInput() {
+    _pop_set_xt_wakeup(FALSE);
     if (IOWaitStatus < INTERRUPTED) IOWaitStatus = INTERRUPTED;
-  }
+}
 
-static void timeout_callback()
-  { if (IOWaitStatus < POLL_TIMEOUT) IOWaitStatus = POLL_TIMEOUT;
-  }
+static void timeout_callback() {
+    if (IOWaitStatus < POLL_TIMEOUT) IOWaitStatus = POLL_TIMEOUT;
+}
 
 /*
  *  Wait-state polling for async appcontexts
  */
-static XtAppContext try_appcons(pollingp)
-  Boolean *pollingp;
-  { register AppEntry *entp = appcon_tab, *tabend = appcon_tab_end;
-    register XtAppContext appcon, lastevent_app = NULL, normapp;
-    register unsigned int mask = 0, bit;
+static XtAppContext try_appcons(Boolean * pollingp) {
+    AppEntry *entp = appcon_tab, *tabend = appcon_tab_end;
+    XtAppContext appcon, lastevent_app = NULL, normapp;
+    unsigned int mask = 0, bit;
     Boolean last_ok = FALSE;
 
     _pop_external_flags |= PEF_RETURN_ABEXIT_ANY;
 
-    for (; entp < tabend; entp++)
-      { bit = BITOF(entp);
+    for (; entp < tabend; entp++) {
+        bit = BITOF(entp);
         appcon = entp->appcon;
-        if (__pop_appcons_normal & bit) /* must be at least one such */
-          { XtInputMask m;
+        if (__pop_appcons_normal & bit) {
+            /* must be at least one such */
+            XtInputMask m;
             normapp = appcon;
             if (last_event_appcon == appcon) last_ok = TRUE;
             while (!POP_ABEXIT && IOWaitStatus == CONTINUE
-                    && (m = XptAppPending(appcon)))
-              { XtAppProcessEvent(appcon, m);
+                    && (m = XptAppPending(appcon))) {
+                XtAppProcessEvent(appcon, m);
                 /* only set lastevent_app for real events */
                 if (IOWaitStatus == CONTINUE) lastevent_app = appcon;
-              }
-          }
-        else if (XtAppPending(appcon))
-          { _pop_add_ast(AST_APP_PENDING, entp->clos);
+            }
+        } else if (XtAppPending(appcon)) {
+            _pop_add_ast(AST_APP_PENDING, entp->clos);
             continue;
-          }
+        }
 
         if (mask) *pollingp = TRUE;     /* this is the 2nd, so more than 1 */
         mask |= bit;
-      }
+    }
 
     appcons_enabled = mask;
-    if (lastevent_app != NULL)
-      { if (lastevent_app != last_event_appcon) poll_time = POLL_INIT;
+    if (lastevent_app != NULL) {
+        if (lastevent_app != last_event_appcon) poll_time = POLL_INIT;
         last_event_appcon = lastevent_app;
-      }
-    else if (!last_ok)
+    } else if (!last_ok) {
         last_event_appcon = normapp;
-
+    }
     return(lastevent_app);
-  }
+}
 
-void XptPause()
-  { XtInputMask m;
+void XptPause() {
+    XtInputMask m;
     XtIntervalId id;
     XtAppContext waitapp;
     caddr_t (*poll_other)() = _pop_set_Xt_poll(NULL);
@@ -732,8 +681,8 @@ void XptPause()
 
     __pop_xt_wakeup_struct.XWK_FLAG_ENABLED = TRUE;
 
-    for (;;)
-      { IOWaitStatus = CONTINUE;
+    for (;;) {
+        IOWaitStatus = CONTINUE;
 
         if (poll_other) poll_other = (caddr_t (*)()) (*poll_other)();
         if (POP_CONDITION) break;
@@ -749,13 +698,13 @@ void XptPause()
 
         XtAppProcessEvent(waitapp, (m=XptAppPending(waitapp)) ? m : XtIMAll);
 
-        if (polling)
-          { if (IOWaitStatus == POLL_TIMEOUT)
-              { if (poll_time < POLL_MAX) poll_time += POLL_STEP;
+        if (polling) {
+            if (IOWaitStatus == POLL_TIMEOUT) {
+                if (poll_time < POLL_MAX) poll_time += POLL_STEP;
                 continue;
-              }
+            }
             XtRemoveTimeOut(id);
-          }
+        }
 
         /* finish off any remaining events */
         while (!POP_CONDITION && IOWaitStatus == CONTINUE
@@ -763,21 +712,21 @@ void XptPause()
             XtAppProcessEvent(waitapp, m);
 
         break;
-      }
+    }
 
     _pop_set_xt_wakeup(FALSE);
     _pop_set_Xt_poll(poll_appcons);
-  }
+}
 
 
 #ifdef VMS
 
-static void input_callback()
-  { IOWaitStatus = 1; }
+static void input_callback() {
+    IOWaitStatus = 1;
+}
 
-int XptReadWait(efnum)
-int efnum;      /* event flag number */
-  { XtInputMask m;
+int XptReadWait(int efnum /* event flag number */) {
+    XtInputMask m;
     XtIntervalId timid;
     XtInputId inid = NULL;
     XtAppContext waitapp, inidapp;
@@ -786,8 +735,8 @@ int efnum;      /* event flag number */
 
     __pop_xt_wakeup_struct.XWK_FLAG_ENABLED = TRUE;
 
-    for (;;)
-      { IOWaitStatus = CONTINUE;
+    for (;;) {
+        IOWaitStatus = CONTINUE;
 
         if (poll_other) poll_other = (caddr_t (*)()) (*poll_other)();
         if (POP_CONDITION) break;
@@ -810,16 +759,16 @@ int efnum;      /* event flag number */
         while (!POP_ABEXIT && IOWaitStatus == CONTINUE)
             XtAppProcessEvent(waitapp, (m=XptAppPending(waitapp)) ? m : XtIMAll);
 
-        if (polling)
-          { if (IOWaitStatus == POLL_TIMEOUT)
-              { if (poll_time < POLL_MAX) poll_time += POLL_STEP;
+        if (polling) {
+            if (IOWaitStatus == POLL_TIMEOUT) {
+                if (poll_time < POLL_MAX) poll_time += POLL_STEP;
                 continue;
-              }
+            }
             XtRemoveTimeOut(timid);
-          }
+        }
 
         break;
-      }
+    }
 
     if (inid) XtRemoveInput(inid);
     _pop_set_xt_wakeup(FALSE);
@@ -827,7 +776,7 @@ int efnum;      /* event flag number */
 
     /* return number of devices ready (i.e. 1) or -1 if interrupted */
     return(IOWaitStatus > 0 ? IOWaitStatus : -1);
-  }
+}
 
 #endif /* VMS */
 
@@ -836,37 +785,35 @@ int efnum;      /* event flag number */
 /* fd_set, FD_SET, FD_ISSET, FD_ZERO... */
 #include <sys/time.h>
 
-typedef struct
-  { short   nfds,       /* max fd in set + 1 (zero if empty)  */
+typedef struct {
+    short   nfds,       /* max fd in set + 1 (zero if empty)  */
             minfd;      /* min fd in set */
     fd_set  fdset;
-  } fdesc_set;
+} fdesc_set;
 
 static fdesc_set *curr_fdsets;
 static XtInputId *curr_inid_array;
 
-static void input_callback(client, fdp)
-int client, *fdp;
-  { int set;
-    if (IOWaitStatus < 0)
-      { for (set = 0; set <= 2; set++)
+static void input_callback(int client, int * fdp) {
+    int set;
+    if (IOWaitStatus < 0) {
+        for (set = 0; set <= 2; set++)
             if (curr_fdsets[set].nfds > 0) FD_ZERO(&curr_fdsets[set].fdset);
         IOWaitStatus = 0;
-      }
+    }
     IOWaitStatus++;
     FD_SET(*fdp, &curr_fdsets[client&3].fdset);
     client >>= 2;
     XtRemoveInput(curr_inid_array[client]);
     curr_inid_array[client] = (XtInputId) 0;
-  }
+}
 
 
-int XptIOWait(fdsets)
-  fdesc_set *fdsets;
-  { XtInputMask m;
+int XptIOWait(fdesc_set * fdsets) {
+    XtInputMask m;
     XtIntervalId timid;
     XtInputId inid_array[FD_SETSIZE], *inidp = NULL;
-    XtAppContext waitapp, inidapp;
+    XtAppContext waitapp, inidapp = 0;
     caddr_t (*poll_other)() = _pop_set_Xt_poll(NULL);
     Boolean polling = poll_other != NULL;
 
@@ -874,8 +821,8 @@ int XptIOWait(fdsets)
     curr_fdsets = fdsets;
     curr_inid_array = inid_array;
 
-    for (;;)
-      { IOWaitStatus = CONTINUE;
+    for (;;) {
+        IOWaitStatus = CONTINUE;
 
         if (poll_other) poll_other = (caddr_t (*)()) (*poll_other)();
         if (POP_CONDITION) break;
@@ -890,17 +837,17 @@ int XptIOWait(fdsets)
         if (polling) timid = XtAppAddTimeOut(waitapp, poll_time,
                                 (XtTimerCallbackProc) timeout_callback, NULL);
 
-        if (inidp && waitapp != inidapp)
-          { XtInputId *ip = inid_array, id;
+        if (inidp && waitapp != inidapp) {
+            XtInputId *ip = inid_array, id;
             while (ip < inidp) if (id = *ip++) XtRemoveInput(id);
             inidp = NULL;
-          }
-        if (!inidp)
-          { int set;
+        }
+        if (!inidp) {
+            int set;
             inidapp = waitapp;
             inidp = inid_array;
-            for (set = 0; set <= 2; set++)
-              { static char masks[] = {XtInputReadMask, XtInputWriteMask,
+            for (set = 0; set <= 2; set++) {
+                static char masks[] = {XtInputReadMask, XtInputWriteMask,
                                                         XtInputExceptMask};
                 fdesc_set *fdes = &fdsets[set];
                 int fd, nfds = fdes->nfds;
@@ -908,26 +855,27 @@ int XptIOWait(fdsets)
                 fd_set *fdsp = &fdes->fdset;
                 if (nfds == 0) continue;
 
-                for (fd = fdes->minfd; fd < nfds; fd++)
-                    if FD_ISSET(fd, fdsp)
-                      { long client = ((inidp-inid_array)<< 2) | set;
+                for (fd = fdes->minfd; fd < nfds; fd++) {
+                    if FD_ISSET(fd, fdsp) {
+                        long client = ((inidp-inid_array)<< 2) | set;
                         *inidp++ = XtAppAddInput(inidapp, fd, (XtPointer) cond,
                                         (XtInputCallbackProc) input_callback,
                                         (XtPointer) client);
-                      }
-              }
-          }
+                    }
+                }
+            }
+        }
 
         while (!POP_ABEXIT && IOWaitStatus == CONTINUE)
             XtAppProcessEvent(waitapp, (m=XptAppPending(waitapp)) ? m : XtIMAll);
 
-        if (polling)
-          { if (IOWaitStatus == POLL_TIMEOUT)
-              { if (poll_time < POLL_MAX) poll_time += POLL_STEP;
+        if (polling) {
+            if (IOWaitStatus == POLL_TIMEOUT) {
+                if (poll_time < POLL_MAX) poll_time += POLL_STEP;
                 continue;
-              }
+            }
             XtRemoveTimeOut(timid);
-          }
+        }
 
         if (IOWaitStatus > 0)
             /* finish off any other I/O events */
@@ -935,78 +883,71 @@ int XptIOWait(fdsets)
                 XtAppProcessEvent(waitapp, XtIMAlternateInput);
 
         break;
-      }
+    }
 
-    if (inidp)
-      { XtInputId *ip = inid_array, id;
+    if (inidp) {
+        XtInputId *ip = inid_array, id;
         while (ip < inidp) if (id = *ip++) XtRemoveInput(id);
-      }
+    }
     _pop_set_xt_wakeup(FALSE);
     _pop_set_Xt_poll(poll_appcons);
 
     /* return number of devices ready or -1 if interrupted */
     return(IOWaitStatus > 0 ? IOWaitStatus : -1);
-  }
+}
 
 #endif  /* UNIX */
 
 
-XtInputMask XptAppTryEvents(appcon)
-XtAppContext appcon;
-  { XtInputMask m;
+XtInputMask XptAppTryEvents(XtAppContext appcon) {
+    XtInputMask m;
     _pop_external_flags |= PEF_RETURN_ABEXIT_ANY;
 
     /* must do at least one event if available */
-    while (m = XptAppPending(appcon))
-      { XtAppProcessEvent(appcon, m);
-        if (last_event_appcon != appcon)
-          { last_event_appcon = appcon;
+    while (m = XptAppPending(appcon)) {
+        XtAppProcessEvent(appcon, m);
+        if (last_event_appcon != appcon) {
+            last_event_appcon = appcon;
             poll_time = POLL_INIT;
-          }
+        }
         if (POP_CONDITION) break;
-      }
+    }
 
     /* re-enable if set for async */
     set_async_appcon(TRUE, appcon);
 
     return(m);
-  }
+}
 
 
 /* Xpt versions of standard event routines that re-enable async processing
  * after an event is read and/or set PEF_RETURN_ABEXIT_ANY for callback, etc
  */
 
-void XptAppProcessEvent(appcon, mask)
-XtAppContext appcon;
-XtInputMask mask;
-  { _pop_external_flags |= PEF_RETURN_ABEXIT_ANY;
+void XptAppProcessEvent(XtAppContext appcon, XtInputMask mask) {
+    _pop_external_flags |= PEF_RETURN_ABEXIT_ANY;
     XtAppProcessEvent(appcon, mask);
     set_async_appcon(TRUE, appcon);     /* re-enable if set for async */
-  }
+}
 
-void XptAppNextEvent(appcon, event_return)
-XtAppContext appcon;
-XEvent *event_return;
-  { XtAppNextEvent(appcon, event_return);
+void XptAppNextEvent(XtAppContext appcon, XEvent * event_return) {
+    XtAppNextEvent(appcon, event_return);
     set_async_appcon(TRUE, appcon);     /* re-enable if set for async */
-  }
+}
 
-Boolean XptDispatchEvent(event)
-XEvent *event;
-  {
+Boolean XptDispatchEvent(XEvent * event) {
+   
     _pop_external_flags |= PEF_RETURN_ABEXIT_ANY;
     return(XtDispatchEvent(event));
-  }
+}
 
     /* All async appcons are disabled in pop before this is called */
-void XptAppMainLoop(appcon)
-XtAppContext appcon;
-  { /* since there's no way of returning out of MainLoop that doesn't
+void XptAppMainLoop(XtAppContext appcon) {
+    /* since there's no way of returning out of MainLoop that doesn't
     screw the toolkit, might as well catch abnormal exits completely */
     _pop_external_flags |= PEF_CATCH_ABEXIT_ANY;
     XtAppMainLoop(appcon);
-  }
+}
 
 
 /* == VMS Only ========================================================== */
@@ -1019,11 +960,10 @@ XtAppContext appcon;
     (instead of just being truncated to 31 chars).
     This defines the truncated name.
  */
-void XtDisplayStringConversionWarnin(dpy, from_value, to_type)
-Display *dpy;
-String from_value, to_type;
-  { XtDisplayStringConvWarning(dpy, from_value, to_type);
-  }
+void XtDisplayStringConversionWarnin(Display * dpy, String from_value,
+                                     String to_type) {
+    XtDisplayStringConvWarning(dpy, from_value, to_type);
+}
 
 
 /* == VMS Version of XtAppAddInput ====================================== */
@@ -1037,8 +977,8 @@ extern void pop$free_clust0_ef();
 #include <descrip.h>
 #include <ssdef.h>
 
-typedef struct _XptInputId
-  { struct _XptInputId *previd,
+typedef struct _XptInputId {
+    struct _XptInputId *previd,
                        *nextid;
     int                 chan;
     unsigned short      devclass,
@@ -1047,7 +987,7 @@ typedef struct _XptInputId
     XtAppContext        appcon;
     XtInputCallbackProc proc;
     Opaque              clntdata;
-  } *XptInputId;
+} *XptInputId;
 
 
 #define NUM_ID_ENTRIES 8
@@ -1062,66 +1002,58 @@ static char dib1[16], dib2[16];
 static $DESCRIPTOR(dib1desc, dib1);
 static $DESCRIPTOR(dib2desc, dib2);
 
-static Boolean poll_input()
-  { register XptInputId id;
-    register unsigned count;
+static Boolean poll_input() {
+    XptInputId id;
+    unsigned count;
     Boolean result = FALSE;
 
-    for (id = curr_id_list; id != NULL; id = id->nextid)
-      { if (id->devclass == DC$_MAILBOX)
-          { /* mailbox */
+    for (id = curr_id_list; id != NULL; id = id->nextid) {
+        if (id->devclass == DC$_MAILBOX) {
+            /* mailbox */
             sys$getchn(id->chan, 0, &dib1desc, 0, 0);
             /* number of messages in mailbox */
             count = *((unsigned short*)
                         &((struct dibdef*) dib1)->dib$l_devdepend);
-          }
-        else
-          { /* terminal */
+        } else {
+            /* terminal */
             sys$qiow(0, id->chan, IO$_SENSEMODE|IO$M_TYPEAHDCNT, 0, 0, 0,
                                                     dib1, 8, 0, 0, 0, 0);
             /* number of chars in typeahead buffer */
             count = *((unsigned short*) dib1);
-          };
+        }
 
-        if (count != 0)
-          { sys$setef(id->ef_num);
+        if (count != 0) {
+            sys$setef(id->ef_num);
             result = TRUE;
-          }
-        else
+        } else
             sys$clref(id->ef_num);
-      }
+    }
 
     return(result);
-  }
+}
 
-static void inpt_callback(id, efp, xtidp)
-register XptInputId id;
-char *efp;
-XtInputId *xtidp;
-  { XptInputId memid;
+static void inpt_callback(XptInputId id, char * efp, XtInputId * xtidp) {
+    XptInputId memid;
     /* call handler */
     memid = id;
     (*id->proc)(id->clntdata, &id->chan, (XtInputId*) &memid);
     sys$clref(id->ef_num);
-  }
+}
 
-XptInputId XptAppAddInput(appcon, chan, condition, proc, clntdata)
-XtAppContext appcon;
-int chan, condition;
-XtInputCallbackProc proc;
-Opaque clntdata;
-  { register XptInputId id, lim;
+XptInputId XptAppAddInput(XtAppContext appcon, int chan, int condition,
+                          XtInputCallbackProc proc, Opaque clntdata) {
+    XptInputId id, lim;
     unsigned dclass;
     int ef_num, save;
     static int setup_done;
 
-    if (!setup_done)
-      { /* set up freelist */
+    if (!setup_done) {
+        /* set up freelist */
         free_ids = id = id_entries;
         for (lim = id+NUM_ID_ENTRIES-1; id < lim; id++) id->nextid = id+1;
         id->nextid = NULL;
         setup_done = TRUE;
-      };
+    } 
 
     /* check device */
     if (!(sys$getchn(chan, 0, &dib2desc, 0, 0)&1))
@@ -1159,11 +1091,10 @@ Opaque clntdata;
         sys$setast(1);
 
     return(id);
-  }
+}
 
-void XptRemoveInput(id)
-register XptInputId id;
-  { int save = sys$setast(0);
+void XptRemoveInput(XptInputId id) {
+    int save = sys$setast(0);
     XtRemoveInput(id->xt_id);
     pop$free_clust0_ef(id->ef_num);
 
@@ -1176,7 +1107,7 @@ register XptInputId id;
         _pop_set_poll_state(IO_POLL_NUM, NULL);
 
     if (save == SS$_WASSET) sys$setast(1);
-  }
+}
 
 #endif  /* VMS */
 

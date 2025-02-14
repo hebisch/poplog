@@ -126,50 +126,44 @@ static void async_poll()
     else if ((activity_level&2) && poll_index_base > n && poll_index_base != 0)
         poll_index_base--;
 
-    if (num_polling != 0)
-      { if (activity_level)
-          { if (activity_level&2) poll_index = poll_index_base; }
-        else if (poll_index < MAX_POLL_INDEX)
+    if (num_polling != 0) {
+        if (activity_level) {
+            if (activity_level&2) poll_index = poll_index_base;
+        } else if (poll_index < MAX_POLL_INDEX)
             poll_index++;
 
         SET_POLL_TIMER();
-      }
+    }
 }
 
-void _pop_stop_polling(which)
-register int which;
-  { poll_handlers[which] = NULL;
+void _pop_stop_polling(int which) {
+    poll_handlers[which] = NULL;
     num_polling--;
-  }
+}
 
-void _pop_set_poll_state(which, handler)
-register int which;
-register int (*handler)();
-  { register int (*old)() = poll_handlers[which];
+void _pop_set_poll_state(int which, int (*handler)()) {
+    int (*old)() = poll_handlers[which];
     poll_handlers[which] = handler;
-    if (handler != NULL)
-      { if (!(old == NULL && ++num_polling == 1)) CANCEL_POLL_TIMER();
+    if (handler != NULL) {
+        if (!(old == NULL && ++num_polling == 1)) CANCEL_POLL_TIMER();
         poll_index = poll_index_base;
         SET_POLL_TIMER();
-      }
-    else
-      { if (old != NULL && --num_polling == 0) CANCEL_POLL_TIMER(); }
-  }
+    } else {
+        if (old != NULL && --num_polling == 0) CANCEL_POLL_TIMER();
+    }
+}
 
-static caddr_t poll_other()
-{
+static caddr_t poll_other() {
     int (*p)();
-    int activity_level = DO_HANDLER(0);
-    activity_level |= DO_HANDLER(1);
+    DO_HANDLER(0);
+    DO_HANDLER(1);
     return(num_polling != 0 ? (caddr_t) poll_other : NULL);
 }
 
 /*
  *  Turn normal polling off/back on during X toolkit waits
  */
-caddr_t (*_pop_set_Xt_poll(handler))()
-register int (*handler)();
-{
+caddr_t (*_pop_set_Xt_poll(int (*handler)()))() {
     if (handler == NULL) {
         _pop_set_poll_state(XT_POLL_NUM, NULL);
         if (num_polling == 0) return(NULL);
@@ -185,11 +179,11 @@ register int (*handler)();
     }
 }
 
-void _pop_retry_Xt_poll()
-  { if (poll_handlers[XT_POLL_NUM] != NULL) return;
+void _pop_retry_Xt_poll() {
+    if (poll_handlers[XT_POLL_NUM] != NULL) return;
     if (num_polling != 0) CANCEL_POLL_TIMER();
     poll_handlers[XT_POLL_NUM] = _pop_Xt_poll_deferred;
     num_polling++;
     _pop_Xt_poll_deferred = NULL;
     async_poll();
-  }
+}

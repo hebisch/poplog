@@ -22,7 +22,7 @@ POPWORD
 POPOBJ
     *pop_exfunc_closure_arg = NULL;
 int
-    (*pop_external_callback)() = NULL;
+    (*pop_external_callback)(void *) = NULL;
 
 #define POP_EXTERNAL_CALLBACK (*pop_external_callback)
 
@@ -45,13 +45,12 @@ globaldef POPOBJ
 
 /*  Generate pop mishap with message message.
  */
-int pop_mishap(message)
-register char *message;
-  { struct { POPWORD func, message; } args;
+int pop_mishap(char * message) {
+    struct { POPWORD func, message; } args;
     args.func   = PEC_FUNC_MISHAP;
     args.message= (POPWORD)message;
     return(POP_EXTERNAL_CALLBACK(&args));
-  }
+}
 
 
 /*  Call obj on argp. obj can be a procedure, an identifier
@@ -59,15 +58,13 @@ register char *message;
  *  as returned by pop_get_ident, etc). The procedure is called with
  *  argp in an external pointer as argument.
  */
-int pop_call(obj, argp)
-register POPOBJ obj;
-register char *argp;
-  { struct { POPWORD func; POPOBJ obj; POPWORD argp; } args;
+int pop_call(POPOBJ obj, void * argp) {
+    struct { POPWORD func; POPOBJ obj; POPWORD argp; } args;
     args.func   = PEC_FUNC_CALL;
     args.obj    = obj;
     args.argp   = (POPWORD)argp;
     return(POP_EXTERNAL_CALLBACK(&args));
-  }
+}
 
 
 /*  Get identifier with (relative/absolute) pathname idname from dictionary.
@@ -75,25 +72,23 @@ register char *argp;
  *  idname or its idval for an assigned constant, i.e.
  *          cons_fixed(item, ref_key, true)
  */
-POPOBJ pop_get_ident(idname)
-register char *idname;
-  { struct { POPWORD func, idname; POPOBJ obj; } args;
+POPOBJ pop_get_ident(char * idname) {
+    struct { POPWORD func, idname; POPOBJ obj; } args;
     args.func   = PEC_FUNC_GET_IDENT;
     args.idname = (POPWORD)idname;
     return( POP_EXTERNAL_CALLBACK(&args) ? args.obj : 0);
-  }
+}
 
 
 /*  Call free_fixed_hold on obj (e.g. to free a ref returned by
  *  pop_get_ident).
  */
-int pop_free_fixed_hold(obj)
-register POPOBJ obj;
-  { struct { POPWORD func; POPOBJ obj; } args;
+int pop_free_fixed_hold(POPOBJ obj) {
+    struct { POPWORD func; POPOBJ obj; } args;
     args.func   = PEC_FUNC_FREE;
     args.obj    = obj;
     return(POP_EXTERNAL_CALLBACK(&args));
-  }
+}
 
 
 /*  Check and service pop interrupts (we use *pop_signals_pending
@@ -101,13 +96,13 @@ register POPOBJ obj;
  *  overhead of full callback)
  */
 
-int pop_check_interrupt()
-  { struct { POPWORD func; } args;
+int pop_check_interrupt() {
+    struct { POPWORD func; } args;
     args.func   = PEC_FUNC_CHECKINTR;
     return( *pop_signals_pending && !(*pop_disable_flags&1) ?
                 POP_EXTERNAL_CALLBACK(&args)
                 : 1);
-  }
+}
 
 
 /* --- Revision History ---------------------------------------------------

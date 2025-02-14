@@ -7,8 +7,7 @@
 
 typedef int sigset_t;
 
-struct sigaction
-{
+struct sigaction {
     struct sigvec sgvec;
 };
 
@@ -23,10 +22,7 @@ struct sigaction
 #define SA_INTERRUPT SV_INTERRUPT
 
 static int
-sigaction(sig,act,oact)
-int sig;
-struct sigaction *act, *oact;
-{
+sigaction(int sig, struct sigaction * act, struct sigaction * oact) {
     return sigvec(sig, &act->sgvec, &oact->sgvec);
 }
 
@@ -35,10 +31,7 @@ struct sigaction *act, *oact;
 #define SIG_SETMASK 2
 
 static int
-sigprocmask(how, set, oset)
-int how;
-sigset_t *set, *oset;
-{
+sigprocmask(int how, sigset_t * set, sigset_t * oset) {
     int old;
     if (how == SIG_BLOCK)
         old = sigblock(*set);

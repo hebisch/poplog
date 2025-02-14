@@ -54,7 +54,7 @@
 #endif
 #endif  /* !VMS */
 
-#if defined(UNIX) && !defined(linux)
+#if defined(UNIX) && !defined(__linux__)
 /*
  *  This must be done early on, because it overrides a definition from a
  *  standard header file (<sys/types.h>?). The value must be the same as
@@ -122,7 +122,7 @@ typedef sigset_t sigsave_t;
 #define RESTORE_SIG(save)       sigprocmask(SIG_SETMASK, &(save), NULL)
 
 /* Pop wrapper for POSIX sigaction */
-void (*_pop_sigaction())();
+void (*_pop_sigaction(int sig, void (*handler)()))();
 
 #endif  /* UNIX */
 
@@ -190,13 +190,15 @@ typedef struct timeval
 
 globalref POPWORD _pop_in_X_call;         /* pop Sys$- _in_X_call */
 
-extern unsigned _pop_rem_ast();
+typedef unsigned bool;
+
+extern unsigned _pop_rem_ast(unsigned int * typep, POPWORD * datap);
 extern void
-    _pop_add_ast(),
+    _pop_add_ast(unsigned int type, POPWORD data),
     _pop_do_interrupt(),
-    _pop_set_poll_state(),
-    _pop_stop_polling(),
-    _pop_set_xt_wakeup();
+    _pop_set_poll_state(int which, int (*handler)()),
+    _pop_stop_polling(int which),
+    _pop_set_xt_wakeup(bool on);
 
 /*
  *  Struct used by _pop_set_xt_wakeup
@@ -221,13 +223,17 @@ globalref XTWAKE __pop_xt_wakeup_struct;
 #define TF_ABS      4
 #define TF_REPEAT   8
 
+#ifdef VMS
 extern long pop_timer();
+#else
+typedef struct timeval timeval;
+extern long
+pop_timer(unsigned flags, POPWORD ident, void (*handler)(), timeval *tvp);
+#endif
 
 /*
  *  Common definitions
  */
-
-typedef unsigned bool;
 
 #ifndef FALSE
 #define FALSE   0

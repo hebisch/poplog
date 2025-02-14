@@ -35,13 +35,13 @@ globaldef XTWAKE __pop_xt_wakeup_struct;
 /*
  *  Struct for returning signal context info to pop Error_signal
  */
-globaldef struct
-    { int       PSC_SIG,
+globaldef struct {
+    int       PSC_SIG,
             PSC_CODE;
     char   *PSC_PC,
              *PSC_ADDR;
     int     PSC_SIGARRAY[16];   /* for VMS only */
-    }  __pop_sigcontext;
+}  __pop_sigcontext;
 
 /*
  *  This is non-zero when in user external calls (set by _call_external),
@@ -62,9 +62,8 @@ globaldef POPWORD __pop_invocation_fp;
  *  __pop_fpe_table in afloat.s is a table of PC ranges and addresses to
  *  continue at.
  */
-static bool in_pop_float(pc_ptr)
-    char **pc_ptr;
-    { POPWORD pc = (POPWORD) *pc_ptr;
+static bool in_pop_float(char ** pc_ptr) {
+    POPWORD pc = (POPWORD) *pc_ptr;
     typedef struct { POPWORD starta, enda, conta; } fpe_entry;
     extern fpe_entry __pop_fpe_table[];
     fpe_entry *entry = __pop_fpe_table;
@@ -78,7 +77,7 @@ static bool in_pop_float(pc_ptr)
         entry++;
         }
     return(FALSE);
-    }
+}
 
 #endif  /* __alpha */
 
@@ -118,34 +117,36 @@ globalref int
 
 globalref int _pop_read_wait_status; /* Sys$- _read_wait_status */
 
-typedef struct
-    {   unsigned short  IOSB_STATUS;
+typedef struct {
+    unsigned short  IOSB_STATUS;
     unsigned short  IOSB_COUNT;
     unsigned int    IOSB_INFO;
-    } IOSB;
+} IOSB;
 
 
 #define INTR_EFN (AST_EFN-1)    /* = 22 */
 
 static unsigned efs_allocated;
 
-int pop$get_clust0_ef()
-    { register unsigned n, efs = efs_allocated;
+int pop$get_clust0_ef() {
+    unsigned n, efs = efs_allocated;
     /* use 21 - 8 (allow pop to use 0 - 7) */
-    for (n = INTR_EFN-1; n >= 8; n--)
-        if (!(efs & (1<<n))) { efs_allocated |= (1<<n); return(n); };
-    return(-1);
+    for (n = INTR_EFN-1; n >= 8; n--) {
+        if (!(efs & (1<<n))) {
+            efs_allocated |= (1<<n);
+            return(n);
+        }
     }
+    return(-1);
+}
 
-void pop$free_clust0_ef(n)
-    register unsigned n;
-    { efs_allocated &= ~(1<<n); }
+void pop$free_clust0_ef(unsigned n) {
+    efs_allocated &= ~(1<<n);
+}
 
 
-static int qiow(chan, func, iosb, p1, p2)
-    register int chan, func, p1, p2;
-    register IOSB *iosb;
-    { return(sys$qiow(
+static int qiow(int chan, int func, IOSB * iosb, int p1, int p2) {
+    return(sys$qiow(
                 /* efn    */    AST_EFN,
                 /* chan   */    chan,
                 /* func   */    func,
@@ -158,12 +159,11 @@ static int qiow(chan, func, iosb, p1, p2)
                 /*  p4    */    0,
                 /*  p5    */    0,
                 /*  p6    */    0));
-    }
+}
 
-static int set_chan_ast(chan, func, ast)
-register int chan, func;
-register void (*ast)();
-    {   return(qiow(chan, func|IO$_SETMODE, 0, ast, chan)); }
+static int set_chan_ast(int chan, int func, void (*ast)()) {
+    return(qiow(chan, func|IO$_SETMODE, 0, ast, chan));
+}
 
 
 /*
@@ -171,49 +171,45 @@ register void (*ast)();
  *  Arg is address of PROC_COND for entry in proc table.
  *  (see sysspawn.p)
  */
-void _pop_spawn_ast(condptr)
-register int *condptr;
-    {   *condptr = -1;  /* set PROC_COND -1 to say dead */
+void _pop_spawn_ast(int * condptr) {
+    *condptr = -1;  /* set PROC_COND -1 to say dead */
     _pop_add_ast(AST_SIGNAL, __SIG_CHLD);
     _pop_do_interrupt();
-    }
+}
 
 /*
  *  AST for Control C -- receives channel as parameter
  *  (see vmsio.p)
  */
-void _pop_ctrlc_ast(chan)
-register int chan;
-    { /* re-enable myself */
+void _pop_ctrlc_ast(int chan) {
+    /* re-enable myself */
     set_chan_ast(chan, IO$M_CTRLCAST, _pop_ctrlc_ast);
     _pop_add_ast(AST_SIGNAL, __SIG_INT);
     _pop_do_interrupt();
-    }
+}
 
 /*
  *  AST for devices allowing direct WRTATTN (e.g. mailboxes)
  *  Receives mailbox unit num as parameter -- re-enabled after actually
  *  reading the device (see vmsio.p)
  */
-void _pop_wrtattn_ast(unit)
-register int unit;
-    { _pop_add_ast(AST_DEV_READ, unit);
+void _pop_wrtattn_ast(int unit) {
+    _pop_add_ast(AST_DEV_READ, unit);
     _pop_do_interrupt();
-    }
+}
 
 /*
  *  AST for reading messages from a device-associated mailbox, each
  *  message generating a DEV_READ ast. Receives mailbox channel as parameter.
  */
-void _pop_devmbx_ast(chan)
-register int chan;
-    {   IOSB iosb;
+void _pop_devmbx_ast(int chan) {
+    IOSB iosb;
 #define MSG_SIZE 256
     char buf[MSG_SIZE];
     typedef struct { unsigned short TYPE, UNIT; } MSG;
 
-    for (;;)
-        {   iosb.IOSB_STATUS = 0;
+    for (;;) {
+        iosb.IOSB_STATUS = 0;
         qiow(chan, IO$_READVBLK|IO$M_NOW, &iosb, buf, MSG_SIZE);
 
         if (iosb.IOSB_STATUS == SS$_NORMAL)
@@ -226,19 +222,19 @@ register int chan;
             _pop_do_interrupt();
             break;
             }
-        };
     }
+}
 
 
 /* cancel any current POPLOG (possibly asynchronous) read (e.g. terminal
  *  or mailbox)
  */
-void _pop_cancel_input_read()
-    { register int chan = _pop_read_wait_status;
+void _pop_cancel_input_read() {
+    int chan = _pop_read_wait_status;
     if (chan <= 0) return;
     _pop_read_wait_status = 0;
     sys$cancel(chan);       /* will set event flag */
-    }
+}
 
 
 /*
@@ -246,9 +242,8 @@ void _pop_cancel_input_read()
  *  number, added as alternate input to every appcontext. Thus to set
  *  wakeup we set the event flag.
  */
-void _pop_set_xt_wakeup(on)
-bool on;
-    { register XTWAKE *xwk = &__pop_xt_wakeup_struct;
+void _pop_set_xt_wakeup(bool on) {
+    XTWAKE *xwk = &__pop_xt_wakeup_struct;
     if (xwk->XWK_FD_IN == 0) return;    /* not set up */
     if (on)
         { if (xwk->XWK_FLAG_ENABLED) sys$setef(xwk->XWK_FD_IN); }
@@ -257,34 +252,33 @@ bool on;
         sys$clref(xwk->XWK_FD_IN);
         }
     xwk->XWK_ON = on;
-    }
+}
 
 /*
  *  wake up pop and/or X toolkit
  */
-static void wakeup()
-    { _pop_set_xt_wakeup(TRUE);
+static void wakeup() {
+    _pop_set_xt_wakeup(TRUE);
     _pop_cancel_input_read();
     sys$setef(INTR_EFN);            /* set interrupt event flag */
-    }
+}
 
 /*
  * Wait for interrupt
  */
-int pause_popintr()
-    { sys$clref(INTR_EFN);          /* clear interrupt event flag */
+int pause_popintr() {
+    sys$clref(INTR_EFN);          /* clear interrupt event flag */
     if (! _pop_signals_pending)
         sys$waitfr(INTR_EFN);       /* then wait for it to be set */
 
     return(SS$_CANCEL);
-    }
+}
 
 /*
  * Wait for interrupt or read
  */
-bool _pop_read_wait(efn)
-int efn;
-    { unsigned efmask = 1 << efn, flstat;
+bool _pop_read_wait(int efn) {
+    unsigned efmask = 1 << efn, flstat;
     sys$clref(INTR_EFN);                /* clear interrupt event flag */
     if (! _pop_signals_pending)
         /* wait for efn or interrupt to be set */
@@ -292,33 +286,31 @@ int efn;
 
     sys$readef(0, &flstat);             /* read clust0 event flags */
     return((flstat & efmask) != 0);     /* true if input waiting */
-    }
+}
 
-int _pop_sigmask(block)
-int block;
-    {   return(sys$setast(block ? 0 : 1));
-    }
+int _pop_sigmask(int block) {
+    return(sys$setast(block ? 0 : 1));
+}
 
 
 /**************************************************************************
  *              Condition (= error signal) Handler                        *
  **************************************************************************/
 
-static void copybytes();
+static void copybytes(char * from, char * to, int nbytes);
 
 static bool in_math_lib = FALSE;
 
-unsigned _pop_errsig_handler(sigarglst, mcharglst)
-struct chf$signal_array *sigarglst;
-struct chf$mech_array *mcharglst;
-    { int sig, *pcp, *pslp;
-    extern __pop_errsig();
+unsigned _pop_errsig_handler(struct chf$signal_array *sigarglst,
+                            struct chf$mech_array * mcharglst) {
+    int sig, *pcp, *pslp;
+    extern void __pop_errsig();
 
-    if (in_math_lib)
-        { /* doing library math function -- assume float error */
+    if (in_math_lib) {
+        /* doing library math function -- assume float error */
         in_math_lib = FALSE;        /* signal error */
         return(SS$_CONTINUE);       /* continue */
-        };
+    } 
 
     /* get signal code */
     sig = sigarglst->chf$l_sig_name;
@@ -338,20 +330,20 @@ struct chf$mech_array *mcharglst;
     *pslp &= ~PSL$M_FPD;
 
     if (sig == SS$_FLTOVF_F || sig == SS$_FLTDIV_F
-            || sig == SS$_FLTOVF || sig == SS$_FLTDIV)
-        { /* floating-point fault/trap -- all fp instructions in afloat.s put
+            || sig == SS$_FLTOVF || sig == SS$_FLTDIV) {
+        /* floating-point fault/trap -- all fp instructions in afloat.s put
          * the address of the next instruction in __pop_fpe_handler
          * (pop Sys$- _fpe_handler)
          */
         globalref int __pop_fpe_handler;
         int diff = __pop_fpe_handler - *pcp;
-        if (0 < diff && diff < 16)
-            {   /* assume OK if less than 16 bytes after instruction */
+        if (0 < diff && diff < 16) {
+            /* assume OK if less than 16 bytes after instruction */
             *pcp = __pop_fpe_handler;
             *pslp |= PSL$M_V;   /* set overflow bit in psl */
             return(SS$_CONTINUE);
-            }
-        };
+        }
+    }
 #endif
 
     __pop_in_user_extern = FALSE;   /* clear this as soon as possible */
@@ -380,7 +372,7 @@ struct chf$mech_array *mcharglst;
     *pcp = (int) __pop_errsig;
     return(SS$_CONTINUE);
 #endif
-    }
+}
 
 
 /**************************************************************************
@@ -394,7 +386,7 @@ struct chf$mech_array *mcharglst;
  */
 
 #define MATH_FUNC(ARGS)                                         \
-    { double res;                                                   \
+    { double res;                                               \
     in_math_lib = TRUE;                                         \
     res = (*func)ARGS;                                          \
     if (!in_math_lib) return(FALSE);                            \
@@ -403,12 +395,10 @@ struct chf$mech_array *mcharglst;
     return(TRUE);                                               \
     }
 
-bool __pop_math_1(dfptr, func)
-register double *dfptr, (*func)();
+bool __pop_math_1(double * dfptr, double *func())
 MATH_FUNC((dfptr))          /* mth$gsin etc take pointers to doubles */
 
-bool __pop_math_2(dfptr, dfptr2, func)
-register double *dfptr, *dfptr2, (*func)();
+bool __pop_math_2(double * dfptr, double * dfptr2, double *func())
 MATH_FUNC((dfptr, dfptr2))
 
 
@@ -422,38 +412,32 @@ MATH_FUNC((dfptr, dfptr2))
  */
 static quad unix_base = {0x4c178020, 0x007c9567};
 
-void pop$timeval_to_quadtime(tvp, quadp, isabs)
-    timeval *tvp;
-    quad *quadp;
-    bool isabs;
-    { long tenmill = 10000000, h_ns = (tvp->tv_usec)*10;    /* usec -> 100ns */
+void pop$timeval_to_quadtime(timeval * tvp, quad * quadp, bool isabs) {
+    long tenmill = 10000000, h_ns = (tvp->tv_usec)*10;    /* usec -> 100ns */
 
     /* quad = (tvp->tv_sec) * 10000000 + h_ns */
     lib$emul(&tenmill, &tvp->tv_sec, &h_ns, quadp);
 
-    if (isabs)
-        {   /* add Unix base time to an absolute time */
+    if (isabs) {
+        /* add Unix base time to an absolute time */
         lib$addx(quadp, &unix_base, quadp);
-        }
     }
+}
 
-void pop$timeval_from_quadtime(tvp, quadp, isabs)
-    timeval *tvp;
-    quad *quadp;
-    bool isabs;
-    {   long tenmill = 10000000, h_ns;
+void pop$timeval_from_quadtime(timeval * tvp, quad * quadp, bool isabs) {
+    long tenmill = 10000000, h_ns;
     quad q;
 
-    if (isabs)
-        {   /* subtract Unix base time from an absolute time */
+    if (isabs) {
+        /* subtract Unix base time from an absolute time */
         lib$subx(quadp, &unix_base, &q);
         quadp = &q;
-        }
+    }
 
     /* quad / 10000000, tvp->tv_sec = quotient, h_ns = remainder */
     lib$ediv(&tenmill, quadp, &tvp->tv_sec, &h_ns);
     tvp->tv_usec = h_ns/10;
-    }
+}
 
 
 #endif  /* VMS */
@@ -493,8 +477,7 @@ void sco_setstack();
 
 typedef struct itimerval itimerval;
 
-int setitimer (int iWhich, itimerval *pitvValue, itimerval *pitvOldValue)
-{
+int setitimer (int iWhich, itimerval *pitvValue, itimerval *pitvOldValue) {
     /* Dummy setitimer - comes as close as I can with alarm() */
     /* iWhich is ignored */
 
@@ -519,10 +502,8 @@ void _pop_errsig_handler();
 
 globaldef sigset_t * _pop_exclude_sigset = NULL;
 
-void (* _pop_sigaction(sig, handler))()
-int sig;
-void (*handler)();
-    { struct sigaction sa, osa;
+void (* _pop_sigaction(int sig, void (*handler)()))() {
+    struct sigaction sa, osa;
 
     /*  if sig is in this set, don't change handler (allows controlling
      *  external code to prevent Pop installing its signals)
@@ -539,17 +520,16 @@ void (*handler)();
 #ifdef SA_INTERRUPT
     sa.sa_flags |= SA_INTERRUPT;
 #endif
-#if defined(SVR4) && !defined(__sgi) || defined(linux)
+#if defined(SVR4) && !defined(__sgi) || defined(__linux__)
     /* pass signal context information to handler */
     sa.sa_flags |= SA_SIGINFO;
 #endif
     return( sigaction(sig, &sa, &osa) == -1 ? (void (*)()) -1
                                             : (void (*)()) osa.sa_handler);
-    }
+}
 
-int _pop_sigmask(block)
-int block;
-    {   sigset_t set;
+int _pop_sigmask(int block) {
+    sigset_t set;
 
     sigfillset(&set);
     if (block) {
@@ -561,7 +541,7 @@ int block;
         sigdelset(&set, SIGSEGV);
     }
     return(sigprocmask(block ? SIG_BLOCK : SIG_UNBLOCK, &set, NULL));
-    }
+}
 
 
 /**************************************************************************
@@ -575,14 +555,12 @@ int block;
     Updated: 30 Jun 2003 (made the set function return 0);
 */
 
-long get_libc_errno(void)
-{
+long get_libc_errno(void) {
         return errno;
 }
 
-int set_libc_errno(int x)
-{
-        errno = x;
+int set_libc_errno(int x) {
+    errno = x;
     return 0;
 }
 
@@ -590,12 +568,12 @@ int set_libc_errno(int x)
  *  Handler for error-type signals, i.e. QUIT, ILL, IOT, EMT, FPE, BUS, SEGV
  */
 
-#if defined(SVR4) || defined(linux)
+#if defined(SVR4) || defined(__linux__)
 /* Default case for SVR4, but not (yet) used for SG IRIX */
 #if !defined(__sgi)
 #define _POP_ERRSIG_HANDLER_
 
-#if !defined(linux)
+#if !defined(__linux__)
 #include <siginfo.h>
 #endif
 #include <ucontext.h>
@@ -626,8 +604,8 @@ int set_libc_errno(int x)
 #endif
 
 
-void _pop_errsig_handler(int sig, siginfo_t *info, ucontext_t *context)
-{
+void _pop_errsig_handler(int sig, siginfo_t *info, ucontext_t *context) {
+
     extern void __pop_errsig();
 
     int code = 0;
@@ -638,8 +616,8 @@ void _pop_errsig_handler(int sig, siginfo_t *info, ucontext_t *context)
 #if defined(i386)||defined(__x86_64__)
     if (sig == SIGFPE) {
         extern greg_t __pop_fpe_handler;
-        if (__pop_fpe_handler)
-        {   /* return to the handler and zero it */
+        if (__pop_fpe_handler) {
+            /* return to the handler and zero it */
             context->uc_mcontext.gregs[REG_PC] = __pop_fpe_handler;
             __pop_fpe_handler = 0;
             return;
@@ -693,21 +671,19 @@ void _pop_errsig_handler(int sig, siginfo_t *info, ucontext_t *context)
 #define _POP_ERRSIG_HANDLER_
 
 void
-_pop_errsig_handler(sig)
-int sig;
-{
+_pop_errsig_handler(int sig) {
+
     /* these are in "asignals.s" */
-    extern void __pop_error_return(), __pop_errsig();
+    extern void __pop_error_return(), void __pop_errsig();
 
     if (__pop_in_user_extern == -1) _exit(1);   /* outside Pop */
 
     _pop_sigaction(sig, _pop_errsig_handler);
 
-    if (sig == SIGFPE)
-    {
+    if (sig == SIGFPE) {
         extern int __pop_fpe_handler;
-        if (__pop_fpe_handler)
-        {   /* return to the handler and zero it */
+        if (__pop_fpe_handler) {
+            /* return to the handler and zero it */
             __pop_error_return(__pop_fpe_handler);
             __pop_fpe_handler = 0;
             return;
@@ -732,10 +708,8 @@ int sig;
 #define _POP_ERRSIG_HANDLER_
 
 void
-_pop_errsig_handler(sig, code, scp)
-int sig, code;
-struct sigcontext *scp;
-{
+_pop_errsig_handler(int sig, int code, struct sigcontext * scp) {
+
     /* __pop_errsig is defined in "asignals.s" */
     extern void __pop_errsig();
     void* sp;
@@ -743,8 +717,7 @@ struct sigcontext *scp;
     if (__pop_in_user_extern == -1) _exit(1);   /* outside Pop */
 
 #if defined(__hp9000s300)
-    if (sig == SIGFPE)
-    {
+    if (sig == SIGFPE) {
         extern int __pop_fpe_flag;
         __pop_fpe_flag = 1;
         return;
@@ -767,8 +740,7 @@ struct sigcontext *scp;
     if (scp->sc_flags & SS_WIDEREGS) {
         __pop_sigcontext.PSC_PC = (char*)scp->sc_ss_64.ss_pcoq_head;
         sp                      = (void*)scp->sc_ss_64.ss_sp;
-    }
-    else {
+    } else {
         __pop_sigcontext.PSC_PC = (char*)scp->sc_ss_32.ss_pcoq_head;
         sp                      = (void*)scp->sc_ss_32.ss_sp;
     }
@@ -791,18 +763,17 @@ struct sigcontext *scp;
 /* default case, BSD-style */
 #define _POP_ERRSIG_HANDLER_
 
-void _pop_errsig_handler(sig, code, scp, addr)
-int sig, code;
-struct sigcontext *scp;
-char *addr;
-    { extern __pop_errsig();
+void _pop_errsig_handler(int sig, int code, struct sigcontext * scp,
+                         char * addr) {
+    extern void __pop_errsig();
 
     /* specials for FPE */
-    if (sig == SIGFPE)
-        {
+    if (sig == SIGFPE) {
 #if defined(sun) && defined(mc68000)
-        if (code == FPE_FPA_ERROR)
-            {   fpa_handler(sig, code, scp, addr); return; };
+        if (code == FPE_FPA_ERROR) {
+            fpa_handler(sig, code, scp, addr);
+            return;
+        }
 #else
 #if defined(__alpha)
         if (in_pop_float(&scp->sc_pc)) return;
@@ -811,27 +782,26 @@ char *addr;
 
         if (__pop_in_user_extern == -1) _exit(1);   /* outside Pop */
 #if defined(vax)
-        if (code == FPE_FLTOVF_FAULT || code == FPE_FLTDIV_FAULT)
-            {   /* all fp instructions in afloat.s put the address of the
+        if (code == FPE_FLTOVF_FAULT || code == FPE_FLTDIV_FAULT) {
+            /* all fp instructions in afloat.s put the address of the
              * next instruction in __pop_fpe_handler (pop Sys$- _fpe_handler)
              */
             extern int __pop_fpe_handler;
             int diff = __pop_fpe_handler - scp->sc_pc;
-            if (0 < diff && diff < 16)
-                {   /* assume OK if less than 16 bytes after instruction */
+            if (0 < diff && diff < 16) {
+                /* assume OK if less than 16 bytes after instruction */
                 scp->sc_pc = __pop_fpe_handler;
                 scp->sc_ps |= 2;    /* set overflow bit in psl */
                 return;
-                }
             }
-        else if (code == FPE_FLTOVF_TRAP || code == FPE_FLTDIV_TRAP)
+        } else if (code == FPE_FLTOVF_TRAP || code == FPE_FLTDIV_TRAP)
             /* nothing to do for these */
             return;
 #else
 #if defined(i386)
         {   extern int __pop_fpe_handler;
-            if (__pop_fpe_handler)
-            {   /* return to the handler and zero it */
+            if (__pop_fpe_handler) {
+                /* return to the handler and zero it */
                 scp->sc_pc = __pop_fpe_handler;
                 __pop_fpe_handler = 0;
                 return;
@@ -839,7 +809,7 @@ char *addr;
         }
 #endif  /* i386 */
 #endif  /* vax */
-        };
+    }
 
     if (__pop_in_user_extern == -1) _exit(1);   /* outside Pop */
 
@@ -860,6 +830,8 @@ char *addr;
 #if defined(AIX)
     /* see <sys/mstsave.h> */
     __pop_sigcontext.PSC_PC     = (char *) scp->sc_jmpbuf.jmp_context.iar;
+#elif defined(__amd64__)
+    __pop_sigcontext.PSC_PC     = (char *) scp->sc_rip;
 #else
     __pop_sigcontext.PSC_PC     = (char *) scp->sc_pc;
 #endif
@@ -890,6 +862,8 @@ char *addr;
       /* pass its address table in register 3 */
       scp->sc_jmpbuf.jmp_context.gpr[3] = (ulong_t) __pop_errsig_adrtab;
     }
+#elif defined(__amd64__)
+    scp->sc_rip = (long) __pop_errsig;
 #else
     scp->sc_pc = (long) __pop_errsig;
 
@@ -904,7 +878,7 @@ char *addr;
 #endif  /* __alpha */
 #endif  /* sparc */
 #endif  /* AIX */
-    }
+}
 
 #endif /* !_POP_ERRSIG_HANDLER_ */
 #undef _POP_ERRSIG_HANDLER_
@@ -913,13 +887,12 @@ char *addr;
 /*
  *  Handler for user-handled signals
  */
-void _pop_usersig_handler(sig)
-int sig;
-    { SAVE_ERRNO;
+void _pop_usersig_handler(int sig) {
+    SAVE_ERRNO;
     _pop_add_ast(AST_SIGNAL, sig);
     _pop_do_interrupt();
     RESTORE_ERRNO;
-    }
+}
 
 
 /*
@@ -928,31 +901,29 @@ int sig;
  *  input to every appcon. Thus to set wakeup we write a single char to the
  *  pipe, or remove it to unset.
  */
-void _pop_set_xt_wakeup(on)
-bool on;
-    { register XTWAKE *xwk = &__pop_xt_wakeup_struct;
+void _pop_set_xt_wakeup(bool on) {
+    XTWAKE *xwk = &__pop_xt_wakeup_struct;
     char c;
     if (xwk->XWK_FD_IN == 0) return;    /* not set up */
-    if (on)
-        { if (xwk->XWK_FLAG_ENABLED && !xwk->XWK_FLAG_ON)
-            { sigsave_t savesig;
+    if (on) {
+        if (xwk->XWK_FLAG_ENABLED && !xwk->XWK_FLAG_ON) {
+            sigsave_t savesig;
             BLOCK_SIG_ALL(savesig);
-            if (!xwk->XWK_FLAG_ON)
-                { write(xwk->XWK_FD_OUT, &c, 1);
+            if (!xwk->XWK_FLAG_ON) {
+                write(xwk->XWK_FD_OUT, &c, 1);
                 xwk->XWK_FLAG_ON = TRUE;
-                }
+            }
             RESTORE_SIG(savesig);
-            }
         }
-    else
-        { xwk->XWK_FLAG_ENABLED = FALSE;
-        if (xwk->XWK_FLAG_ON)
-            { read(xwk->XWK_FD_IN, &c, 1);
+    } else {
+        xwk->XWK_FLAG_ENABLED = FALSE;
+        if (xwk->XWK_FLAG_ON) {
+            read(xwk->XWK_FD_IN, &c, 1);
             xwk->XWK_FLAG_ON = FALSE;
-            }
         }
-    xwk->XWK_ON = on;
     }
+    xwk->XWK_ON = on;
+}
 
 /* Set Xt wakeup in case needed (does more in VMS) */
 #define wakeup()    _pop_set_xt_wakeup(TRUE)
@@ -970,14 +941,13 @@ bool on;
 static bool probe_failed = FALSE;
 static jmp_buf env;
 
-static void sigill_handler(sig)
-int sig;
-  { probe_failed = TRUE;
+static void sigill_handler(int sig) {
+    probe_failed = TRUE;
     siglongjmp(env, 1);
-  }
+}
 
-bool _pop_needs_cache_flush()
-  { struct sigaction sa, osa;
+bool _pop_needs_cache_flush(void) {
+    struct sigaction sa, osa;
     sigemptyset(&sa.sa_mask);
     sa.sa_handler = sigill_handler;
     sa.sa_flags = 0;
@@ -985,7 +955,7 @@ bool _pop_needs_cache_flush()
     if (sigsetjmp(env, TRUE) == 0) _pop_try_cache_flush();
     sigaction(SIGILL, &osa, NULL);
     return(!probe_failed);
-  }
+}
 
 #endif  /* AIX */
 
@@ -1006,25 +976,24 @@ static int    async_maxfd[3]    /* max file desc in async_fds */
 
 #define TOT_ASYNC   (async_ctr[RDSET]+async_ctr[WRSET]+async_ctr[EXSET])
 
-static void copybytes();
-bool _pop_set_async_check();
+static void copybytes(char * from, char * to, int nbytes);
+bool _pop_set_async_check(bool on, int fd, int set);
 static timeval zero_tim;
 
-static int sigio_handler()
-    {   SAVE_ERRNO;
-    register int n, fd, res, maxfd = -1;
+static void sigio_handler() {
+    SAVE_ERRNO;
+    int n, fd, res, maxfd = -1;
     fd_set on_fds[3], *setptr[3];
 
-#define SETUP_SET(set)                                          \
-    if (async_ctr[set])                                         \
-        { if (async_maxfd[set] > maxfd) maxfd = async_maxfd[set];   \
-        setptr[set] = &on_fds[set];                             \
-        }                                                           \
-    else                                                        \
+#define SETUP_SET(set)                                            \
+    if (async_ctr[set]) {                                         \
+        if (async_maxfd[set] > maxfd) maxfd = async_maxfd[set];   \
+        setptr[set] = &on_fds[set];                               \
+    } else                                                        \
         setptr[set] = NULL;
 
     SETUP_SET(RDSET); SETUP_SET(WRSET); SETUP_SET(EXSET);
-    if (maxfd < 0) return(0);
+    if (maxfd < 0) return /* (0) */;
 
     copybytes((char *) async_on_fds, (char *) on_fds, sizeof(on_fds));
     res = n = select(maxfd+1, setptr[RDSET], setptr[WRSET], setptr[EXSET],
@@ -1039,64 +1008,59 @@ static int sigio_handler()
 #endif
 
 #define CHECK_SET(set)                                          \
-        if (setptr[set] && FD_ISSET(fd, setptr[set]))           \
-            { _pop_add_ast(AST_DEV+set, fd);  n--;              \
+        if (setptr[set] && FD_ISSET(fd, setptr[set])) {         \
+            _pop_add_ast(AST_DEV+set, fd);  n--;                \
             /* disable it until after a write/read etc */       \
             DISABLE_SET(set);                                   \
-            }
+        }
 
     for (fd = 0; n > 0; fd++)
         {   CHECK_SET(RDSET); CHECK_SET(WRSET); CHECK_SET(EXSET); }
 
-    if (n != res)
-        {
+    if (n != res) {
 #ifdef SIM_ASYNC_IO
         if (TOT_ASYNC == 0) _pop_stop_polling(IO_POLL_NUM);
 #endif
         _pop_do_interrupt();
         RESTORE_ERRNO;
-        return(2);
-        }
-    else
-        { RESTORE_ERRNO;
-        return(0);
-        }
+        return /* (2) */;
+    } else {
+        RESTORE_ERRNO;
+        return /* (0) */;
     }
+}
 
-bool _pop_set_async_check(on, fd, set)
-    bool on;
-    int fd, set;
-    { register int n;
-    register fd_set *on_fds;
-    register bool ison;
-    int tot_async, seln, flags, res;
+bool _pop_set_async_check(bool on, int fd, int set) {
+    int n;
+    fd_set *on_fds;
+    bool ison;
+    int seln, res;
 
     if (!FD_ISSET(fd, &async_fds[set])) return (TRUE);
 
     on_fds = &async_on_fds[set];
     ison = FD_ISSET(fd, on_fds);
 
-    if (on)
-        { if (ison) return(TRUE);
+    if (on) {
+        if (ison) return(TRUE);
         FD_SET(fd, on_fds); n = 1;
-        }
-    else
-        { if (!ison) return(TRUE);
+    } else {
+        if (!ison) return(TRUE);
         FD_CLR(fd, on_fds); n = -1;
-        };
+    }
 
     async_ctr[set] += n;
 
 #ifdef SIM_ASYNC_IO
-    tot_async = TOT_ASYNC;
+    int tot_async = TOT_ASYNC;
     if (tot_async == 0 || (tot_async == 1 && on))
         _pop_set_poll_state(IO_POLL_NUM, on ? sigio_handler : NULL);
     return(TRUE);
 
 #else
     res = seln = 0;
-    if (on == 2)
-        { /* being turned on from _pop_set_async_fd */
+    if (on == 2) {
+        /* being turned on from _pop_set_async_fd */
         fd_set fdset; int nfds = fd+1;
         FD_ZERO(&fdset); FD_SET(fd, &fdset);
         if (set == RDSET)
@@ -1106,10 +1070,10 @@ bool _pop_set_async_check(on, fd, set)
         else
             seln = select(nfds, NULL, NULL, &fdset, &zero_tim);
         on = TRUE;
-        }
+    }
 
 #define STREAMS_CODE                                            \
-    flags = 0;                                                  \
+    int flags = 0;                                              \
     if (FD_ISSET(fd, &async_on_fds[RDSET])) flags |= S_RDNORM;  \
     if (FD_ISSET(fd, &async_on_fds[WRSET])) flags |= S_WRNORM;  \
     if (FD_ISSET(fd, &async_on_fds[EXSET])) flags |= S_RDBAND;  \
@@ -1132,40 +1096,43 @@ bool _pop_set_async_check(on, fd, set)
     NON_STREAMS_CODE
 #endif
 
-    if (res >= 0 || !on)
-        { if (seln > 0) sigio_handler();
+    if (res >= 0 || !on) {
+        if (seln > 0) sigio_handler();
         return(TRUE);
-        }
+    }
 
     /* ioctl failed */
     FD_CLR(fd, on_fds);
     async_ctr[set] -= n;
     return(FALSE);
 #endif
-    }
+}
 
-long _pop_set_async_fd(on, fd, set)
-    bool on;
-    int fd, set;
-    {   register fd_set *fds = &async_fds[set];
+long _pop_set_async_fd(bool on, int fd, int set) {
+    fd_set *fds = &async_fds[set];
 
-    if (on)
-        { static bool setup_done;
+    if (on) {
+        static bool setup_done;
         int save;
         if (FD_ISSET(fd, fds)) return(0);
 
 #ifndef SIM_ASYNC_IO
-        if (!setup_done)
-            { _pop_sigaction(SIGIO, sigio_handler);
+        if (!setup_done) {
+            _pop_sigaction(SIGIO, sigio_handler);
             _pop_sigaction(SIGURG, sigio_handler);
             setup_done = TRUE;
-            };
+        }
 
-#if defined(linux) || defined(AIX) || defined(__sgi) || defined(__DGUX__)
+/* was
+
+    defined(__linux__) || defined(AIX) || defined(__sgi) || defined(__DGUX__)
+
+but probably everything except old BSD */
+#if 1
 #define GETPGRP getpgrp()
 #else
 #define GETPGRP getpgrp(0)
-#endif  /* linux */
+#endif
 
 #if defined(HAS_STREAMS) || defined(SCO)
 #ifdef FIOASYNC
@@ -1187,50 +1154,47 @@ long _pop_set_async_fd(on, fd, set)
         FD_CLR(fd, fds);
         async_maxfd[set] = save;
         return(-1);
-        }
-    else
-        { if (!FD_ISSET(fd, fds)) return(0);
+    } else {
+        if (!FD_ISSET(fd, fds)) return(0);
         _pop_set_async_check(FALSE, fd, set);
         FD_CLR(fd, fds);
-        if (fd == async_maxfd[set])
-            { int f;
+        if (fd == async_maxfd[set]) {
+            int f;
             async_maxfd[set] = -1;
             for (f = fd-1; f >= 0; f--)
                 if (FD_ISSET(f, fds)) { async_maxfd[set] = f; break; }
-            }
-        return(0);
         }
+        return(0);
     }
+}
 
-bool _pop_get_async_fd(fd, set)
-    int fd, set;
-    {  return(FD_ISSET(fd, &async_fds[set]));
-    }
+bool _pop_get_async_fd(int fd, int set) {
+    return(FD_ISSET(fd, &async_fds[set]));
+}
 
 
 /**************************************************************************
  *                      Async-related System Calls                        *
  **************************************************************************/
 
-int pop_close(fd)
-    int fd;
-    { _pop_set_async_fd(FALSE, fd, RDSET);
+int pop_close(int fd) {
+    _pop_set_async_fd(FALSE, fd, RDSET);
     _pop_set_async_fd(FALSE, fd, WRSET);
     _pop_set_async_fd(FALSE, fd, EXSET);
     return(close(fd));
-    }
+}
 
 long pop_fork() {
-        int fd;
-        long pid;
+    int fd;
+    long pid;
     sigset_t all, save;
     sigfillset(&all);
     sigprocmask(SIG_BLOCK, &all, &save);
 
-    if (pid = fork())
-        { sigprocmask(SIG_SETMASK, &save, NULL);
+    if ((pid = fork())) {
+        sigprocmask(SIG_SETMASK, &save, NULL);
         return(pid);
-        };
+    }
 
     /* child */
     /* cancel all timers */
@@ -1250,18 +1214,17 @@ long pop_fork() {
  *              Pop-Interrupt Versions of System Calls                    *
  **************************************************************************/
 
-#define SYSCALL_POPINTR(call)   \
-        { int res;                                                      \
+#define SYSCALL_POPINTR(call) {  \
+        int res;                                                        \
         if (_pop_signals_pending && !(_pop_disable_flags & 1))          \
-            { errno = EINTR; return(-1); };                             \
-        for (;;)                                                        \
-            { if ((res = (call)) != -1 || errno != EINTR) return(res);  \
-            if (_pop_signals_pending) { errno = EINTR; return(-1); };   \
-            }                                                               \
-        }
+            { errno = EINTR; return(-1); }                              \
+        for (;;) {                                                      \
+            if ((res = (call)) != -1 || errno != EINTR) return(res);    \
+            if (_pop_signals_pending) { errno = EINTR; return(-1); }    \
+        }                                                               \
+    }
 
-long read_popintr(fd, buf, nbyte)
-    int fd; char *buf; int nbyte;
+long read_popintr(int fd, char * buf, int nbyte)
     SYSCALL_POPINTR(read(fd, buf, nbyte))
 
 long pause_popintr()
@@ -1308,10 +1271,10 @@ extern char *sbrk();
 /*
  * Structure of the chains of blocks
  */
-typedef struct BLOCK_HEADER
-    { struct BLOCK_HEADER * next_block;
+typedef struct BLOCK_HEADER {
+    struct BLOCK_HEADER * next_block;
     unsigned                block_size; /* in bytes, includes header */
-    } *BLOCKP;
+} *BLOCKP;
 
 
 /*
@@ -1331,15 +1294,15 @@ typedef struct BLOCK_HEADER
  * and the second is the size index.
  */
 
-typedef union OVERHEAD
-    { union OVERHEAD *  next_p;     /* when free */
-    struct
-        { unsigned int  magic;      /* magic number */
+typedef union OVERHEAD {
+    union OVERHEAD *  next_p;     /* when free */
+    struct {
+        unsigned int  magic;      /* magic number */
         unsigned int    bucket;     /* bucket # */
-        } used;
+    } used;
 #define magic_num       used.magic
 #define bucket_index    used.bucket
-    } *ALLOCP;
+} *ALLOCP;
 
 
 #define MAGIC       0xff00fe01  /* magic # on accounting info */
@@ -1353,11 +1316,11 @@ typedef union OVERHEAD
  * The OVERHEAD information precedes the data area returned to the user.
  */
 
-struct FREESET
-    { BLOCKP    block_chain;            /* block chain */
-    BLOCKP  (*get_mem_block)();     /* get mem procedure */
+struct FREESET {
+    BLOCKP    block_chain;            /* block chain */
+    BLOCKP  (*get_mem_block)(unsigned int);    /* get mem procedure */
     ALLOCP  free_table[NBUCKETS];   /* freetable */
-    };
+};
 
 unsigned __pop_malloc_exhausted;
 
@@ -1367,19 +1330,18 @@ unsigned __pop_malloc_exhausted;
 static int pop_mem_block[POP_MEM_BLOCK_SIZE];   /* the block of memory */
 
 
-static BLOCKP get_pop_mem_block(nbytes)
-    unsigned nbytes;
-    { static bool allocated;
+static BLOCKP get_pop_mem_block(unsigned nbytes) {
+    static bool allocated;
     if (allocated)
         return(NULL);
-    else
-        { /* first time -- allocate static block (doubleword aligned) */
+    else {
+        /* first time -- allocate static block (doubleword aligned) */
         BLOCKP blkp = (BLOCKP) ((((long)pop_mem_block)+7) &~ 7);
         blkp->block_size = sizeof(pop_mem_block) - 8;
         allocated = TRUE;
         return(blkp);
-        }
     }
+}
 
 struct FREESET popsys_freeset = {NULL, get_pop_mem_block};
 
@@ -1388,16 +1350,17 @@ struct FREESET popsys_freeset = {NULL, get_pop_mem_block};
  */
 unsigned __pop_malloc_min_alloc = 0;
 
-static BLOCKP get_ext_mem_block(nbytes)
-    register unsigned nbytes;
-    { register BLOCKP blkp;
-    register unsigned mask, over;
+static BLOCKP get_ext_mem_block(unsigned nbytes) {
+    BLOCKP blkp;
+    unsigned mask, over;
     static unsigned pagesize = 0;
 
     if (pagesize == 0) pagesize = GETPAGESIZE();
     mask = pagesize-1;
 
-    if (over = ((unsigned long)sbrk(0) & mask)) sbrk(pagesize-over);
+    if ((over = ((unsigned long)sbrk(0) & mask))) {
+        sbrk(pagesize-over);
+    }
 
     if (nbytes < __pop_malloc_min_alloc) nbytes = __pop_malloc_min_alloc;
     nbytes = (nbytes+mask) & ~mask;
@@ -1406,7 +1369,7 @@ static BLOCKP get_ext_mem_block(nbytes)
 
     blkp->block_size = nbytes;
     return(blkp);
-    }
+}
 
 static struct FREESET extern_freeset = {NULL, get_ext_mem_block};
 
@@ -1423,60 +1386,54 @@ static struct FREESET extern_freeset = {NULL, get_ext_mem_block};
 
 /* Find nbytes of memory from a given freeset
 */
-static char *find_mem(nbytes, freeset)
-    unsigned nbytes;
-    struct FREESET *freeset;
-    { register BLOCKP blkp, newblkp, *last_addr;
-    register long newsize;
+static char *find_mem(unsigned nbytes, struct FREESET * freeset) {
+    BLOCKP blkp, newblkp, *last_addr;
+    long newsize;
 
     last_addr = &(freeset->block_chain);
     blkp = freeset->block_chain;
 
-    for ( ; ; )
-        {
-        if (blkp == NULL)
+    for(;;) {
+        if (blkp == NULL) {
             /*  tried all blocks, none of sufficient size
                 call the get_mem_block procedure for the freeset in use
             */
-            { blkp = (freeset->get_mem_block)(nbytes+sizeof(struct BLOCK_HEADER));
+            blkp = (freeset->get_mem_block)(nbytes+sizeof(struct BLOCK_HEADER));
             if (blkp == NULL)
                 return(NULL);
-            else
-                { blkp->next_block = NULL;
+            else {
+                blkp->next_block = NULL;
                 *last_addr = blkp;      /* chain new block on end */
-                }
             }
+        }
 
-        if (blkp->block_size >= nbytes)
+        if (blkp->block_size >= nbytes) {
             /* this block is big enough */
-            { newsize = blkp->block_size - nbytes;
-            if (newsize > sizeof(struct BLOCK_HEADER))
+            newsize = blkp->block_size - nbytes;
+            if (newsize > sizeof(struct BLOCK_HEADER)) {
                 /* reduce block size by nbytes */
-                { newblkp = (BLOCKP)(((char *)blkp) + nbytes);
+                newblkp = (BLOCKP)(((char *)blkp) + nbytes);
                 newblkp->block_size = newsize;
                 newblkp->next_block = blkp->next_block;
                 *last_addr = newblkp;
-                }
-            else
+            } else
                 /* discard it */
                 *last_addr = blkp->next_block;
 
             /* return pointer to space */
             return((char *)blkp);
-            }
-        else
+        } else {
             /* try next block */
-            { last_addr = &blkp->next_block;
+            last_addr = &blkp->next_block;
             blkp = blkp->next_block;
-            }
         }
     }
+}
 
 
-void *malloc(size_t nbytes)
-    {
-    register ALLOCP p;
-    register unsigned bucket, s1, s2, s3, size;
+void *malloc(size_t nbytes) {
+    ALLOCP p;
+    unsigned bucket, s1, s2, s3, size;
     struct FREESET *freeset = CURR_FREESET;
     ALLOCP *freetab = freeset->free_table;
 
@@ -1501,42 +1458,41 @@ void *malloc(size_t nbytes)
      */
     bucket = 0;
     s1 = s2 = s3 = size = 8;
-    while (nbytes > size)
-        { register unsigned tmp = s1;
+    while (nbytes > size) {
+        unsigned tmp = s1;
         s1 = s2; s2 = s3; s3 = size; size = size+tmp;
         bucket++;
-        }
+    }
 
     if (bucket >= NBUCKETS) return(NULL);
 
     /*
      * If nothing in hash bucket right now, request more memory
      */
-    if ((p = freetab[bucket]) == NULL)
-        { p = (ALLOCP) find_mem(size, freeset);
-        if (p == NULL)
-            { /* no new mem -- try bigger blocks */
+    if ((p = freetab[bucket]) == NULL) {
+        p = (ALLOCP) find_mem(size, freeset);
+        if (p == NULL) {
+            /* no new mem -- try bigger blocks */
             while (++bucket < NBUCKETS && (p = freetab[bucket]) == NULL) ;
             if (bucket < NBUCKETS)
                 freetab[bucket] = p->next_p;    /* remove from linked list */
-            else
-                { /* no more space */
+            else {
+                /* no more space */
                 _pop_in_X_call = save_X_call;
-                if (freeset == &popsys_freeset)
-                    {   /* get pop mishap, by sending SIGEMT with
+                if (freeset == &popsys_freeset) {
+                    /* get pop mishap, by sending SIGEMT with
                      * __pop_malloc_exhausted set to the required amount
                      * (tested for by System_error)
                      */
                     __pop_malloc_exhausted = nbytes;
                     kill(getpid(), SIGEMT);
                     pause();                    /* allow sig to be sent */
-                    }
+                }
                 errno = ENOMEM;
                 return(NULL);
-                }
             }
         }
-    else
+    } else
         freetab[bucket] = p->next_p;    /* remove from linked list */
 
     p->magic_num = MAGIC;
@@ -1544,12 +1500,12 @@ void *malloc(size_t nbytes)
 
     _pop_in_X_call = save_X_call;
     return ((char *)(p + 1));
-    }
+}
 
 
-void free(void *cp)
-    { register unsigned bucket;
-    register ALLOCP p, *freetab = CURR_FREESET->free_table;
+void free(void *cp) {
+    unsigned bucket;
+    ALLOCP p, *freetab = CURR_FREESET->free_table;
     POPWORD save_X_call = _pop_in_X_call;
 
     if (cp == NULL) return;
@@ -1566,7 +1522,7 @@ void free(void *cp)
     freetab[bucket] = p;
 
     _pop_in_X_call = save_X_call;
-    }
+}
 
 /*
  * When a program attempts "storage compaction" as mentioned in the
@@ -1586,41 +1542,36 @@ int realloc_srchlen = 4;    /* 4 should be plenty, -1 =>'s whole list */
  * header starts at ``freep''.  If srchlen is -1 search the whole list.
  * Return bucket number, or -1 if not found.
  */
-static int findbucket(freep, srchlen)
-    ALLOCP freep;
-    int srchlen;
-    { register ALLOCP p;
-    register int i, j;
+static int findbucket(ALLOCP freep, int srchlen) {
+    ALLOCP p;
+    int i, j;
     ALLOCP *freetab = CURR_FREESET->free_table;
 
-    for (i = 0; i < NBUCKETS; i++)
-        { j = 0;
-        for (p = freetab[i]; p && j != srchlen; p = p->next_p)
-            { if (p == freep) return (i);
+    for (i = 0; i < NBUCKETS; i++) {
+        j = 0;
+        for (p = freetab[i]; p && j != srchlen; p = p->next_p) {
+            if (p == freep) return (i);
             j++;
-            }
         }
-    return (-1);
     }
+    return (-1);
+}
 
-void *realloc(void * cp, size_t nbytes)
-    {
-    register size_t size, s1, s2, s3;
+void *realloc(void * cp, size_t nbytes) {
+    size_t size, s1, s2, s3;
     ALLOCP p;
     char *res;
-    register int bucket;
+    int bucket;
     int was_alloced = 0;
 
     if (cp == NULL) return(malloc(nbytes));
 
     p = (ALLOCP)(cp - sizeof(union OVERHEAD));
-    if (p->magic_num == MAGIC)
-        { was_alloced++;
+    if (p->magic_num == MAGIC) {
+        was_alloced++;
         bucket = p->bucket_index;
-        }
-    else
-        { /*
-         * Already free, doing "compaction".
+    } else {
+        /* Already free, doing "compaction".
          *
          * Search for the old block of memory on the
          * free list.  First, check the most common
@@ -1633,15 +1584,15 @@ void *realloc(void * cp, size_t nbytes)
         if ((bucket = findbucket(p, 1)) < 0 &&
             (bucket = findbucket(p, realloc_srchlen)) < 0)
             bucket = 0;
-        }
+    }
 
     /* convert bucket to size */
     s1 = s2 = s3 = size = 8;
-    while (bucket != 0)
-        { register unsigned tmp = s1;
+    while (bucket != 0) {
+        unsigned tmp = s1;
         s1 = s2; s2 = s3; s3 = size; size = size+tmp;
         bucket--;
-        }
+    }
 
     size -= sizeof(union OVERHEAD);
 
@@ -1654,7 +1605,7 @@ void *realloc(void * cp, size_t nbytes)
     if (cp != res) copybytes(cp, res, (nbytes < size) ? nbytes : size);
     if (was_alloced) free(cp);
     return(res);
-    }
+}
 
 
 
@@ -1662,11 +1613,10 @@ void *realloc(void * cp, size_t nbytes)
  */
 #define CHARPERLONG (sizeof(long)/sizeof(char))
 
-void *calloc(size_t num, size_t size)
-    {
-    register char *mp;
-    register long *q;
-    register int m;
+void *calloc(size_t num, size_t size) {
+    char *mp;
+    long *q;
+    int m;
 
     num *= size;
     mp = malloc(num);
@@ -1675,12 +1625,11 @@ void *calloc(size_t num, size_t size)
     m = (num+CHARPERLONG-1)/CHARPERLONG;
     while (--m >= 0) *q++ = 0;
     return(mp);
-    }
+}
 
-void cfree(p, num, size)
-    char *p;
-    unsigned num, size;
-    { free(p); }
+void cfree(char * p, unsigned num, unsigned size) {
+    free(p);
+}
 
 
 
@@ -1701,56 +1650,57 @@ extern char * (*(__pop_return_arg()))();
 static char * current_break = (char *) 0x30000000;
 
 void *mmap(void *addr, size_t len, int prot, int flags, int fildes, off_t off)
-  {
+{
     int desc[3], *d = (int*) mprotect;
     char *res;
     desc[0] = d[0];
     desc[1] = d[1]+(224-223);       /* mprotect -> mmap */
     desc[2] = 0;
     res = __pop_return_arg(desc)(addr, len, prot, flags, fildes, off);
-    if (res != (char *)-1)
-      { char *lim = res+len;
+    if (res != (char *)-1) {
+        char *lim = res+len;
         if (lim > current_break && res < (char *)0x40000000)
             current_break = lim;
-      }
+    }
     return((void *) res);
-  }
+}
 
-int munmap(void *addr, size_t len)
-  {
+int munmap(void *addr, size_t len) {
     int desc[3], *d = (int*) mprotect;
     int res;
     desc[0] = d[0];
     desc[1] = d[1]+(221-223);       /* mprotect -> munmap */
     desc[2] = 0;
     res = (int) __pop_return_arg(desc)(addr, len);
-    if (res != -1)
-      { char *a = (char*)addr, *lim = a+len;
+    if (res != -1) {
+        char *a = (char*)addr, *lim = a+len;
         if (lim >= current_break && a < (char *)0x40000000)
             current_break = a;
-      }
+    }
     return(res);
-  }
+}
 
-int _pop_brk(char *new_break)
-  { if (new_break > current_break)
+int _pop_brk(char *new_break) {
+    if (new_break > current_break) {
         return(mmap(current_break, new_break-current_break,
                     PROT_READ|PROT_WRITE|PROT_EXEC,
                     MAP_PRIVATE|MAP_ANONYMOUS, -1, 0)
                 == (void *) -1 ? -1 : 0);
-    else if (new_break < current_break)
+    } else if (new_break < current_break) {
         return(munmap(new_break, current_break-new_break));
-    else
+    } else {
         return(0);
-  }
+    }
+}
 
-char * _pop_sbrk(int nbytes)
-  { char *new_break = current_break+nbytes;
-    if (nbytes != 0 && _pop_brk(new_break) == -1)
+char * _pop_sbrk(int nbytes) {
+    char *new_break = current_break+nbytes;
+    if (nbytes != 0 && _pop_brk(new_break) == -1) {
         return((char *) -1);
-    else
+    } else {
         return(new_break);
-  }
+    }
+}
 
 #endif  /* AIX */
 
@@ -1767,7 +1717,7 @@ char * _pop_sbrk(int nbytes)
  */
 
 #define MATH_FUNC(ARGS)                                         \
-    { sigset_t all, save;                                           \
+    { sigset_t all, save;                                       \
     int en;                                                     \
     double res;                                                 \
                                                                 \
@@ -1787,12 +1737,11 @@ char * _pop_sbrk(int nbytes)
         return(FALSE);                                          \
     }
 
-bool __pop_math_1(dfptr, func)
-register double *dfptr, (*func)();
+bool __pop_math_1(double * dfptr, double (*func)(double))
 MATH_FUNC((*dfptr))
 
-bool __pop_math_2(dfptr, dfptr2, func)
-register double *dfptr, *dfptr2, (*func)();
+bool __pop_math_2(double * dfptr, double * dfptr2,
+                  double (*func)(double, double))
 MATH_FUNC((*dfptr, *dfptr2))
 
 
@@ -1808,19 +1757,21 @@ MATH_FUNC((*dfptr, *dfptr2))
  *  Call a procedure (e.g. inet_ntoa) which takes an in_addr struct by value
  *  as arg. (Used by lib unix_sockets.)
  */
-char * pop_call_in_addr_arg(inp, func)
-    struct in_addr *inp;
-    char * (*func)();
-    { return( (*func)(*inp) ); }
+char * pop_call_in_addr_arg(struct in_addr * inp,
+                            char * (*func)(struct in_addr)) {
+    return( (*func)(*inp) );
+}
 
 /*
  *  Call a procedure (inet_makeaddr) which takes two ints and returns
  *  an in_addr struct by value
  */
-void pop_call_in_addr_res(net, lna, inp, func)
-    unsigned int net, lna;
-    struct in_addr *inp, (*func)();
-    { *inp = (*func)(net, lna); }
+void pop_call_in_addr_res(unsigned int net, unsigned int lna,
+                          struct in_addr * inp,
+                          struct in_addr (*func)(unsigned int,
+                                                 unsigned int)) {
+    *inp = (*func)(net, lna);
+}
 
 #if defined(__hpux) || defined(AIX)
 /* These are macros in hpux/AIX */
@@ -1842,16 +1793,15 @@ unsigned short ntohs(n) unsigned short n; { return(n); }
  * fixed by the -bnogc option, but that seems to be buggy).
  * This procedure is never actually called.
  */
-__pop_socket_stuff_dummy(dum)
-int *dum;
-  {
+void
+__pop_socket_stuff_dummy(int * dum) {
     dum[0] = (int) pop_call_in_addr_arg;
     dum[1] = (int) pop_call_in_addr_res;
     dum[2] = (int) htonl;
     dum[3] = (int) htons;
     dum[4] = (int) ntohl;
     dum[5] = (int) ntohs;
-  }
+}
 #endif
 
 #endif  /* defined(__hpux) || defined(AIX) */
@@ -1866,21 +1816,18 @@ int *dum;
 <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<*/
 
 
-static void copybytes(from, to, nbytes)
-register char *from, *to;
-int nbytes;
-    { register char *lim;
-    if (from > to)
-        { lim = from + nbytes;
+static void copybytes(char * from, char * to, int nbytes) {
+    char *lim;
+    if (from > to) {
+        lim = from + nbytes;
         while (from < lim) *to++ = *from++;
-        }
-    else if (from < to)
-        { lim = from;
+    } else if (from < to) {
+        lim = from;
         from += nbytes;
         to += nbytes;
         while (from > lim) *--to = *--from;
-        };
     }
+}
 
 
 /**************************************************************************
@@ -1890,10 +1837,10 @@ int nbytes;
 #if defined(__hpux) && defined(__hppa)
 /*  _WEAK_pop_external_callback is a pointer to a plabel
 */
-globalref int (**_WEAK_pop_external_callback)();
+globalref int (**_WEAK_pop_external_callback)(void *);
 #define POP_EXTERNAL_CALLBACK (**_WEAK_pop_external_callback)
 #else
-globalref int (*_WEAK_pop_external_callback)();
+globalref int (*_WEAK_pop_external_callback)(void *);
 #define POP_EXTERNAL_CALLBACK (*_WEAK_pop_external_callback)
 #endif
 
@@ -1902,10 +1849,10 @@ globalref int (*_WEAK_pop_external_callback)();
  */
 #define QLEN 64
 
-typedef struct
-  { unsigned AST_TYPE;      /* type, e.g. AST_SIGNAL */
+typedef struct {
+    unsigned AST_TYPE;      /* type, e.g. AST_SIGNAL */
     POPWORD  AST_DATA;      /* data, e.g. signal number */
-  } AST;
+} AST;
 
 static AST
     astq[QLEN],                 /* queue */
@@ -1917,10 +1864,8 @@ static AST
 /*
  *  Add ast to queue
  */
-void _pop_add_ast(type, data)
-register unsigned type;
-register POPWORD data;
-    {   register AST *p;
+void _pop_add_ast(unsigned int type, POPWORD data) {
+    AST *p;
     sigsave_t savesig;
     BLOCK_SIG_ALL(savesig);
 
@@ -1934,49 +1879,45 @@ register POPWORD data;
 
     _pop_signals_pending = 1;   /* set pop _trap */
     RESTORE_SIG(savesig);
-    }
+}
 
 /*
  *  Remove next ast from queue and store type and data thru typep and
  *  datap (returning 1 if there was one and 0 if queue empty).
  */
-unsigned _pop_rem_ast(typep, datap)
-register unsigned *typep;
-register POPWORD *datap;
-    {   register AST *p;
-    register unsigned result;
+unsigned int _pop_rem_ast(unsigned int * typep, POPWORD * datap) {
+    AST *p;
+    unsigned result;
     sigsave_t savesig;
     BLOCK_SIG_ALL(savesig);
 
-    if ((p = astq_rem) == astq_add)
+    if ((p = astq_rem) == astq_add) {
         /* queue empty -- return 0 */
-        {   _pop_signals_pending = 0;   /* clear pop _trap */
+        _pop_signals_pending = 0;   /* clear pop _trap */
         result = 0;
-        }
-    else
+    } else {
         /* return next ast in loc */
-        {   *typep = p->AST_TYPE; *datap = p->AST_DATA;
+        *typep = p->AST_TYPE; *datap = p->AST_DATA;
         astq_rem = (++p == ASTQ_LIM) ? astq : p;
         result = 1;
-        };
+    }
 
     RESTORE_SIG(savesig);
     return(result);
-    }
+}
 
 /*
  *  Called after adding one or more asts with _pop_add_ast
  */
-void _pop_do_interrupt()
-    {
+void _pop_do_interrupt() {
     /* wake up things */
     wakeup();
 
-    if (__pop_in_user_extern)
-        { /* async callback is safe */
+    if (__pop_in_user_extern) {
+        /* async callback is safe */
         POPWORD pef = _pop_external_flags;
-        if (pef & PEF_ASYNC_CALLBACK && !(_pop_disable_flags & 1))
-            { /* service interrupt by calling back */
+        if (pef & PEF_ASYNC_CALLBACK && !(_pop_disable_flags & 1)) {
+            /* service interrupt by calling back */
             struct { POPWORD func; } args;
             sigsave_t savesig;
 
@@ -1993,19 +1934,18 @@ void _pop_do_interrupt()
             UNBLOCK_SIG_ALL(savesig);
             POP_EXTERNAL_CALLBACK(&args);
             RESTORE_SIG(savesig);
-            }
         }
     }
+}
 
 
 /*
  *  Handler for pop_timer used by sys_timer
  */
-void _pop_timer_trap(ident)
-POPWORD ident;
-    {   _pop_add_ast(AST_TIMER, ident);
+void _pop_timer_trap(POPWORD ident) {
+    _pop_add_ast(AST_TIMER, ident);
     _pop_do_interrupt();
-    }
+}
 
 
 /*  Wrapper for consexfunc routines. Invoked as an exfunc_closure with
@@ -2048,9 +1988,9 @@ OPAQUE arg18,
 OPAQUE arg19)
 #endif
 #endif
-    {
+{
     struct efdata { POPOBJ flags, pdr; };
-    register struct efdata *efdata = (struct efdata *)pop_exfunc_arg;
+    struct efdata *efdata = (struct efdata *)pop_exfunc_arg;
     struct { POPWORD func; POPOBJ obj; POPWORD argp; } args;
     va_list argp;
 #if 0
@@ -2116,9 +2056,9 @@ tmp[19] = arg19;
         return(*(OPAQUE*)args.argp);
 #endif
     va_end(argp);
-    }
+}
 
-#if defined(linux)
+#if defined(__linux__)
 
 /* Personality code, stolen from sbcl */
 
@@ -2129,8 +2069,7 @@ int personality (unsigned long);
 #include <sys/utsname.h>
 
 void
-linux_setper(int argc, char * * argv, char * * envp)
-{
+linux_setper(int argc, char * * argv, char * * envp) {
 #if defined(__i386__) || defined(__x86_64__) || defined(__arm__)
     struct utsname name;
     int major_version = 2;

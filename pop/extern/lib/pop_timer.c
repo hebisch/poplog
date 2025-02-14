@@ -21,12 +21,12 @@
 
 extern void pop$timeval_to_quadtime(), pop$timeval_from_quadtime();
 
-typedef struct itm
-  { short   ITM_BUFLEN,
+typedef struct itm {
+    short   ITM_BUFLEN,
             ITM_FUNC;
-    char   *ITM_BUFFER;
-    long   *ITM_RETLEN;
-  } itm;
+    char *  ITM_BUFFER;
+    long *  ITM_RETLEN;
+} itm;
 
 /* Doesn't really matter what these are providing they're non-zero */
 #define RTIMER_SIG  ((int) &real_timer)
@@ -35,16 +35,13 @@ typedef struct itm
 #define HZ 100
 #define TIMER_SETUP(handler, clockintp) *(clockintp) = MILL/HZ
 
-static void TIMER_SET_ITIMER(virt, sec, usec, sig, handler)
-bool virt;
-long sec, usec;
-int sig;
-void (*handler)();
-  { /* must cancel first even if setting, else we get more than one */
+static void TIMER_SET_ITIMER(bool virt, long sec, long usec, int sig,
+                             void (*handler)()) {
+    /* must cancel first even if setting, else we get more than one */
     sys$cantim(sig, 0);
 
-    if (sec|usec)
-      { /* setting -- have to use the real timer always, but since
+    if (sec|usec) {
+        /* setting -- have to use the real timer always, but since
          * this runs faster than cpu time it doesn't matter
          */
         timeval tv; quad qt;
@@ -54,14 +51,12 @@ void (*handler)();
                     /* daytim */    &qt,
                     /* astadr */    handler,
                     /* reqidt */    sig);
-      }
-  }
+    }
+}
 
-static void TIMER_GET_CLOCK(virt, tvp)
-register timeval *tvp;
-register bool virt;
-  { if (virt)
-      { itm itmlst[2];
+static void TIMER_GET_CLOCK(timeval * virt, bool tvp) {
+    if (virt) {
+        itm itmlst[2];
         long t;
         /* get cpu time */
         itmlst[0].ITM_BUFLEN    = sizeof(long);
@@ -79,14 +74,12 @@ register bool virt;
 
         tvp->tv_sec  = t/HZ;
         tvp->tv_usec = ((t%HZ)*MILL)/HZ;
-      }
-
-    else
-      { quad qt;
+    } else {
+        quad qt;
         sys$gettim(&qt);        /* real time */
         pop$timeval_from_quadtime(tvp, &qt, TRUE);  /* TRUE = abs time */
-      }
-  }
+    }
+}
 
 #define TIMER_RAISE_TRAP(sig, handler)  sys$dclast((handler), (sig), 0)
 
@@ -115,10 +108,8 @@ static struct itimerval itv;
 #define RTIMER_SIG  SIGALRM
 #define VTIMER_SIG  SIGVTALRM
 
-static void TIMER_SETUP(handler, clockintp)
-void (*handler)();
-long *clockintp;
-  { static struct itimerval zero_itv;
+static void TIMER_SETUP(void (*handler)(), long * clockintp) {
+    static struct itimerval zero_itv;
 
     /* get clock interval in usec */
     itv.it_sec = 0; itv.it_usec = 1;
@@ -129,7 +120,7 @@ long *clockintp;
     /* set signal handlers */
     _pop_sigaction(RTIMER_SIG, handler);
     _pop_sigaction(VTIMER_SIG, handler);
-  }
+}
 
 #define TIMER_SET_ITIMER(virt, sec, usec, sig, handler)         \
   { itv.it_sec = (sec); itv.it_usec = (usec);                   \
@@ -162,15 +153,13 @@ long *clockintp;
 
 #define GETTIMEOFDAY(tvp) gettimeofday(tvp, NULL)
 
-static void TIMER_GET_CLOCK(virt, tvp)
-register timeval *tvp;
-register bool virt;
-  { if (virt)
+static void TIMER_GET_CLOCK(bool virt, timeval * tvp) {
+    if (virt)
         TIMER_VIRT(tvp)
     else
         /* real time */
         GETTIMEOFDAY(tvp);
-  }
+}
 
 #define TIMER_RAISE_TRAP(sig, handler)  kill(getpid(), sig)
 
@@ -267,8 +256,7 @@ static DWORD timer_loop(DWORD arg)
 {
     TIMER_HANDLER handler = (TIMER_HANDLER)arg;
 
-    for (;;)
-    {
+    for (;;) {
         DWORD which;
 
         /* wait for some timer to fire */
@@ -311,8 +299,7 @@ static void TIMER_SET_ITIMER(
         UINT msec = (sec * 1000) + ((usec + 500) / 1000);
         if (msec < timecaps.wPeriodMin) {
             msec = timecaps.wPeriodMin;
-        }
-        else if (msec > timecaps.wPeriodMax) {
+        } else if (msec > timecaps.wPeriodMax) {
             msec = timecaps.wPeriodMax;
         }
         timer_event[which] =
@@ -342,8 +329,7 @@ static void TIMER_GET_CLOCK(BOOL virt, struct timeval *tvp)
         DWORD t = pop_get_process_time();
         tvp->tv_sec = t / 100;
         tvp->tv_usec = (t % 100) * 10000;
-    }
-    else {
+    } else {
         /* real time */
         tvp->tv_sec = pop_get_real_time(&tvp->tv_usec);
     }
@@ -359,7 +345,8 @@ static void TIMER_SETUP(TIMER_HANDLER handler, long *clockintp)
 
     /* create timer semaphores */
     for (i = 0; i < N_TIMERS; i++) {
-        timer_semaphore[i] = CreateSemaphore(NULL, 0, TIMER_SEMAPHORE_MAX, NULL);
+        timer_semaphore[i] = CreateSemaphore(NULL, 0,
+                                             TIMER_SEMAPHORE_MAX, NULL);
     }
 
     /* initialise critical section */
@@ -411,9 +398,9 @@ typedef int sigsave_t;
 *                                                                          *
 ***************************************************************************/
 
-typedef struct timentry
-  { struct timentry  *E_NEXT;
-    void            (*E_HANDLER)();
+typedef struct timentry {
+    struct timentry * E_NEXT;
+    void            (*E_HANDLER)(POPWORD);
     POPWORD           E_IDENT;
     timeval           E_VAL;
 #define                 E_SEC  E_VAL.tv_sec
@@ -421,12 +408,12 @@ typedef struct timentry
     timeval           E_INTERVAL;
 #define                 E_INTSEC  E_INTERVAL.tv_sec
 #define                 E_INTUSEC E_INTERVAL.tv_usec
-  } timentry;
+} timentry;
 
-typedef struct timer
-  { timentry   *T_QUEUE;
+typedef struct timer {
+    timentry *  T_QUEUE;
     int         T_SIG;
-  } timer;
+} timer;
 
 
 #define ADDTIM(xs,xu,ys,yu,ds,du) \
@@ -440,109 +427,101 @@ typedef struct timer
 #define N_TIMENTS 32
 static timentry
     timents[N_TIMENTS],
-    *free_timents = timents;
+    * free_timents = timents;
 
 static timer
     real_timer = {NULL, RTIMER_SIG},
     virt_timer = {NULL, VTIMER_SIG};
 
 static long half_clockint;
-static void timer_handler();
+static void timer_handler(int sig);
 
-static timentry *next_timer(timerp, handling)
-register timer *timerp;
-bool handling;
-  { register timentry *e;
+static timentry *next_timer(timer * timerp, bool handling) {
+    timentry *e;
     timeval clk;
-    register int sec, usec;
+    int sec, usec;
 
     if ((e = timerp->T_QUEUE) == NULL)          /* next timer entry */
         /* no timers */
         sec = usec = 0;
-    else
-      { sec = e->E_SEC; usec = e->E_USEC;
-        if (sec | usec)
-          { TIMER_GET_CLOCK(VIRT(timerp), &clk);        /* abs time */
+    else {
+        sec = e->E_SEC; usec = e->E_USEC;
+        if (sec | usec) {
+            TIMER_GET_CLOCK(VIRT(timerp), &clk);        /* abs time */
             /* get time till expiry */
             SUBTIM(sec, usec, clk.tv_sec, clk.tv_usec, sec, usec);
-          };
+        }
 
-        if (sec < 0 || (sec == 0 && usec <= half_clockint))
-          { /* expired */
-            if (handling)
-              { timerp->T_QUEUE = e->E_NEXT;    /* make next entry head of queue */
+        if (sec < 0 || (sec == 0 && usec <= half_clockint)) {
+            /* expired */
+            if (handling) {
+                /* make next entry head of queue */
+                timerp->T_QUEUE = e->E_NEXT;
 
                 /* test whether to repeat timer (interval nonzero) */
                 sec = e->E_INTSEC; usec = e->E_INTUSEC;
-                if (sec | usec)
-                  { /* repeat it */
-                    register timentry *f, **last;
+                if (sec | usec) {
+                    /* repeat it */
+                    timentry * f, ** last;
                     ADDTIM(sec, usec, e->E_SEC, e->E_USEC, sec, usec);
                     e->E_SEC = sec; e->E_USEC = usec;
                     /* add back to queue in order */
                     last = &timerp->T_QUEUE;
                     for (f = timerp->T_QUEUE; f; f = f->E_NEXT)
-                        if (sec < f->E_SEC || (sec == f->E_SEC && usec < f->E_USEC))
+                        if (sec < f->E_SEC || (sec == f->E_SEC
+                                               && usec < f->E_USEC)) {
                             break;
-                        else
+                        } else {
                             last = &f->E_NEXT;
-
+                        }
                     *last = e;
                     e->E_NEXT = f;
-                  }
-                else
-                  { /* no repeat -- free entry */
+                } else {
+                    /* no repeat -- free entry */
                     e->E_NEXT = free_timents;   /* chain free entries */
                     free_timents = e;           /* onto old entry */
-                  }
+                }
                 return(e);
-              }
-
-            else
-              { /* not handling immediately -- generate trap */
+            } else {
+                /* not handling immediately -- generate trap */
                 sec = usec = 0;     /* to cancel itimer */
                 TIMER_RAISE_TRAP(timerp->T_SIG, timer_handler);
-              }
-          }
-      };
+            }
+        }
+    }
 
     /* set/cancel timer */
     TIMER_SET_ITIMER(VIRT(timerp), sec, usec, timerp->T_SIG, timer_handler);
     return(NULL);
-  }
+}
 
-static void timer_handler(sig)
-int sig;
-  { SAVE_ERRNO;
-    register timer *timerp = (sig == VTIMER_SIG) ? &virt_timer : &real_timer;
-    register timentry *e = next_timer(timerp, TRUE);
-    if (e != NULL)
-      { /* check next before running handler */
+static void timer_handler(int sig) {
+    SAVE_ERRNO;
+    timer *timerp = (sig == VTIMER_SIG) ? &virt_timer : &real_timer;
+    timentry *e = next_timer(timerp, TRUE);
+    if (e != NULL) {
+        /* check next before running handler */
         next_timer(timerp, FALSE);
         /* run handler for expired entry */
         (*e->E_HANDLER)(e->E_IDENT);
-      }
+    }
     RESTORE_ERRNO;
-  }
+}
 
-long pop_timer(flags, ident, handler, tvp)
-unsigned flags;
-POPWORD ident;
-void (*handler)();
-timeval *tvp;
-  {
-    register timer *timerp = flags&TF_VIRT ? &virt_timer : &real_timer;
-    register timentry *e, *nxt, **last, *org;
+long pop_timer(unsigned flags, POPWORD ident, void (*handler)(), timeval *tvp)
+{
+    timer *timerp = flags&TF_VIRT ? &virt_timer : &real_timer;
+    timentry * e, * nxt, ** last, * org;
     timeval clk;
     int res;
-    register int sec, usec;
+    int sec, usec;
     sigsave_t savesig;
     static long clockint;
     static bool setup_done;
 
 
-    if (!setup_done)
-      { if (!handler && !ident) return(0);  /* cancelling all timers */
+    if (!setup_done) {
+        if (!handler && !ident) return(0);  /* cancelling all timers */
         /* set up free list of timer entries */
         e = free_timents;
         for (nxt = e+N_TIMENTS-1; e < nxt; e++) e->E_NEXT = e+1;
@@ -551,20 +530,19 @@ timeval *tvp;
         TIMER_SETUP(timer_handler, &clockint);
         half_clockint = clockint>>1;
         setup_done = 1;
-      };
+    }
 
     BLOCK_SIG(savesig, timerp->T_SIG);
 
     org = e = timerp->T_QUEUE;  /* current timer entry */
 
-    if (handler)
-
+    if (handler) {
         /* SETTING */
-      { if ((nxt = free_timents) == NULL || tvp == NULL)
-          { /* no free entries or no time pointer -- return error */
+        if ((nxt = free_timents) == NULL || tvp == NULL) {
+            /* no free entries or no time pointer -- return error */
             RESTORE_SIG(savesig);
             return(-1);
-          };
+        }
 
         free_timents = nxt->E_NEXT;
         nxt->E_HANDLER = handler;
@@ -573,79 +551,75 @@ timeval *tvp;
 
         sec = tvp->tv_sec; usec = tvp->tv_usec;
 
-        if (!(flags&TF_ABS) && (sec|usec))
-          { /* time interval -- make into abs time */
+        if (!(flags&TF_ABS) && (sec|usec)) {
+            /* time interval -- make into abs time */
 
             /* if nonzero and less than 1 clock interval, make it 1 */
             if (sec == 0 && usec < clockint) usec = clockint;
             /* then record interval if repeating */
-            if (flags&TF_REPEAT)
-                { nxt->E_INTSEC = sec; nxt->E_INTUSEC = usec; }
-
+            if (flags&TF_REPEAT) {
+                nxt->E_INTSEC = sec; nxt->E_INTUSEC = usec;
+            }
             TIMER_GET_CLOCK(VIRT(timerp), &clk);    /* get current time */
             ADDTIM(sec, usec, clk.tv_sec, clk.tv_usec, sec, usec);
-          };
+        }
         /* elseif zero interval, leave as zero and expires immediately */
         nxt->E_SEC = sec; nxt->E_USEC = usec;
 
         /* add to queue in order */
-        for (last = &timerp->T_QUEUE; e != NULL; e = e->E_NEXT)
-            if (sec < e->E_SEC || (sec == e->E_SEC && usec < e->E_USEC))
+        for (last = &timerp->T_QUEUE; e != NULL; e = e->E_NEXT) {
+            if (sec < e->E_SEC || (sec == e->E_SEC && usec < e->E_USEC)) {
                 break;
-            else
+            } else {
                 last = &e->E_NEXT;
-
+            }
+        }
         *last = nxt;
         nxt->E_NEXT = e;
         res = 0;
-      }
-
-    else if (ident)
-
+    } else if (ident) {
         /* GETTING/CANCELLING */
-      { /* find entry matching ident */
+        /* find entry matching ident */
         res = -1;
-        for (last = &timerp->T_QUEUE; e != NULL; e = e->E_NEXT)
-            if (e->E_IDENT == ident)
-              { if (tvp != NULL)
-                  { /* return time */
+        for (last = &timerp->T_QUEUE; e != NULL; e = e->E_NEXT) {
+            if (e->E_IDENT == ident) {
+                if (tvp != NULL) {
+                    /* return time */
                     TIMER_GET_CLOCK(VIRT(timerp), &clk);    /* current time */
                     sec = e->E_SEC; usec = e->E_USEC;
-                    if (!(sec|usec))
-                      { sec = clk.tv_sec; usec = clk.tv_usec; };
-                    if (!(flags&TF_ABS))
-                      { /* return interval */
+                    if (!(sec|usec)) {
+                        sec = clk.tv_sec; usec = clk.tv_usec;
+                    }
+                    if (!(flags&TF_ABS)) {
+                        /* return interval */
                         SUBTIM(sec, usec, clk.tv_sec, clk.tv_usec, sec, usec);
                         if ((sec|usec) < 0) sec = usec = 0;
-                      };
+                    }
                     tvp->tv_sec = sec; tvp->tv_usec = usec;
-                  };
-                if (!(flags&TF_NOCANC))
-                  { /* cancel entry */
+                }
+                if (!(flags&TF_NOCANC)) {
+                    /* cancel entry */
                     *last = e->E_NEXT;
                     e->E_NEXT = free_timents;   /* chain free entries */
                     free_timents = e;           /* onto old entry */
-                  };
+                }
                 res = 0;
                 break;
-              }
-
-            else
+            } else {
                 last = &e->E_NEXT;
-      }
-
-    else
-
+            }
+        }
+    } else {
         /* CANCELLING ALL TIMERS */
-      { timerp->T_QUEUE = NULL; res = 0; };
-
-    if (timerp->T_QUEUE != org)
+        timerp->T_QUEUE = NULL; res = 0;
+    }
+    if (timerp->T_QUEUE != org) {
         /* head of queue changed -- set timer etc */
         next_timer(timerp, FALSE);
-
+    }
     RESTORE_SIG(savesig);
     return(res);
-  }
+}
 
 
 
