@@ -226,6 +226,9 @@ globalref XTWAKE __pop_xt_wakeup_struct;
 #ifdef VMS
 extern long pop_timer();
 #else
+#ifdef UNIX
+#include <sys/time.h>
+#endif
 typedef struct timeval timeval;
 extern long
 pop_timer(unsigned flags, POPWORD ident, void (*handler)(), timeval *tvp);

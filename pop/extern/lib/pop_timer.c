@@ -96,9 +96,6 @@ static void TIMER_GET_CLOCK(timeval * virt, bool tvp) {
 
 #include <unistd.h>
 #include <signal.h>
-#include <sys/time.h>
-
-typedef struct timeval timeval;
 
 static struct itimerval itv;
 

@@ -38,9 +38,6 @@ static int poll_time[2] = {0, -1};
 
 #ifdef UNIX
 
-#include <sys/time.h>
-typedef struct timeval timeval;
-
 #define CLT(clicks) (20000*clicks)      /* 1 click = 1/50 sec */
 static timeval poll_time  = {0, 0};
 

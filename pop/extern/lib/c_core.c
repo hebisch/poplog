@@ -454,7 +454,6 @@ void pop$timeval_from_quadtime(timeval * tvp, quad * quadp, bool isabs) {
 #if defined(__STDC__) || defined(__hpux)
 #include <unistd.h>
 #endif
-#include <sys/time.h>
 #include <sys/types.h>
 #include <errno.h>
 #include <sys/param.h>
@@ -467,9 +466,6 @@ void pop$timeval_from_quadtime(timeval * tvp, quad * quadp, bool isabs) {
 /* additional ioctls */
 #include <stropts.h>
 #endif
-
-
-typedef struct timeval timeval;
 
 #ifdef SCO
 
