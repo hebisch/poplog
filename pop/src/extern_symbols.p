@@ -53,7 +53,7 @@ lconstant macro DLOPEN_FLAGS = 16:10004;    ;;; RTLD_LAZY|RTLD_GLOBAL
 lconstant macro DLOPEN_FLAGS = 16:005;  ;;; RTLD_LAZY|RTLD_GLOBAL
 #_ELSEIF DEF NCR
 lconstant macro DLOPEN_FLAGS = 16:003;  ;;; RTLD_LAZY_GLOBAL
-#_ELSEIF DEF OSF1 or DEF LINUX_ELF
+#_ELSEIF DEF OSF1 or DEF UNIX_ELF
 lconstant macro DLOPEN_FLAGS = 16:001;  ;;; RTLD_LAZY
 #_ELSEIF DEFV IRIX >= 5.0
 lconstant macro DLOPEN_FLAGS = 16:001;  ;;; RTLD_LAZY
@@ -233,7 +233,7 @@ define Name_translate(name, lang, cvt_always) -> name;
     endif;
 #_ELSE
     returnunless(cvt_always);
-  #_IF not(DEF SYSTEM_V or DEF COFF or DEF HP9000_700 or DEF LINUX_ELF)
+  #_IF not(DEF SYSTEM_V or DEF COFF or DEF HP9000_700 or DEF UNIX_ELF)
     '_' <> name -> name;
   #_ENDIF
     ;;; the only one that needs something special is Unix FORTRAN

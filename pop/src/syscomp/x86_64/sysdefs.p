@@ -56,7 +56,7 @@ global constant macro (
     UNIX = true,
     BERKELEY = 4.3,
     LINUX = 2.0,
-    LINUX_ELF = true,
+    UNIX_ELF = true,
     POSIX1 = 198808,            ;;; probably later than this ...
     OPERATING_SYSTEM = [[unix linux ^LINUX elf posix {^POSIX1}]],
 

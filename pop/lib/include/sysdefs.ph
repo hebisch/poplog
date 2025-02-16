@@ -127,7 +127,7 @@ dest(sys_os_type) -> (h, t);
         iconstant LINUX = hd(t);
         iconstant BERKELEY = 4.3;
         #_IF lmember("elf", t)
-            iconstant LINUX_ELF = true;
+            iconstant UNIX_ELF = true;
         #_ENDIF
     #_ELSEIF h == "osf1"
         iconstant OSF1 = hd(t);
@@ -149,7 +149,11 @@ dest(sys_os_type) -> (h, t);
         iconstant BSD_SYMLINKS = true;
     #_ENDIF
 
-    #_IF DEFV SYSTEM_V >= 4.0 or DEFV HPUX >= 9.0 or DEF OSF1 or DEF LINUX_ELF or DEF AIX
+    #_IF DEFV SYSTEM_V >= 4.0
+        iconstant UNIX_ELF = true;
+    #_ENDIF
+
+    #_IF DEF UNIX_ELF or DEFV HPUX >= 9.0 or DEF OSF1 or DEF AIX
         iconstant SHARED_LIBRARIES = true;
     #_ENDIF
 

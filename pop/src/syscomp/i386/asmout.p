@@ -159,7 +159,7 @@ constant procedure (
 
 global constant procedure (
     asm_align_word =
-        #_IF DEF LINUX and not(DEF LINUX_ELF)
+        #_IF DEF LINUX and not(DEF UNIX_ELF)
             outcode(% '.align\t2' %)
         #_ELSE
             outcode(% '.align\t4' %)
@@ -358,7 +358,7 @@ enddefine;
 define global extern_name_translate(lang, symbol, type) -> symbol;
     lvars lang, symbol, type;
     returnif(lang = 'ASM');
-#_IF DEF LINUX and not(DEF LINUX_ELF)
+#_IF DEF LINUX and not(DEF UNIX_ELF)
     '_' <> symbol -> symbol;
 #_ENDIF
     if lang = 'FORTRAN' then uppertolower(symbol) <> '_' -> symbol endif
@@ -378,11 +378,6 @@ constant
         ;;; export global symbols for external load
         <> '-B export \\\n'
     #_ENDIF
-#_ELSEIF DEF LINUX_ELF
-        '/usr/bin/ld -S -x -o $IM -m elf_i386 -L/lib \\\n' <>
-        '-export-dynamic -dynamic-linker /lib/ld-linux.so.1 \\\n'
-#_ELSEIF DEF LINUX
-        '/usr/bin/ld -S -x -static -o $IM \\\n'
 #_ELSEIF DEF SCO
         '/bin/ld -x -o $IM -e _start \\\n'
 #_ELSE

@@ -289,7 +289,7 @@ lconstant macro (
     _STM_IFLNK  = _8:120000,
     );
 
-#_IF DEF LINUX_ELF or DEF NCR or DEF DGUX or DEF SOLARIS_X86
+#_IF DEF LINUX and DEF UNIX_ELF or DEF NCR or DEF DGUX or DEF SOLARIS_X86
 ;;; In these systems -- all PC Unix variants -- calls to the *stat()
 ;;; functions are replaced by the C compiler with calls to *xstat()
 ;;; alternatives. In some versions of Linux, the stat() functions

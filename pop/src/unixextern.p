@@ -1149,7 +1149,7 @@ define lconstant process_link_args(args, dummy, link_item);
                     report(WARNING, 'can\'t open %S %S', [^SHLIB_NAME ^arg]);
                 endif;
             elseif isstartstring('-L', arg)
-#_IF DEFV SYSTEM_V >= 4.0 or DEF LINUX_ELF
+#_IF DEF UNIX_ELF
             ;;; allow -R as well
             or isstartstring('-R', arg)
 #_ENDIF

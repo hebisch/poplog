@@ -21,10 +21,10 @@ consstring
     ARCH <> 'r5' -> ARCH;
 #_ENDIF
 
-#_IF DEFV SYSTEM_V >= 4.0 or DEF OSF1 or DEF LINUX_ELF or DEF AIX
-    '.so', dup()
-#_ELSEIF DEF HPUX and DEF SHARED_LIBRARIES
+#_IF DEF HPUX and DEF SHARED_LIBRARIES
     '.sl', dup()
+#_ELSEIF DEF UNIX_ELF or DEF OSF1 or DEF AIX
+    '.so', dup()
 #_ELSEIF DEF VMS
     '.obj', '.olb'
 #_ELSEIF DEF WINDOWS

@@ -74,7 +74,7 @@ lconstant
     SHLIB_NAME = 'shared library',  ;;; what to call a shared library
 ;
 
-#_ELSEIF DEFV SYSTEM_V >= 4.0 or DEF OSF1 or DEF LINUX_ELF or DEF AIX
+#_ELSEIF DEF UNIX_ELF or DEF OSF1 or DEF AIX
 
 lconstant
     DL_LIB     = '-ldl',
