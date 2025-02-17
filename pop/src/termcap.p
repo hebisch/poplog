@@ -47,7 +47,7 @@ constant procedure (
  *  Dummy exload to incorporate termcap library
  */
 exload termcap
-#_IF DEF OSF1 or DEFV IRIX >= 6.0 or DEF AIX
+#_IF DEF OSF1 or DEFV IRIX >= 6.0 or DEF AIX or DEF SOLARIS
     ['-lcurses']
 #_ELSEIF DEFV IRIX >= 5.0
     ;;; names in the curses library clash with names defined in the
