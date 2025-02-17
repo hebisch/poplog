@@ -99,7 +99,7 @@ vars _unix_usrstack = _NULL;    ;;; must be vars so it's not restored
     */
 define Abs_callstack_lim();
 
-#_IF DEF SUNOS or DEF NCR or DEF DGUX or DEF HPUX or DEF LINUX
+#_IF DEF SUNOS or DEF NCR or DEF DGUX or DEF HPUX or DEF LINUX or DEF FREEBSD
     ;;; They have several different USRSTACK values (and they're liable
     ;;; to change with a new release, etc). The following code finds the
     ;;; highest arg or env string address, and then takes that rounded up
@@ -189,7 +189,7 @@ lconstant macro BSD_PWENT = DEF BERKELEY and not(DEF HPUX);
 struct PASSWD_ENTRY
   { (byte)  PWE_NAME,
             PWE_PASSWD;
-#_IF DEFV SYSTEM_V >= 4.0 or DEF OSF1 or DEF LINUX or DEF AIX
+#_IF DEFV SYSTEM_V >= 4.0 or DEF OSF1 or DEF LINUX or DEF AIX or DEF FREEBSD
     uid_t   PWE_UID;
     gid_t   PWE_GID;
 #_ELSE

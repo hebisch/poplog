@@ -339,7 +339,7 @@ define asm_gen_exfunc_clos_code(action_lab);
     ;;; call *%eax (= 2 bytes)
     asmf_printf('\tcall\t*%%r10\n');
     ;;; pad to 16 bytes
-#_IF DEF SYSTEM_V or DEF LINUX
+#_IF DEF SYSTEM_V or DEF LINUX or DEF FREEBSD
     asmf_printf('\t.align\t8\n');
 #_ELSE
     asmf_printf('\t.space\t5\n');

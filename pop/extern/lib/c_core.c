@@ -81,7 +81,12 @@ static bool in_pop_float(char ** pc_ptr) {
 
 #endif  /* __alpha */
 
-
+#ifdef __FreeBSD__
+#include <unistd.h>
+char *get_current_dir_name(void) {
+    return getcwd(0, 0);
+}
+#endif
 
 /*>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 <<<<<<<<<<<<<<<<<<<<<<                            >>>>>>>>>>>>>>>>>>>>>>>>>

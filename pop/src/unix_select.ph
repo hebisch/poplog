@@ -4,7 +4,7 @@
  > Author:          John Gibson Jun 13 1994 (see revisions)
  */
 
-#_IF DEF LINUX
+#_IF DEF LINUX or DEF FREEBSD
 deftype fd_mask = long;
     ;;; Use the standard definition
 lconstant macro FD_SETSIZE = 1024;

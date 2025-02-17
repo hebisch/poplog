@@ -16,13 +16,15 @@ iconstant macro (
     ENOENT          = 2,
     ESRCH           = 3,
     EINTR           = 4,
-    EIO         = 5,
+    EIO             = 5,
     ENXIO           = 6,
     E2BIG           = 7,
     ENOEXEC         = 8,
     EBADF           = 9,
     ECHILD          = 10,
-    EAGAIN          = #_IF DEF ALPHA_LINUX 35 #_ELSE 11 #_ENDIF,
+    EAGAIN          = #_IF DEF ALPHA_LINUX or DEF FREEBSD 35
+                      #_ELSE 11
+                      #_ENDIF,
     ENOMEM          = 12,
     EACCES          = 13,
     EEXIST          = 17,
@@ -106,7 +108,19 @@ iconstant macro (
     );
 
 #_ELSE
-
+  #_IF DEF FREEBSD
+  iconstant macro (
+    EDEADLK         = 11,
+    EFAULT          = 14,
+    ENOTBLK         = 15,
+    EBUSY           = 16,
+    ENOTTY          = 25,
+    ETXTBSY         = 26,
+    ESPIPE          = 29,
+    EROFS           = 30,
+    EMLINK          = 31,
+  );
+  #_ENDIF
 iconstant macro (
     EWOULDBLOCK     = 35,
     ENOSR           = #_IF DEF OSF1 or DEF LINUX 82

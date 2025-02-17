@@ -106,7 +106,7 @@ define Decode_dir_entry(_dir_entry, _sbuf) -> (_cptr, _clim, is16);
     lstackmem int _ilenp, int _olenp, int _state;
 
     ;;; Establish the length of the name
-#_IF DEFV SYSTEM_V >= 4.0 or DEF LINUX or DEF AIX
+#_IF DEFV SYSTEM_V >= 4.0 or DEF LINUX or DEF AIX or DEF FREEBSD
     ;;; no DIR_NAMLEN, but the name must fit in the record
     ;;; (NB: AIX has DIR_NAMLEN, but it's buggy with NFS files.)
     _dir_entry!DIR_RECLEN -> _len;
@@ -153,7 +153,7 @@ enddefine;
     /*  Get the current directory pathname
     */
 
-#_IF DEF LINUX
+#_IF DEF LINUX or DEF FREEBSD
 
 /* New version for Linux by Waldek Hebisch, installed by A.Sloman 28 Sep 2007
     uses external C utility
