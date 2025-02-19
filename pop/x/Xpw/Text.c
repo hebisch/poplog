@@ -3030,9 +3030,10 @@ XpwSetSelection(Widget w, String location, String string, int nbytes,
 typedef struct {XtCallbackProc p; Opaque val;} closure;
 
 static void
-SelectionCB(Widget w, closure * clos, Atom * selectionp, Atom * typep,
+SelectionCB(Widget w, XtPointer cl_p, Atom * selectionp, Atom * typep,
             Opaque value, unsigned long * length, int * format)
 {
+    closure * clos = (closure *)cl_p;
     if (*typep != XA_STRING) {
         value = NULL;
     }
