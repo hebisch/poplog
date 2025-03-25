@@ -22,7 +22,7 @@ iconstant macro (
     ENOEXEC         = 8,
     EBADF           = 9,
     ECHILD          = 10,
-    EAGAIN          = #_IF DEF ALPHA_LINUX or DEF FREEBSD 35
+    EAGAIN          = #_IF DEF ALPHA_LINUX or DEF FREEBSD or DEF NETBSD 35
                       #_ELSE 11
                       #_ENDIF,
     ENOMEM          = 12,
@@ -108,7 +108,7 @@ iconstant macro (
     );
 
 #_ELSE
-  #_IF DEF FREEBSD
+  #_IF DEF FREEBSD or DEF NETBSD
   iconstant macro (
     EDEADLK         = 11,
     EFAULT          = 14,

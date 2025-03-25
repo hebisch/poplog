@@ -312,7 +312,7 @@ lconstant
     _ZMAGIC     = _8:413,
     ;
 
-#_IF DEF LINUX or DEF FREEBSD
+#_IF DEF LINUX or DEF FREEBSD or DEF NETBSD
 lconstant
     _MAGIC_MASK = _16:FFFF,
     _QMAGIC     = _8:314;
@@ -345,7 +345,7 @@ define macro _N_TXTOFF x;
         else _HDR_BYTES
         endif
     )].dl
-#_ELSEIF DEF LINUX or DEF FREEBSD
+#_ELSEIF DEF LINUX or DEF FREEBSD or DEF NETBSD
     [(  if (^x!AH_MAGIC _bimask _MAGIC_MASK) == _ZMAGIC then _1024
         elseif (^x!AH_MAGIC _bimask _MAGIC_MASK) == _QMAGIC then _0
         else _HDR_BYTES
@@ -1352,7 +1352,7 @@ define Do_link_load(objfiles, symbol_list, old_link_base, new_link_base);
         () >< ''
     enddefine;
 
-#_IF DEF LINUX or DEF FREEBSD
+#_IF DEF LINUX or DEF FREEBSD or DEF NETBSD
     define lconstant ignore_ld_messages(file);
     lvars file, charrep = discin(file), ch, line;
     lconstant text_start = 'text_start', data_start = 'data_start';
@@ -1385,7 +1385,7 @@ define Do_link_load(objfiles, symbol_list, old_link_base, new_link_base);
     ;;; ASM_TEXT_STR and ASM_WORD_STR are macros defined in syscomp/asmout.p
     fprintf(ASM_TEXT_STR, '%p\n');
 
-#_IF DEF LINUX or DEF FREEBSD
+#_IF DEF LINUX or DEF FREEBSD or DEF NETBSD
     ;;; Linux linker complains if there are no symbols in the object file
     ;;; so if none are requested, include one we know will be there.
     ;;;
@@ -1416,7 +1416,7 @@ define Do_link_load(objfiles, symbol_list, old_link_base, new_link_base);
         libc    = '-lc',
     ;
 
-  #_IF DEF IRIX or DEF LINUX or DEF FREEBSD
+  #_IF DEF IRIX or DEF LINUX or DEF FREEBSD or DEF NETBSD
         '/usr/bin/as' -> as_cmd;
         '/usr/bin/ld' -> ld_cmd;
   #_ENDIF
@@ -1428,7 +1428,7 @@ define Do_link_load(objfiles, symbol_list, old_link_base, new_link_base);
     #_ENDIF
   #_ENDIF
 
-  #_IF DEF LINUX or DEF FREEBSD
+  #_IF DEF LINUX or DEF FREEBSD or DEF NETBSD
         '-Ttext' -> Tflag;
         ['-static' ^^flags] -> flags;
   #_ENDIF
@@ -1454,7 +1454,7 @@ define Do_link_load(objfiles, symbol_list, old_link_base, new_link_base);
             ]
         do explode(x), `\s` endfor%}
     %],
-    #_IF DEF LINUX or DEF FREEBSD
+    #_IF DEF LINUX or DEF FREEBSD or DEF NETBSD
         true
     #_ELSE
         false
@@ -1504,7 +1504,7 @@ define Do_link_load(objfiles, symbol_list, old_link_base, new_link_base);
         cucharout(x);
         true -> fail;
     enduntil;
-#_IF DEF LINUX or DEF FREEBSD
+#_IF DEF LINUX or DEF FREEBSD or DEF NETBSD
     ;;; some options to the Linux linker always seem to generate output
     if fail then
         ignore_ld_messages(procout);

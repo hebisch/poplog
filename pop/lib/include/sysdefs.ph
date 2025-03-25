@@ -135,6 +135,12 @@ dest(sys_os_type) -> (h, t);
         #_IF lmember("elf", t)
             iconstant UNIX_ELF = true;
         #_ENDIF
+    #_ELSEIF h == "netbsd"
+        iconstant NETBSD = hd(t);
+        iconstant BERKELEY = 4.3;
+        #_IF lmember("elf", t)
+            iconstant UNIX_ELF = true;
+        #_ENDIF
     #_ELSEIF h == "osf1"
         iconstant OSF1 = hd(t);
         iconstant BERKELEY = 4.3;

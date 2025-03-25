@@ -99,7 +99,7 @@ vars _unix_usrstack = _NULL;    ;;; must be vars so it's not restored
     */
 define Abs_callstack_lim();
 
-#_IF DEF SUNOS or DEF NCR or DEF DGUX or DEF HPUX or DEF LINUX or DEF FREEBSD
+#_IF DEF SUNOS or DEF NCR or DEF DGUX or DEF HPUX or DEF LINUX or DEF FREEBSD or DEF NETBSD
     ;;; They have several different USRSTACK values (and they're liable
     ;;; to change with a new release, etc). The following code finds the
     ;;; highest arg or env string address, and then takes that rounded up
@@ -183,20 +183,23 @@ enddefine;
 
 ;;; --------------------------------------------------------------------
 
-lconstant macro BSD_PWENT = DEF BERKELEY and not(DEF HPUX);
+lconstant macro BSD_PWENT = DEF BERKELEY and not(DEF HPUX) and not(DEF NETBSD);
 
     ;;; entry returned by _extern getpwnam, getpwuid
 struct PASSWD_ENTRY
   { (byte)  PWE_NAME,
             PWE_PASSWD;
-#_IF DEFV SYSTEM_V >= 4.0 or DEF OSF1 or DEF LINUX or DEF AIX or DEF FREEBSD
+#_IF DEFV SYSTEM_V >= 4.0 or DEF OSF1 or DEF LINUX or DEF AIX or DEF FREEBSD or DEF NETBSD
     uid_t   PWE_UID;
     gid_t   PWE_GID;
 #_ELSE
     int     PWE_UID,
             PWE_GID;
 #_ENDIF
-#_IF not(DEF LINUX or DEF AIX)
+#_IF DEF NETBSD
+    time_t  PWE_CHANGE;
+    (byte)  PWE_CLASS;
+#_ELSEIF not(DEF LINUX or DEF AIX)
   #_IF BSD_PWENT
     int     PWE_QUOTA;
   #_ELSE
@@ -207,6 +210,9 @@ struct PASSWD_ENTRY
     (byte)  PWE_GECOS,
             PWE_DIR,
             PWE_SHELL;
+#_IF DEF NETBSD
+    time_t  PWE_EXPIRE;
+#_ENDIF
   };
 
 ;;; sysgetpasswdentry either returns a line a line got by Sysgetpasswdentry
@@ -237,7 +243,7 @@ define sysgetpasswdentry(name);
         GID:
             return(Uint_->_pint(_pwent!PWE_GID));
         QUOTA:
-          #_IF DEF LINUX or DEF AIX
+          #_IF DEF LINUX or DEF AIX or DEF NETBSD
             ;;; dummy
             return(0);
           #_ELSEIF DEF BSD_PWENT
@@ -246,7 +252,7 @@ define sysgetpasswdentry(name);
             return(Consstring_bptr(_pwent!PWE_AGE, _-1, CSB_FIXED));
           #_ENDIF
         COMMENT:
-          #_IF DEF LINUX or DEF AIX
+          #_IF DEF LINUX or DEF AIX or DEF NETBSD
             ;;; dummy
             return(nullstring);
           #_ELSE

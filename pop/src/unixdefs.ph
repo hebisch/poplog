@@ -31,7 +31,7 @@ lconstant macro _ERRNO = [DO_ERRNO_VAL];
 
 /* From <sys/types.h> */
 
-#_IF DEF FREEBSD
+#_IF DEF FREEBSD or DEF NETBSD
 deftype
     off_t   = -double,
     blkcnt_t= -double;
@@ -52,13 +52,20 @@ deftype
     uid_t   = -long,
     gid_t   = uid_t;
 
-#_ELSEIF DEF FREEBSD        /* must come before BERKELEY */
+#_ELSEIF DEF FREEBSD or DEF NETBSD   /* must come before BERKELEY */
+
 deftype
     dev_t   = double,
     ino_t   = double,
+#_IF DEF NETBSD
+    mode_t  = int,
+    nlink_t = int,
+    time_t  = -double,
+#_ELSE
     mode_t  = short,
     nlink_t = double,
     time_t  = -long,
+#_ENDIF
     uid_t   = int,
     gid_t   = int;
 
@@ -166,6 +173,31 @@ struct STATB
     byte    ST_FSTYPE[16];
     long    ST_PAD4[8]; /* expansion area */
   };
+
+#_ELSEIF DEF NETBSD         /* must come before BERKELEY */
+struct STATB {
+    dev_t   ST_DEV;
+    mode_t  ST_MODE;
+    ino_t   ST_INO;
+    nlink_t ST_NLINK;
+    uid_t   ST_UID;
+    gid_t   ST_GID;
+    dev_t   ST_RDEV;
+    time_t  ST_ATIME;
+    long    ST_ATIME_NS;
+    time_t  ST_MTIME;
+    long    ST_MTIME_NS;
+    time_t  ST_CTIME;
+    long    ST_CTIME_NS;
+    time_t  ST_BIRTHTIM;
+    long    ST_BIRTHTIM_NS;
+    off_t   ST_SIZE;
+    blkcnt_t ST_BLOCKS;
+    int     ST_BLKSIZE;
+    int     ST_FLAGS;
+    int     ST_GEN;
+    int     ST_SPARE[2];
+};
 
 #_ELSEIF DEF FREEBSD        /* must come before BERKELEY */
 struct STATB {
@@ -344,7 +376,7 @@ lconstant macro (
     _STM_IFLNK  = _8:120000,
     );
 
-#_IF DEF LINUX and DEF UNIX_ELF or DEF FREEBSD or DEF NCR or DEF DGUX or DEF SOLARIS_X86
+#_IF DEF LINUX and DEF UNIX_ELF or DEF FREEBSD or DEF NETBSD or DEF NCR or DEF DGUX or DEF SOLARIS_X86
 ;;; In these systems -- all PC Unix variants -- calls to the *stat()
 ;;; functions are replaced by the C compiler with calls to *xstat()
 ;;; alternatives. In some versions of Linux, the stat() functions
@@ -396,6 +428,9 @@ struct DIRECT
     ino_t   DIR_INO;
     short   DIR_RECLEN,
             DIR_NAMLEN;
+#_IF DEF NETBSD
+    byte    DIR_TYPE;
+#_ENDIF
     byte    DIR_NAME[];
   };
 
@@ -564,7 +599,7 @@ lconstant macro (
 
 struct TMS
   {
-#_IF DEF FREEBSD
+#_IF DEF FREEBSD or DEF NETBSD
     int
 #_ELSE
    long

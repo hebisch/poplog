@@ -18,7 +18,7 @@ global constant
 
 section $-Sys => sys_convert_date, sysdaytime;
 
-#_IF DEFV SUNOS < 5.0 or DEF OSF1 or DEFV ULTRIX >= 4.0 or DEF LINUX or DEF FREEBSD
+#_IF DEFV SUNOS < 5.0 or DEF OSF1 or DEFV ULTRIX >= 4.0 or DEF LINUX or DEF FREEBSD or DEF NETBSD
 lconstant macro USE_TM_ZONE = true;
 #_ELSEIF DEF SYSTEM_V or DEF HPUX or DEF AIX
 lconstant macro TZNAME = [tzname:data];     ;;; Timezone name for System V systems

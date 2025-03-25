@@ -26,7 +26,7 @@ lconstant macro (
     AS_CMD  = '/usr/ccs/bin/as',
     AR_CMD  = '/usr/ccs/bin/ar',
 );
-#_ELSEIF DEF LINUX or DEF FREEBSD
+#_ELSEIF DEF LINUX or DEF FREEBSD or DEF NETBSD
 lconstant macro (
     ;;; AS_CMD  = '/sklad/kompi/poplog/pp4/asm',
     AS_CMD  = '/usr/bin/as',
@@ -107,7 +107,7 @@ define gen_link_command(exlink, link_cmnd, image_name, wobj_files, link_flags,
             ;;; libraries are inside refs
             if isref(f) then cont(f) -> f endif;
             if exlink then sysfileok(f) -> f endif;
-#_IF DEF LINUX or DEF FREEBSD
+#_IF DEF LINUX or DEF FREEBSD or DEF NETBSD
             if isstartstring('-R', f) then
   #_IF DEF cc_link_command_header
                 '-Wl,-rpath,' <> allbutfirst(2, f) -> f

@@ -251,7 +251,7 @@ L1.1:   ;;; Copy the transformed dfloat to the work area, load it to the
     ;;; 387 as a double float then store it back as a single
 
     movl    %eax, WORK
-#_IF DEF LINUX or DEF FREEBSD
+#_IF DEF LINUX or DEF FREEBSD or DEF NETBSD
     movl    %edx, (WORK+4)
 #_ELSE
     movl    %edx, WORK+4
@@ -684,7 +684,7 @@ DEF_C_LAB(-> _pf_expof)
     ;;; Mask out the exponent from EAX and OR in the new one;
     ;;; store it back to the argument and return <true>
 
-#_IF DEF LINUX or DEF FREEBSD
+#_IF DEF LINUX or DEF FREEBSD or DEF NETBSD
     andl    $(~D_EXP), %eax
 #_ELSE
     andl    $-1!D_EXP, %eax

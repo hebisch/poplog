@@ -225,7 +225,7 @@ define System_error(_sig, _fault_code, _pc, _fault_addr);
 
     if _sig == _:SIG_SEGV then
         ;;; segmentation violation
-#_IF DEF SUNOS or DEF MIPS or DEF OSF1 or DEF NCR or DEF AIX or DEF DGUX or DEF LINUX or DEF FREEBSD
+#_IF DEF SUNOS or DEF MIPS or DEF OSF1 or DEF NCR or DEF AIX or DEF DGUX or DEF LINUX or DEF FREEBSD or DEF NETBSD
         ;;; _fault_addr is reliable
         'serr: MEMORY ACCESS VIOLATION (see above)' -> ms;
         if

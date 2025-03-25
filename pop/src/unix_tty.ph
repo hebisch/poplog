@@ -53,7 +53,7 @@ lconstant macro NCCS = 16;
 deftype tcflag_t = short;
 lconstant macro NCCS = 31;
 
-  #_ELSEIF DEF OSF1 or DEF FREEBSD
+  #_ELSEIF DEF OSF1 or DEF FREEBSD or DEF NETBSD
 
 deftype tcflag_t = int;
 lconstant macro NCCS = 20;
@@ -83,7 +83,7 @@ struct TERMIOS
   #_IF DEF ULTRIX or DEF ALPHA_LINUX
         byte            TMIO_LINE;              ;;; line discipline
   #_ENDIF
-  #_IF DEF OSF1 or DEFV LINUX >= 2.0 or DEF FREEBSD
+  #_IF DEF OSF1 or DEFV LINUX >= 2.0 or DEF FREEBSD or DEF NETBSD
     int         TMIO_ISPEED,    ;;; input speed
                 TMIO_OSPEED;    ;;; output speed
   #_ENDIF
@@ -173,11 +173,11 @@ lconstant macro (
 
     ;;; Control character indexes in TMIO_CC
 
-  #_IF DEF OSF1 or DEF ALPHA_LINUX or DEF FREEBSD
+  #_IF DEF OSF1 or DEF ALPHA_LINUX or DEF FREEBSD or DEF NETBSD
 
     #_IF DEF FREEBSD
         lconstant macro _CC_VERASE2     = _7;
-    #_ELSE
+    #_ELSEIF not(DEF NETBSD)
         lconstant macro _CC_VSWTCH      = _7;
     #_ENDIF
 

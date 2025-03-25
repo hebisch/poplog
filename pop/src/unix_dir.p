@@ -153,7 +153,7 @@ enddefine;
     /*  Get the current directory pathname
     */
 
-#_IF DEF LINUX or DEF FREEBSD
+#_IF DEF LINUX or DEF FREEBSD or DEF NETBSD
 
 /* New version for Linux by Waldek Hebisch, installed by A.Sloman 28 Sep 2007
     uses external C utility

@@ -110,8 +110,14 @@ if (eval "$comp_cmd") 2> contest.err; then
     echo "   "yes
 else
     echo "   "not found
-    echo "Please install ncurses developement library and try again"
-    exit 1
+    echo -n "Trying curses"
+    comp_cmd="${CC} conftest.c -lcurses -o conftest.exe"
+    if (eval "$comp_cmd") 2> contest.err; then
+        echo "   "yes
+    else
+        echo "Please install (n)curses developement library and try again"
+        exit 1
+    fi
 fi
 rm -f conftest.exe
 
@@ -155,6 +161,9 @@ if [ x"$X_CONF" != "xno" ] ; then
 
   echo -n "Testing linking with Xt"
   XT_OPT="-lXt -lX11"
+  if [ -d /usr/X11R7/lib ] ; then
+  XT_OPT="-L/usr/X11R7/lib $XT_OPT"
+  fi
   comp_cmd="${CC} conftest.c -o conftest.exe $XT_OPT"
   if (eval "$comp_cmd") 2> contest.err; then
       HAS_XT=yes
@@ -219,7 +228,11 @@ EOF
 
 if test "$X_CONF" != "no" ; then
 echo -n "Testing for X11 headers"
-comp_cmd="${CC} -c conftest.c -o conftest.o"
+X_INCLUDES=
+if [ -d /usr/X11R7/include ] ; then
+    X_INCLUDES="-I /usr/X11R7/include"
+fi
+comp_cmd="${CC} ${X_INCLUDES} -c conftest.c -o conftest.o"
 if (eval "$comp_cmd") 2> contest.err; then
     HAS_X11HEADERS=yes
 else
@@ -238,8 +251,8 @@ POPEXTERNLIB=$USEPOP/$POP_target/exlib
 POPOBJLIB=$USEPOP/$POP_target/obj
 
 SUBSTS="s,@@USEPOP@@,$USEPOP,"
-for A in POPSYS POPEXTERNLIB POPOBJLIB X_CONF ABS_BUILD POP_BIN_DIR \
-    POP_arch CC POP_target PACK_CONF ;
+for A in POPSYS POPEXTERNLIB POPOBJLIB X_CONF X_INCLUDES \
+    ABS_BUILD  POP_BIN_DIR POP_arch CC POP_target PACK_CONF ;
 do
     VAL=`eval echo '$'"$A"`
     SUBSTS="$SUBSTS;s,@@$A@@,$VAL,"

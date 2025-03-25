@@ -81,7 +81,7 @@ static bool in_pop_float(char ** pc_ptr) {
 
 #endif  /* __alpha */
 
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__)||defined(__NetBSD__)
 #include <unistd.h>
 char *get_current_dir_name(void) {
     return getcwd(0, 0);
@@ -569,12 +569,12 @@ int set_libc_errno(int x) {
  *  Handler for error-type signals, i.e. QUIT, ILL, IOT, EMT, FPE, BUS, SEGV
  */
 
-#if defined(SVR4) || defined(__linux__)
+#if defined(SVR4) || defined(__linux__) || defined(__NetBSD__)
 /* Default case for SVR4, but not (yet) used for SG IRIX */
 #if !defined(__sgi)
 #define _POP_ERRSIG_HANDLER_
 
-#if !defined(__linux__)
+#if !(defined(__linux__) || defined(__NetBSD__))
 #include <siginfo.h>
 #endif
 #include <ucontext.h>
@@ -594,6 +594,10 @@ int set_libc_errno(int x) {
 #define REG_PC REG_EIP
 #endif
 #endif
+#elif defined(__NetBSD__)
+#if defined(__x86_64__)
+#define REG_PC _REG_RIP
+#endif
 #else
 #if defined(i386)
 #if defined(R_EIP)
@@ -602,6 +606,11 @@ int set_libc_errno(int x) {
 #define REG_PC EIP
 #endif
 #endif
+#endif
+
+#if defined(__NetBSD__)
+#define greg_t __greg_t
+#define gregs __gregs
 #endif
 
 
