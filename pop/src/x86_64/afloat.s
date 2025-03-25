@@ -131,7 +131,7 @@ DEF_C_LAB (_pf_sfloat_dec)
 DEF_C_LAB (_pf_dfloat_int)
 
     movq    (%USP), %rdi
-    fildq   8(%USP)
+    fildll   8(%USP)
     addq    $16, %USP
     fstpl   (%rdi)
     wait

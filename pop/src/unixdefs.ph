@@ -46,10 +46,19 @@ deftype
 deftype
     dev_t   = long,
     ino_t   = long,
+#_IF DEF SOLARIS and WORD_BITS = 64
+    mode_t  = int,
+    nlink_t = int,
+#_ELSE
     mode_t  = long,
     nlink_t = long,
+#_ENDIF
     time_t  = -long,
+#_IF DEF SOLARIS and WORD_BITS = 64
+    uid_t   = -int,
+#_ELSE
     uid_t   = -long,
+#_ENDIF
     gid_t   = uid_t;
 
 #_ELSEIF DEF FREEBSD or DEF NETBSD   /* must come before BERKELEY */
@@ -148,7 +157,7 @@ deftype
 
 /* From <sys/stat.h> */
 
-#_IF DEFV SYSTEM_V >= 4.0
+#_IF DEFV SYSTEM_V >= 4.0 and WORD_BITS = 32
 
 struct STATB
   { dev_t   ST_DEV;
@@ -173,6 +182,28 @@ struct STATB
     byte    ST_FSTYPE[16];
     long    ST_PAD4[8]; /* expansion area */
   };
+
+#_ELSEIF DEF SOLARIS
+
+struct STATB {
+    dev_t   ST_DEV;
+    ino_t   ST_INO;
+    mode_t  ST_MODE;
+    nlink_t ST_NLINK;
+    uid_t   ST_UID;
+    gid_t   ST_GID;
+    dev_t   ST_RDEV;
+    off_t   ST_SIZE;
+    time_t  ST_ATIME;
+    long    ST_ATIME_X;
+    time_t  ST_MTIME;
+    long    ST_MTIME_X;
+    time_t  ST_CTIME;
+    long    ST_CTIME_X;
+    int    ST_BLKSIZE;
+    blkcnt_t ST_BLOCKS;
+    byte    ST_FSTYPE[16];
+};
 
 #_ELSEIF DEF NETBSD         /* must come before BERKELEY */
 struct STATB {

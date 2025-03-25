@@ -286,7 +286,7 @@ L5.1:
     cmpl    $3, _BGI_LENGTH(%rax)
     jb      L5.2
     movl    _BGI_SLICES+8(%rax), %r10d
-    shl     $62, %r10
+    salq    $62, %r10
     ;;; spill to the stack
     movq    %r10, -8(%rbp)
     movl    _BGI_SLICES+4(%rax),%r10d

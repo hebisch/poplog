@@ -2093,6 +2093,8 @@ define lconstant outinst(instr);
     lvars instr;
 #_IF DEF MASM
     lconstant COMMENT = `;`;
+#_ELSEIF DEF SOLARIS
+    lconstant COMMENT = `/`;
 #_ELSE
     lconstant COMMENT = `#`;
 #_ENDIF

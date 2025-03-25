@@ -163,49 +163,49 @@ L2.1:
 
     movzwl _PD_REGMASK(%PB), %ecx
 
-    bt  $15, %rcx
+    btq  $15, %rcx
     jnc L2.14
     movq %r15, %rax
     stosq
     popq %r15
 L2.14:
-    bt  $14, %rcx
+    btq  $14, %rcx
     jnc L2.13
     movq %r14, %rax
     stosq
     popq %r14
 L2.13:
-    bt  $13, %rcx
+    btq  $13, %rcx
     jnc L2.12
     movq %r13, %rax
     stosq
     popq %r13
 L2.12:
-    bt  $12, %rcx
+    btq  $12, %rcx
     jnc L2.11
     movq %r12, %rax
     stosq
     popq %r12
 L2.11:
-    bt  $11, %rcx
+    btq  $11, %rcx
     jnc L2.10
     movq %r11, %rax
     stosq
     popq %r11
 L2.10:
-    bt  $10, %rcx
+    btq  $10, %rcx
     jnc L2.9
     movq %r10, %rax
     stosq
     popq %r10
 L2.9:
-    bt  $9, %rcx
+    btq  $9, %rcx
     jnc L2.8
     movq %r9, %rax
     stosq
     popq %r9
 L2.8:
-    bt  $8, %rcx
+    btq  $8, %rcx
     jnc L2.7
     movq %r8, %rax
     stosq
@@ -327,49 +327,49 @@ siloop:
 
     movzwl _PD_REGMASK(%PB), %ecx
 
-    bt $8, %rcx
+    btq $8, %rcx
     jnc L1.9
     push %r8
     lodsq
     movq %rax, %r8
 L1.9:
-    bt $9, %rcx
+    btq $9, %rcx
     jnc L1.10
     push %r9
     lodsq
     movq %rax, %r9
 L1.10:
-    bt $10, %rcx
+    btq $10, %rcx
     jnc L1.11
     push %r10
     lodsq
     movq %rax, %r10
 L1.11:
-    bt $11, %rcx
+    btq $11, %rcx
     jnc L1.12
     push %r11
     lodsq
     movq %rax, %r11
 L1.12:
-    bt $12, %rcx
+    btq $12, %rcx
     jnc L1.13
     push %r12
     lodsq
     movq %rax, %r12
 L1.13:
-    bt $13, %rcx
+    btq $13, %rcx
     jnc L1.14
     push %r13
     lodsq
     movq %rax, %r13
 L1.14:
-    bt $14, %rcx
+    btq $14, %rcx
     jnc L1.15
     push %r14
     lodsq
     movq %rax, %r14
 L1.15:
-    bt $15, %rcx
+    btq $15, %rcx
     jnc L1.16
     push %r15
     lodsq
