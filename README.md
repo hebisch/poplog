@@ -27,11 +27,14 @@ core part.  It misses binary needed for bootstrap and extensions
 
   https://github.com/hebisch/poplog_packages
 
-You can find link to bootstrap binary and buildable tarball for
-Intel/AMD 64-bit Linux at
+You can find bootstrap binaries at:
+
+  https://poplog.fricas.org/corepops
+
+There is buildable tarball for Intel/AMD 64-bit Linux at
 
   http://fricas.org/~hebisch/poplog
 
-(this build version closely corresponding to repository).
+(this build version does not include newest changes to repository).
 
 For more detailed installation instructions see INSTALL.
