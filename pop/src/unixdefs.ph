@@ -204,7 +204,7 @@ struct STATB {
     int     ST_BLKSIZE;
     long    ST_GEN;
     long    ST_SPARE[10];
-}; 
+};
 
 #_ELSEIF DEF ALPHA_LINUX    /* must come before BERKELEY */
 

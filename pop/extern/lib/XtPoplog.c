@@ -486,7 +486,7 @@ static int poll_appcons() {
             _pop_add_ast(AST_APP_PENDING, entp->clos);
             newmask &= ~BITOF(entp);    /* disable it */
         }
-     } 
+     }
     _pop_external_flags = save_external_flags;
 
     mask = appcons_enabled;
@@ -936,7 +936,6 @@ void XptAppNextEvent(XtAppContext appcon, XEvent * event_return) {
 }
 
 Boolean XptDispatchEvent(XEvent * event) {
-   
     _pop_external_flags |= PEF_RETURN_ABEXIT_ANY;
     return(XtDispatchEvent(event));
 }
@@ -1053,7 +1052,7 @@ XptInputId XptAppAddInput(XtAppContext appcon, int chan, int condition,
         for (lim = id+NUM_ID_ENTRIES-1; id < lim; id++) id->nextid = id+1;
         id->nextid = NULL;
         setup_done = TRUE;
-    } 
+    }
 
     /* check device */
     if (!(sys$getchn(chan, 0, &dib2desc, 0, 0)&1))

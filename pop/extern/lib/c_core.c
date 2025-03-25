@@ -315,7 +315,7 @@ unsigned _pop_errsig_handler(struct chf$signal_array *sigarglst,
         /* doing library math function -- assume float error */
         in_math_lib = FALSE;        /* signal error */
         return(SS$_CONTINUE);       /* continue */
-    } 
+    }
 
     /* get signal code */
     sig = sigarglst->chf$l_sig_name;
