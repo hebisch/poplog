@@ -16,6 +16,8 @@
 *                                                                          *
 ***************************************************************************/
 
+static void async_poll(POPWORD dummy);
+
 #ifdef VMS
 
 #define CLT(clicks) (-200000*clicks)    /* 1 click = 1/50 sec */
@@ -112,7 +114,7 @@ static int (*poll_handlers[2])();
 
 #define DO_HANDLER(n)   ((p = poll_handlers[n]) ? (*p)() : 0)
 
-static void async_poll()
+static void async_poll(POPWORD dummy)
 {
     int (*p)();
     int activity_level = DO_HANDLER(0);
@@ -160,7 +162,7 @@ static caddr_t poll_other() {
 /*
  *  Turn normal polling off/back on during X toolkit waits
  */
-caddr_t (*_pop_set_Xt_poll(int (*handler)()))() {
+caddr_t (*_pop_set_Xt_poll(int (*handler)(void)))() {
     if (handler == NULL) {
         _pop_set_poll_state(XT_POLL_NUM, NULL);
         if (num_polling == 0) return(NULL);
@@ -182,5 +184,5 @@ void _pop_retry_Xt_poll() {
     poll_handlers[XT_POLL_NUM] = _pop_Xt_poll_deferred;
     num_polling++;
     _pop_Xt_poll_deferred = NULL;
-    async_poll();
+    async_poll(0);
 }

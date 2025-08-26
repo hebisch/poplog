@@ -15,11 +15,7 @@
  ***********************************************************************/
 
 #include <X11/Intrinsic.h>  /* for XtSpecificationRelease */
-#ifdef XpwNotInstalled
 #include "Methods.h"      /* methods for XpwCore widgets + descendants */
-#else
-#include <X11/Xpw/Methods.h>
-#endif
 
 /* Resources:
 
@@ -53,6 +49,8 @@ typedef struct _XpwCoreRec *XpwCoreWidget;
 typedef struct _XpwCoreClassRec *XpwCoreWidgetClass;
 
 externalref WidgetClass xpwCoreWidgetClass;
+
+void _XpwRecolorPointer(XpwCoreWidget w);
 
 #endif /* _XpwCore_h */
 

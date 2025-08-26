@@ -39,9 +39,9 @@ typedef struct {
     int size;           /* Table size (number of buckets). */
 } XpwAssocTable;
 
-extern XpwAssocTable *XpwCreateAssocTable();
-extern void XpwMakeAssoc();
-caddr_t XpwLookupAssoc();
+extern XpwAssocTable *XpwCreateAssocTable(int size);
+extern void XpwMakeAssoc(XpwAssocTable * table, XpwAssocID id, caddr_t data);
+caddr_t XpwLookupAssoc(XpwAssocTable * table, XpwAssocID id);
 
 /* not implemented:
 extern void XpwDestAssocTable();

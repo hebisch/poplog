@@ -69,7 +69,8 @@ TakeClientMessage(Widget w, Opaque client, XEvent * event,
                 request is processed, so we redefine the error handler to
                 ignore errors */
             if (win_attribs.map_state == IsViewable) {
-                int (*old)() = XSetErrorHandler((XErrorHandler)dummy_handler);
+                XErrorHandler old = XSetErrorHandler(
+                                       (XErrorHandler)dummy_handler);
                 if (event->xclient.data.l[0] == atom)
                     XSetInputFocus(dpy, win, RevertToParent,
                                                     event->xclient.data.l[1]);

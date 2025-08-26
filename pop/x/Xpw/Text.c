@@ -19,21 +19,22 @@
 
 /* declarations */
 
-extern void
-    _XpwTextCopyWait(),
-    _XpwSetCharAttributes(),
-    _XpwGetCharAttributes(),
-    _XpwSetTextCursor(),
-    _XpwGetTextCursor();
+/* from XpwScrText.c */
+extern void _XpwTextCopyWait(XpwScrollTextWidget w);
+extern void _XpwSetCharAttributes(XpwScrollTextWidget w, unsigned int attr);
+extern XpwMethodRet _XpwGetCharAttributes(XpwScrollTextWidget w);
+extern void _XpwSetTextCursor(XpwScrollTextWidget w, unsigned cchar);
+extern XpwMethodRet _XpwGetTextCursor(XpwScrollTextWidget w);
 
-extern MyGC _XpwGetWorkTextGC();
+extern MyGC _XpwGetWorkTextGC(XpwScrollTextWidget w, unsigned colornum,
+                       unsigned fontnum, Boolean isstatus);
 
-XpwMethodRet
-    _XpwTextMoveCursorTo();
+/* internal */
+static void Clear(XpwScrollTextWidget w, int col, int row, int ncols,
+                  int nrows);
 
-static void Clear();
-
-externaldef (xpwscrolltext) uint (*XpwUcToMb)();
+externaldef (xpwscrolltext) uint (*XpwUcToMb)(ushort * string, size_t nchars,
+                                     unsigned char * mbout, size_t outlen);
 
 
 /* The XpwScrollText widget has three core methods:
@@ -1302,7 +1303,7 @@ _XpwSetBlinkTimer() {
     if (blink_timerid || !w) return;
     blink_timerid =
         XtAppAddTimeOut(XtDisplayToApplicationContext(XtDisplay(w)),
-                                                    600, DoBlink, NULL);
+                        600, (XtTimerCallbackProc)DoBlink, NULL);
 }
 
 static void

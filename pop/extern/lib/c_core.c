@@ -62,7 +62,7 @@ globaldef POPWORD __pop_invocation_fp;
  *  __pop_fpe_table in afloat.s is a table of PC ranges and addresses to
  *  continue at.
  */
-static bool in_pop_float(char ** pc_ptr) {
+static pop_bool in_pop_float(char ** pc_ptr) {
     POPWORD pc = (POPWORD) *pc_ptr;
     typedef struct { POPWORD starta, enda, conta; } fpe_entry;
     extern fpe_entry __pop_fpe_table[];
@@ -247,7 +247,7 @@ void _pop_cancel_input_read() {
  *  number, added as alternate input to every appcontext. Thus to set
  *  wakeup we set the event flag.
  */
-void _pop_set_xt_wakeup(bool on) {
+void _pop_set_xt_wakeup(pop_bool on) {
     XTWAKE *xwk = &__pop_xt_wakeup_struct;
     if (xwk->XWK_FD_IN == 0) return;    /* not set up */
     if (on)
@@ -282,7 +282,7 @@ int pause_popintr() {
 /*
  * Wait for interrupt or read
  */
-bool _pop_read_wait(int efn) {
+pop_bool _pop_read_wait(int efn) {
     unsigned efmask = 1 << efn, flstat;
     sys$clref(INTR_EFN);                /* clear interrupt event flag */
     if (! _pop_signals_pending)
@@ -304,7 +304,7 @@ int _pop_sigmask(int block) {
 
 static void copybytes(char * from, char * to, int nbytes);
 
-static bool in_math_lib = FALSE;
+static pop_bool in_math_lib = FALSE;
 
 unsigned _pop_errsig_handler(struct chf$signal_array *sigarglst,
                             struct chf$mech_array * mcharglst) {
@@ -400,10 +400,10 @@ unsigned _pop_errsig_handler(struct chf$signal_array *sigarglst,
     return(TRUE);                                               \
     }
 
-bool __pop_math_1(double * dfptr, double *func())
+pop_bool __pop_math_1(double * dfptr, double *func())
 MATH_FUNC((dfptr))          /* mth$gsin etc take pointers to doubles */
 
-bool __pop_math_2(double * dfptr, double * dfptr2, double *func())
+pop_bool __pop_math_2(double * dfptr, double * dfptr2, double *func())
 MATH_FUNC((dfptr, dfptr2))
 
 
@@ -417,7 +417,7 @@ MATH_FUNC((dfptr, dfptr2))
  */
 static quad unix_base = {0x4c178020, 0x007c9567};
 
-void pop$timeval_to_quadtime(timeval * tvp, quad * quadp, bool isabs) {
+void pop$timeval_to_quadtime(timeval * tvp, quad * quadp, pop_bool isabs) {
     long tenmill = 10000000, h_ns = (tvp->tv_usec)*10;    /* usec -> 100ns */
 
     /* quad = (tvp->tv_sec) * 10000000 + h_ns */
@@ -429,7 +429,7 @@ void pop$timeval_to_quadtime(timeval * tvp, quad * quadp, bool isabs) {
     }
 }
 
-void pop$timeval_from_quadtime(timeval * tvp, quad * quadp, bool isabs) {
+void pop$timeval_from_quadtime(timeval * tvp, quad * quadp, pop_bool isabs) {
     long tenmill = 10000000, h_ns;
     quad q;
 
@@ -498,36 +498,6 @@ int setitimer (int iWhich, itimerval *pitvValue, itimerval *pitvOldValue) {
 /**************************************************************************
  *                          Signals                                       *
  **************************************************************************/
-
-void _pop_errsig_handler();
-
-globaldef sigset_t * _pop_exclude_sigset = NULL;
-
-void (* _pop_sigaction(int sig, void (*handler)()))() {
-    struct sigaction sa, osa;
-
-    /*  if sig is in this set, don't change handler (allows controlling
-     *  external code to prevent Pop installing its signals)
-     */
-    if (_pop_exclude_sigset && sigismember(_pop_exclude_sigset, sig))
-        return((void (*)()) -2);
-
-    if (handler == _pop_errsig_handler)
-        sigfillset(&sa.sa_mask);
-    else
-        sigemptyset(&sa.sa_mask);
-    sa.sa_sigaction = handler;
-    sa.sa_flags = 0;
-#ifdef SA_INTERRUPT
-    sa.sa_flags |= SA_INTERRUPT;
-#endif
-#if defined(SVR4) && !defined(__sgi) || defined(__linux__)
-    /* pass signal context information to handler */
-    sa.sa_flags |= SA_SIGINFO;
-#endif
-    return( sigaction(sig, &sa, &osa) == -1 ? (void (*)()) -1
-                                            : (void (*)()) osa.sa_handler);
-}
 
 int _pop_sigmask(int block) {
     sigset_t set;
@@ -893,6 +863,33 @@ void _pop_errsig_handler(int sig, int code, struct sigcontext * scp,
 #endif /* !_POP_ERRSIG_HANDLER_ */
 #undef _POP_ERRSIG_HANDLER_
 
+sigset_t * _pop_exclude_sigset = NULL;
+
+void * _pop_sigaction(int sig, pop_fun_ptr handler) {
+    struct sigaction sa, osa;
+
+    /*  if sig is in this set, don't change handler (allows controlling
+     *  external code to prevent Pop installing its signals)
+     */
+    if (_pop_exclude_sigset && sigismember(_pop_exclude_sigset, sig))
+        return((void (*)) -2);
+
+    if (handler == (pop_fun_ptr)_pop_errsig_handler)
+        sigfillset(&sa.sa_mask);
+    else
+        sigemptyset(&sa.sa_mask);
+    sa.sa_sigaction = (void (*)(int, siginfo_t *, void *))handler;
+    sa.sa_flags = 0;
+#ifdef SA_INTERRUPT
+    sa.sa_flags |= SA_INTERRUPT;
+#endif
+#if defined(SVR4) && !defined(__sgi) || defined(__linux__)
+    /* pass signal context information to handler */
+    sa.sa_flags |= SA_SIGINFO;
+#endif
+    return( sigaction(sig, &sa, &osa) == -1 ? (void (*)()) -1
+                                            : (void (*)()) osa.sa_handler);
+}
 
 /*
  *  Handler for user-handled signals
@@ -911,7 +908,7 @@ void _pop_usersig_handler(int sig) {
  *  input to every appcon. Thus to set wakeup we write a single char to the
  *  pipe, or remove it to unset.
  */
-void _pop_set_xt_wakeup(bool on) {
+void _pop_set_xt_wakeup(pop_bool on) {
     XTWAKE *xwk = &__pop_xt_wakeup_struct;
     char c;
     if (xwk->XWK_FD_IN == 0) return;    /* not set up */
@@ -948,7 +945,7 @@ void _pop_set_xt_wakeup(bool on) {
 
 #include <setjmp.h>
 
-static bool probe_failed = FALSE;
+static pop_bool probe_failed = FALSE;
 static jmp_buf env;
 
 static void sigill_handler(int sig) {
@@ -956,7 +953,7 @@ static void sigill_handler(int sig) {
     siglongjmp(env, 1);
 }
 
-bool _pop_needs_cache_flush(void) {
+pop_bool _pop_needs_cache_flush(void) {
     struct sigaction sa, osa;
     sigemptyset(&sa.sa_mask);
     sa.sa_handler = sigill_handler;
@@ -987,7 +984,7 @@ static int    async_maxfd[3]    /* max file desc in async_fds */
 #define TOT_ASYNC   (async_ctr[RDSET]+async_ctr[WRSET]+async_ctr[EXSET])
 
 static void copybytes(char * from, char * to, int nbytes);
-bool _pop_set_async_check(bool on, int fd, int set);
+pop_bool _pop_set_async_check(pop_bool on, int fd, int set);
 static timeval zero_tim;
 
 static void sigio_handler() {
@@ -1040,10 +1037,10 @@ static void sigio_handler() {
     }
 }
 
-bool _pop_set_async_check(bool on, int fd, int set) {
+pop_bool _pop_set_async_check(pop_bool on, int fd, int set) {
     int n;
     fd_set *on_fds;
-    bool ison;
+    pop_bool ison;
     int seln, res;
 
     if (!FD_ISSET(fd, &async_fds[set])) return (TRUE);
@@ -1118,11 +1115,11 @@ bool _pop_set_async_check(bool on, int fd, int set) {
 #endif
 }
 
-long _pop_set_async_fd(bool on, int fd, int set) {
+long _pop_set_async_fd(pop_bool on, int fd, int set) {
     fd_set *fds = &async_fds[set];
 
     if (on) {
-        static bool setup_done;
+        static pop_bool setup_done;
         int save;
         if (FD_ISSET(fd, fds)) return(0);
 
@@ -1178,7 +1175,7 @@ but probably everything except old BSD */
     }
 }
 
-bool _pop_get_async_fd(int fd, int set) {
+pop_bool _pop_get_async_fd(int fd, int set) {
     return(FD_ISSET(fd, &async_fds[set]));
 }
 
@@ -1341,7 +1338,7 @@ static int pop_mem_block[POP_MEM_BLOCK_SIZE];   /* the block of memory */
 
 
 static BLOCKP get_pop_mem_block(unsigned nbytes) {
-    static bool allocated;
+    static pop_bool allocated;
     if (allocated)
         return(NULL);
     else {
@@ -1747,10 +1744,10 @@ char * _pop_sbrk(int nbytes) {
         return(FALSE);                                          \
     }
 
-bool __pop_math_1(double * dfptr, double (*func)(double))
+pop_bool __pop_math_1(double * dfptr, double (*func)(double))
 MATH_FUNC((*dfptr))
 
-bool __pop_math_2(double * dfptr, double * dfptr2,
+pop_bool __pop_math_2(double * dfptr, double * dfptr2,
                   double (*func)(double, double))
 MATH_FUNC((*dfptr, *dfptr2))
 

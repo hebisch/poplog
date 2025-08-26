@@ -35,7 +35,7 @@ typedef struct itm {
 #define HZ 100
 #define TIMER_SETUP(handler, clockintp) *(clockintp) = MILL/HZ
 
-static void TIMER_SET_ITIMER(bool virt, long sec, long usec, int sig,
+static void TIMER_SET_ITIMER(pop_bool virt, long sec, long usec, int sig,
                              void (*handler)()) {
     /* must cancel first even if setting, else we get more than one */
     sys$cantim(sig, 0);
@@ -54,7 +54,7 @@ static void TIMER_SET_ITIMER(bool virt, long sec, long usec, int sig,
     }
 }
 
-static void TIMER_GET_CLOCK(timeval * virt, bool tvp) {
+static void TIMER_GET_CLOCK(pop_bool virt, timeval * tvp) {
     if (virt) {
         itm itmlst[2];
         long t;
@@ -105,7 +105,7 @@ static struct itimerval itv;
 #define RTIMER_SIG  SIGALRM
 #define VTIMER_SIG  SIGVTALRM
 
-static void TIMER_SETUP(void (*handler)(), long * clockintp) {
+static void TIMER_SETUP(void (*handler)(int), long * clockintp) {
     static struct itimerval zero_itv;
 
     /* get clock interval in usec */
@@ -115,8 +115,8 @@ static void TIMER_SETUP(void (*handler)(), long * clockintp) {
     *clockintp = itv.it_usec;
 
     /* set signal handlers */
-    _pop_sigaction(RTIMER_SIG, handler);
-    _pop_sigaction(VTIMER_SIG, handler);
+    _pop_sigaction(RTIMER_SIG, (pop_fun_ptr)handler);
+    _pop_sigaction(VTIMER_SIG, (pop_fun_ptr)handler);
 }
 
 #define TIMER_SET_ITIMER(virt, sec, usec, sig, handler)         \
@@ -150,7 +150,7 @@ static void TIMER_SETUP(void (*handler)(), long * clockintp) {
 
 #define GETTIMEOFDAY(tvp) gettimeofday(tvp, NULL)
 
-static void TIMER_GET_CLOCK(bool virt, timeval * tvp) {
+static void TIMER_GET_CLOCK(pop_bool virt, timeval * tvp) {
     if (virt)
         TIMER_VIRT(tvp)
     else
@@ -433,7 +433,7 @@ static timer
 static long half_clockint;
 static void timer_handler(int sig);
 
-static timentry *next_timer(timer * timerp, bool handling) {
+static timentry *next_timer(timer * timerp, pop_bool handling) {
     timentry *e;
     timeval clk;
     int sec, usec;
@@ -505,7 +505,8 @@ static void timer_handler(int sig) {
     RESTORE_ERRNO;
 }
 
-long pop_timer(unsigned flags, POPWORD ident, void (*handler)(), timeval *tvp)
+long pop_timer(unsigned flags, POPWORD ident, void (*handler)(POPWORD),
+               timeval *tvp)
 {
     timer *timerp = flags&TF_VIRT ? &virt_timer : &real_timer;
     timentry * e, * nxt, ** last, * org;
@@ -514,7 +515,7 @@ long pop_timer(unsigned flags, POPWORD ident, void (*handler)(), timeval *tvp)
     int sec, usec;
     sigsave_t savesig;
     static long clockint;
-    static bool setup_done;
+    static pop_bool setup_done;
 
 
     if (!setup_done) {

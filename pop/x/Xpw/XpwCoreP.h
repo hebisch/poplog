@@ -25,15 +25,9 @@
 
 #include <X11/CoreP.h> /* this is directly below Core in widget heirarchy */
 
-#ifdef XpwNotInstalled
 #include "XpwCore.h"
 #include "MethodsP.h" /* all XpwCore widgets use Methods */
 #include "Assoc.h"   /* and Assoc Tables */
-#else
-#include <X11/Xpw/XpwCore.h>
-#include <X11/Xpw/MethodsP.h>
-#include <X11/Xpw/Assoc.h>
-#endif
 
 /* New fields for the instance record */
 

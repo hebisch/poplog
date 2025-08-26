@@ -23,34 +23,48 @@
  ****************************************************************/
 
 /* private procedures */
+static void ClassInit();
+static void Destroy(Widget gw);
+static void Initialize(Widget request, Widget new);
+static void Realize(Widget gw, XtValueMask * valueMask,
+                    XSetWindowAttributes * attrs);
+static void Redisplay(Widget w, XEvent * event, Region region);
+static void Resize(Widget gw);
+static Boolean SetValues(Widget gcurrent, Widget grequest, Widget gnew);
+static void SetValuesAlmost(Widget gcurrent, Widget gnew,
+                            XtWidgetGeometry * request,
+                            XtWidgetGeometry * reply);
 
-static void ScrollTextClassInit(), ScrollTextInitialize(),
-            ScrollTextRealize(), ScrollTextResize(),
-            ScrollTextRedisplay(), ScrollTextSetValuesAlmost(),
-            ScrollTextDestroy();
-static Boolean ScrollTextSetValues();
-static XtGeometryResult QueryGeometry();
+static XtGeometryResult QueryGeometry(XpwScrollTextWidget w,
+                                      XtWidgetGeometry * request,
+                                      XtWidgetGeometry * preferred);
 
-extern void
-    _XpwTextExpose(),
-    _XpwSetBlinkTimer(),
-    _XpwTextDestroy(),
-    _XpwRecolorPointer(),
-    _XpwTextTestActiveChange();
+extern void _XpwTextExpose(XpwScrollTextWidget w, Coord x, Coord y,
+                           Coord xl, Coord yl, Boolean in_status);
+extern void _XpwSetBlinkTimer();
+extern void _XpwTextDestroy(XpwScrollTextWidget w);
+extern void _XpwTextTestActiveChange(XpwScrollTextWidget w);
 
-extern int _XpwYCoordToRow();
-extern int _XpwXCoordToCol();
+extern int _XpwYCoordToRow(XpwScrollTextWidget w, Coord y);
+extern int _XpwXCoordToCol(XpwScrollTextWidget w, Coord x, uint row);
 
-extern XpwMethodRet _XpwTextMoveCursorTo();
-extern XFontStruct * _XpwFont8OfFontSet();
-extern XFontSet _XpwFontSetFromFont();
+extern XpwMethodRet _XpwTextMoveCursorTo(XpwScrollTextWidget w,
+                                         int col, int row);
+extern XFontSet _XpwFontSetFromFont(XpwCoreWidget w, XFontStruct * font);
+extern XFontStruct * _XpwFont8OfFontSet(XpwCoreWidget w, XFontSet font_set,
+                                 Boolean iso_latin_1);
 
 /* Action procedures */
-static void NotifyButtonEvent();
-static void NotifyMotionEvent();
-static void NotifyKeyboardEvent();
-static void BellAction();
-static void EventHandler();
+static void NotifyButtonEvent(Widget w, XEvent * event,
+                              String *  params, Cardinal * num_params);
+static void NotifyMotionEvent(Widget w, XEvent * event,
+                              String * params, Cardinal * num_params);
+static void NotifyKeyboardEvent(Widget gw, XEvent * event, String * params,
+                                Cardinal * num_params);
+static void BellAction(Widget gw, XEvent * event, String * params,
+                       Cardinal * num_params);
+static void EventHandler(Widget w, Opaque client, XEvent * event,
+                         Boolean * continue_to_dispatch);
 
 /* defined in Text.c */
 externalref XpwMethod _xpwScrollTextMethods[];
@@ -318,12 +332,12 @@ externaldef(xpwscrolltextclassrec)
     /* superclass       */  (WidgetClass) &xpwCoreClassRec,
     /* class_name       */  "XpwScrollText",
     /* widget_size      */  sizeof(XpwScrollTextRec),
-    /* class_initialize */      ScrollTextClassInit,
+    /* class_initialize */      ClassInit,
     /* class_part_initialize*/      NULL,
     /* class_inited     */  False,
-    /* initialize       */  ScrollTextInitialize,
+    /* initialize       */  (XtInitProc)Initialize,
     /* initialize_hook  */      NULL,
-    /* realize          */  ScrollTextRealize,
+    /* realize          */  Realize,
     /* actions          */  actions,
     /* num_actions      */  XtNumber(actions),
     /* resources        */  resources,
@@ -333,12 +347,12 @@ externaldef(xpwscrolltextclassrec)
     /* compress_exposure*/      XtExposeCompressMultiple, /*False,*/
     /* compress_enterleave*/        False,
     /* visible_interest */      True,
-    /* destroy          */  ScrollTextDestroy,
-    /* resize           */  ScrollTextResize,
-    /* expose           */  ScrollTextRedisplay,
-    /* set_values       */  ScrollTextSetValues,
+    /* destroy          */  Destroy,
+    /* resize           */  Resize,
+    /* expose           */  Redisplay,
+    /* set_values       */  (XtSetValuesFunc)SetValues,
     /* set_values_hook  */  NULL,
-    /* set_values_almost*/  ScrollTextSetValuesAlmost,
+    /* set_values_almost*/  SetValuesAlmost,
     /* get_values_hook  */  NULL,
     /* accept_focus     */  NULL,
     /* version          */  XtVersion,
@@ -377,19 +391,14 @@ char *m;
 #endif
 
 
-static void ScrollTextClassInit()
+static void ClassInit()
   { xpwScrollTextClassRec.xpwcore_class.num_methods =
         _num_xpwScrollTextMethods;
   }
 
-static void ColorFgBg(w, colornum, isstatus, fgp, bgp, bgpixp, flagsp)
-  XpwScrollTextWidget w;
-  int colornum;
-  Boolean isstatus;
-  Pixel *fgp, *bgp;
-  Pixmap *bgpixp;
-  uint *flagsp;
-  { Pixel fg = NO_PIXEL, bg = NO_PIXEL;
+static void ColorFgBg(XpwScrollTextWidget w, int colornum, Boolean isstatus,
+                  Pixel * fgp, Pixel * bgp, Pixmap * bgpixp, uint * flagsp) {
+    Pixel fg = NO_PIXEL, bg = NO_PIXEL;
     Pixmap bgpix = XtUnspecifiedPixmap;
     uint defnum, flags;
 
@@ -440,12 +449,10 @@ static void ColorFgBg(w, colornum, isstatus, fgp, bgp, bgpixp, flagsp)
                     ? GC_HAS_WIN_BG : 0;
     if (bgpix != XtUnspecifiedPixmap && bgpix != None) flags |= GC_HAS_BG_PIX;
     *flagsp = flags;
-  }
+}
 
-
-static void SetShadowBits(w)
-  XpwScrollTextWidget w;
-  { XColor cdefs[NALLCOLORS], *cd;
+static void SetShadowBits(XpwScrollTextWidget w) {
+    XColor cdefs[NALLCOLORS], *cd;
     Colormap cmap = w->core.colormap;
     Display *dpy = XtDisplay(w);
     int s, i;
@@ -490,12 +497,10 @@ static void SetShadowBits(w)
                 white_bits |= 1 << i;
         w->xpwscrolltext.shadow_white_bits[s] = white_bits;
       }
-  }
+}
 
-static Boolean IsFixedFont(font, fwidth)
-  XFontStruct *font;
-  unsigned fwidth;
-  { XCharStruct *pc = font->per_char, *pclim;
+static Boolean IsFixedFont(XFontStruct * font, unsigned fwidth) {
+    XCharStruct *pc = font->per_char, *pclim;
     unsigned maxwidth = font->max_bounds.width;
 
     if (font->min_bounds.width == maxwidth || !pc) return(True);
@@ -510,12 +515,10 @@ static Boolean IsFixedFont(font, fwidth)
         if (pc->width != maxwidth && pc->width != 0) return(False);
 
     return(True);
-  }
+}
 
-static Boolean IsFixedFontSet(fontset, fwidth)
-  XFontSet fontset;
-  unsigned fwidth;
-  { XFontStruct **font_struct_list;
+static Boolean IsFixedFontSet(XFontSet fontset, unsigned fwidth) {
+    XFontStruct **font_struct_list;
     char **font_name_list;
     int nfonts = XFontsOfFontSet(fontset, &font_struct_list, &font_name_list);
     while (nfonts--)
@@ -525,28 +528,22 @@ static Boolean IsFixedFontSet(fontset, fwidth)
             return(False);
       }
     return(True);
-  }
+}
 
 typedef struct { int max_width, av_width, ascent, descent; } FontData;
 
-static void ExtentOfFont(font, datap, aw_atom)
-  XFontStruct *font;
-  FontData *datap;
-  Atom aw_atom;
-  { unsigned long value;
+static void ExtentOfFont(XFontStruct * font, FontData * datap, Atom aw_atom) {
+    unsigned long value;
     datap->max_width = font->max_bounds.width;
     datap->av_width = (aw_atom != None
                         && XGetFontProperty(font, aw_atom, &value))
                         ? value : datap->max_width * 10;
     datap->ascent = font->ascent;
     datap->descent = font->descent;
-  }
+}
 
-static void ExtentOfFontSet(fontset, datap, aw_atom)
-  XFontSet fontset;
-  FontData *datap;
-  Atom aw_atom;
-  { FontData d;
+static void ExtentOfFontSet(XFontSet fontset, FontData * datap, Atom aw_atom) {
+    FontData d;
     XFontStruct **font_struct_list;
     char **font_name_list;
     int nfonts = XFontsOfFontSet(fontset, &font_struct_list, &font_name_list);
@@ -563,11 +560,9 @@ static void ExtentOfFontSet(fontset, datap, aw_atom)
     datap->av_width = av_width;
     datap->ascent = ascent;
     datap->descent = descent;
-  }
+}
 
-static void SetupFonts(w)
-  XpwScrollTextWidget w;
-  {
+static void SetupFonts(XpwScrollTextWidget w) {
     unsigned fontnum, draw_modes = 0;
     int width, av_width = 0, ascent = 0, descent = 0;
     FontData data;
@@ -657,10 +652,9 @@ static int VExcess(XpwScrollTextWidget w) {
     return( vm*2 + (StatusStyle(w)==0 ? 0 : StatusVExcess(vm)) );
 }
 
-static void TextRecalc(w, set_width, set_height)
-  XpwScrollTextWidget w;
-  Boolean set_width, set_height;
-  { int av_width = FontAverageWidth(w), fheight = FontHeight(w),
+static void TextRecalc(XpwScrollTextWidget w, Boolean set_width,
+                       Boolean set_height) {
+    int av_width = FontAverageWidth(w), fheight = FontHeight(w),
         hex = HExcess(w)*10, vex = VExcess(w), width10 = w->core.width*10;
     unsigned short sstyle = StatusStyle(w);
 
@@ -709,13 +703,11 @@ static void TextRecalc(w, set_width, set_height)
             Row0Offset(w) = SplitOffset(w) + 2;
           }
       }
-  }
+}
 
-static void GetNewGC(w, gc_index, isstatus)
-  XpwScrollTextWidget w;
-  unsigned gc_index;
-  Boolean isstatus;
-  { XGCValues values;
+static void GetNewGC(XpwScrollTextWidget w, unsigned gc_index,
+                     Boolean isstatus) {
+    XGCValues values;
     XFontStruct *font;
     unsigned long
         valuemask = GCFont | GCForeground | GCBackground | GCGraphicsExposures;
@@ -744,13 +736,11 @@ static void GetNewGC(w, gc_index, isstatus)
     values.graphics_exposures = True;
 
     fieldp->gc = XtGetGC((Widget)w, valuemask, &values);
-  }
+}
 
-MyGC _XpwGetWorkTextGC(w, colornum, fontnum, isstatus)
-XpwScrollTextWidget w;
-unsigned colornum, fontnum;
-Boolean isstatus;
-  { Display *dpy = XtDisplay(w);
+MyGC _XpwGetWorkTextGC(XpwScrollTextWidget w, unsigned colornum,
+                       unsigned fontnum, Boolean isstatus) {
+    Display *dpy = XtDisplay(w);
     GC gc = w->xpwscrolltext.work_gc;
     XGCValues values;
     unsigned long valuemask = 0;
@@ -782,38 +772,34 @@ Boolean isstatus;
     if (valuemask != 0) XChangeGC(dpy, gc, valuemask, &values);
     mygc.gc = gc;
     return(mygc);
-  }
+}
 
 
-static void CvtUserAttributes(arp, attrp, setting)
-  AttrResources *arp;
-  unsigned *attrp;
-  Boolean setting;
-  { unsigned int attr;
+static void CvtUserAttributes(AttrResources * arp, unsigned * attrp,
+                              Boolean setting) {
+    unsigned int attr;
 
-    if (setting)
-      { attr = *attrp;
+    if (setting) {
+        attr = *attrp;
         arp->colornum   = (attr & XpwFcolorNumber) >> XpwFcolorShift;
         arp->underline  = (attr & XpwFunderlineOn)  != 0;
         arp->bold       = (attr & XpwFboldOn)       != 0;
         arp->alt_font   = (attr & XpwFaltFontOn)    != 0;
         arp->blink      = (attr & XpwFblinkOn)      != 0;
         arp->active     = (attr & XpwFactiveOn)     != 0;
-      }
-    else
-      { attr = arp->colornum << XpwFcolorShift;
+    } else {
+        attr = arp->colornum << XpwFcolorShift;
         if (arp->underline) attr |= XpwFunderlineOn;
         if (arp->bold)      attr |= XpwFboldOn;
         if (arp->alt_font)  attr |= XpwFaltFontOn;
         if (arp->blink)     attr |= XpwFblinkOn;
         if (arp->active)    attr |= XpwFactiveOn;
         *attrp = attr;
-      }
-  }
+    }
+}
 
-static unsigned WinCharAttributes(arp)
-  AttrResources *arp;
-  { unsigned fontnum = NORMAL_FONT, flags = 0;
+static unsigned WinCharAttributes(AttrResources * arp) {
+    unsigned fontnum = NORMAL_FONT, flags = 0;
     if (arp->alt_font)  fontnum = ALT_FONT;
     if (arp->bold)      fontnum |= BOLDFONTBIT;
     if (arp->underline) flags |= ATTR_UNDERLINE;
@@ -821,12 +807,11 @@ static unsigned WinCharAttributes(arp)
     if (arp->active)    flags |= ATTR_ACTIVE;
 
     return( GCIndex(arp->colornum, fontnum) | flags );
-  }
+}
 
 
-static void SetTextAttributes(w)
-  XpwScrollTextWidget w;
-  { WinCharB wc;
+static void SetTextAttributes(XpwScrollTextWidget w) {
+    WinCharB wc;
     unsigned attrs, cchar = w->xpwscrolltext.cursor_char;
     AttrResources ar;
 
@@ -849,29 +834,24 @@ static void SetTextAttributes(w)
             = ((w->xpwscrolltext.curr_attr_resources.colornum&1) != 0);
 
     _XpwTextCursorOn(w, w->xpwscrolltext.cursor_status && attrs == 0);
-  }
+}
 
 /* Special methods for setting/getting boolean character attribute resources
  * quickly from bit flags
  */
-void _XpwSetCharAttributes(w, attr)
-    XpwScrollTextWidget w;
-    unsigned attr;
-  { CvtUserAttributes(&w->xpwscrolltext.curr_attr_resources, &attr, True);
+void _XpwSetCharAttributes(XpwScrollTextWidget w, unsigned int attr) {
+    CvtUserAttributes(&w->xpwscrolltext.curr_attr_resources, &attr, True);
     SetTextAttributes(w);
-  }
+}
 
-XpwMethodRet _XpwGetCharAttributes(w)
-XpwScrollTextWidget w;
-  { unsigned attr;
+XpwMethodRet _XpwGetCharAttributes(XpwScrollTextWidget w) {
+    unsigned attr;
     CvtUserAttributes(&w->xpwscrolltext.curr_attr_resources, &attr, False);
     return(attr);
-  }
+}
 
-void _XpwSetTextCursor(w, cchar)
-    XpwScrollTextWidget w;
-    unsigned cchar;
-  { Boolean old_status = w->xpwscrolltext.cursor_status;
+void _XpwSetTextCursor(XpwScrollTextWidget w, unsigned cchar) {
+     Boolean old_status = w->xpwscrolltext.cursor_status;
     unsigned old_cchar = w->xpwscrolltext.cursor_char;
     if (cchar == 0)
         w->xpwscrolltext.cursor_status = False;
@@ -882,7 +862,7 @@ void _XpwSetTextCursor(w, cchar)
     if (w->xpwscrolltext.cursor_status != old_status
      || w->xpwscrolltext.cursor_char != old_cchar)
         SetTextAttributes(w);
-  }
+}
 
 XpwMethodRet _XpwGetTextCursor(XpwScrollTextWidget w) {
     return(w->xpwscrolltext.cursor_status ? w->xpwscrolltext.cursor_char : 0);
@@ -892,11 +872,9 @@ XpwMethodRet _XpwGetTextCursor(XpwScrollTextWidget w) {
 /*  Allocate space for text in window, etc
  */
 
-static void FreeRowArrayRows(w, num_rows, free_whole)
-  XpwScrollTextWidget w;
-  uint num_rows;
-  Boolean free_whole;
-  { uint i;
+static void FreeRowArrayRows(XpwScrollTextWidget w, uint num_rows,
+                             Boolean free_whole) {
+    uint i;
     WinRowB *rowarr = RowArray(w);
     char *lim = w->xpwscrolltext.row_array_lim;
     if (!rowarr) return;
@@ -908,13 +886,11 @@ static void FreeRowArrayRows(w, num_rows, free_whole)
       { XtFree((char*)rowarr);
         RowArray(w) = NULL;
       }
-  }
+}
 
-static void AllocRowArray(w, num_cols, num_rows, oldarr)
-  XpwScrollTextWidget w;
-  uint num_cols, num_rows;
-  WinRowB *oldarr;
-  { uint i, nbytes, WCsize, headsize, rsize, csz_code, charmode = CharMode(w);
+static void AllocRowArray(XpwScrollTextWidget w, uint num_cols,
+                          uint num_rows, WinRowB * oldarr) {
+    uint i, nbytes, WCsize, headsize, rsize, csz_code, charmode = CharMode(w);
     char *p;
     WinRowB *rowarr;
     Boolean var_width_mode = VarWidthMode(w);
@@ -982,22 +958,20 @@ static void AllocRowArray(w, num_cols, num_rows, oldarr)
       }
 
     w->xpwscrolltext.row_array_lim = p;
-  }
+}
 
-static void InitWinText(w)
-  XpwScrollTextWidget w;
-  { AllocRowArray(w, NumCols(w), NumRows(w), NULL);
+static void InitWinText(XpwScrollTextWidget w) {
+    AllocRowArray(w, NumCols(w), NumRows(w), NULL);
 
     w->xpwscrolltext.blink_start_row = MAX_ROWS;
     w->xpwscrolltext.blink_lim_row = 0;
 
     CursorCol(w) = CursorRow(w) = 0;
     CursorX(w) = CURSOR_X_UNDEF;
-  }
+}
 
-static void CopyIL1ToU(old, new)
-  XpwScrollTextWidget old, new;
-  { uint i, num_cols = NumCols(old), num_rows = NumRows(old);
+static void CopyIL1ToU(XpwScrollTextWidget old, XpwScrollTextWidget new) {
+    uint i, num_cols = NumCols(old), num_rows = NumRows(old);
     WinRowB *oldarr = RowArray(old);
     WinRowS *newarr;
 
@@ -1026,23 +1000,20 @@ static void CopyIL1ToU(old, new)
       }
 
     FreeRowArrayRows(old, num_rows, True);
-  }
+}
 
-static void ResetWinText(w, num_rows)
-  XpwScrollTextWidget w;
-  uint num_rows;
-  { FreeRowArrayRows(w, num_rows, False);
+static void ResetWinText(XpwScrollTextWidget w, uint num_rows) {
+    FreeRowArrayRows(w, num_rows, False);
     InitWinText(w);
     _XpwTextCursorOn(w, True);
     XtCallCallbacks((Widget)w, XtNxpwCallback, 0);
-  }
+}
 
 
-static XtGeometryResult QueryGeometry(w, request, preferred)
-XpwScrollTextWidget w;
-XtWidgetGeometry *request;
-XtWidgetGeometry *preferred;
-  { XtGeometryResult result = XtGeometryYes;
+static XtGeometryResult QueryGeometry(XpwScrollTextWidget w,
+                                      XtWidgetGeometry * request,
+                                      XtWidgetGeometry * preferred) {
+    XtGeometryResult result = XtGeometryYes;
 
     preferred->request_mode = request->request_mode;
 
@@ -1076,12 +1047,12 @@ XtWidgetGeometry *preferred;
       }
 
     return(result);
-  }
+}
 
 
-static void ScrollTextInitialize(request, w)
-XpwScrollTextWidget request, w;
-  { unsigned i, fontnum, vclass = XDefaultVisualOfScreen(XtScreen(w))->class;
+static void Initialize(Widget gr, Widget gw) {
+    XpwScrollTextWidget w = (XpwScrollTextWidget)gw;
+    unsigned i, fontnum, vclass = XDefaultVisualOfScreen(XtScreen(w))->class;
 
     debug_msg("Initialize start");
 
@@ -1104,9 +1075,9 @@ XpwScrollTextWidget request, w;
       { XFontSet *fsp = FontSetFieldPtr(w,fontnum);
         XFontStruct **fp = FontFieldPtr(w,fontnum);
         if (*fsp)
-            *fp = _XpwFont8OfFontSet(w, *fsp, True);
+            *fp = _XpwFont8OfFontSet((XpwCoreWidget)w, *fsp, True);
         else if (*fp)
-            *fsp = _XpwFontSetFromFont(w, *fp);
+            *fsp = _XpwFontSetFromFont((XpwCoreWidget)w, *fp);
       }
     SetupFonts(w);
 
@@ -1149,30 +1120,29 @@ XpwScrollTextWidget request, w;
 
     debug_msg("Initialize end");
     return;
-  }
+}
 
-static unsigned GCSelectMask(n, isfont)
-unsigned n;
-Boolean isfont;
-  { unsigned i, mask = 0;
+static unsigned GCSelectMask(unsigned n, Boolean isfont) {
+    unsigned i, mask = 0;
     if (isfont)
         for (i = 0; i < NCOLORS; i++) mask |= 1 << GCIndex(i,n);
     else if (n < NCOLORS)
         for (i = 0; i < NFONTS; i++) mask |= 1 << GCIndex(n,i);
     return(mask);
-  }
+}
 
-static void RecolorPointer2(w)
-  XpwScrollTextWidget w;
-  { Cursor save = w->xpwcore.pointer_shape;
+static void RecolorPointer2(XpwScrollTextWidget w) {
+    Cursor save = w->xpwcore.pointer_shape;
     w->xpwcore.pointer_shape = w->xpwscrolltext.pointer2_shape;
-    _XpwRecolorPointer(w);
+    _XpwRecolorPointer((XpwCoreWidget)w);
     w->xpwcore.pointer_shape = save;
-  }
+}
 
-static Boolean ScrollTextSetValues(current, request, new)
-XpwScrollTextWidget current, request, new;
-  { Boolean
+static Boolean SetValues(Widget gcurrent, Widget grequest, Widget gnew) {
+    XpwScrollTextWidget current = (XpwScrollTextWidget)gcurrent;
+    XpwScrollTextWidget new = (XpwScrollTextWidget)gnew;
+
+    Boolean
         redisplay       = False,
         recalc_height   = False,
         recalc_width    = False,
@@ -1281,11 +1251,11 @@ XpwScrollTextWidget current, request, new;
         XFontStruct *f, **fp = FontFieldPtr(new,fontnum),
                         **old_fp = FontFieldPtr(current,fontnum);
         if ((fs = *fsp) != *old_fsp)
-          { *fp = fs ? _XpwFont8OfFontSet(new, fs, True) : NULL;
+          { *fp = fs ? _XpwFont8OfFontSet((XpwCoreWidget)new, fs, True) : NULL;
             font_changes = True;
           }
         else if ((f = *fp) != *old_fp)
-          { *fsp = f ? _XpwFontSetFromFont(new, f) : NULL;
+          { *fsp = f ? _XpwFontSetFromFont((XpwCoreWidget)new, f) : NULL;
             font_changes = True;
           }
       }
@@ -1361,7 +1331,7 @@ XpwScrollTextWidget current, request, new;
       { if (new->core.width == cw && new->core.height == ch)
             /*  no size change, but changed rows/cols and something else, which
                 meant window size stayed the same */
-          { ScrollTextResize(new); redisplay = True; }
+          { Resize((Widget)new); redisplay = True; }
       }
     else if (DIFF(xpwscrolltext.var_width_mode)
           || DIFF(xpwscrolltext.num_fixed_columns)
@@ -1376,24 +1346,22 @@ XpwScrollTextWidget current, request, new;
 }
 
     /* Called if we failed to change size after SetValues */
-static void ScrollTextSetValuesAlmost(current, new, request, reply)
-    XpwScrollTextWidget current, new;
-    XtWidgetGeometry *request, *reply;
-  { request->request_mode = 0;  /* don't try again */
-    ScrollTextResize(new);      /* recalc and do callback */
-  }
+static void SetValuesAlmost(Widget gcurrent, Widget gnew,
+                            XtWidgetGeometry * request,
+                            XtWidgetGeometry * reply) {
+    XpwScrollTextWidget new = (XpwScrollTextWidget)gnew;
+    request->request_mode = 0;  /* don't try again */
+    Resize((Widget)new);      /* recalc and do callback */
+}
 
-static void ScrollTextRealize(w, valueMask, attrs)
-XpwScrollTextWidget w;
-XtValueMask *valueMask;
-XSetWindowAttributes *attrs;
-  {
-
+static void Realize(Widget gw, XtValueMask * valueMask,
+                              XSetWindowAttributes * attrs) {
+    XpwScrollTextWidget w = (XpwScrollTextWidget)gw;
     *valueMask |= CWBitGravity;
     attrs->bit_gravity = ForgetGravity;
     if ((attrs->cursor = w->xpwcore.pointer_shape)) {
         *valueMask |= CWCursor;
-        _XpwRecolorPointer(w);
+        _XpwRecolorPointer((XpwCoreWidget)w);
     }
     RecolorPointer2(w);
 
@@ -1407,11 +1375,11 @@ XSetWindowAttributes *attrs;
     if (w->xpwscrolltext.highlight_on)
         w->xpwscrolltext.curr_attr_resources.colornum |= 1;
     SetTextAttributes(w);
-  }
+}
 
-static void ScrollTextResize(w)
-  XpwScrollTextWidget w;
-  { int num_rows = NumRows(w), num_cols = NumCols(w);
+static void Resize(Widget gw) {
+    XpwScrollTextWidget w = (XpwScrollTextWidget)gw;
+    int num_rows = NumRows(w), num_cols = NumCols(w);
 
     /* do nothing if window hasn't been realized yet. */
     if (!XtIsRealized((Widget)w)) return;
@@ -1421,11 +1389,12 @@ static void ScrollTextResize(w)
     TextRecalc(w, False,False);
     if (NumRows(w) != num_rows || NumCols(w) != num_cols)
         ResetWinText(w, num_rows);
-  }
+}
 
 
 static void
-ScrollTextRedisplay(XpwScrollTextWidget w, XEvent * event, Region region) {
+Redisplay(Widget gw, XEvent * event, Region region) {
+    XpwScrollTextWidget w = (XpwScrollTextWidget)gw;
     Position x, y, xl, yl;
     int split = SplitOffset(w);
     Boolean sattop = (StatusStyle(w) != 2);
@@ -1445,9 +1414,9 @@ ScrollTextRedisplay(XpwScrollTextWidget w, XEvent * event, Region region) {
 }
 
 
-static void ScrollTextDestroy(w)
-XpwScrollTextWidget w;
-  { unsigned i, s;
+static void Destroy(Widget gw) {
+    XpwScrollTextWidget w = (XpwScrollTextWidget)gw;
+    unsigned i, s;
 
     _XpwTextDestroy(w);
 
@@ -1474,8 +1443,7 @@ XpwScrollTextWidget w;
 
     if (Flags(w) & HAVE_FOCUS)
         XtCallCallbacks((Widget)w, XtNfocusChange, (XtPointer) False);
-  }
-
+}
 
 
 /* ACTIONS */
@@ -1493,15 +1461,13 @@ static int
 
 static XtIntervalId buff_timerid = (XtIntervalId)NULL;
 
-static void button_timeout();
+static void button_timeout(void * gw, XtIntervalId * timeridp);
 
 /* takes an event, and fills in the mouse locations */
 
-static void ExtractPosition(w, event, mouse)
-  XpwScrollTextWidget w;
-  XEvent *event;
-  MousePosition *mouse;
-  { int x, y, row;
+static void ExtractPosition(XpwScrollTextWidget w, XEvent * event,
+                            MousePosition * mouse) {
+    int x, y, row;
     Boolean row_relative = False;
     unsigned evtype = event->type;
 
@@ -1540,12 +1506,10 @@ static void ExtractPosition(w, event, mouse)
         if (evtype == ButtonPress) last_button_row = row;
 
     mouse->row = row;
-  }
+}
 
-static void flush_button(w, timed_out)
-XpwScrollTextWidget w;
-Boolean timed_out;
-  { long button = buff_button, nclicks = buff_nclicks, mode = buff_mode;
+static void flush_button(XpwScrollTextWidget w, Boolean timed_out) {
+    long button = buff_button, nclicks = buff_nclicks, mode = buff_mode;
     buff_button = buff_nclicks = 0;
     buff_mode = RELEASE;
     if (button == 0) return;
@@ -1565,12 +1529,11 @@ Boolean timed_out;
     else if (timed_out && mode == HOLD)
         /* button Hold callback */
         XtCallCallbacks((Widget)w, XtNbuttonEvent, (XtPointer)(HOLD|button));
-  }
+}
 
-static void button_timeout(w, timeridp)
-XpwScrollTextWidget w;
-XtIntervalId *timeridp;
-  { Display *dpy = XtDisplay(w);
+static void button_timeout(void * gw, XtIntervalId * timeridp) {
+    XpwScrollTextWidget w = (XpwScrollTextWidget)gw;
+    Display *dpy = XtDisplay(w);
     int interval;
     if (buff_button == 0) return;
     interval = buff_expire_time - timer_expire_time;
@@ -1587,14 +1550,13 @@ XtIntervalId *timeridp;
       { buff_timerid = (XtIntervalId)NULL;
         flush_button(w, True);
       }
-  }
+}
 
-static void NotifyButtonEvent(w, event, params, num_params)
-XpwScrollTextWidget w;
-XEvent *event;
-String *params;
-Cardinal *num_params;
-{   long button = event->xbutton.button;
+static void
+NotifyButtonEvent(Widget gw, XEvent * event, String *  params,
+                  Cardinal * num_params) {
+    XpwScrollTextWidget w = (XpwScrollTextWidget)gw;
+    long button = event->xbutton.button;
 
     if (!w->core.visible) return;
     w->xpwcore.modifiers = event->xbutton.state;
@@ -1626,15 +1588,14 @@ Cardinal *num_params;
             XtCallCallbacks((Widget)w, XtNbuttonEvent, (XtPointer)(RELEASE|button));
           }
       }
-  }
+}
 
 
-static void NotifyMotionEvent(w, event, params, num_params)
-XpwScrollTextWidget w;
-XEvent *event;
-String *params;
-Cardinal *num_params;
-  { long call_data;
+static void
+NotifyMotionEvent(Widget gw, XEvent * event, String * params,
+                  Cardinal * num_params) {
+    XpwScrollTextWidget w = (XpwScrollTextWidget)gw;
+    long call_data;
     MousePosition mouse;
 
     if (!w->core.visible) return;
@@ -1663,12 +1624,9 @@ Cardinal *num_params;
         w->xpwcore.modifiers = call_data;
         _XpwTextTestActiveChange(w);
       }
-  }
+}
 
-static void process_string(src, dst, len)
-String src, dst;
-int len;
-{
+static void process_string(String src, String dst, int len) {
     if (src[0] == 0) dst[0] = 0;
     else if (src[0] == '0' && src[1] == 'x' && src[2] != '\0') {
         /* turn 0x?? to a string containing that hex character */
@@ -1698,12 +1656,8 @@ int len;
     }
 }
 
-static void NotifyKeyboardEvent(gw, event, params, num_params)
-Widget gw;
-XEvent *event;
-String *params;
-Cardinal *num_params;
-  {
+static void NotifyKeyboardEvent(Widget gw, XEvent * event, String * params,
+                                Cardinal * num_params) {
     KeySym key; unsigned int count = 14;
     XpwScrollTextWidget w = (XpwScrollTextWidget) gw;
     if (!gw->core.visible) return;
@@ -1738,21 +1692,15 @@ Cardinal *num_params;
 
 /* Bell action */
 
-static void BellAction(gw, event, params, num_params)
-Widget gw;
-XEvent *event;
-String *params;
-Cardinal *num_params;
-  {
+static void BellAction(Widget gw, XEvent * event, String * params,
+                       Cardinal * num_params) {
     XBell(XtDisplay(gw), 100);
-  }
+}
 
-static void EventHandler(w, client, event, continue_to_dispatch)
-XpwScrollTextWidget w;
-Opaque client;
-XEvent *event;
-Boolean *continue_to_dispatch;
-  { unsigned flags = Flags(w), oldflags = flags, f;
+static void EventHandler(Widget gw, Opaque client, XEvent * event,
+                         Boolean * continue_to_dispatch) {
+    XpwScrollTextWidget w = (XpwScrollTextWidget)gw;
+    unsigned flags = Flags(w), oldflags = flags, f;
     Boolean in, have_focus;
 
     if (w->core.being_destroyed) return;
@@ -1830,13 +1778,11 @@ Boolean *continue_to_dispatch;
     else
         Flags(w) &= ~CALLBACK_YES;
     XtCallCallbacks((Widget)w, XtNfocusChange, (XtPointer)(long) have_focus);
-  }
+}
 
 
 /* _XpwTextCopyWait(w) - waits for an exposure or a noexpose event */
-void _XpwTextCopyWait(w)
-XpwScrollTextWidget w;
-  {
+void _XpwTextCopyWait(XpwScrollTextWidget w) {
     Display *dpy = XtDisplay(w);
     Window win = XtWindow(w);
     XEvent event;
@@ -1846,14 +1792,14 @@ XpwScrollTextWidget w;
         if (event.type == NoExpose)
             return;
         else if (event.type == GraphicsExpose)
-          { ScrollTextRedisplay(w, &event, NULL);
+          { Redisplay((Widget)w, &event, NULL);
             if (event.xgraphicsexpose.count == 0) return;
           }
         else if (event.type == Expose)
-          { ScrollTextRedisplay(w, &event, NULL);
+          { Redisplay((Widget)w, &event, NULL);
           }
       }
-  }
+}
 
 
 /* --- Revision History ---------------------------------------------------

@@ -153,7 +153,8 @@ static char *_SysErrorMsg(int n) {
 #define XTFORMATSTR "%s: %s -- %s"
 
 static void Err_msg(String name, String type, String class, String defaultp,
-                    String* params, Cardinal* num_params, void (*err_p)()) {
+                    String* params, Cardinal* num_params,
+                    void (*err_p)(const char *)) {
     char buffer[1000], message[1000];
     XtGetErrorDatabaseText(name, type, class, defaultp, buffer, 1000);
     if (params == NULL || num_params == NULL || *num_params == 0) {
@@ -313,7 +314,7 @@ typedef struct _OlListToken *OlListToken;   /* opaque item token */
 
 OlListToken XpolAddListItem(Widget widget, OlListToken parent,
                             OlListToken reference, OlListItem * item) {
-    OlListToken  (*Addfn)();
+    OlListToken  (*Addfn)(Widget, OlListToken, OlListToken, OlListItem);
 
     /* Get the add procedure */
     XtVaGetValues(widget, XtNapplAddItem, (XtArgVal)&Addfn, NULL);
@@ -411,7 +412,7 @@ static void XptWMProtocol(Widget w, XEvent * event, String * params,
     num-params non-zero means we're starting, and arg is what kind of
     gc
 */
-XtInputMask XptAppTryEvents();
+XtInputMask XptAppTryEvents(XtAppContext appcon);
 
 static void XptGarbageFeedback(Widget w, XEvent * event, String * params,
                                Cardinal * num_params) {
@@ -578,7 +579,7 @@ POPOBJ _pop_async_appcon_clos() {
 
 /* == Event Handling ============================================ */
 
-extern caddr_t (*_pop_set_Xt_poll())();
+extern caddr_t (*_pop_set_Xt_poll(int (*handler)(void)))();
 
 #define POP_INTERRUPT   (_pop_signals_pending)
 #define POP_ABEXIT      (_pop_external_flags & PEF_DOING_ABEXIT)

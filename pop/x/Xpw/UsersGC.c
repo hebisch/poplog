@@ -36,12 +36,12 @@ static void debug_msg(char * m)
 {
     printf("xpwCore: %s\n",m);
 }
-static void 
+static void
 printgc(XtGCMask valuemask, XGCValues * values) {
     if (valuemask & GCBackground) {
         printf("GC:background%i\n", values->background );
     }
-    if (valuemask & GCForeground) { 
+    if (valuemask & GCForeground) {
         printf("GC:foreground%i\n", values->foreground );
     }
     if (valuemask & GCFunction) {
@@ -97,7 +97,7 @@ printgc(XtGCMask valuemask, XGCValues * values) {
 */
 
 
-void 
+void
 _XpwUpdateUsersGC(XpwCoreWidget w, unsigned long valuemask, XGCValues * values)
 {
     register Display *dpy = XtDisplay(w);

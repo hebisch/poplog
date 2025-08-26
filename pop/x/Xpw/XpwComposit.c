@@ -44,9 +44,16 @@ static XtResource resources[] = {
         offset(work_area), XtRImmediate, (caddr_t)NULL},
 };
 
-static void NotifyConfigureEvent(), CompositeResize(), ChangeManaged();
-static XtGeometryResult GeometryManager();
-static XtGeometryResult CompositeQueryGeometry();
+static void NotifyConfigureEvent(Widget gw, XEvent * event,
+           String * params, Cardinal * num_params);
+static void CompositeResize(Widget gw);
+static void ChangeManaged(Widget gw);
+static XtGeometryResult GeometryManager(Widget wid,
+                                        XtWidgetGeometry * request,
+                                        XtWidgetGeometry * reply);
+static XtGeometryResult CompositeQueryGeometry(XpwCompositeWidget w,
+                                               XtWidgetGeometry * req,
+                                               XtWidgetGeometry * reply);
 
 static char defaultTranslations[] =
     "<Configure>:   notify-configure-event()\n";
@@ -155,11 +162,9 @@ static void SetToMaxSize(XpwCompositeWidget composite) {
 */
 }
 
-static XtGeometryResult GeometryManager(wid, request, reply)
-    Widget wid;
-    XtWidgetGeometry *request;
-    XtWidgetGeometry *reply;
-{
+static XtGeometryResult GeometryManager(Widget wid,
+                                        XtWidgetGeometry * request,
+                                        XtWidgetGeometry * reply) {
     XpwCompositeWidget composite = (XpwCompositeWidget)wid->core.parent;
 
     *reply = *request;
@@ -203,10 +208,10 @@ static void CompositeResize(Widget gw) {
         XtCallCallbacks(gw, XtNxpwCallback, (caddr_t)RESIZE);
 }
 
-static XtGeometryResult CompositeQueryGeometry(w, req, reply)
-XpwCompositeWidget w;
-XtWidgetGeometry *req, *reply;
-  { Widget work_area = w->xpwcomposite.work_area;
+static XtGeometryResult CompositeQueryGeometry(XpwCompositeWidget w,
+                                               XtWidgetGeometry * req,
+                                               XtWidgetGeometry * reply) {
+    Widget work_area = w->xpwcomposite.work_area;
     XtGeometryResult result = XtGeometryYes;
 
     *reply = *req;
@@ -240,8 +245,7 @@ static void ChangeManaged(Widget gw) {
 
 #define CONFIGURE 1
 static void NotifyConfigureEvent(Widget gw, XEvent * event,
-           String * params, Cardinal * num_params)
-{
+           String * params, Cardinal * num_params) {
     /* notify the clients of the event: */
     XtCallCallbacks(gw, XtNxpwCallback, (XtPointer)CONFIGURE);
 /*  if (w->xpwcomposite.resize) SetToMaxSize(w);*/

@@ -25,27 +25,41 @@
 
 /* The following procs are part of the class structure */
 
-static void Initialize(), Realize(), Resize(), Redisplay(), Destroy();
-static void ClassInit(), ClassPartInit();
-static Boolean SetValues();
-static XpwMethodRet ApplyMethod();
+static void ClassInit();
+static void ClassPartInit(WidgetClass gwc);
+static void Destroy(Widget gw);
+static void Initialize(Widget request, Widget new);
+static void Realize(Widget gw, XtValueMask * valueMask,
+                    XSetWindowAttributes * attrs);
+static void Redisplay(Widget gw, XEvent * event, Region region);
+static void Resize(Widget gw);
+static Boolean SetValues(Widget gcurrent, Widget grequest, Widget gnew);
+static XpwMethodRet ApplyMethod(XpwCoreWidget w, XpwMethod * method,
+                                va_list args);
 
 /* Action procedures - only one for the Core Widget: */
 
-static void NotifyEvent();
-
+static void NotifyEvent(Widget gw, XEvent * event, String * params,
+                        Cardinal * num_params);
 
 /* procs for handling UsersGC - see UsersGC.c */
 externalref XGCValues _xpwGCvalues;
 externalref XtGCMask  _xpwGCvaluemask;
 
-extern void _XpwCondUpdateUsersGC();
-extern void _XpwUpdateUsersGC();
-extern void XpwCopyAssoc();
-extern Pixmap XpwLocateBitmapFile();
+extern void _XpwCondUpdateUsersGC(WidgetClass wc, Widget w);
+extern void _XpwUpdateUsersGC(XpwCoreWidget w, unsigned long valuemask,
+                              XGCValues * values);
+extern void XpwCopyAssoc(XpwAssocTable * src_table,
+                         XpwAssocTable * dest_table);
+extern Pixmap XpwLocateBitmapFile(Screen * screen, char * name, char * srcname,
+                    int srcnamelen, int * widthp, int * heightp,
+                    int * xhotp, int * yhotp);
 
 /* converting bitmap files to pixmaps - see CvtStrToPmap.c and RecolorPmap.c*/
-extern Pixmap XpwRecolorPixmap();
+extern Pixmap XpwRecolorPixmap(Screen * screen, Pixmap src_pix,
+            unsigned long src_fg, unsigned long src_bg,
+            unsigned long dst_fg, unsigned long dst_bg,
+            unsigned long dst_depth, int free);
 /*
 extern XpwCvtStringToPixmap();
 */
@@ -120,8 +134,15 @@ static XtResource resources[] = {
    JM - added SetColor and FreeColor
 */
 
-static XpwMethodRet LoadFont(), LoadColor(), SetCursor(), LoadPixmap();
-static void FreeFont(), FreeColor(), FreeCursor();
+static XpwMethodRet LoadFont(XpwCoreWidget w, char * string);
+static XpwMethodRet LoadColor(XpwCoreWidget w, char * string);
+static XpwMethodRet SetCursor(XpwCoreWidget w, unsigned int shape);
+static XpwMethodRet LoadPixmap(XpwCoreWidget w, char * string,
+                               int fg, int bg, int depth);
+static void FreeFont(XpwCoreWidget w, char * string);
+static void FreeColor(XpwCoreWidget w, char * string);
+static void FreeCursor(XpwCoreWidget w, unsigned int shape);
+
 static XpwMethod methods[] = {
 /*  {id,                    proc,       num_args,       flags     }*/
 #define M METHOD_STRUCT
@@ -177,7 +198,7 @@ externaldef(xpwCoreClassRec)
     /* class_initialize */      ClassInit,
     /* class_part_initialize*/  ClassPartInit,
     /* class_inited     */      FALSE,
-    /* initialize       */      Initialize,
+    /* initialize       */      (XtInitProc)Initialize,
     /* initialize_hook  */      NULL,
     /* realize          */      Realize,
     /* actions          */      actions,
@@ -192,7 +213,7 @@ externaldef(xpwCoreClassRec)
     /* destroy          */      Destroy,
     /* resize           */      Resize,
     /* expose           */      Redisplay,
-    /* set_values       */      SetValues,
+    /* set_values       */      (XtSetValuesFunc)SetValues,
     /* set_values_hook  */      NULL,
     /* set_values_almost*/      XtInheritSetValuesAlmost,
     /* get_values_hook  */      NULL,
@@ -253,9 +274,7 @@ static void ClassInit()
     or apply_proc inheritance, and initializes the methods_table
 */
 
-static void ClassPartInit(gwc)
-WidgetClass gwc;
-{
+static void ClassPartInit(WidgetClass gwc) {
     register XpwCoreWidgetClass wc = (XpwCoreWidgetClass)gwc,
                 super = (XpwCoreWidgetClass)gwc->core_class.superclass;
     int num_methods, table_size=0;
@@ -319,9 +338,8 @@ WidgetClass gwc;
     debug_msg("ClassPart Initialize End");
 }
 
-void _XpwRecolorPointer(w)
-XpwCoreWidget w;
- {
+void _XpwRecolorPointer(XpwCoreWidget w)
+{
     Display *dpy = XtDisplay(w);
     XColor colordefs[2];        /* 0 is foreground, 1 is background */
 
@@ -329,14 +347,12 @@ XpwCoreWidget w;
     colordefs[1].pixel = w->xpwcore.pointer_background;
     XQueryColors(dpy, DefaultColormapOfScreen(XtScreen(w)), colordefs, 2);
     XRecolorCursor(dpy, w->xpwcore.pointer_shape, colordefs, colordefs+1);
- }
+}
 
     /*  This tedium is necessary because not all systems offer
         strcasecmp() as standard
     */
-static int is_iso_latin_1_font(font_name)
-char* font_name;
-{
+static int is_iso_latin_1_font(char * font_name) {
     char *p1, *p2;
     int n = strlen(font_name) - 9;
     if (n < 0) return 0;
@@ -348,10 +364,8 @@ char* font_name;
     return 1;
 }
 
-XFontSet _XpwFontSetFromFont(w, font)
-  XpwCoreWidget w;
-  XFontStruct *font;
-  { Atom a;
+XFontSet _XpwFontSetFromFont(XpwCoreWidget w, XFontStruct * font) {
+    Atom a;
     XrmValue from_val, to_val;
     XFontSet font_set = (XFontSet)NULL;
     char *name, *fname = (char *)NULL;
@@ -373,13 +387,11 @@ XFontSet _XpwFontSetFromFont(w, font)
     XtConvertAndStore((Widget)w, XtRString, &from_val, XtRFontSet, &to_val);
     if (fname) XFree(fname);
     return(font_set);
-  }
+}
 
-XFontStruct * _XpwFont8OfFontSet(w, font_set, iso_latin_1)
-  XpwCoreWidget w;
-  XFontSet font_set;
-  Boolean iso_latin_1;
-  { XFontStruct **font_struct_list, **lim, *font;
+XFontStruct * _XpwFont8OfFontSet(XpwCoreWidget w, XFontSet font_set,
+                                 Boolean iso_latin_1) {
+    XFontStruct **font_struct_list, **lim, *font;
     char **font_name_list, *name;
     int nfonts = XFontsOfFontSet(font_set, &font_struct_list, &font_name_list);
     XrmValue from_val, to_val;
@@ -401,11 +413,9 @@ XFontStruct * _XpwFont8OfFontSet(w, font_set, iso_latin_1)
     to_val.addr = (XPointer)&font;
     XtConvertAndStore((Widget)w, XtRString, &from_val, XtRFontStruct, &to_val);
     return(font);
-  }
+}
 
-static void Initialize (request, new)
-Widget request, new;
-{
+static void Initialize(Widget request, Widget new) {
     XpwCoreWidget w = (XpwCoreWidget)new;
 
     if (w->xpwcore.font_set)
@@ -424,15 +434,12 @@ Widget request, new;
     _xpwGCvalues.background = w->core.background_pixel;
 
     /* invert the auto flush */
-    _XpwCondUpdateUsersGC(xpwCoreWidgetClass, w);
+    _XpwCondUpdateUsersGC(xpwCoreWidgetClass, (Widget)w);
     debug_msg("Initialize End");
 }
 
 
-
-static Boolean SetValues (gcurrent, grequest, gnew)
-Widget gcurrent, grequest, gnew;
-{
+static Boolean SetValues(Widget gcurrent, Widget grequest, Widget gnew) {
     XGCValues gcv;
     XpwCoreWidget current = (XpwCoreWidget) gcurrent;
     XpwCoreWidget new = (XpwCoreWidget) gnew;
@@ -498,7 +505,7 @@ Widget gcurrent, grequest, gnew;
     }
 
 
-    _XpwCondUpdateUsersGC(xpwCoreWidgetClass, new);
+    _XpwCondUpdateUsersGC(xpwCoreWidgetClass, (Widget)new);
 
     if (new->xpwcore.auto_flush != current->xpwcore.auto_flush) {
         if (new->xpwcore.auto_flush) XFlush(XtDisplay(new));
@@ -508,11 +515,9 @@ Widget gcurrent, grequest, gnew;
     return (redisplay);
 }
 
-static void Realize (gw, valueMask, attrs)
-    Widget gw;
-    XtValueMask *valueMask;
-    XSetWindowAttributes *attrs;
-{       XpwCoreWidget w=(XpwCoreWidget)gw;
+static void Realize(Widget gw, XtValueMask * valueMask,
+                    XSetWindowAttributes * attrs) {
+    XpwCoreWidget w=(XpwCoreWidget)gw;
     if ((attrs->cursor = w->xpwcore.pointer_shape)) {
         *valueMask |= CWCursor; _XpwRecolorPointer(w);
     }
@@ -521,8 +526,7 @@ static void Realize (gw, valueMask, attrs)
 
 }
 
-
-static void Resize (Widget gw) {
+static void Resize(Widget gw) {
     /* don't do this computation if window hasn't been realized yet. */
     if (XtIsRealized(gw)) {
         XtCallCallbacks(gw,XtNxpwCallback, (caddr_t)ConfigureNotify);
@@ -530,19 +534,13 @@ static void Resize (Widget gw) {
 }
 
 
-static void Redisplay (gw, event, region)
-    Widget gw;
-    XEvent *event;      /* unused */
-    Region region;      /* unused */
-{
+static void Redisplay(Widget gw, XEvent * event, Region region) {
     /* again we need a hook to Poplog */
     XtCallCallbacks(gw, XtNxpwCallback, (caddr_t)(event));
 }
 
 
-static void Destroy (gw)
-     Widget gw;
-{
+static void Destroy(Widget gw) {
     XpwCoreWidget w = (XpwCoreWidget) gw;
     register Display *dpy = XtDisplay(w);
     if (w->xpwcore.users_gc)
@@ -559,12 +557,8 @@ static void Destroy (gw)
  *
  ****************************************************************/
 
-static void NotifyEvent (gw, event, params, num_params)
-Widget gw;
-XEvent *event;
-String *params;
-Cardinal *num_params;
-{
+static void NotifyEvent(Widget gw, XEvent * event, String * params,
+                        Cardinal * num_params) {
     /* notify the clients of the event: */
     XtCallCallbacks(gw, XtNxpwCallback, (caddr_t)event);
 }
@@ -578,10 +572,7 @@ Cardinal *num_params;
  ****************************************************************/
 
 /* Call resource converter to load font */
-static XpwMethodRet LoadFont (w, string)
-XpwCoreWidget w;
-char *string;
-{
+static XpwMethodRet LoadFont(XpwCoreWidget w, char * string) {
     if (string == NULL) string = XtDefaultFontSet;
     setvalues_done = FALSE;
     XtVaSetValues((Widget)w, XtVaTypedArg, XtNfontSet, XtRString,
@@ -590,16 +581,11 @@ char *string;
     else return((XpwMethodRet)0);
 }
 
-static void FreeFont(w,string)
-XpwCoreWidget w;
-char *string;
-{   /* do nothing now - leave free to the resource converters */
+static void FreeFont(XpwCoreWidget w, char * string) {
+   /* do nothing now - leave free to the resource converters */
 }
 
-static XpwMethodRet LoadColor (w, string)
-XpwCoreWidget w;
-char *string;
-{
+static XpwMethodRet LoadColor(XpwCoreWidget w, char * string) {
     if (string == NULL) string = XtDefaultForeground;
     setvalues_done = FALSE;
     XtVaSetValues((Widget)w, XtVaTypedArg, XtNforeground, XtRString,
@@ -608,16 +594,10 @@ char *string;
     else return((XpwMethodRet)-1);
 }
 
-static void FreeColor(w,string)
-XpwCoreWidget w;
-char *string;
-{
+static void FreeColor(XpwCoreWidget w, char * string) {
 }
 
-static XpwMethodRet SetCursor(w, shape)
-XpwCoreWidget w;
-unsigned int shape;
-{
+static XpwMethodRet SetCursor(XpwCoreWidget w, unsigned int shape) {
     register Display *dpy = XtDisplay(w);
     Cursor cur;
     setvalues_done = FALSE;
@@ -627,17 +607,11 @@ unsigned int shape;
     else return(0);
 }
 
-static void FreeCursor(w,shape)
-XpwCoreWidget w;
-unsigned int shape;
-{
+static void FreeCursor(XpwCoreWidget w, unsigned int shape) {
 }
 
-static XpwMethodRet LoadPixmap(w, string, fg, bg, depth)
-XpwCoreWidget w;
-char *string;
-int fg, bg, depth;
-{
+static XpwMethodRet LoadPixmap(XpwCoreWidget w, char * string,
+                               int fg, int bg, int depth) {
     Pixmap new;
     Screen *screen = XtScreen(w);
     if (!depth) depth = w->core.depth;
@@ -662,11 +636,9 @@ static void FreePixmap(Widget w, Pixmap pixmap) {
     XFreePixmap(XtDisplay(w), pixmap);
 }
 
-static XpwMethodRet ApplyMethod(w, method, args)
-XpwCoreWidget w;
-XpwMethod *method;
-va_list args;
-{   int i, num_args = method->num_args;
+static XpwMethodRet ApplyMethod(XpwCoreWidget w, XpwMethod * method,
+                                va_list args) {
+    int i, num_args = method->num_args;
     XpwMethodProc proc=method->proc;
     Cardinal flags = method->flags;
     XpwMethodArg  arg_list[MAX_ARGS];

@@ -22,27 +22,38 @@
 
 /* The following procs are part of the class structure */
 
-static void ClassInit(), Initialize(), Realize(), Resize(), Redisplay(), Destroy();
-static Boolean SetValues();
+static void ClassInit();
+static void Destroy(Widget gw);
+static void Initialize(Widget request, Widget new);
+static void Realize(Widget gw, XtValueMask * valueMask,
+                    XSetWindowAttributes * attrs);
+static void Redisplay(Widget gw, XEvent * event, Region region);
+static void Resize(Widget gw);
+static Boolean SetValues(Widget gcurrent, Widget grequest, Widget gnew);
 
 /* Action procedures */
 
-static void NotifyButtonEvent();
-static void NotifyMouseEvent();
-static void NotifyKeyboardEvent();
-static void NotifyMotionEvent();
-static void ExtractPosition();
-static void NotifyResizeEvent();
+static void NotifyButtonEvent(Widget gw, XEvent * event, String * params,
+                              Cardinal * num_params);
+static void NotifyMouseEvent(Widget gw, XEvent * event, String * params,
+                              Cardinal * num_params);
+static void NotifyKeyboardEvent(Widget gw, XEvent * event, String * params,
+                              Cardinal * num_params);
+static void NotifyMotionEvent(Widget gw, XEvent * event, String * params,
+                              Cardinal * num_params);
+static void NotifyResizeEvent(Widget gw, XEvent * event, String * params,
+                              Cardinal * num_params);
+static void ExtractPosition(XEvent * event, int * x, int * y /* RETURN */);
 
 /* General procedures */
 
-static XpwMethodRet ApplyMethod();
-static void ExtractPosition();
+static XpwMethodRet ApplyMethod(XpwGraphicWidget w, XpwMethod * method,
+                                va_list args);
 
 /* External declarations */
-extern void _XpwCondUpdateUsersGC();
-extern void _XpwRecolorPointer(), _XpwFreeColormap(), _XpwFreeColors();
-
+extern void _XpwCondUpdateUsersGC(WidgetClass wc, Widget w);
+extern void  _XpwFreeColors(XpwGraphicWidget w, XpwColorList * colorlist);
+extern void  _XpwFreeColormap(XpwGraphicWidget w);
 
 /****************************************************************
  *
@@ -109,7 +120,7 @@ static XtActionsRec actions[] =
    {"string", NotifyKeyboardEvent},
    {"notify-keyboard-event", NotifyKeyboardEvent},
    {"notify-motion-event", NotifyMotionEvent},
-   {"notify-resize-event",NotifyResizeEvent},
+   {"notify-resize-event", NotifyResizeEvent},
    {NULL,NULL}};
 
 
@@ -145,7 +156,7 @@ externaldef(xpwgraphicclassrec)
     /* class_initialize */      ClassInit,
     /* class_part_initialize*/  NULL,
     /* class_inited     */      FALSE,
-    /* initialize       */      Initialize,
+    /* initialize       */      (XtInitProc)Initialize,
     /* initialize_hook  */      NULL,
     /* realize          */      Realize,
     /* actions          */      actions,
@@ -160,7 +171,7 @@ externaldef(xpwgraphicclassrec)
     /* destroy          */      Destroy,
     /* resize           */      Resize,
     /* expose           */      Redisplay,
-    /* set_values       */      SetValues,
+    /* set_values       */      (XtSetValuesFunc)SetValues,
     /* set_values_hook  */      NULL,
     /* set_values_almost*/      XtInheritSetValuesAlmost,
     /* get_values_hook  */      NULL,
@@ -177,7 +188,7 @@ externaldef(xpwgraphicclassrec)
     { /*xpwcore fields */
     /*methods           */      _xpwGraphicMethods,
     /*num_methods       */      0, /* set at class_init */
-    /*apply             */      ApplyMethod,
+    /*apply             */      (XpwApplyProc)ApplyMethod,
     /*methods_table     */      XtInheritMethods,
     }
 };
@@ -222,7 +233,7 @@ static void Initialize(Widget request, Widget new) {
     w->xpwgraphic.allocated_colors = colors;
 
     /* set my_gc */
-    _XpwCondUpdateUsersGC(xpwGraphicWidgetClass, w);
+    _XpwCondUpdateUsersGC(xpwGraphicWidgetClass, (Widget)w);
     w->xpwgraphic.my_gc = w->xpwpixmap.private_gc;
 
     debug_msg("Initialize End");
@@ -244,29 +255,25 @@ static Boolean SetValues(Widget gcurrent, Widget grequest, Widget gnew) {
         _XpwFreeColormap(current);
     }
 
-    _XpwCondUpdateUsersGC(xpwGraphicWidgetClass, new);
+    _XpwCondUpdateUsersGC(xpwGraphicWidgetClass, (Widget)new);
     return (redisplay);
 }
 
-static void Realize (gw, valueMask, attrs)
-     Widget gw;
-     XtValueMask *valueMask;
-     XSetWindowAttributes *attrs;
-{       XpwGraphicWidget w= (XpwGraphicWidget)gw;
+static void Realize(Widget gw, XtValueMask * valueMask,
+                    XSetWindowAttributes * attrs) {
+     XpwGraphicWidget w= (XpwGraphicWidget)gw;
     debug_msg("Realize start");
      *valueMask |= CWBitGravity;
      attrs->bit_gravity = ForgetGravity;
      if ((attrs->cursor = w->xpwcore.pointer_shape) !=0)
-       { *valueMask |= CWCursor; _XpwRecolorPointer(w); }
+       { *valueMask |= CWCursor; _XpwRecolorPointer((XpwCoreWidget)w); }
      XtCreateWindow( gw, InputOutput, (Visual *)CopyFromParent,
              *valueMask, attrs);
     debug_msg("Realize end");
 }
 
 
-static void Resize (gw)
-    Widget gw;
-{
+static void Resize(Widget gw) {
     XpwGraphicWidget w= (XpwGraphicWidget)gw;
     /* run pixmap's resize even if unrealized */
     ((WidgetClass)xpwPixmapWidgetClass)->core_class.resize(gw);
@@ -286,10 +293,8 @@ static void Resize (gw)
     }
 }
 
-static void ExtractExpose (event, x, y, width, height)
-XEvent *event;
-int *x, *y, *width, *height;
-{
+static void ExtractExpose(XEvent * event, int * x, int * y,
+                          int * width, int * height) {
     switch (event->type) {
     case GraphicsExpose:
         *x = event->xgraphicsexpose.x;
@@ -306,11 +311,8 @@ int *x, *y, *width, *height;
     }
 }
 /* ARGSUSED */
-static void Redisplay (gw, event, region)
-    Widget gw;
-    XEvent *event;      /* unused */
-    Region region;      /* unused */
-{
+static void Redisplay(Widget gw, XEvent * event /* unused */,
+                      Region region /* unused */) {
     XpwGraphicWidget w = (XpwGraphicWidget) gw;
     register Display *dpy = XtDisplay(w);
     register Window win = XtWindow(w);
@@ -330,12 +332,9 @@ static void Redisplay (gw, event, region)
         x,y,width,height,x,y);
 
     debug_msg("Redisplay");
-
 }
 
-static void Destroy (gw)
-Widget gw;
-{
+static void Destroy(Widget gw) {
     XpwGraphicWidget w=(XpwGraphicWidget)gw;
     register Screen *screen = XtScreen(w);
     register Display *dpy = XtDisplay(w);
@@ -358,12 +357,9 @@ Widget gw;
 /* each of these calls the relevant callback list with the
    right parameters */
 
-static void NotifyButtonEvent (gw, event, params, num_params)
-Widget gw;
-XEvent *event;
-String *params;
-Cardinal *num_params;
-{   long call_data;
+static void NotifyButtonEvent(Widget gw, XEvent * event, String * params,
+                              Cardinal * num_params) {
+    long call_data;
     XpwGraphicWidget w = (XpwGraphicWidget) gw;
     call_data = event->xbutton.button;
     w->xpwcore.modifiers = event->xbutton.state;
@@ -373,12 +369,9 @@ Cardinal *num_params;
     XtCallCallbacks(gw, XtNbuttonEvent, (caddr_t)call_data);
 }
 
-static void NotifyResizeEvent (gw, event, params, num_params)
-Widget gw;
-XEvent *event;
-String *params;
-Cardinal *num_params;
-{   long call_data;
+static void NotifyResizeEvent(Widget gw, XEvent * event, String * params,
+                             Cardinal * num_params) {
+    long call_data;
     call_data = event->type;
     /* notify the clients of the event: */
     XtCallCallbacks(gw, XtNresizeEvent, (caddr_t)call_data);
@@ -401,12 +394,9 @@ static void CheckSwitchCmaps(XpwGraphicWidget w, int type) {
     }
 }
 
-static void NotifyMouseEvent (gw, event, params, num_params)
-Widget gw;
-XEvent *event;
-String *params;
-Cardinal *num_params;
-{   long call_data;
+static void NotifyMouseEvent(Widget gw, XEvent * event, String * params,
+                             Cardinal * num_params) {
+    long call_data;
     XpwGraphicWidget w = (XpwGraphicWidget) gw;
     ExtractPosition( event, (int *)&(w->xpwgraphic.mouse_x), (int *)&(w->xpwgraphic.mouse_y));
     call_data = event->type ;
@@ -415,10 +405,7 @@ Cardinal *num_params;
     XtCallCallbacks(gw, XtNmouseEvent, (caddr_t)call_data );
 }
 
-static void process_string(src, dst, len)
-String src, dst;
-int len;
-{
+static void process_string(String src, String dst, int len) {
     if (src[0] == 0) dst[0] = 0;
     else if (src[0] == '0' && src[1] == 'x' && src[2] != '\0') {
         /* turn 0x?? to a string containing that hex character */
@@ -448,12 +435,9 @@ int len;
     }
 }
 
-static void NotifyKeyboardEvent (gw, event, params, num_params)
-Widget gw;
-XEvent *event;
-String *params;
-Cardinal *num_params;
-{   /* converts keycode to keysym */
+static void NotifyKeyboardEvent(Widget gw, XEvent * event, String * params,
+                                Cardinal * num_params) {
+    /* converts keycode to keysym */
     KeySym key; unsigned int count = 14;
     XComposeStatus compose;
     XpwGraphicWidget w = (XpwGraphicWidget) gw;
@@ -477,12 +461,9 @@ Cardinal *num_params;
     XtCallCallbacks(gw, XtNkeyboardEvent, (caddr_t)key);
 }
 
-static void NotifyMotionEvent (gw, event, params, num_params)
-Widget gw;
-XEvent *event;
-String *params;
-Cardinal *num_params;
-{   long call_data;
+static void NotifyMotionEvent(Widget gw, XEvent * event, String * params,
+                              Cardinal * num_params) {
+    long call_data;
     XpwGraphicWidget w = (XpwGraphicWidget) gw;
     ExtractPosition( event, &(w->xpwgraphic.mouse_x), &(w->xpwgraphic.mouse_y));
     w->xpwcore.modifiers = call_data = event->xmotion.state;
@@ -498,10 +479,7 @@ Cardinal *num_params;
 
 /* takes an event, and returns the mouse location */
 
-static void ExtractPosition (event, x, y )
-    XEvent *event;
-    int *x, *y;         /* RETURN */
-{
+static void ExtractPosition(XEvent * event, int * x, int * y /* RETURN */) {
     switch( event->type ) {
       case MotionNotify:
         *x = event->xmotion.x;   *y = event->xmotion.y;   break;
@@ -520,11 +498,9 @@ static void ExtractPosition (event, x, y )
 }
 
 
-static XpwMethodRet ApplyMethod (w, method, args)
-XpwGraphicWidget w;
-XpwMethod *method;
-va_list args;
-{   int i, num_args = method->num_args;
+static XpwMethodRet ApplyMethod(XpwGraphicWidget w, XpwMethod * method,
+                                va_list args) {
+    int i, num_args = method->num_args;
     XpwMethodProc proc=method->proc;
     Cardinal flags = method->flags;
     XpwMethodArg arg_list[10];

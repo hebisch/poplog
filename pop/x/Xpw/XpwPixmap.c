@@ -26,10 +26,18 @@
 /* Declare local widget class procedures. */
 
 /* private procedures*/
-static void ClassInit(), Initialize(), Realize(), Destroy(), Resize();
-static Boolean SetValues(), SetSubpartValues();
-static void InitSubpartValues(), GetSubpartValues();
-static XpwMethodRet ApplyMethod();
+static void ClassInit();
+static void Destroy(Widget gw);
+static void GetSubpartValues(Widget gw, ArgList args, Cardinal * num_args);
+static void Initialize(Widget request, Widget new);
+static void InitSubpartValues(Widget gw, ArgList args, Cardinal * num_args);
+static void Realize(Widget gw, XtValueMask * valueMask,
+                    XSetWindowAttributes * attrs);
+static void Resize(Widget gw);
+static Boolean SetSubpartValues(Widget gw, ArgList args, Cardinal * num_args);
+static Boolean SetValues(Widget gcurrent, Widget grequest, Widget gnew);
+static XpwMethodRet ApplyMethod(XpwPixmapWidget w, XpwMethod * method,
+                                va_list args);
 
 /* external declarations */
 /*
@@ -39,7 +47,7 @@ extern XmuCvtStringToBitmap();
 extern XmuCvtStringToPixmap();
 #endif
 */
-extern void _XpwCondUpdateUsersGC();
+extern void _XpwCondUpdateUsersGC(WidgetClass wc, Widget w);
 
 externalref XtGCMask _xpwGCvaluemask;
 externalref XGCValues _xpwGCvalues;
@@ -77,9 +85,7 @@ externalref XGCValues _xpwGCvalues;
 
 #define GC_FIELD(values, field, mask) ((values.field == _xpwGCvalues.field) ? 0 : mask)
 
-static XtGCMask GCsubpartMask(values)
-XGCValues values;
-{
+static XtGCMask GCsubpartMask(XGCValues values) {
     XtGCMask valuemask;
 
     /* used to find which relevant members of values differ from the
@@ -256,7 +262,8 @@ typedef struct {
 
 /* Function */
 
-static void CvtStringToFunction();
+static void CvtStringToFunction(XrmValue * args, Cardinal * num_args,
+                                XrmValue * fromVal, XrmValue * toVal);
 static XrmQuark XrmQExtdefaultfunction;
 static XpwAssocTable *functionQuarkTable = NULL;
 
@@ -281,7 +288,8 @@ static QuarkList functionQuarks [] = {
 };
 
 /* Cap Style */
-static void CvtStringToCapStyle();
+static void CvtStringToCapStyle(XrmValue * args, Cardinal * num_args,
+                                XrmValue * fromVal, XrmValue * toVal);
 static XrmQuark XrmQExtdefaultcapstyle;
 static XpwAssocTable *capStyleQuarkTable = NULL;
 static QuarkList capStyleQuarks [] = {
@@ -293,7 +301,8 @@ static QuarkList capStyleQuarks [] = {
 };
 
 /* JoinStyle */
-static void CvtStringToJoinStyle();
+static void CvtStringToJoinStyle(XrmValue * args, Cardinal * num_args,
+                                XrmValue * fromVal, XrmValue * toVal);
 static XrmQuark XrmQExtdefaultjoinstyle;
 static XpwAssocTable *joinStyleQuarkTable = NULL;
 static QuarkList joinStyleQuarks [] = {
@@ -304,7 +313,8 @@ static QuarkList joinStyleQuarks [] = {
 };
 
 /* LineStyle */
-static void CvtStringToLineStyle();
+static void CvtStringToLineStyle(XrmValue * args, Cardinal * num_args,
+                                XrmValue * fromVal, XrmValue * toVal);
 static XrmQuark XrmQExtdefaultlinestyle;
 static XpwAssocTable *lineStyleQuarkTable = NULL;
 static QuarkList lineStyleQuarks [] = {
@@ -315,7 +325,8 @@ static QuarkList lineStyleQuarks [] = {
 };
 
 /* FillStyle */
-static void CvtStringToFillStyle();
+static void CvtStringToFillStyle(XrmValue * args, Cardinal * num_args,
+                                XrmValue * fromVal, XrmValue * toVal);
 static XrmQuark XrmQExtdefaultfillstyle;
 static XpwAssocTable *fillStyleQuarkTable = NULL;
 static QuarkList fillStyleQuarks [] = {
@@ -327,12 +338,14 @@ static QuarkList fillStyleQuarks [] = {
 };
 
 /* FillRule */
-static void CvtStringToFillRule();
+static void CvtStringToFillRule(XrmValue * args, Cardinal * num_args,
+                                XrmValue * fromVal, XrmValue * toVal);
 static XrmQuark XrmQExtdefaultfillrule;
 static XpwAssocTable *fillRuleQuarkTable = NULL;
 
 /* Subwindow Mode */
-static void CvtStringToSubwindow();
+static void CvtStringToSubwindow(XrmValue * args, Cardinal * num_args,
+                                XrmValue * fromVal, XrmValue * toVal);
 static XrmQuark XrmQExtdefaultsubwindow;
 static XpwAssocTable *subwindowQuarkTable = NULL;
 static QuarkList subwindowQuarks [] = {
@@ -342,7 +355,8 @@ static QuarkList subwindowQuarks [] = {
 };
 
 /* ArcMode */
-static void CvtStringToArcMode();
+static void CvtStringToArcMode(XrmValue * args, Cardinal * num_args,
+                                XrmValue * fromVal, XrmValue * toVal);
 static XrmQuark XrmQExtdefaultarcmode;
 static XpwAssocTable *arcModeQuarkTable = NULL;
 static QuarkList arcModeQuarks [] = {
@@ -353,7 +367,8 @@ static QuarkList arcModeQuarks [] = {
 
 /* pixmap Status */
 
-static void CvtStringToPixmapStatus();
+static void CvtStringToPixmapStatus(XrmValue * args, Cardinal * num_args,
+                                XrmValue * fromVal, XrmValue * toVal);
 static XrmQuark XrmQExtdefaultpixmapstatus;
 static XpwAssocTable *pixmapStatusQuarkTable = NULL;
 static QuarkList pixmapStatusQuarks [] = {
@@ -382,7 +397,7 @@ externaldef(xpwpixmapclassrec)
     /* class_initialize */      ClassInit,
     /* class_part_initialize*/  NULL,
     /* class_inited     */      FALSE,
-    /* initialize       */      Initialize,
+    /* initialize       */      (XtInitProc)Initialize,
     /* initialize_hook  */      InitSubpartValues,
     /* realize          */      Realize,
     /* actions          */      NULL,
@@ -397,7 +412,7 @@ externaldef(xpwpixmapclassrec)
     /* destroy          */      Destroy,
     /* resize           */      Resize,
     /* expose           */      NULL,
-    /* set_values       */      SetValues,
+    /* set_values       */      (XtSetValuesFunc)SetValues,
     /* set_values_hook  */      SetSubpartValues,
     /* set_values_almost*/      XtInheritSetValuesAlmost,
     /* get_values_hook  */      GetSubpartValues,
@@ -414,7 +429,7 @@ externaldef(xpwpixmapclassrec)
     { /*xpwcore fields */
     /*methods           */      _xpwPixmapMethods,
     /*num_methods       */      0, /* see class_init */
-    /*apply             */      ApplyMethod,
+    /*apply             */      (XpwApplyProc)ApplyMethod,
     /*methods_table     */      NULL,
     }
 };
@@ -450,11 +465,8 @@ char *m;
 
 
 /* take a QuarkList, and convert it into a hashed Assoc table */
-static XpwAssocTable *MakeQuarkTable(list,num_quarks,default_quark)
-QuarkList list[];
-XrmQuark *default_quark;
-int num_quarks;
-{
+static XpwAssocTable *MakeQuarkTable(QuarkList list[], int num_quarks,
+                                     XrmQuark * default_quark) {
     int i;
     int table_size;
     XpwAssocTable *t;
@@ -513,9 +525,7 @@ static void ClassInit ()
 
 
 /* INITIALIZE - create pixmap and private_gc, check for background_pixmap */
-static void Initialize (request, new)
-    Widget request, new;
-{
+static void Initialize(Widget request, Widget new) {
     XpwPixmapWidget w = (XpwPixmapWidget)new;
     Display *dpy = XtDisplay(new);
     Pixmap pixmap;
@@ -568,11 +578,7 @@ static void Initialize (request, new)
 /* The subparts of the widget - ie. the graphics context resources - must
    be initialized and set using the initialize_hook and setvalues_hook. */
 
-static void InitSubpartValues(gw, args, num_args)
-    Widget gw;
-    ArgList args;
-    Cardinal *num_args;
-{
+static void InitSubpartValues(Widget gw, ArgList args, Cardinal * num_args) {
     XpwCoreWidget w=(XpwCoreWidget)gw;
 
     /* get resources for the graphics context values subpart */
@@ -594,16 +600,12 @@ static void InitSubpartValues(gw, args, num_args)
 
     /* create/update the GC of the widget */
 
-    _XpwCondUpdateUsersGC(xpwPixmapWidgetClass,w);
+    _XpwCondUpdateUsersGC(xpwPixmapWidgetClass, (Widget)w);
 
     debug_msg("InitSubpart End");
 }
 
-static Boolean SetSubpartValues(gw, args, num_args)
-    Widget gw;
-    ArgList args;
-    Cardinal *num_args;
-{
+static Boolean SetSubpartValues(Widget gw, ArgList args, Cardinal * num_args) {
     XpwCoreWidget w=(XpwCoreWidget)gw;
     Display *dpy = XtDisplay(gw);
     XGCValues gcv;
@@ -637,16 +639,12 @@ static Boolean SetSubpartValues(gw, args, num_args)
 
     _xpwGCvaluemask |= GCsubpartMask(gcv);
 
-    _XpwCondUpdateUsersGC(xpwPixmapWidgetClass, w);
+    _XpwCondUpdateUsersGC(xpwPixmapWidgetClass, (Widget)w);
     debug_msg("SetSubpartValues End");
     return(redisplay);
 }
 
-static void GetSubpartValues(gw, args, num_args)
-    Widget gw;
-    ArgList args;
-    Cardinal *num_args;
-{
+static void GetSubpartValues(Widget gw, ArgList args, Cardinal * num_args) {
     XpwCoreWidget w=(XpwCoreWidget)gw;
     Display *dpy = XtDisplay(gw);
     XGCValues gcv;
@@ -664,9 +662,7 @@ static void GetSubpartValues(gw, args, num_args)
             args, *num_args);
 }
 
-static Boolean SetValues (gcurrent, grequest, gnew)
-    Widget gcurrent, grequest, gnew;
-{
+static Boolean SetValues(Widget gcurrent, Widget grequest, Widget gnew) {
     XpwPixmapWidget current = (XpwPixmapWidget) gcurrent;
     XpwPixmapWidget new = (XpwPixmapWidget) gnew;
     Display *dpy = XtDisplay(gcurrent);
@@ -699,7 +695,7 @@ static Boolean SetValues (gcurrent, grequest, gnew)
             XFreePixmap(dpy,current->xpwpixmap.pixmap);
     }
 
-    if (redisplay) Resize(new);
+    if (redisplay) Resize((Widget)new);
 
     if (new->xpwpixmap.pixmap_status != current->xpwpixmap.pixmap_status) {
         PixmapStatus new_status = new->xpwpixmap.pixmap_status;
@@ -739,16 +735,14 @@ static Boolean SetValues (gcurrent, grequest, gnew)
 }
 
 
-static void Realize ()
-{
+static void Realize(Widget gw, XtValueMask * valueMask,
+                    XSetWindowAttributes * attrs) {
     XtWarning("XpwPixmap: cannot realize XpwPixmap widget");
     /* do nothing */
 }
 
 
-static void Resize (gw)
-    Widget gw;
-{
+static void Resize(Widget gw) {
     XpwPixmapWidget w = (XpwPixmapWidget) gw;
     Pixmap old, new;
     register Display *dpy = XtDisplay(gw);
@@ -766,9 +760,7 @@ static void Resize (gw)
 }
 
 
-static void Destroy (gw)
-     Widget gw;
-{
+static void Destroy(Widget gw) {
     XpwPixmapWidget w = (XpwPixmapWidget) gw;
     register Display *dpy = XtDisplay(w);
     if (w->xpwpixmap.pixmap_status != PixmapHasNone)
@@ -784,9 +776,7 @@ static void Destroy (gw)
 static char lowercase_string[1000];
 
 static void
-LowerCase(source, dest)
-register char *source, *dest;
-{
+LowerCase(char * source, char * dest) {
     register char ch;
     int i;
 
@@ -797,12 +787,9 @@ register char *source, *dest;
 
 /* generic version for all GC resources */
 
-static void CvtString(fromVal, toVal, name, table, def)
-XrmValuePtr fromVal, toVal;
-String name;
-XpwAssocTable *table;
-XrmQuark def;
-{   static long ret_val;
+static void CvtString(XrmValue * fromVal, XrmValue * toVal,
+                      String name, XpwAssocTable * table, XrmQuark def) {
+    static long ret_val;
     caddr_t lookup_result;
     XrmQuark q;
     LowerCase((char *) fromVal->addr, lowercase_string);
@@ -817,90 +804,59 @@ XrmQuark def;
     toVal->addr = (caddr_t)&ret_val; toVal->size = sizeof(caddr_t);
 }
 
-static void CvtStringToFunction( args, num_args, fromVal, toVal)
-XrmValuePtr *args;
-Cardinal    *num_args;
-XrmValuePtr fromVal, toVal;
-{
+static void CvtStringToFunction(XrmValue * args, Cardinal * num_args,
+                                XrmValue * fromVal, XrmValue * toVal) {
     CvtString(fromVal, toVal, "Function",functionQuarkTable,
         XrmQExtdefaultfunction);
 }
 
-static void CvtStringToCapStyle( args, num_args, fromVal, toVal)
-XrmValuePtr *args;
-Cardinal    *num_args;
-XrmValuePtr fromVal, toVal;
-{
+static void CvtStringToCapStyle(XrmValue * args, Cardinal * num_args,
+                                XrmValue * fromVal, XrmValue * toVal) {
     CvtString(fromVal, toVal, "CapStyle",capStyleQuarkTable,
         XrmQExtdefaultcapstyle);
 }
 
-static void CvtStringToLineStyle( args, num_args, fromVal, toVal)
-XrmValuePtr *args;
-Cardinal    *num_args;
-XrmValuePtr fromVal, toVal;
-{
+static void CvtStringToLineStyle(XrmValue * args, Cardinal * num_args,
+                                 XrmValue * fromVal, XrmValue * toVal) {
         CvtString(fromVal, toVal, "LineStyle",lineStyleQuarkTable,
                 XrmQExtdefaultlinestyle);
 
 }
 
-static void CvtStringToJoinStyle( args, num_args, fromVal, toVal)
-XrmValuePtr *args;
-Cardinal    *num_args;
-XrmValuePtr fromVal, toVal;
-{
+static void CvtStringToJoinStyle(XrmValue * args, Cardinal * num_args,
+                                 XrmValue * fromVal, XrmValue * toVal) {
     CvtString(fromVal, toVal, "JoinStyle",joinStyleQuarkTable,
                 XrmQExtdefaultjoinstyle);
-
 }
 
-static void CvtStringToSubwindow( args, num_args, fromVal, toVal)
-XrmValuePtr *args;
-Cardinal    *num_args;
-XrmValuePtr fromVal, toVal;
-{
+static void CvtStringToSubwindow(XrmValue * args, Cardinal * num_args,
+                                 XrmValue * fromVal, XrmValue * toVal) {
     CvtString(fromVal, toVal, "Subwindow",subwindowQuarkTable,
                     XrmQExtdefaultsubwindow);
 }
 
-static void CvtStringToPixmapStatus( args, num_args, fromVal, toVal)
-XrmValuePtr *args;
-Cardinal    *num_args;
-XrmValuePtr fromVal, toVal;
-{
+static void CvtStringToPixmapStatus(XrmValue * args, Cardinal * num_args,
+                                    XrmValue * fromVal, XrmValue * toVal) {
     CvtString(fromVal, toVal, "PixmapStatus", pixmapStatusQuarkTable,
                     XrmQExtdefaultpixmapstatus);
 }
 
-static void CvtStringToFillStyle( args, num_args, fromVal, toVal)
-XrmValuePtr *args;
-Cardinal    *num_args;
-XrmValuePtr fromVal, toVal;
-{
+static void CvtStringToFillStyle(XrmValue * args, Cardinal * num_args,
+                                 XrmValue * fromVal, XrmValue * toVal) {
     CvtString(fromVal, toVal, "FillStyle",fillStyleQuarkTable,
                 XrmQExtdefaultfillstyle);
-
 }
 
-static void CvtStringToFillRule( args, num_args, fromVal, toVal)
-XrmValuePtr *args;
-Cardinal    *num_args;
-XrmValuePtr fromVal, toVal;
-{
+static void CvtStringToFillRule(XrmValue * args, Cardinal * num_args,
+                                XrmValue * fromVal, XrmValue * toVal) {
     CvtString(fromVal, toVal, "FillRule", fillRuleQuarkTable,
                 XrmQExtdefaultfillrule);
-
 }
 
-static void CvtStringToArcMode( args, num_args, fromVal, toVal)
-XrmValuePtr *args;
-Cardinal    *num_args;
-XrmValuePtr fromVal, toVal;
-{
+static void CvtStringToArcMode(XrmValue * args, Cardinal * num_args,
+                               XrmValue * fromVal, XrmValue * toVal) {
     CvtString(fromVal, toVal, "ArcMode",arcModeQuarkTable,
                 XrmQExtdefaultarcmode);
-
 }
 /* Methods */
 
@@ -923,11 +879,9 @@ XrmValuePtr fromVal, toVal;
     }
 
 
-static XpwMethodRet ApplyMethod(w, method, args)
-XpwPixmapWidget w;
-XpwMethod *method;
-va_list args;
-{   int i, num_args = method->num_args;
+static XpwMethodRet ApplyMethod(XpwPixmapWidget w, XpwMethod * method,
+                                va_list args) {
+    int i, num_args = method->num_args;
     XpwMethodProc proc=method->proc;
     XpwMethodArg arg_list[MAX_ARGS];
     XpwMethodRet ret_val = 0;

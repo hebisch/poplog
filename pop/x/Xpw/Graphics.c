@@ -33,18 +33,8 @@
  *
  ****************************************************************/
 
-extern void _XpwSyntheticExposeEvent();
-
-static XpwMethodRet /* methods with return values */
-            CreateImage(),
-            GetImage();
-
-static void  /* methods private to pixmap widgets*/
-            DrawRoundedRect(), FillRoundedRect(),
-            CopyFrom(), CopyTo(),
-            PutImage(), CreatePutImage(),
-            ClearPixmap(), ClearPixmapArea();
-
+extern void _XpwSyntheticExposeEvent(Widget widget, int x, int y,
+                                     int width, int height);
 
 /****************************************************************
  *
@@ -196,7 +186,7 @@ PutImage(XpwPixmapWidget w, XImage * image, int x, int y,
         XPutImage(dpy, w->xpwpixmap.pixmap, gc, image,
                 x,y,dst_x, dst_y, width, height);
         if (XtClass(w) != xpwPixmapWidgetClass) {
-            _XpwSyntheticExposeEvent(w, dst_x, dst_y, width, height);
+            _XpwSyntheticExposeEvent((Widget)w, dst_x, dst_y, width, height);
         }
     } else if (XtClass(w) != xpwPixmapWidgetClass) {
         XPutImage(dpy, XtWindow(w), gc, image,
@@ -421,19 +411,9 @@ int _num_xpwPixmapMethods = XtNumber(_xpwPixmapMethods);
  *
  ****************************************************************/
 
-extern void         /* defined here, used internally (XpwGraphic.c) */
-            _XpwFreeColors(),
-            _XpwFreeColormap();
-
-static XpwMethodRet /* methods with return values */
-            AllocColorRange(),
-            AllocStoreColor();
-
-static void /* basic methods */
-            SetPixelColor(),
-            ClearGraphic(),
-            ClearGraphicArea(),
-            CreateColormap();
+/* defined here, used in XpwGraphic.c */
+extern void  _XpwFreeColors(XpwGraphicWidget w, XpwColorList * colorlist);
+extern void  _XpwFreeColormap(XpwGraphicWidget w);
 
 /****************************************************************
  *
@@ -616,7 +596,7 @@ _XpwFreeColors(XpwGraphicWidget w, XpwColorList * colorlist)
         prev->next = allocated_colors->next;
         XtFree((char *)colorlist);
     } else {
-        _XpwMethodWarning(w, XpwMFreeColor, "invalidColors", "",
+        _XpwMethodWarning((Widget)w, XpwMFreeColor, "invalidColors", "",
             "The widget does not own the specified colour(s)");
     }
 }

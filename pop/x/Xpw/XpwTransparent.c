@@ -15,15 +15,21 @@
 #include <X11/StringDefs.h>
 #include "XpwTransparentP.h"
 
-static void Realize();
-static Boolean SetValues();
+static void Realize(Widget gw, XtValueMask *valueMask,
+                    XSetWindowAttributes *attrs);
+static Boolean SetValues(Widget gcurrent, Widget grequest, Widget gnew);
 
-static void NotifyButtonEvent();
-static void NotifyMouseEvent();
-static void NotifyKeyboardEvent();
-static void NotifyMotionEvent();
-static void ExtractPosition();
-static void RecolorPointer();
+static void NotifyButtonEvent(Widget gw, XEvent * event, String *params,
+                              Cardinal * num_params);
+static void NotifyMouseEvent(Widget gw, XEvent * event, String *params,
+                              Cardinal * num_params);
+static void NotifyKeyboardEvent(Widget gw, XEvent * event, String *params,
+                              Cardinal * num_params);
+static void NotifyMotionEvent(Widget gw, XEvent * event, String *params,
+                              Cardinal * num_params);
+
+static void ExtractPosition(XEvent * event, int * x, int * y);
+static void RecolorPointer(XpwTransparentWidget w);
 
 /***************************************************************************
  *
@@ -107,7 +113,7 @@ externaldef(xpwtransparentclassrec)
     /* destroy            */    NULL,
     /* resize             */    XtInheritResize,
     /* expose             */    NULL,
-    /* set_values         */    SetValues,
+    /* set_values         */    (XtSetValuesFunc)SetValues,
     /* set_values_hook      */  NULL,
     /* set_values_almost    */  XtInheritSetValuesAlmost,
     /* get_values_hook      */  NULL,
@@ -128,11 +134,9 @@ externaldef(xpwtransparentclassrec)
 externaldef(xpwtransparentwidgetclass)
     WidgetClass xpwTransparentWidgetClass = (WidgetClass) &xpwTransparentClassRec;
 
-static void Realize (gw, valueMask, attrs)
-    Widget gw;
-    XtValueMask *valueMask;
-    XSetWindowAttributes *attrs;
-{       XpwTransparentWidget w=(XpwTransparentWidget)gw;
+static void Realize(Widget gw, XtValueMask *valueMask,
+                    XSetWindowAttributes *attrs) {
+    XpwTransparentWidget w=(XpwTransparentWidget)gw;
     if (attrs->cursor = w->xpwtransparent.pointer_shape)
       { *valueMask |= CWCursor; RecolorPointer(w); }
 
@@ -155,9 +159,7 @@ static void Realize (gw, valueMask, attrs)
             InputOnly, NULL, *valueMask, attrs);
 }
 
-static Boolean SetValues (gcurrent, grequest, gnew)
-Widget gcurrent, grequest, gnew;
-{
+static Boolean SetValues(Widget gcurrent, Widget grequest, Widget gnew) {
     XpwTransparentWidget current = (XpwTransparentWidget) gcurrent;
     XpwTransparentWidget new = (XpwTransparentWidget) gnew;
     Display *dpy = XtDisplay(gcurrent);
@@ -185,9 +187,7 @@ Widget gcurrent, grequest, gnew;
     return (FALSE);
 }
 
-static void RecolorPointer(w)
-XpwTransparentWidget w;
- {
+static void RecolorPointer(XpwTransparentWidget w) {
     Display *dpy = XtDisplay(w);
     XColor colordefs[2];        /* 0 is foreground, 1 is background */
 
@@ -197,10 +197,7 @@ XpwTransparentWidget w;
     XRecolorCursor(dpy, w->xpwtransparent.pointer_shape, colordefs, colordefs+1);
  }
 
-static void ExtractPosition (event, x, y )
-    XEvent *event;
-    int *x, *y;         /* RETURN */
-{
+static void ExtractPosition(XEvent * event, int * x, int * y /* RETURN */) {
     switch( event->type ) {
       case MotionNotify:
         *x = event->xmotion.x;   *y = event->xmotion.y;   break;
@@ -218,12 +215,9 @@ static void ExtractPosition (event, x, y )
     }
 }
 
-static void NotifyButtonEvent (gw, event, params, num_params)
-Widget gw;
-XEvent *event;
-String *params;
-Cardinal *num_params;
-{   long call_data;
+static void NotifyButtonEvent(Widget gw, XEvent * event, String *params,
+                              Cardinal * num_params) {
+    long call_data;
     XpwTransparentWidget w = (XpwTransparentWidget) gw;
     call_data = event->xbutton.button;
     w->xpwtransparent.modifiers = event->xbutton.state;
@@ -233,12 +227,9 @@ Cardinal *num_params;
     XtCallCallbacks(gw, XtNbuttonEvent, (XtPointer)call_data);
 }
 
-static void NotifyMouseEvent (gw, event, params, num_params)
-Widget gw;
-XEvent *event;
-String *params;
-Cardinal *num_params;
-{   long call_data;
+static void NotifyMouseEvent(Widget gw, XEvent * event, String *params,
+                              Cardinal * num_params) {
+    long call_data;
     XpwTransparentWidget w = (XpwTransparentWidget) gw;
     ExtractPosition( event, (int *)&(w->xpwtransparent.mouse_x), (int *)&(w->xpwtransparent.mouse_y));
     call_data = event->type ;
@@ -246,10 +237,7 @@ Cardinal *num_params;
     XtCallCallbacks(gw, XtNmouseEvent, (XtPointer)call_data );
 }
 
-static void process_string(src, dst, len)
-String src, dst;
-int len;
-{
+static void process_string(String src, String dst, int len) {
     if (src[0] == 0) dst[0] = 0;
     else if (src[0] == '0' && src[1] == 'x' && src[2] != '\0') {
         /* turn 0x?? to a string containing that hex character */
@@ -281,8 +269,7 @@ int len;
 
 static void
 NotifyKeyboardEvent(Widget gw, XEvent * event, String * params,
-                    Cardinal *num_params)
-{
+                    Cardinal *num_params) {
     /* converts keycode to keysym */
     KeySym key; unsigned int count = 14;
     XComposeStatus compose;
@@ -311,12 +298,9 @@ NotifyKeyboardEvent(Widget gw, XEvent * event, String * params,
     XtCallCallbacks(gw, XtNkeyboardEvent, (XtPointer)key);
 }
 
-static void NotifyMotionEvent (gw, event, params, num_params)
-Widget gw;
-XEvent *event;
-String *params;
-Cardinal *num_params;
-{   long call_data;
+static void NotifyMotionEvent(Widget gw, XEvent * event, String *params,
+                              Cardinal * num_params) {
+    long call_data;
     XpwTransparentWidget w = (XpwTransparentWidget) gw;
     ExtractPosition( event, &(w->xpwtransparent.mouse_x), &(w->xpwtransparent.mouse_y));
     w->xpwtransparent.modifiers = call_data = event->xmotion.state;

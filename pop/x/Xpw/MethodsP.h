@@ -28,8 +28,11 @@
 
 typedef caddr_t XpwMethodArg;
 
+typedef struct _XpwMethod XpwMethod;
+
 typedef XpwMethodRet (*XpwMethodProc)();
-typedef XpwMethodRet (*XpwApplyProc)();
+typedef XpwMethodRet (*XpwApplyProc)(XpwCoreWidget w, XpwMethod *method,
+                                     va_list ap);
 typedef unsigned int XpwMethodID;
 
 typedef struct _XpwMethod {
@@ -37,10 +40,12 @@ typedef struct _XpwMethod {
     XpwMethodProc proc;
     Cardinal num_args;
     Cardinal flags;
-} XpwMethod, *XpwMethodList;
+} *XpwMethodList;
 
-extern XpwMethodRet _XpwMakeCall();
-extern void _XpwMethodWarning();
+
+extern XpwMethodRet _XpwMakeCall(XpwMethodProc proc, XpwMethodArg args[]);
+extern void _XpwMethodWarning(Widget widget, XpwMethodID id, String name,
+                              String type, String message);
 
 #define MAX_ARGS 10
 #define METHOD_STRUCT(id, proc, num_args, flags) \
