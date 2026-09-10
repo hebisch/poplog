@@ -486,9 +486,9 @@ define :GEN biginteger(i);
         mishap(i, 1, 'SYSTEM ERROR GENERATING BIGINTEGER')
     endunless;
 
-    EL_BITS - 1 -> slice_bits;
+    EL_BITS -> slice_bits;
     (1 << slice_bits) - 1 -> slice_mask;
-    (ilen+slice_bits-1) div slice_bits -> nslices;
+    (ilen + slice_bits) div slice_bits -> nslices;
     ;;; Need special case when host integers are bigger
     ;;; than target integers
     if isinteger(i) then
