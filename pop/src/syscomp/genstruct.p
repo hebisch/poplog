@@ -1009,8 +1009,8 @@ define lconstant gen_field(type_spec, val);
         gf_acc_nbits fi_+ size -> gf_acc_nbits
     else
         gf_flush_bits();
+        type_spec && tv_VAL_TYPE -> valtype;
         if type == t_WORD or type == t_DOUBLE then
-            type_spec && tv_VAL_TYPE -> valtype;
             if valtype == tv_FULL then
                 label_of(val, false)
             elseif type == t_DOUBLE and isdecimal(val) then
@@ -1035,6 +1035,9 @@ define lconstant gen_field(type_spec, val);
         elseif type == t_SHORT then
             asm_outshort(val, 1)
         elseif type == t_INT then
+            if valtype == tv_FLOAT then
+                get_sfloat_int(val, false) -> val;
+            endif;
             asm_outint(val, 1)
         else
             mishap(type, 1, 'gen_field: UNKNOWN FIELD TYPE')
